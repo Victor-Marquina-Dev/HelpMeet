@@ -1,0 +1,9 @@
+.venv/
+__pycache__/
+*.pyc
+data/
+.superpowers/
+assets/models/
+*.sqlite
+*.sqlite3
+.pytest_cache/
