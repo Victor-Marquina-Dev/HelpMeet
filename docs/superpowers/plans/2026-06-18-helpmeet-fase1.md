@@ -1114,7 +1114,7 @@ Marca cada tarea al completarla (esto se refleja también en el documento de dis
 - [x] Task 3 — Repositorio CRUD
 - [x] Task 4 — Exportador para Claude
 - [x] Task 5 — Capturador de pantalla
-- [ ] Task 6 — Atajo de teclado global
+- [x] Task 6 — Atajo de teclado global
 - [ ] Task 7 — Motor de transcripción
 - [ ] Task 8 — Capturador de audio
 - [ ] Task 9 — Orquestador de sesión
