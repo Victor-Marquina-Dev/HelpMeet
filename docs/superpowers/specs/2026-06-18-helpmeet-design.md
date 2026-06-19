@@ -209,15 +209,17 @@ Opcionalmente, el exportador puede generar también un `contexto.md` **consolida
 
 > Esta lista se actualiza automáticamente conforme se construye cada pieza. ✅ = hecho, ⬜ = pendiente. El detalle paso a paso está en `docs/superpowers/plans/2026-06-18-helpmeet-fase1.md`.
 
-- ⬜ **Task 0** — Preparar entorno (Python 3.12) y estructura del proyecto
-- ⬜ **Task 1** — Modelo de datos (Iniciativa, Reunión, Frases, Capturas)
-- ⬜ **Task 2** — Inicialización de la base de datos
-- ⬜ **Task 3** — Repositorio (guardar/leer datos)
-- ⬜ **Task 4** — Exportador para Claude Code
-- ⬜ **Task 5** — Capturador de pantalla
+- ✅ **Task 0** — Preparar entorno (Python 3.12) y estructura del proyecto
+- ✅ **Task 1** — Modelo de datos (Iniciativa, Reunión, Frases, Capturas)
+- ✅ **Task 2** — Inicialización de la base de datos
+- ✅ **Task 3** — Repositorio (guardar/leer datos)
+- ✅ **Task 4** — Exportador para Claude Code
+- ✅ **Task 5** — Capturador de pantalla
 - ⬜ **Task 6** — Atajo de teclado global
 - ⬜ **Task 7** — Motor de transcripción (faster-whisper)
 - ⬜ **Task 8** — Capturador de audio (micrófono + sistema)
 - ⬜ **Task 9** — Orquestador de la reunión
 - ⬜ **Task 10** — Interfaz (ventana de la app)
 - ⬜ **Task 11** — Punto de entrada y prueba completa
+
+> **Estado al 2026-06-18:** 6 de 12 tareas completadas. Toda la lógica que no depende de hardware está construida y con **10 pruebas automáticas en verde**. Lo que falta (audio en vivo, transcripción, interfaz) requiere probarlo con tu micrófono.

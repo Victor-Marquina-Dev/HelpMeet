@@ -1108,12 +1108,12 @@ git commit -m "feat: punto de entrada y app Helpmeet Fase 1 completa"
 
 Marca cada tarea al completarla (esto se refleja también en el documento de diseño):
 
-- [ ] Task 0 — Entorno y estructura
-- [ ] Task 1 — Modelo de datos
-- [ ] Task 2 — Inicialización BD
-- [ ] Task 3 — Repositorio CRUD
-- [ ] Task 4 — Exportador para Claude
-- [ ] Task 5 — Capturador de pantalla
+- [x] Task 0 — Entorno y estructura
+- [x] Task 1 — Modelo de datos
+- [x] Task 2 — Inicialización BD
+- [x] Task 3 — Repositorio CRUD
+- [x] Task 4 — Exportador para Claude
+- [x] Task 5 — Capturador de pantalla
 - [ ] Task 6 — Atajo de teclado global
 - [ ] Task 7 — Motor de transcripción
 - [ ] Task 8 — Capturador de audio
