@@ -216,7 +216,7 @@ Opcionalmente, el exportador puede generar también un `contexto.md` **consolida
 - ✅ **Task 4** — Exportador para Claude Code
 - ✅ **Task 5** — Capturador de pantalla
 - ✅ **Task 6** — Atajo de teclado global (verificado: 10/10 pulsaciones detectadas)
-- ⬜ **Task 7** — Motor de transcripción (faster-whisper)
+- ✅ **Task 7** — Motor de transcripción (faster-whisper) (verificado: audio ES transcrito correctamente, 5.5s)
 - ⬜ **Task 8** — Capturador de audio (micrófono + sistema)
 - ⬜ **Task 9** — Orquestador de la reunión
 - ⬜ **Task 10** — Interfaz (ventana de la app)
