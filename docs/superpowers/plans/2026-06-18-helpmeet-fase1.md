@@ -1116,7 +1116,7 @@ Marca cada tarea al completarla (esto se refleja también en el documento de dis
 - [x] Task 5 — Capturador de pantalla
 - [x] Task 6 — Atajo de teclado global
 - [x] Task 7 — Motor de transcripción
-- [ ] Task 8 — Capturador de audio
-- [ ] Task 9 — Orquestador de sesión
+- [~] Task 8 — Capturador de audio (sistema verificado; micrófono pendiente de hardware)
+- [x] Task 9 — Orquestador de sesión
 - [ ] Task 10 — Interfaz pywebview
 - [ ] Task 11 — Punto de entrada y E2E

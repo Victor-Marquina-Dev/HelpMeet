@@ -218,7 +218,7 @@ Opcionalmente, el exportador puede generar también un `contexto.md` **consolida
 - ✅ **Task 6** — Atajo de teclado global (verificado: 10/10 pulsaciones detectadas)
 - ✅ **Task 7** — Motor de transcripción (faster-whisper) (verificado: audio ES transcrito correctamente, 5.5s)
 - 🟡 **Task 8** — Capturador de audio (código hecho; canal "Los demás"/sistema **verificado** con audio real; canal "Yo"/micrófono **pendiente de verificar**: micro apagado por ahora)
-- ⬜ **Task 9** — Orquestador de la reunión
+- ✅ **Task 9** — Orquestador de la reunión (verificado: flujo completo grabar→transcribir→guardar→exportar con audio del sistema; 4 frases + 1 captura → contexto.md correcto)
 - ⬜ **Task 10** — Interfaz (ventana de la app)
 - ⬜ **Task 11** — Punto de entrada y prueba completa
 
