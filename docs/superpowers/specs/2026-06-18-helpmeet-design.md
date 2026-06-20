@@ -219,7 +219,7 @@ Opcionalmente, el exportador puede generar también un `contexto.md` **consolida
 - ✅ **Task 7** — Motor de transcripción (faster-whisper) (verificado: audio ES transcrito correctamente, 5.5s)
 - 🟡 **Task 8** — Capturador de audio (código hecho; canal "Los demás"/sistema **verificado** con audio real; canal "Yo"/micrófono **pendiente de verificar**: micro apagado por ahora)
 - ✅ **Task 9** — Orquestador de la reunión (verificado: flujo completo grabar→transcribir→guardar→exportar con audio del sistema; 4 frases + 1 captura → contexto.md correcto)
-- ⬜ **Task 10** — Interfaz (ventana de la app)
-- ⬜ **Task 11** — Punto de entrada y prueba completa
+- ✅ **Task 10** — Interfaz (ventana de la app) (verificado: ventana abre, grabación y transcripción en vivo mostrándose en pantalla)
+- ✅ **Task 11** — Punto de entrada (verificado: `python -m helpmeet.main` abre la app)
 
 > **Estado al 2026-06-18:** 6 de 12 tareas completadas. Toda la lógica que no depende de hardware está construida y con **10 pruebas automáticas en verde**. Lo que falta (audio en vivo, transcripción, interfaz) requiere probarlo con tu micrófono.

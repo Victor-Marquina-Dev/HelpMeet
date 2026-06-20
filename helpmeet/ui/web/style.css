@@ -1,0 +1,34 @@
+* { box-sizing: border-box; }
+body { margin: 0; font-family: "Segoe UI", system-ui, sans-serif; background: #0f1419; color: #cbd3e1; }
+header {
+  display: flex; align-items: center; gap: 8px;
+  padding: 10px 14px; background: #151b24; border-bottom: 1px solid #2a3140;
+  position: sticky; top: 0;
+}
+.logo { color: #3b82f6; font-weight: 700; font-size: 15px; }
+.spacer { flex: 1; }
+.status { color: #ff5a5a; font-size: 13px; font-weight: 600; }
+button {
+  background: #2a3140; color: #cbd3e1; border: 0; border-radius: 6px;
+  padding: 7px 13px; cursor: pointer; font-size: 13px;
+}
+button:hover:not(:disabled) { filter: brightness(1.2); }
+button.rec { background: #ef4444; color: #fff; }
+button.cap { background: #3b82f6; color: #fff; }
+button.exp { background: #22c55e; color: #fff; }
+button:disabled { opacity: .4; cursor: default; }
+select {
+  background: #1f2937; color: #cbd3e1; border: 0; border-radius: 20px;
+  padding: 6px 12px; font-size: 13px;
+}
+main { padding: 18px; overflow-y: auto; height: calc(100vh - 57px); }
+.hint { color: #5b6472; text-align: center; margin-top: 40px; }
+.row { margin-bottom: 12px; line-height: 1.5; max-width: 800px; }
+.row .who { font-weight: 700; font-size: 12px; }
+.row.me .who { color: #3b82f6; }
+.row.others .who { color: #22c55e; }
+.row .txt { display: block; margin-top: 2px; }
+.cap-mark {
+  display: inline-block; margin: 6px 0; padding: 4px 10px;
+  border: 1px dashed #3b82f6; border-radius: 8px; color: #3b82f6; font-size: 12px;
+}
