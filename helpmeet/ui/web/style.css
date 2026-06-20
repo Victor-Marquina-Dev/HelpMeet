@@ -32,3 +32,12 @@ main { padding: 18px; overflow-y: auto; height: calc(100vh - 57px); }
   display: inline-block; margin: 6px 0; padding: 4px 10px;
   border: 1px dashed #3b82f6; border-radius: 8px; color: #3b82f6; font-size: 12px;
 }
+.meeting-header {
+  border-left: 3px solid #3b82f6; padding: 4px 0 4px 12px; margin: 4px 0 18px;
+}
+.meeting-header h2 { margin: 0; font-size: 17px; color: #e6ebf2; }
+.meeting-header .meta { color: #9aa4b4; font-size: 12px; }
+.meeting-footer {
+  margin: 18px 0; padding: 8px 12px; color: #9aa4b4; font-size: 13px;
+  border-top: 1px solid #2a3140;
+}

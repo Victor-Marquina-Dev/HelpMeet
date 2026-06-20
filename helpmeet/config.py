@@ -10,10 +10,19 @@ DB_PATH = DATA_DIR / "helpmeet.sqlite"
 DATABASE_URL = f"sqlite:///{DB_PATH}"
 
 # Transcripción
-WHISPER_MODEL = "small"      # "base" | "small" | "medium"
+WHISPER_MODEL = "medium"     # "base" | "small" | "medium"
 WHISPER_DEVICE = "cpu"
 WHISPER_COMPUTE_TYPE = "int8"
 WHISPER_LANGUAGE = "es"
+
+# "Pista" de vocabulario para que reconozca mejor términos técnicos.
+# Puedes añadir aquí nombres de tus proyectos y palabras frecuentes.
+WHISPER_INITIAL_PROMPT = (
+    "Reunión técnica de programación. Términos frecuentes: endpoint, API, deploy, "
+    "commit, branch, merge, pull request, frontend, backend, base de datos, query, "
+    "token, bug, framework, repositorio, sprint, backlog, login, autenticación, "
+    "servidor, despliegue, producción, staging."
+)
 
 # Atajo global para captura de pantalla
 SCREENSHOT_HOTKEY = "<ctrl>+<shift>+s"

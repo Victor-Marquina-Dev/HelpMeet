@@ -29,12 +29,18 @@ class Api:
     def start_recording(self, initiative_id, title):
         if self._engine is None:
             self._engine = TranscriptionEngine()
+        title = (title or "").strip() or "Reunión"
         self._recorder = MeetingRecorder(
             int(initiative_id), title, self._engine,
             on_utterance=self._push_utterance,
         )
         self._recorder.start()
-        return {"ok": True}
+        m = self._recorder.meeting
+        return {
+            "meeting_id": m.id,
+            "title": m.title,
+            "started_at": m.started_at.strftime("%Y-%m-%d %H:%M"),
+        }
 
     def _push_utterance(self, speaker, text, start, end):
         if self._window:
@@ -48,9 +54,17 @@ class Api:
         return {"ok": False}
 
     def stop_recording(self):
-        if self._recorder:
-            self._recorder.stop()
-        return {"ok": True}
+        if not self._recorder:
+            return {"ok": False, "duration": ""}
+        self._recorder.stop()
+        m = self._recorder.meeting
+        if m.ended_at and m.started_at:
+            total = int((m.ended_at - m.started_at).total_seconds())
+            mm, ss = divmod(total, 60)
+            duration = f"{mm} min {ss} s"
+        else:
+            duration = ""
+        return {"ok": True, "duration": duration}
 
     def export(self):
         if self._recorder and self._recorder.meeting:

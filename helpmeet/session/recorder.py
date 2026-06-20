@@ -22,33 +22,45 @@ class MeetingRecorder:
         self._session = get_session()
         self.meeting = None
         self._last_utterance_id = None
+        self._thread = None
         self._tmp = config.DATA_DIR / "tmp_audio"
 
     def start(self):
         self.meeting = repo.start_meeting(self._session, self.initiative_id, self.title)
         self._running = True
-        threading.Thread(target=self._loop, daemon=True).start()
+        self._thread = threading.Thread(target=self._loop, daemon=True)
+        self._thread.start()
 
     def _loop(self):
         elapsed = 0.0
         while self._running:
             rec = DualAudioRecorder(self._tmp)
             rec.start()
-            time.sleep(self.chunk_seconds)
+            self._wait_chunk()
             rec.stop()
             for label, fname in (("me", "me.wav"), ("others", "others.wav")):
-                wav = self._tmp / fname
-                if not wav.exists():
-                    continue
-                for seg in self.engine.transcribe_file(str(wav)):
-                    if not seg.text:
-                        continue
-                    u = repo.add_utterance(self._session, self.meeting.id, label,
-                                           seg.text, elapsed + seg.start, elapsed + seg.end)
-                    self._last_utterance_id = u.id
-                    if self.on_utterance:
-                        self.on_utterance(label, seg.text, u.start_time, u.end_time)
+                self._store_segments(label, self._tmp / fname, elapsed)
             elapsed += self.chunk_seconds
+
+    def _wait_chunk(self):
+        """Espera el trozo en pasos cortos para poder cortar al pulsar Parar."""
+        slept = 0.0
+        while self._running and slept < self.chunk_seconds:
+            time.sleep(0.2)
+            slept += 0.2
+
+    def _store_segments(self, label, wav, elapsed):
+        """Transcribe un WAV y guarda cada frase, avisando a la UI."""
+        if not wav.exists():
+            return
+        for seg in self.engine.transcribe_file(str(wav)):
+            if not seg.text:
+                continue
+            u = repo.add_utterance(self._session, self.meeting.id, label,
+                                   seg.text, elapsed + seg.start, elapsed + seg.end)
+            self._last_utterance_id = u.id
+            if self.on_utterance:
+                self.on_utterance(label, seg.text, u.start_time, u.end_time)
 
     def capture_screenshot(self):
         path = take_screenshot(config.CAPTURES_DIR)
@@ -57,6 +69,9 @@ class MeetingRecorder:
         return path
 
     def stop(self):
+        # Detener y ESPERAR a que termine el último trozo (transcripción incluida),
+        # así no llegan frases después de marcar la reunión como finalizada.
         self._running = False
-        time.sleep(0.3)
+        if self._thread:
+            self._thread.join(timeout=60)
         repo.end_meeting(self._session, self.meeting.id)
