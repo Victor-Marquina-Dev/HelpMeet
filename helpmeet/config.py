@@ -10,19 +10,25 @@ DB_PATH = DATA_DIR / "helpmeet.sqlite"
 DATABASE_URL = f"sqlite:///{DB_PATH}"
 
 # Transcripción
-WHISPER_MODEL = "medium"     # "base" | "small" | "medium"
+WHISPER_MODEL = "small"      # "base" (más rápido) | "small" (equilibrado) | "medium" (más preciso pero lento)
 WHISPER_DEVICE = "cpu"
 WHISPER_COMPUTE_TYPE = "int8"
 WHISPER_LANGUAGE = "es"
 
-# "Pista" de vocabulario para que reconozca mejor términos técnicos.
-# Puedes añadir aquí nombres de tus proyectos y palabras frecuentes.
-WHISPER_INITIAL_PROMPT = (
-    "Reunión técnica de programación. Términos frecuentes: endpoint, API, deploy, "
-    "commit, branch, merge, pull request, frontend, backend, base de datos, query, "
-    "token, bug, framework, repositorio, sprint, backlog, login, autenticación, "
-    "servidor, despliegue, producción, staging."
-)
+# Cada cuántos segundos se procesa un trozo de audio (modo local en vivo)
+CHUNK_SECONDS = 6
+
+# Proveedor de transcripción:
+#   True  -> Replicate: graba la reunión entera y la transcribe de una vez al
+#            terminar (alta calidad, 1 cobro por reunión, sin texto en vivo).
+#   False -> Local: modelo en tu PC, texto en vivo por trozos (gratis, privado).
+USE_REPLICATE = True
+
+# "Pista" de vocabulario para reconocer mejor términos técnicos.
+# Desactivada (None) por defecto: con audio variado/silencios se "colaba" como
+# texto transcrito. Actívala SOLO para reuniones técnicas reales poniendo aquí
+# una frase con tus términos (ej. "Reunión de programación: endpoint, deploy, token").
+WHISPER_INITIAL_PROMPT = None
 
 # Atajo global para captura de pantalla
 SCREENSHOT_HOTKEY = "<ctrl>+<shift>+s"

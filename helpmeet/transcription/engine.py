@@ -1,14 +1,7 @@
-from dataclasses import dataclass
 from faster_whisper import WhisperModel
 from helpmeet import config
 from helpmeet.transcription.cleanup import clean_text
-
-
-@dataclass
-class TranscribedSegment:
-    text: str
-    start: float
-    end: float
+from helpmeet.transcription.segment import TranscribedSegment
 
 
 class TranscriptionEngine:
@@ -26,8 +19,8 @@ class TranscriptionEngine:
             audio_path,
             language=config.WHISPER_LANGUAGE,
             vad_filter=True,
-            beam_size=5,
-            condition_on_previous_text=True,
+            beam_size=1,                       # decodificación rápida (greedy)
+            condition_on_previous_text=False,  # más rápido y evita bucles de repetición
             initial_prompt=config.WHISPER_INITIAL_PROMPT,
         )
         result = []

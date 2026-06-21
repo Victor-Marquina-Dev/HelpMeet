@@ -28,18 +28,37 @@
 - ⬜ Re-exportar una reunión pasada.
 - ⬜ (Opcional) Editar/borrar frases mal transcritas.
 
-## Mejora D — Calidad de transcripción
+## Mejora D — Calidad de transcripción (evolución)
 
-- ✅ Modelo cambiado a `medium` (configurable en `config.py`). Selector en UI: opcional futuro.
-- ✅ Vocabulario técnico (`initial_prompt`) para reconocer mejor términos de programación.
-- ✅ Parámetros de calidad: `beam_size=5`, `condition_on_previous_text=True`.
+Historial de la decisión (el usuario priorizó **velocidad** y luego **máxima calidad**):
+- Se probó `medium` local → demasiado lento para el usuario.
+- Se volvió a `small` local + `beam_size=1` + trozos de 6s → más rápido, pero perdía audio en los "huecos" entre trozos y fallaba con términos técnicos.
+- Se quitó `initial_prompt` (se "colaba" como texto en silencios).
+- ✅ **Decisión final: Replicate (Whisper en la nube) al terminar la reunión.**
+  - Graba la reunión entera **sin cortes** (sin huecos) y la transcribe de una vez al parar.
+  - El audio se **reduce a 16 kHz mono** antes de enviarlo → de 15 MB a 2.6 MB, de 143 s a **21 s**.
+  - Token en `.env` (no versionado). Local sigue disponible con `USE_REPLICATE=False`.
 - ✅ Limpieza ligera del texto (muletillas, espacios, puntuación) con 6 tests verdes.
+
+## Mejora C — Panel de reuniones guardadas (hecha con el rediseño)
+
+- ✅ Panel lateral con iniciativas y sus reuniones; clic en una carga su transcripción.
+- ✅ Botón "Re-exportar" para volver a generar la carpeta de una reunión pasada.
+- ✅ Panel **desplegable** con el botón ☰.
+
+## Mejoras de interfaz (extra, pedidas durante las pruebas)
+
+- ✅ Rediseño visual (estilo "premium" oscuro con tarjetas — opción C elegida por el usuario).
+- ✅ Selector de **pantalla** (monitor) para las capturas.
+- ✅ **Cronómetro** mientras transcribe ("Transcribiendo… Ns").
+- ✅ Capturas ligadas a su **momento exacto** (`[MM:SS]`) en el documento exportado.
 
 ---
 
 ## Seguimiento
 
 - ✅ Mejora A — Título y datos de reunión
-- ⬜ Mejora B — Mejor documento para Claude
-- ⬜ Mejora C — Panel de reuniones guardadas
-- 🟡 Mejora D — Calidad de transcripción (código hecho; falta probar en vivo con el usuario)
+- ⬜ Mejora B — Mejor documento para Claude (resumen + exportar iniciativa completa) — **pendiente**
+- ✅ Mejora C — Panel de reuniones guardadas (con el rediseño)
+- ✅ Mejora D — Calidad de transcripción (Replicate al terminar, rápido)
+- ✅ Extras de interfaz — diseño, selector de pantalla, cronómetro, capturas con hora

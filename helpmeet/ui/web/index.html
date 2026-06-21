@@ -2,22 +2,38 @@
 <html lang="es">
 <head>
   <meta charset="utf-8">
+  <title>Helpmeet</title>
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
   <header>
+    <button id="toggleSidebar" class="icon-btn" title="Mostrar/ocultar panel">☰</button>
     <span class="logo">◆ Helpmeet</span>
-    <select id="initiative"></select>
-    <button id="newIni">+ Iniciativa</button>
     <span class="spacer"></span>
     <span id="status" class="status"></span>
-    <button id="btnRec" class="rec">● Grabar</button>
-    <button id="btnCap" class="cap" disabled>📷 Captura</button>
-    <button id="btnExp" class="exp" disabled>⬆ Exportar</button>
+    <select id="monitor" class="monitor" title="Pantalla a capturar"></select>
+    <button id="btnRec" class="btn rec">● Grabar</button>
+    <button id="btnCap" class="btn cap" disabled>📷 Captura</button>
+    <button id="btnExp" class="btn exp" disabled>⬆ Exportar</button>
   </header>
-  <main id="transcript">
-    <p class="hint">Elige una iniciativa y pulsa <b>Grabar</b> para empezar.</p>
-  </main>
+
+  <div class="body">
+    <aside id="sidebar">
+      <div class="side-head">
+        <span class="side-title">Iniciativas</span>
+        <button id="newIni" class="ghost-sm" title="Nueva iniciativa">+ Nueva</button>
+      </div>
+      <div id="iniList" class="ini-list"></div>
+    </aside>
+
+    <main id="transcript">
+      <div class="empty">
+        <div class="empty-icon">🎙️</div>
+        <p>Elige una iniciativa en el panel y pulsa <b>Grabar</b>.</p>
+      </div>
+    </main>
+  </div>
+
   <script src="app.js"></script>
 </body>
 </html>

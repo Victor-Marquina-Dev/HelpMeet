@@ -2,6 +2,9 @@
 __pycache__/
 *.pyc
 data/
+.env
+*.env
+.claude/
 .superpowers/
 assets/models/
 *.sqlite

@@ -15,6 +15,13 @@ def list_initiatives(session: Session) -> list[Initiative]:
     return list(session.scalars(select(Initiative).order_by(Initiative.created_at)))
 
 
+def list_meetings(session: Session, initiative_id: int) -> list[Meeting]:
+    ini = session.get(Initiative, initiative_id)
+    if ini is None:
+        return []
+    return sorted(ini.meetings, key=lambda m: m.started_at, reverse=True)
+
+
 def start_meeting(session: Session, initiative_id: int, title: str) -> Meeting:
     meeting = Meeting(initiative_id=initiative_id, title=title, started_at=datetime.now())
     session.add(meeting)
