@@ -16,9 +16,11 @@
 
 ## Mejora B — Mejor documento para Claude
 
-- ⬜ Encabezado enriquecido en `contexto.md`: fecha, duración, nº de frases, hablantes presentes.
-- ⬜ Nueva función `export_initiative`: junta todas las reuniones de una iniciativa en un solo `contexto.md` cronológico.
-- ⬜ Botón/opción en la app para "Exportar iniciativa completa".
+- ✅ Encabezado enriquecido en `contexto.md`: por reunión, duración, nº de frases y hablantes presentes (y nº de capturas si las hay).
+- ✅ Nueva función `export_initiative`: junta todas las reuniones de una iniciativa en un solo `contexto.md` cronológico, con cabecera de iniciativa (descripción, nº de reuniones, frases totales, periodo) y carpeta `capturas/` compartida (nombres con prefijo `rNN-` para no pisarse).
+- ✅ Además del combinado, `export_initiative` escribe **un `.md` por reunión** con la fecha y hora en el nombre (`YYYY-MM-DD_HH-MM-SS_titulo.md`).
+- ✅ Botón "Exportar iniciativa completa" en el panel lateral (al desplegar una iniciativa).
+- ✅ 3 tests nuevos (encabezado enriquecido, orden cronológico, capturas sin colisión) — 19 tests verdes en total.
 
 ## Mejora C — Ver reuniones guardadas (panel lateral)
 
@@ -58,7 +60,7 @@ Historial de la decisión (el usuario priorizó **velocidad** y luego **máxima 
 ## Seguimiento
 
 - ✅ Mejora A — Título y datos de reunión
-- ⬜ Mejora B — Mejor documento para Claude (resumen + exportar iniciativa completa) — **pendiente**
+- ✅ Mejora B — Mejor documento para Claude (encabezado enriquecido + exportar iniciativa completa)
 - ✅ Mejora C — Panel de reuniones guardadas (con el rediseño)
 - ✅ Mejora D — Calidad de transcripción (Replicate al terminar, rápido)
 - ✅ Extras de interfaz — diseño, selector de pantalla, cronómetro, capturas con hora

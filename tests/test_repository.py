@@ -31,3 +31,58 @@ def test_list_initiatives(session):
     repo.create_initiative(session, "A")
     repo.create_initiative(session, "B")
     assert {i.name for i in repo.list_initiatives(session)} == {"A", "B"}
+
+
+def test_add_note(session):
+    ini = repo.create_initiative(session, "X")
+    meeting = repo.start_meeting(session, ini.id, "M")
+    note = repo.add_note(session, meeting.id, "ojo: cambiamos a PostgreSQL")
+    assert note.id is not None
+    refreshed = repo.get_meeting(session, meeting.id)
+    assert refreshed.notes[0].text == "ojo: cambiamos a PostgreSQL"
+    assert refreshed.notes[0].created_at is not None
+
+
+def test_rename_initiative(session):
+    ini = repo.create_initiative(session, "Viejo nombre")
+    repo.rename_initiative(session, ini.id, "Nombre nuevo")
+    assert repo.list_initiatives(session)[0].name == "Nombre nuevo"
+
+
+def test_rename_meeting(session):
+    ini = repo.create_initiative(session, "X")
+    m = repo.start_meeting(session, ini.id, "Reunión 21/6")
+    repo.rename_meeting(session, m.id, "Endpoints de login")
+    assert repo.get_meeting(session, m.id).title == "Endpoints de login"
+
+
+def test_move_meeting_to_another_initiative(session):
+    a = repo.create_initiative(session, "A")
+    b = repo.create_initiative(session, "B")
+    m = repo.start_meeting(session, a.id, "R")
+    repo.move_meeting(session, m.id, b.id)
+    assert repo.get_meeting(session, m.id).initiative_id == b.id
+    assert len(repo.list_meetings(session, a.id)) == 0
+    assert len(repo.list_meetings(session, b.id)) == 1
+
+
+def test_search_finds_utterances_and_notes(session):
+    ini = repo.create_initiative(session, "Proyecto")
+    m = repo.start_meeting(session, ini.id, "R1")
+    repo.add_utterance(session, m.id, "others", "usamos PostgreSQL para esto", 1.0, 2.0)
+    repo.add_note(session, m.id, "recordar el token de refresco")
+    repo.add_utterance(session, m.id, "me", "nada relevante aquí", 3.0, 4.0)
+
+    # encuentra una frase (búsqueda sin distinguir mayúsculas)
+    res = repo.search(session, "postgres")
+    assert len(res) == 1
+    assert res[0]["kind"] == "frase"
+    assert res[0]["meeting"].id == m.id
+
+    # encuentra una nota
+    res2 = repo.search(session, "token")
+    assert len(res2) == 1
+    assert res2[0]["kind"] == "nota"
+
+    # sin resultados
+    assert repo.search(session, "kubernetes") == []

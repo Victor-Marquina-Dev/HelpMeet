@@ -100,6 +100,35 @@ class MeetingRecorder:
                          near_utterance_id=self._last_utterance_id)
         return path
 
+    def add_note(self, text: str):
+        """Guarda una nota anclada al momento actual de la reunión."""
+        return repo.add_note(self._session, self.meeting.id, text)
+
+    def _transcribe_channels(self):
+        """Transcribe las pistas con audio UNA A UNA.
+
+        Replicate con saldo bajo solo permite 1 petición a la vez (burst=1),
+        así que NO se puede paralelizar. Si una pista falla, se avisa por
+        `on_status` y se sigue con la otra (no se traga el error en silencio)."""
+        for label, fname in _CHANNELS:
+            wav = self._tmp / fname
+            if not wav.exists() or not self._has_audio(wav):
+                continue
+            try:
+                segments = self.engine.transcribe_file(str(wav))
+            except Exception as exc:  # noqa: BLE001 - se informa al usuario
+                if self.on_status:
+                    self.on_status(f"No se pudo transcribir una pista: {exc}")
+                continue
+            for seg in segments:
+                if not seg.text:
+                    continue
+                u = repo.add_utterance(self._session, self.meeting.id, label,
+                                       seg.text, seg.start, seg.end)
+                self._last_utterance_id = u.id
+                if self.on_utterance:
+                    self.on_utterance(label, seg.text, u.start_time, u.end_time)
+
     def _link_captures_by_time(self):
         """Asigna cada captura a la frase de su momento (por tiempo)."""
         utts = sorted(self.meeting.utterances, key=lambda u: u.start_time)
@@ -127,8 +156,7 @@ class MeetingRecorder:
             # parar grabación y transcribir TODO el audio de una vez
             self._recorder.stop()
             if self.on_status:
-                self.on_status("Transcribiendo con Replicate… (puede tardar un poco)")
-            for label, fname in _CHANNELS:
-                self._store_segments(label, self._tmp / fname, 0.0)
+                self.on_status("Transcribiendo en la nube…")
+            self._transcribe_channels()
         self._link_captures_by_time()
         repo.end_meeting(self._session, self.meeting.id)

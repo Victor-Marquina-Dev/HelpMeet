@@ -1,6 +1,6 @@
 from faster_whisper import WhisperModel
 from helpmeet import config
-from helpmeet.transcription.cleanup import clean_text
+from helpmeet.transcription.cleanup import clean_text, is_hallucination
 from helpmeet.transcription.segment import TranscribedSegment
 
 
@@ -25,6 +25,10 @@ class TranscriptionEngine:
         )
         result = []
         for s in segments:
+            if getattr(s, "no_speech_prob", 0.0) > 0.6:  # silencio: no hay voz
+                continue
+            if is_hallucination(s.text):
+                continue
             text = clean_text(s.text)
             if text:
                 result.append(TranscribedSegment(text, s.start, s.end))

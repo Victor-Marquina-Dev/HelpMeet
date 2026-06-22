@@ -1,13 +1,32 @@
 # Helpmeet
 
-App de escritorio que transcribe reuniones de Google Meet en vivo, las organiza por *iniciativa*, permite tomar capturas de pantalla ligadas a la transcripción, y exporta todo el contexto para Claude Code.
+App de escritorio que transcribe reuniones de Google Meet, las organiza por *iniciativa*, permite tomar capturas de pantalla y notas ligadas al momento exacto, y exporta todo el contexto en Markdown para Claude Code.
 
-> Estado: **Fase 1** en construcción. Ver `docs/superpowers/specs/` (diseño) y `docs/superpowers/plans/` (plan de implementación).
+> Estado: **Fase 1 funcionando** + mejoras. Ver `docs/superpowers/specs/` (diseño) y `docs/superpowers/plans/` (planes).
+
+## Características
+
+- Transcripción del audio del sistema ("Los demás") y del micrófono ("Yo"), con **Whisper en la nube (Replicate)** o local (faster-whisper).
+- Organización: Iniciativa → Reunión → Frases + Capturas + Notas, ancladas al minuto exacto.
+- Búsqueda global en todas las reuniones; renombrar/mover con clic derecho.
+- Exportación a Markdown (`contexto.md` + capturas), por reunión o iniciativa completa.
+- Panel de ajustes ⚙️ para la API key y la carpeta de exportación.
 
 ## Requisitos
 
 - Windows 10/11
 - Python 3.12 (no usar la versión de Microsoft Store)
+
+## Configuración
+
+La transcripción en la nube usa [Replicate](https://replicate.com). Crea un archivo `.env`
+en la raíz del proyecto con tu token (este archivo **no se sube al repositorio**):
+
+```
+REPLICATE_API_TOKEN=tu_token_aqui
+```
+
+También puedes pegar el token desde el panel de **Ajustes ⚙️** dentro de la app.
 
 ## Puesta en marcha
 

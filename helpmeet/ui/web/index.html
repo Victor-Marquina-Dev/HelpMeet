@@ -14,8 +14,12 @@
     <select id="monitor" class="monitor" title="Pantalla a capturar"></select>
     <button id="btnRec" class="btn rec">● Grabar</button>
     <button id="btnCap" class="btn cap" disabled>📷 Captura</button>
+    <button id="btnNote" class="btn note" disabled>📝 Nota</button>
     <button id="btnExp" class="btn exp" disabled>⬆ Exportar</button>
+    <button id="btnSettings" class="icon-btn" title="Ajustes">⚙️</button>
   </header>
+
+  <div id="progress" class="progress hidden"><div class="progress-bar"></div></div>
 
   <div class="body">
     <aside id="sidebar">
@@ -23,6 +27,8 @@
         <span class="side-title">Iniciativas</span>
         <button id="newIni" class="ghost-sm" title="Nueva iniciativa">+ Nueva</button>
       </div>
+      <input id="search" class="search-box" type="search"
+             placeholder="🔎 Buscar en todo (Enter)…">
       <div id="iniList" class="ini-list"></div>
     </aside>
 
@@ -32,6 +38,35 @@
         <p>Elige una iniciativa en el panel y pulsa <b>Grabar</b>.</p>
       </div>
     </main>
+  </div>
+
+  <div id="ctxmenu" class="ctxmenu hidden"></div>
+
+  <div id="settings" class="modal hidden">
+    <div class="modal-card">
+      <div class="modal-head">
+        <h3>⚙️ Ajustes</h3>
+        <button id="closeSettings" class="icon-btn" title="Cerrar">✕</button>
+      </div>
+
+      <div class="field">
+        <label for="apiToken">API key de Replicate</label>
+        <div class="field-row">
+          <input id="apiToken" type="password" placeholder="r8_…">
+          <button id="saveToken" class="btn cap">Guardar</button>
+        </div>
+        <small id="tokenStatus" class="hint"></small>
+      </div>
+
+      <div class="field">
+        <label for="exportDir">Carpeta de exportación</label>
+        <div class="field-row">
+          <input id="exportDir" type="text" readonly>
+          <button id="chooseDir" class="btn cap">Elegir…</button>
+        </div>
+        <small class="hint">Aquí se guardan los .md y las carpetas de capturas.</small>
+      </div>
+    </div>
   </div>
 
   <script src="app.js"></script>

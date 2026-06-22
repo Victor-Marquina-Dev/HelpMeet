@@ -1,4 +1,4 @@
-from helpmeet.transcription.cleanup import clean_text
+from helpmeet.transcription.cleanup import clean_text, is_hallucination
 
 
 def test_collapses_whitespace():
@@ -25,3 +25,18 @@ def test_capitalizes_first_letter():
 
 def test_empty_stays_empty():
     assert clean_text("   ") == ""
+
+
+def test_is_hallucination_detects_youtube_filler():
+    assert is_hallucination("¡Suscríbete al canal!")
+    assert is_hallucination("Gracias por ver el video")
+    assert is_hallucination("¡Gracias por ver el vídeo!")
+    assert is_hallucination("Subtítulos realizados por la comunidad de Amara.org")
+    assert is_hallucination("   ")  # vacío
+
+
+def test_is_hallucination_keeps_real_speech():
+    assert not is_hallucination("revisamos el endpoint de login")
+    assert not is_hallucination("el error 500 viene de la validación")
+    # una frase larga que casualmente contiene 'gracias' NO se descarta
+    assert not is_hallucination("muchas gracias por mandarme el código del backend")
