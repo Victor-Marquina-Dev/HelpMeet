@@ -375,6 +375,19 @@ function addMeetingFooter(duration) {
 /* ---------- Recording ---------- */
 function showProgress(on) {
   $("progress").classList.toggle("hidden", !on);
+  if (on) {
+    // al mostrarla, empieza en modo "animado" (indeterminado) hasta tener %
+    const bar = document.querySelector("#progress .progress-bar");
+    bar.classList.remove("determinate");
+    bar.style.width = "";
+  }
+}
+
+// Barra que se LLENA al porcentaje real (lo manda Python en local).
+function setProgress(frac) {
+  const bar = document.querySelector("#progress .progress-bar");
+  bar.classList.add("determinate");
+  bar.style.width = Math.max(0, Math.min(100, Math.round(frac * 100))) + "%";
 }
 
 async function stopRecording() {
@@ -475,17 +488,12 @@ $("btnImport").onclick = async () => {
   if (recording) { alert("Termina la grabación actual antes de subir un video."); return; }
   if (!activeInitiativeId) { alert("Elige una iniciativa en el panel primero."); return; }
 
-  let secs = 0;
   showProgress(true);
-  setStatus("📹 Procesando y transcribiendo el video… 0s");
-  const timer = setInterval(() => {
-    secs++;
-    setStatus(`📹 Procesando y transcribiendo el video… ${secs}s`);
-  }, 1000);
+  setStatus("📹 Procesando el video…");
 
+  // El progreso real (porcentaje y tiempo restante) lo va mandando Python.
   const r = await window.pywebview.api.import_media(activeInitiativeId);
 
-  clearInterval(timer);
   showProgress(false);
   setStatus("");
   if (!r || !r.ok) {

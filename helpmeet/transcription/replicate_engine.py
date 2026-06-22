@@ -23,9 +23,10 @@ RETRY_WAIT_S = 12
 REQUEST_TIMEOUT = httpx.Timeout(900.0, connect=15.0)
 
 # Si un segmento tiene una probabilidad de "no hay voz" mayor que esto, se
-# descarta (es silencio y Whisper estaría "alucinando" texto). 0.6 es el
-# umbral estándar de Whisper.
-NO_SPEECH_MAX = 0.6
+# descarta (silencio claro donde Whisper "alucina" texto). 0.9 es conservador:
+# las alucinaciones sobre silencio rondan 0.95+, mientras que la voz real
+# (aunque sea floja) suele quedar por debajo de 0.9.
+NO_SPEECH_MAX = 0.9
 
 
 def _is_throttle(exc: Exception) -> bool:

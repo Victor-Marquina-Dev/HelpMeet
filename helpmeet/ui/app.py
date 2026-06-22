@@ -1,8 +1,11 @@
 import os
 import sys
+import time
+import wave
 import subprocess
 import webview
 from pathlib import Path
+from datetime import timedelta
 from helpmeet.db.database import init_db, get_session
 from helpmeet.db import repository as repo
 from helpmeet.transcription.engine import TranscriptionEngine
@@ -11,6 +14,15 @@ from helpmeet.session.recorder import MeetingRecorder
 from helpmeet.export.exporter import export_meeting, export_initiative, meeting_export_dir
 from helpmeet import config
 from helpmeet import settings
+
+
+def _wav_seconds(path) -> float:
+    """Duración en segundos de un WAV (0 si falla)."""
+    try:
+        with wave.open(str(path), "rb") as wf:
+            return wf.getnframes() / (wf.getframerate() or 1)
+    except Exception:
+        return 0.0
 
 
 def _open_in_explorer(path: str) -> None:
@@ -264,9 +276,30 @@ class Api:
         tmp_dir.mkdir(parents=True, exist_ok=True)
         wav = tmp_dir / "import.wav"
         try:
+            self._push_status("📹 Extrayendo el audio del video…")
             extract_audio_to_wav(src, str(wav))
+            audio_seconds = _wav_seconds(wav)
+            self._push_status("📹 Preparando el modelo (la 1ª vez se descarga)…")
+            engine = self._get_local_engine()
+
+            start = time.time()
+
+            def _progress(frac):
+                pct = int(frac * 100)
+                eta = ""
+                if frac > 0.02:
+                    rem = (time.time() - start) / frac * (1 - frac)
+                    if rem > 3:
+                        eta = f" · ~{int(rem // 60)} min {int(rem % 60)} s restantes"
+                self._push_status(f"📹 Transcribiendo… {pct}%{eta}")
+                if self._window:
+                    self._window.evaluate_js(f"setProgress({frac})")
+
             utterances = []
-            for seg in self._get_local_engine().transcribe_file(str(wav)):
+            # no_speech_max=1.0: en videos subidos NO descartamos por silencio
+            # (el VAD ya salta los silencios); así no se pierde nada de voz.
+            for seg in engine.transcribe_file(str(wav), on_progress=_progress,
+                                              no_speech_max=1.0):
                 if not seg.text:
                     continue
                 repo.add_utterance(self._session, meeting.id, "others",
@@ -274,9 +307,15 @@ class Api:
                 utterances.append({"speaker": "others", "text": seg.text})
         except Exception as exc:  # noqa: BLE001 - se informa al usuario
             repo.end_meeting(self._session, meeting.id)
+            self._push_status("")
             return {"ok": False, "error": str(exc)}
 
         repo.end_meeting(self._session, meeting.id)
+        # La duración debe ser la del video, no el rato que tardó en importar.
+        if audio_seconds:
+            meeting.ended_at = meeting.started_at + timedelta(seconds=int(audio_seconds))
+            self._session.commit()
+        self._push_status("")
         return {
             "ok": True,
             "meeting_id": meeting.id,
