@@ -153,6 +153,15 @@ body.collapsed #sidebar { width: 0; opacity: 0; border-right: 0; }
 .sr-meta { color: var(--muted); font-size: 11.5px; margin-bottom: 5px; }
 .sr-text { color: var(--text); font-size: 13.5px; }
 
+.glossary { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 6px; }
+.term-chip {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 6px 12px; border-radius: 999px;
+  background: #0e1626; border: 1px solid var(--border-2); color: var(--text);
+  font-size: 13px;
+}
+.term-chip b { color: var(--blue-2); font-size: 11.5px; }
+
 .ini-list { overflow-y: auto; padding: 8px; }
 .ini-row {
   display: flex;
@@ -220,12 +229,16 @@ body.collapsed #sidebar { width: 0; opacity: 0; border-right: 0; }
   padding: 7px 10px;
   border-radius: 7px;
   cursor: pointer;
-  font-size: 12.5px;
-  color: var(--muted);
-  border-left: 1px solid var(--border-2);
+  border-left: 2px solid transparent;
 }
-.meet:hover { background: #121a2a; color: var(--text); }
-.meet.active { color: var(--blue-2); background: rgba(91, 141, 239, 0.1); }
+.meet:hover { background: #121a2a; }
+.meet.active { background: rgba(91, 141, 239, 0.12); border-left-color: var(--blue); }
+.meet-title {
+  font-size: 12.8px; color: var(--text);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.meet-meta { font-size: 10.5px; color: var(--muted); margin-top: 1px; }
+.meet.active .meet-title { color: var(--blue-2); }
 
 .exp-ini {
   display: block; width: 100%; margin: 0 0 6px 0; padding: 6px 10px;

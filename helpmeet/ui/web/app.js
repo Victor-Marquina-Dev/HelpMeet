@@ -51,6 +51,7 @@ async function loadSidebar() {
       e.preventDefault();
       e.stopPropagation();
       showContextMenu(e.clientX, e.clientY, [
+        { label: "📖 Ver glosario", onClick: () => showGlossary(ini.id, ini.name) },
         { label: "✏️ Renombrar iniciativa", onClick: () => renameInitiative(ini.id, ini.name) },
         { label: "⬆ Exportar iniciativa a otra carpeta…", onClick: () => exportInitiativeTo(ini.id) },
       ]);
@@ -65,6 +66,7 @@ async function onInitiativeClick(box, row, arrow, meetList, iniId) {
   document.querySelectorAll(".ini-row.active").forEach((r) => r.classList.remove("active"));
   row.classList.add("active");
   activeInitiativeId = iniId;
+  $("btnExp").disabled = false;  // ya se puede abrir la carpeta de esta iniciativa
 
   // expandir / colapsar reuniones
   const isOpen = box.classList.toggle("open");
@@ -96,7 +98,13 @@ async function onInitiativeClick(box, row, arrow, meetList, iniId) {
       const item = document.createElement("div");
       item.className = "meet";
       item.dataset.mid = m.id;
-      item.textContent = `${m.date} · ${m.title}`;
+      const mt = document.createElement("div");
+      mt.className = "meet-title";
+      mt.textContent = m.title;
+      const mm = document.createElement("div");
+      mm.className = "meet-meta";
+      mm.textContent = m.date;
+      item.append(mt, mm);
       item.onclick = (e) => { e.stopPropagation(); openMeeting(m.id, item); };
       item.oncontextmenu = (e) => {
         e.preventDefault();
@@ -159,6 +167,37 @@ async function renameMeeting(id, currentTitle) {
     await loadSidebar();
     openMeeting(id, null);
   }
+}
+
+async function showGlossary(iniId, iniName) {
+  const glos = await window.pywebview.api.get_glossary(iniId);
+  clearTranscript();
+  const head = document.createElement("div");
+  head.className = "meeting-header";
+  const h = document.createElement("h2");
+  h.textContent = `📖 Glosario — ${iniName}`;
+  const meta = document.createElement("span");
+  meta.className = "meta";
+  meta.textContent = "Términos más frecuentes del proyecto (con nº de apariciones)";
+  head.append(h, meta);
+  $("transcript").appendChild(head);
+
+  if (glos.length === 0) {
+    const none = document.createElement("div");
+    none.className = "empty";
+    none.innerHTML = "<p>Aún no hay términos repetidos. Graba más reuniones.</p>";
+    $("transcript").appendChild(none);
+    return;
+  }
+  const wrap = document.createElement("div");
+  wrap.className = "glossary";
+  for (const g of glos) {
+    const chip = document.createElement("span");
+    chip.className = "term-chip";
+    chip.innerHTML = `${g.term} <b>${g.count}</b>`;
+    wrap.appendChild(chip);
+  }
+  $("transcript").appendChild(wrap);
 }
 
 async function exportMeetingTo(mid) {
@@ -414,8 +453,8 @@ $("newIni").onclick = async () => {
 $("btnRec").onclick = async () => {
   if (!recording) {
     if (!activeInitiativeId) { alert("Elige una iniciativa en el panel de la izquierda primero."); return; }
-    const sugerido = "Reunión " + new Date().toLocaleDateString();
-    const title = prompt("¿Cómo quieres llamar a esta reunión?", sugerido);
+    const sugerido = "Reunión";
+    const title = prompt("¿Cómo quieres llamar a esta reunión? (la fecha y hora se guardan solas)", sugerido);
     if (title === null) return;
     clearTranscript();
     const info = await window.pywebview.api.start_recording(activeInitiativeId, title);
@@ -448,6 +487,11 @@ $("btnNote").onclick = async () => {
 
 $("btnExp").onclick = async () => {
   if (recording) await stopRecording();
-  const e = await window.pywebview.api.export();
-  await openExport(e, "Nada que exportar todavía.");
+  if (!activeInitiativeId) {
+    alert("Elige una iniciativa en el panel de la izquierda primero.");
+    return;
+  }
+  // Refresca la carpeta de la iniciativa seleccionada y la abre en el Explorador.
+  const e = await window.pywebview.api.export_initiative_by_id(activeInitiativeId);
+  await openExport(e, "No se pudo abrir la carpeta.");
 };

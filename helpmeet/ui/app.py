@@ -58,6 +58,11 @@ class Api:
         repo.move_meeting(self._session, int(meeting_id), int(initiative_id))
         return {"ok": True}
 
+    def get_glossary(self, initiative_id):
+        from helpmeet.glossary import build_glossary
+        glos = build_glossary(self._session, int(initiative_id))
+        return [{"term": t, "count": c} for t, c in glos]
+
     def list_meetings(self, initiative_id):
         meetings = repo.list_meetings(self._session, int(initiative_id))
         return [

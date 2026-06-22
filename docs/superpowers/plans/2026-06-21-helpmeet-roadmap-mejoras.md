@@ -81,12 +81,16 @@ Las ideas están en 3 niveles. El **Nivel 1** es lo que yo te recomendaría hace
 - **Esfuerzo:** 🟢🟡 bajo-medio. **Estado:** implementado (tabla `notes`, `repo.add_note`,
   render en el exportador, 2 tests nuevos).
 
-### 7. Glosario de términos técnicos
-- **Qué hace:** detecta los términos técnicos que más se repiten y los lista; además
-  puede usarlos para que la **próxima** transcripción los reconozca mejor.
-- **Por qué te sirve:** mejora la calidad con el tiempo y le da a Claude un vocabulario
-  del proyecto.
-- **Esfuerzo:** 🟡 medio.
+### 7. Glosario de términos técnicos — ✅ HECHO (2026-06-22)
+- **Qué hace:** detecta los términos que más se repiten en una iniciativa (descartando
+  palabras vacías). Clic derecho en una iniciativa → **"📖 Ver glosario"**, y además sale
+  una sección **"## Glosario (términos frecuentes)"** al inicio del documento de iniciativa
+  completa (vocabulario del proyecto para Claude).
+- **Por qué te sirve:** le da a Claude el vocabulario del proyecto y te muestra los temas clave.
+- **Esfuerzo:** 🟡 medio. **Estado:** implementado (`helpmeet/glossary.py`, API `get_glossary`,
+  integrado en `export_initiative` y en el menú de clic derecho; 2 tests nuevos).
+- **Pendiente opcional:** usar el glosario como pista de vocabulario para la próxima
+  transcripción (con cuidado, por el riesgo de que el "initial_prompt" se cuele en silencios).
 
 ### 8. Auto-guardado y recuperación ante cierre
 - **Qué hace:** si la app o el PC se cierran a mitad de una grabación, al volver a abrir

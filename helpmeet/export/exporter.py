@@ -3,6 +3,7 @@ import shutil
 from pathlib import Path
 from sqlalchemy.orm import Session
 from helpmeet.db.models import Meeting, Initiative
+from helpmeet.glossary import glossary_from_meetings
 
 SPEAKER_LABEL = {"me": "Yo", "others": "Los demás"}
 
@@ -113,87 +114,73 @@ def _render_meeting(meeting: Meeting, captures_dir: Path, prefix: str = "") -> l
 
 
 def meeting_export_dir(meeting: Meeting, base_dir: Path) -> Path:
-    """Ruta de la carpeta de exportación de una reunión (sin crearla)."""
-    folder_name = f"{_slug(meeting.initiative.name)}_{meeting.started_at:%Y-%m-%d}"
-    return Path(base_dir) / folder_name
+    """Carpeta de exportación de una reunión: la de SU iniciativa (sin crearla)."""
+    return Path(base_dir) / _slug(meeting.initiative.name)
 
 
-def export_meeting(session: Session, meeting_id: int, base_dir: Path) -> Path:
-    """Exporta UNA grabación a `<slug>_<fecha>/`.
+def _export_initiative_folder(ini: Initiative, base_dir: Path) -> Path:
+    """Exporta TODA una iniciativa a una sola carpeta `<iniciativa>/`.
 
-    Escribe DOS archivos con el mismo contenido:
-    - `contexto.md`: la grabación actual (cómodo de abrir siempre igual).
-    - `<fecha>_<hora>_<titulo>.md`: un archivo por grabación; al llevar la hora,
-      varias grabaciones del mismo día NO se sobreescriben.
-    Las capturas se prefijan con la hora por el mismo motivo.
+    Dentro deja:
+    - `contexto.md`: documento combinado (todas las reuniones + glosario), el
+      contexto completo para Claude.
+    - `<fecha>_<hora>_<titulo>.md`: un archivo por cada grabación.
+    - `capturas/`: compartida (nombres con prefijo `rNN-` para no pisarse).
     """
-    meeting: Meeting = session.get(Meeting, meeting_id)
-    ini = meeting.initiative
-
-    out_dir = meeting_export_dir(meeting, base_dir)
-    captures_dir = out_dir / "capturas"
-    out_dir.mkdir(parents=True, exist_ok=True)
-    captures_dir.mkdir(parents=True, exist_ok=True)
-
-    stamp = f"{meeting.started_at:%H-%M-%S}-"
-    lines: list[str] = [f"# Iniciativa: {ini.name}", ""]
-    lines += _render_meeting(meeting, captures_dir, prefix=stamp)
-    content = "\n".join(lines) + "\n"
-
-    dated_name = f"{meeting.started_at:%Y-%m-%d_%H-%M-%S}_{_slug(meeting.title)}.md"
-    (out_dir / dated_name).write_text(content, encoding="utf-8")
-    (out_dir / "contexto.md").write_text(content, encoding="utf-8")
-    return out_dir
-
-
-def export_initiative(session: Session, initiative_id: int, base_dir: Path) -> Path:
-    """Junta TODAS las reuniones de una iniciativa en un solo `contexto.md`.
-
-    Las reuniones se ordenan cronológicamente y comparten una única carpeta
-    `capturas/` (los nombres llevan prefijo `rNN-` para no pisarse). Así Claude
-    recibe el contexto completo de la iniciativa de principio a fin.
-    """
-    ini: Initiative = session.get(Initiative, initiative_id)
     meetings = sorted(ini.meetings, key=lambda m: m.started_at)
-
-    folder_name = f"{_slug(ini.name)}_completa"
-    out_dir = Path(base_dir) / folder_name
+    out_dir = Path(base_dir) / _slug(ini.name)
     captures_dir = out_dir / "capturas"
     out_dir.mkdir(parents=True, exist_ok=True)
     captures_dir.mkdir(parents=True, exist_ok=True)
 
     total_utts = sum(len(m.utterances) for m in meetings)
-    if meetings:
-        periodo = (
-            f"{meetings[0].started_at:%Y-%m-%d} – {meetings[-1].started_at:%Y-%m-%d}"
-        )
-    else:
-        periodo = "—"
+    periodo = (
+        f"{meetings[0].started_at:%Y-%m-%d} – {meetings[-1].started_at:%Y-%m-%d}"
+        if meetings else "—"
+    )
 
-    lines: list[str] = [f"# Iniciativa: {ini.name}"]
+    combined: list[str] = [f"# Iniciativa: {ini.name}"]
     if ini.description:
-        lines += ["", ini.description]
-    lines.append("")
-    lines.append(
+        combined += ["", ini.description]
+    combined.append("")
+    combined.append(
         f"Reuniones: {len(meetings)} · Frases totales: {total_utts} · Periodo: {periodo}"
     )
-    lines.append("")
+
+    # Glosario: términos frecuentes del proyecto (vocabulario para Claude).
+    glossary = glossary_from_meetings(meetings)
+    if glossary:
+        combined.append("")
+        combined.append("## Glosario (términos frecuentes)")
+        for term, count in glossary:
+            combined.append(f"- {term} ({count})")
+    combined.append("")
 
     for i, meeting in enumerate(meetings, start=1):
-        # Se renderiza UNA vez (esto copia sus capturas a la carpeta compartida)
-        # y se reutiliza para el documento combinado y para el individual.
+        # Se renderiza UNA vez (copia sus capturas) y se reutiliza para el
+        # documento combinado y para el .md individual de la grabación.
         meeting_lines = _render_meeting(meeting, captures_dir, prefix=f"r{i:02d}-")
 
-        # 1) Añadir al documento combinado (1 para todo).
-        lines.append("---")
-        lines.append("")
-        lines += meeting_lines
-        lines.append("")
+        combined.append("---")
+        combined.append("")
+        combined += meeting_lines
+        combined.append("")
 
-        # 2) Escribir un .md propio de la reunión, con fecha y hora en el nombre.
         per = [f"# Iniciativa: {ini.name}", ""] + meeting_lines
         fname = f"{meeting.started_at:%Y-%m-%d_%H-%M-%S}_{_slug(meeting.title)}.md"
         (out_dir / fname).write_text("\n".join(per) + "\n", encoding="utf-8")
 
-    (out_dir / "contexto.md").write_text("\n".join(lines) + "\n", encoding="utf-8")
+    (out_dir / "contexto.md").write_text("\n".join(combined) + "\n", encoding="utf-8")
     return out_dir
+
+
+def export_meeting(session: Session, meeting_id: int, base_dir: Path) -> Path:
+    """Exporta la grabación (y refresca toda la carpeta de su iniciativa)."""
+    meeting: Meeting = session.get(Meeting, meeting_id)
+    return _export_initiative_folder(meeting.initiative, base_dir)
+
+
+def export_initiative(session: Session, initiative_id: int, base_dir: Path) -> Path:
+    """Exporta TODA la iniciativa a su carpeta `<iniciativa>/`."""
+    ini: Initiative = session.get(Initiative, initiative_id)
+    return _export_initiative_folder(ini, base_dir)
