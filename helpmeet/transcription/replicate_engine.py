@@ -3,6 +3,7 @@ import time
 import wave
 import tempfile
 import numpy as np
+import httpx
 import replicate
 from dotenv import load_dotenv
 from helpmeet import config
@@ -16,6 +17,10 @@ load_dotenv()
 # 6 peticiones/min y 1 a la vez; el límite se resetea en ~10 s.
 MAX_RETRIES = 4
 RETRY_WAIT_S = 12
+
+# Tiempo de espera amplio (15 min): el por defecto de la librería es 30 s, que
+# se queda corto al subir/procesar el audio de videos largos.
+REQUEST_TIMEOUT = httpx.Timeout(900.0, connect=15.0)
 
 # Si un segmento tiene una probabilidad de "no hay voz" mayor que esto, se
 # descarta (es silencio y Whisper estaría "alucinando" texto). 0.6 es el
@@ -99,11 +104,15 @@ class ReplicateTranscriptionEngine:
 
     def _run(self, prepared: str):
         """Llama a Replicate; si hay throttling (429) espera y reintenta."""
+        client = replicate.Client(
+            api_token=os.environ.get("REPLICATE_API_TOKEN"),
+            timeout=REQUEST_TIMEOUT,
+        )
         last_exc = None
         for attempt in range(MAX_RETRIES):
             try:
                 with open(prepared, "rb") as audio:
-                    return replicate.run(
+                    return client.run(
                         WHISPER_MODEL_VERSION,
                         input={"audio": audio, "language": config.WHISPER_LANGUAGE},
                     )

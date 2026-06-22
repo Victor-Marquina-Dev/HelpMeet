@@ -33,6 +33,7 @@ class Api:
         settings.apply_env()  # vuelca el token guardado a la variable de entorno
         self._session = get_session()
         self._engine = None
+        self._local_engine = None
         self._recorder = None
         self._window = None
 
@@ -134,6 +135,12 @@ class Api:
             self._engine = (ReplicateTranscriptionEngine() if config.USE_REPLICATE
                             else TranscriptionEngine())
         return self._engine
+
+    def _get_local_engine(self):
+        """Motor LOCAL (faster-whisper) para videos subidos: gratis, sin límites."""
+        if self._local_engine is None:
+            self._local_engine = TranscriptionEngine()
+        return self._local_engine
 
     def start_recording(self, initiative_id, title):
         self._get_engine()
@@ -241,7 +248,11 @@ class Api:
         return None
 
     def import_media(self, initiative_id):
-        """Pide un video/audio, le saca el audio, lo transcribe y lo guarda como reunión."""
+        """Pide un video/audio, le saca el audio, lo transcribe (LOCAL) y lo guarda.
+
+        Los videos subidos se transcriben en el PC (faster-whisper): gratis, sin
+        límite de tiempo ni de saldo, ideal para archivos grandes.
+        """
         from helpmeet.media import extract_audio_to_wav
         src = self._pick_file()
         if not src:
@@ -255,7 +266,7 @@ class Api:
         try:
             extract_audio_to_wav(src, str(wav))
             utterances = []
-            for seg in self._get_engine().transcribe_file(str(wav)):
+            for seg in self._get_local_engine().transcribe_file(str(wav)):
                 if not seg.text:
                     continue
                 repo.add_utterance(self._session, meeting.id, "others",
