@@ -79,6 +79,7 @@ select {
 .btn.rec { background: var(--red); color: #fff; }
 .btn.cap { background: var(--blue); color: #fff; }
 .btn.note { background: #f59e0b; color: #2a1700; }
+.btn.import { background: #8b5cf6; color: #fff; }
 .btn.exp { background: var(--green); color: #06210f; }
 .btn:hover:not(:disabled) { filter: brightness(1.12); }
 .btn:disabled { opacity: 0.4; cursor: default; }

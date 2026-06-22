@@ -129,12 +129,14 @@ class Api:
         _open_in_explorer(folder)
         return {"ok": True, "path": str(folder)}
 
-    def start_recording(self, initiative_id, title):
+    def _get_engine(self):
         if self._engine is None:
-            if config.USE_REPLICATE:
-                self._engine = ReplicateTranscriptionEngine()
-            else:
-                self._engine = TranscriptionEngine()
+            self._engine = (ReplicateTranscriptionEngine() if config.USE_REPLICATE
+                            else TranscriptionEngine())
+        return self._engine
+
+    def start_recording(self, initiative_id, title):
+        self._get_engine()
         title = (title or "").strip() or "Reunión"
         live = not config.USE_REPLICATE
         self._recorder = MeetingRecorder(
@@ -224,6 +226,53 @@ class Api:
         if result:
             return result[0] if isinstance(result, (list, tuple)) else result
         return None
+
+    def _pick_file(self):
+        """Abre el diálogo nativo para elegir un archivo de video/audio."""
+        types = (
+            "Video o audio (*.mp4;*.mkv;*.mov;*.avi;*.webm;*.mp3;*.m4a;*.wav;*.ogg)",
+            "Todos los archivos (*.*)",
+        )
+        result = self._window.create_file_dialog(
+            webview.OPEN_DIALOG, allow_multiple=False, file_types=types
+        )
+        if result:
+            return result[0] if isinstance(result, (list, tuple)) else result
+        return None
+
+    def import_media(self, initiative_id):
+        """Pide un video/audio, le saca el audio, lo transcribe y lo guarda como reunión."""
+        from helpmeet.media import extract_audio_to_wav
+        src = self._pick_file()
+        if not src:
+            return {"ok": False}
+
+        title = Path(src).stem or "Video importado"
+        meeting = repo.start_meeting(self._session, int(initiative_id), title)
+        tmp_dir = config.DATA_DIR / "tmp_audio"
+        tmp_dir.mkdir(parents=True, exist_ok=True)
+        wav = tmp_dir / "import.wav"
+        try:
+            extract_audio_to_wav(src, str(wav))
+            utterances = []
+            for seg in self._get_engine().transcribe_file(str(wav)):
+                if not seg.text:
+                    continue
+                repo.add_utterance(self._session, meeting.id, "others",
+                                   seg.text, seg.start, seg.end)
+                utterances.append({"speaker": "others", "text": seg.text})
+        except Exception as exc:  # noqa: BLE001 - se informa al usuario
+            repo.end_meeting(self._session, meeting.id)
+            return {"ok": False, "error": str(exc)}
+
+        repo.end_meeting(self._session, meeting.id)
+        return {
+            "ok": True,
+            "meeting_id": meeting.id,
+            "title": title,
+            "started_at": meeting.started_at.strftime("%Y-%m-%d %H:%M"),
+            "utterances": utterances,
+        }
 
     def choose_export_dir(self):
         path = self._pick_folder()

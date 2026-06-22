@@ -471,6 +471,34 @@ $("btnRec").onclick = async () => {
   }
 };
 
+$("btnImport").onclick = async () => {
+  if (recording) { alert("Termina la grabación actual antes de subir un video."); return; }
+  if (!activeInitiativeId) { alert("Elige una iniciativa en el panel primero."); return; }
+
+  let secs = 0;
+  showProgress(true);
+  setStatus("📹 Procesando y transcribiendo el video… 0s");
+  const timer = setInterval(() => {
+    secs++;
+    setStatus(`📹 Procesando y transcribiendo el video… ${secs}s`);
+  }, 1000);
+
+  const r = await window.pywebview.api.import_media(activeInitiativeId);
+
+  clearInterval(timer);
+  showProgress(false);
+  setStatus("");
+  if (!r || !r.ok) {
+    if (r && r.error) alert("No se pudo transcribir el video:\n" + r.error);
+    return;
+  }
+  clearTranscript();
+  addMeetingHeader(r.title, r.started_at, r.meeting_id);
+  for (const u of r.utterances) addUtterance(u.speaker, u.text);
+  addMeetingFooter("");
+  refreshActiveMeetings();
+};
+
 $("btnCap").onclick = async () => {
   const mon = $("monitor").value || 1;
   const r = await window.pywebview.api.take_capture(mon);
