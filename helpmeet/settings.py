@@ -56,3 +56,30 @@ def apply_env() -> None:
     token = _load().get("api_token")
     if token:
         os.environ["REPLICATE_API_TOKEN"] = token
+
+
+# ---------- Preferencias de transcripción y audio ----------
+def get_transcription_settings() -> dict:
+    data = _load()
+    provider = data.get("transcription_provider", "auto")
+    if provider not in {"auto", "local", "replicate"}:
+        provider = "auto"
+    return {
+        "provider": provider,
+        "default_mic_muted": bool(data.get("default_mic_muted", False)),
+        "video_quality": "accurate",
+        "language": config.WHISPER_LANGUAGE,
+    }
+
+
+def set_transcription_settings(values: dict) -> dict:
+    current = _load()
+    if "provider" in values:
+        provider = str(values["provider"]).lower()
+        if provider not in {"auto", "local", "replicate"}:
+            raise ValueError("Proveedor de transcripción no válido.")
+        current["transcription_provider"] = provider
+    if "default_mic_muted" in values:
+        current["default_mic_muted"] = bool(values["default_mic_muted"])
+    _save(current)
+    return get_transcription_settings()

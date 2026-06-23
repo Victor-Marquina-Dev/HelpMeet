@@ -80,6 +80,8 @@ def _prepare_audio(src_path: str) -> str:
 class ReplicateTranscriptionEngine:
     """Transcribe enviando el audio al modelo Whisper alojado en Replicate."""
 
+    supports_progress = False
+
     def transcribe_file(self, audio_path: str) -> list[TranscribedSegment]:
         prepared = _prepare_audio(audio_path)
         try:
