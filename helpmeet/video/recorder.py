@@ -37,6 +37,7 @@ class ScreenVideoRecorder:
         self._tmp_dir = config.DATA_DIR / "tmp_video"
         self._tmp_video = self._tmp_dir / TEMP_VIDEO
         self._audio = None
+        self._mic_muted = False
         self._frames = 0
         self._error = None
 
@@ -48,6 +49,7 @@ class ScreenVideoRecorder:
         self._tmp_dir.mkdir(parents=True, exist_ok=True)
         self._running = True
         self._audio = DualAudioRecorder(self._tmp_dir)
+        self._audio.set_mic_muted(self._mic_muted)
         self._audio.start()
         self._thread = threading.Thread(target=self._record_video, daemon=True)
         self._thread.start()
@@ -57,8 +59,9 @@ class ScreenVideoRecorder:
 
     def set_mic_muted(self, muted: bool) -> None:
         """Silencia/activa el micrófono durante la grabación."""
+        self._mic_muted = bool(muted)
         if self._audio is not None:
-            self._audio.set_mic_muted(muted)
+            self._audio.set_mic_muted(self._mic_muted)
 
     def set_monitor(self, monitor) -> None:
         """Cambia en caliente el monitor que se está grabando (salta a la otra

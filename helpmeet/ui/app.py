@@ -2,7 +2,10 @@ import os
 import sys
 import time
 import wave
+import json
+import tempfile
 import subprocess
+import shutil
 import webview
 from pathlib import Path
 from datetime import timedelta
@@ -63,8 +66,10 @@ class Api:
         settings.apply_env()  # vuelca el token guardado a la variable de entorno
         self._session = get_session()
         self._engine = None
+        self._engine_provider = None
         self._local_engine = None
         self._recorder = None
+        self._last_meeting_id = None
         self._screen_rec = None
         self._screen_active = False     # True mientras se graba pantalla
         self._screen_meeting_id = None  # reunión asociada a la grabación de pantalla
@@ -149,10 +154,23 @@ class Api:
 
     def list_meetings(self, initiative_id):
         meetings = repo.list_meetings(self._session, int(initiative_id))
-        return [
-            {"id": m.id, "title": m.title, "date": m.started_at.strftime("%d/%m/%Y %H:%M")}
-            for m in meetings
-        ]
+        result = []
+        for m in meetings:
+            total = int((m.ended_at - m.started_at).total_seconds()) if m.ended_at else 0
+            mm, ss = divmod(max(0, total), 60)
+            is_video = bool(m.audio_path and str(m.audio_path).lower().endswith(".mp4"))
+            result.append({
+                "id": m.id,
+                "title": m.title,
+                "date": m.started_at.strftime("%d/%m/%Y %H:%M"),
+                "status": "pending" if is_video and not m.utterances else (
+                    "done" if m.ended_at else "pending"
+                ),
+                "frases": len(m.utterances),
+                "dur": f"{mm:02d}:{ss:02d}" if m.ended_at else "—",
+                "has_video": is_video,
+            })
+        return result
 
     def search(self, query):
         out = []
@@ -172,16 +190,51 @@ class Api:
     def get_transcript(self, meeting_id):
         m = repo.get_meeting(self._session, int(meeting_id))
         if m is None:
-            return {"title": "", "started_at": "", "utterances": [], "video_path": None}
+            return {"title": "", "started_at": "", "utterances": [],
+                    "assets": {"captures": [], "notes": [], "video": None},
+                    "video_path": None}
         video = m.audio_path if (m.audio_path and str(m.audio_path).lower().endswith(".mp4")
                                  and os.path.exists(m.audio_path)) else None
+
+        def stamp(seconds):
+            minutes, secs = divmod(max(0, int(seconds or 0)), 60)
+            return f"{minutes:02d}:{secs:02d}"
+
+        timeline = []
+        for u in m.utterances:
+            timeline.append({
+                "id": u.id, "kind": "utterance", "speaker": u.speaker,
+                "text": u.text, "start": u.start_time, "end": u.end_time,
+                "time": stamp(u.start_time), "_sort": float(u.start_time),
+            })
+        captures = []
+        for cap in m.captures:
+            offset = max(0.0, (cap.taken_at - m.started_at).total_seconds())
+            item = {
+                "id": cap.id, "kind": "capture", "time": stamp(offset),
+                "offset": offset, "path": cap.image_path, "note": cap.note or "",
+                "_sort": offset,
+            }
+            captures.append({key: value for key, value in item.items() if key != "_sort"})
+            timeline.append(item)
+        notes = []
+        for note in m.notes:
+            offset = max(0.0, (note.created_at - m.started_at).total_seconds())
+            item = {
+                "id": note.id, "kind": "note", "time": stamp(offset),
+                "offset": offset, "text": note.text, "_sort": offset,
+            }
+            notes.append({key: value for key, value in item.items() if key != "_sort"})
+            timeline.append(item)
+        timeline.sort(key=lambda item: (item["_sort"], item["kind"] != "utterance"))
+        for item in timeline:
+            item.pop("_sort", None)
+
         return {
             "title": m.title,
             "started_at": m.started_at.strftime("%Y-%m-%d %H:%M"),
-            "utterances": [
-                {"speaker": u.speaker, "text": u.text}
-                for u in sorted(m.utterances, key=lambda u: u.start_time)
-            ],
+            "utterances": timeline,
+            "assets": {"captures": captures, "notes": notes, "video": video},
             "video_path": video,
         }
 
@@ -217,9 +270,16 @@ class Api:
         return {"ok": True, "path": str(folder)}
 
     def _get_engine(self):
-        if self._engine is None:
-            self._engine = (ReplicateTranscriptionEngine() if config.USE_REPLICATE
+        prefs = settings.get_transcription_settings()
+        provider = prefs["provider"]
+        if provider == "auto":
+            provider = "local"
+        if self._engine is None or self._engine_provider != provider:
+            if provider == "replicate" and not settings.get_api_token():
+                raise ValueError("Configura la API key de Replicate o elige transcripción local.")
+            self._engine = (ReplicateTranscriptionEngine() if provider == "replicate"
                             else TranscriptionEngine())
+            self._engine_provider = provider
         return self._engine
 
     def _get_local_engine(self):
@@ -229,34 +289,63 @@ class Api:
         return self._local_engine
 
     def start_recording(self, initiative_id, title):
+        if self._recorder is not None:
+            return {"ok": False, "error": "Ya hay una grabación de reunión en curso."}
+        if self._screen_rec is not None:
+            return {"ok": False, "error": "Detén la grabación de pantalla antes de grabar una reunión."}
         self._get_engine()
         title = (title or "").strip() or "Reunión"
-        live = not config.USE_REPLICATE
+        prefs = settings.get_transcription_settings()
+        provider = prefs["provider"]
+        if provider == "auto":
+            provider = "local"
+        # Ambos proveedores graban de forma continua. El motor local procesa al
+        # detener: es más rápido que alternar grabación/transcripción por trozos
+        # y, sobre todo, no deja huecos de audio.
+        live = False
+        mic_muted = prefs["default_mic_muted"]
         self._recorder = MeetingRecorder(
             int(initiative_id), title, self._engine,
             live=live,
             chunk_seconds=config.CHUNK_SECONDS,
             on_utterance=self._push_utterance,
             on_status=self._push_status,
+            mic_muted=mic_muted,
+            on_progress=self._push_progress,
         )
         self._recorder.start()
         m = self._recorder.meeting
+        self._last_meeting_id = m.id
         return {
+            "ok": True,
             "meeting_id": m.id,
             "title": m.title,
             "started_at": m.started_at.strftime("%Y-%m-%d %H:%M"),
             "live": live,
+            "provider": provider,
+            "mic_muted": mic_muted,
         }
+
+    def toggle_meeting_mic_mute(self, muted):
+        """Silencia/reactiva el micrófono de una grabación de reunión normal."""
+        if self._recorder is None:
+            return {"ok": False, "error": "No hay una reunión grabándose."}
+        self._recorder.set_mic_muted(bool(muted))
+        return {"ok": True, "muted": bool(muted)}
 
     def _push_utterance(self, speaker, text, start, end):
         if self._window:
-            safe = text.replace("\\", "\\\\").replace("'", "\\'")
-            self._window.evaluate_js(f"addUtterance('{speaker}', '{safe}')")
+            self._window.evaluate_js(
+                f"addUtterance({json.dumps(speaker)}, {json.dumps(text)})"
+            )
 
     def _push_status(self, text):
         if self._window:
-            safe = text.replace("\\", "\\\\").replace("'", "\\'")
-            self._window.evaluate_js(f"setStatus('{safe}')")
+            self._window.evaluate_js(f"setStatus({json.dumps(text)})")
+
+    def _push_progress(self, fraction):
+        if self._window:
+            self._window.evaluate_js(f"setProgress({max(0.0, min(1.0, float(fraction)))})")
 
     def _push_preview(self, b64):
         # base64 estándar no lleva comillas ni \, es seguro interpolarlo.
@@ -317,6 +406,8 @@ class Api:
         meeting = repo.start_meeting(self._session, ini.id, "Grabación de pantalla")
         rec = ScreenVideoRecorder(dest, mon, on_status=self._push_status,
                                   on_preview=self._push_preview)
+        mic_muted = settings.get_transcription_settings()["default_mic_muted"]
+        rec.set_mic_muted(mic_muted)
         try:
             rec.start()
         except Exception as exc:  # noqa: BLE001
@@ -326,7 +417,7 @@ class Api:
         self._screen_active = True
         self._screen_meeting_id = meeting.id
         self._push_status("🎥 Grabando pantalla…")
-        return {"ok": True, "meeting_id": meeting.id}
+        return {"ok": True, "meeting_id": meeting.id, "mic_muted": mic_muted}
 
     def toggle_screen_mic_mute(self, muted):
         """Silencia/activa el micrófono durante la grabación de pantalla."""
@@ -353,10 +444,18 @@ class Api:
         self._screen_active = False
         meeting_id = self._screen_meeting_id
         result = rec.stop()
-        rec.cleanup()                 # ya no hacen falta las pistas sueltas
+        path = result.get("path")
+        # Conservamos micrófono y sistema por separado junto al MP4. Whisper
+        # entiende mucho mejor cada pista aislada que la mezcla final del video.
+        if result.get("ok") and path:
+            video_path = Path(path)
+            for label, source in rec.audio_channels():
+                if source.exists() and source.stat().st_size > 44:
+                    suffix = ".mic.wav" if label == "me" else ".system.wav"
+                    shutil.copy2(source, video_path.with_suffix(suffix))
+        rec.cleanup()
         self._reset_screen_state()    # no queda nada pendiente
         if meeting_id:
-            path = result.get("path")
             if result.get("ok") and path:
                 m = repo.get_meeting(self._session, meeting_id)
                 if m is not None:
@@ -379,35 +478,68 @@ class Api:
                            for u in sorted(m.utterances, key=lambda u: u.start_time)],
         }
 
-    def transcribe_meeting_video(self, meeting_id):
-        """Transcribe en local el .mp4 de una reunión de grabación de pantalla.
-        Funciona en cualquier momento: justo al grabar o al abrir la reunión."""
+    def transcribe_meeting_video(self, meeting_id, force=False):
+        """Transcribe o vuelve a transcribir el video de una reunión.
+
+        Las grabaciones nuevas usan las pistas aisladas de micrófono/sistema.
+        Para videos antiguos (solo mezcla MP4), se prioriza Replicate cuando hay
+        token porque ofrece mejor precisión con una única petición.
+        """
         from helpmeet.media import extract_audio_to_wav
         m = repo.get_meeting(self._session, int(meeting_id))
         if m is None or not m.audio_path or not os.path.exists(m.audio_path):
             return {"ok": False, "error": "No se encontró el video de esta reunión."}
-        if m.utterances:  # ya estaba transcrita
+        if m.utterances and not force:
             return {"ok": True, "already": True, **self._finish_meeting_info(m.id)}
 
         tmp_dir = config.DATA_DIR / "tmp_audio"
         tmp_dir.mkdir(parents=True, exist_ok=True)
-        wav = tmp_dir / "video_transcribe.wav"
+        tmp = tempfile.NamedTemporaryFile(dir=tmp_dir, suffix=".wav", delete=False)
+        wav = Path(tmp.name)
+        tmp.close()
+        video_path = Path(m.audio_path)
+        sidecars = [
+            ("me", video_path.with_suffix(".mic.wav")),
+            ("others", video_path.with_suffix(".system.wav")),
+        ]
+        tracks = [(speaker, path) for speaker, path in sidecars if path.exists()]
+        new_segments = []
         try:
-            self._push_status("📝 Extrayendo el audio del video…")
-            extract_audio_to_wav(m.audio_path, str(wav))
-            engine = self._get_local_engine()
+            if tracks:
+                engine = self._get_local_engine()
+            else:
+                self._push_status("Extrayendo el audio del video…")
+                extract_audio_to_wav(m.audio_path, str(wav))
+                tracks = [("others", wav)]
+                engine = (ReplicateTranscriptionEngine() if settings.get_api_token()
+                          else self._get_local_engine())
 
-            def _progress(frac):
-                self._push_status(f"📝 Transcribiendo… {int(frac * 100)}%")
-                if self._window:
-                    self._window.evaluate_js(f"setProgress({frac})")
+            for index, (speaker, audio_path) in enumerate(tracks):
+                self._push_status(f"Transcribiendo pista {index + 1} de {len(tracks)}…")
+                if getattr(engine, "supports_progress", False):
+                    def _progress(frac, track=index):
+                        overall = (track + frac) / len(tracks)
+                        self._push_progress(overall)
+                    segments = engine.transcribe_file(
+                        str(audio_path), on_progress=_progress,
+                        no_speech_max=0.95, quality="accurate"
+                    )
+                else:
+                    segments = engine.transcribe_file(str(audio_path))
+                for seg in segments:
+                    if seg.text:
+                        new_segments.append((speaker, seg))
 
-            # no_speech_max=1.0: el VAD ya salta silencios (y el micro muteado).
-            for seg in engine.transcribe_file(str(wav), on_progress=_progress,
-                                              no_speech_max=1.0):
-                if seg.text:
-                    repo.add_utterance(self._session, m.id, "others",
-                                       seg.text, seg.start, seg.end)
+            if not new_segments:
+                raise ValueError("No se detectó voz clara en el video.")
+
+            if force:
+                for utterance in list(m.utterances):
+                    self._session.delete(utterance)
+                self._session.commit()
+            for speaker, seg in new_segments:
+                repo.add_utterance(self._session, m.id, speaker,
+                                   seg.text, seg.start, seg.end)
             self._link_screen_captures(m.id)
         except Exception as exc:  # noqa: BLE001 - se informa al usuario
             self._push_status("")
@@ -455,8 +587,14 @@ class Api:
     def stop_recording(self):
         if not self._recorder:
             return {"ok": False, "duration": ""}
-        self._recorder.stop()
-        m = self._recorder.meeting
+        recorder = self._recorder
+        try:
+            recorder.stop()
+        finally:
+            # Tras parar, capturas/notas deben dejar de apuntar a esta reunión y
+            # una grabación de pantalla debe poder iniciarse normalmente.
+            self._recorder = None
+        m = recorder.meeting
         if m.ended_at and m.started_at:
             total = int((m.ended_at - m.started_at).total_seconds())
             mm, ss = divmod(total, 60)
@@ -467,12 +605,14 @@ class Api:
             {"speaker": u.speaker, "text": u.text}
             for u in sorted(m.utterances, key=lambda u: u.start_time)
         ]
-        return {"ok": True, "duration": duration, "utterances": utterances}
+        return {"ok": True, "meeting_id": m.id, "duration": duration,
+                "utterances": utterances}
 
     def export(self):
-        if self._recorder and self._recorder.meeting:
-            out = export_meeting(self._session, self._recorder.meeting.id,
-                                 settings.get_export_dir())
+        meeting_id = (self._recorder.meeting.id if self._recorder and self._recorder.meeting
+                      else self._last_meeting_id)
+        if meeting_id:
+            out = export_meeting(self._session, meeting_id, settings.get_export_dir())
             return {"path": str(out)}
         return {"path": None}
 
@@ -483,12 +623,23 @@ class Api:
             "export_dir": str(settings.get_export_dir()),
             "has_token": bool(token),
             "token_hint": ("…" + token[-4:]) if token else "",
+            **settings.get_transcription_settings(),
         }
 
     def set_api_token(self, token):
         settings.set_api_token(token)
         self._engine = None  # forzar recrear el motor con el token nuevo
+        self._engine_provider = None
         return {"ok": True}
+
+    def get_transcription_settings(self):
+        return settings.get_transcription_settings()
+
+    def set_transcription_settings(self, values):
+        result = settings.set_transcription_settings(values or {})
+        self._engine = None
+        self._engine_provider = None
+        return {"ok": True, **result}
 
     def _pick_folder(self):
         """Abre el diálogo nativo para elegir una carpeta. Devuelve la ruta o None."""
@@ -525,7 +676,9 @@ class Api:
         meeting = repo.start_meeting(self._session, int(initiative_id), title)
         tmp_dir = config.DATA_DIR / "tmp_audio"
         tmp_dir.mkdir(parents=True, exist_ok=True)
-        wav = tmp_dir / "import.wav"
+        tmp = tempfile.NamedTemporaryFile(dir=tmp_dir, suffix=".wav", delete=False)
+        wav = Path(tmp.name)
+        tmp.close()
         try:
             self._push_status("📹 Extrayendo el audio del video…")
             extract_audio_to_wav(src, str(wav))
@@ -547,19 +700,30 @@ class Api:
                     self._window.evaluate_js(f"setProgress({frac})")
 
             utterances = []
-            # no_speech_max=1.0: en videos subidos NO descartamos por silencio
-            # (el VAD ya salta los silencios); así no se pierde nada de voz.
+            # Para archivos priorizamos precisión: beam search más amplio y
+            # contexto entre segmentos. El filtro 0.95 solo elimina silencio claro.
             for seg in engine.transcribe_file(str(wav), on_progress=_progress,
-                                              no_speech_max=1.0):
+                                              no_speech_max=0.95,
+                                              quality="accurate"):
                 if not seg.text:
                     continue
                 repo.add_utterance(self._session, meeting.id, "others",
                                    seg.text, seg.start, seg.end)
                 utterances.append({"speaker": "others", "text": seg.text})
+            if not utterances:
+                raise ValueError(
+                    "No se detectó voz en el archivo. Comprueba que tenga audio audible."
+                )
         except Exception as exc:  # noqa: BLE001 - se informa al usuario
-            repo.end_meeting(self._session, meeting.id)
+            self._session.delete(meeting)
+            self._session.commit()
             self._push_status("")
             return {"ok": False, "error": str(exc)}
+        finally:
+            try:
+                wav.unlink(missing_ok=True)
+            except Exception:
+                pass
 
         repo.end_meeting(self._session, meeting.id)
         # La duración debe ser la del video, no el rato que tardó en importar.
