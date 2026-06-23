@@ -14,6 +14,8 @@
     <select id="monitor" class="monitor" title="Pantalla a capturar"></select>
     <button id="btnRec" class="btn rec">● Grabar</button>
     <button id="btnImport" class="btn import">📹 Subir video</button>
+    <button id="btnScreenRec" class="btn screenrec">🎥 Grabar pantalla</button>
+    <button id="btnMic" class="btn mic" hidden>🎤 Micro</button>
     <button id="btnCap" class="btn cap" disabled>📷 Captura</button>
     <button id="btnNote" class="btn note" disabled>📝 Nota</button>
     <button id="btnExp" class="btn exp" disabled>📂 Abrir carpeta</button>
@@ -31,6 +33,10 @@
       <input id="search" class="search-box" type="search"
              placeholder="🔎 Buscar en todo (Enter)…">
       <div id="iniList" class="ini-list"></div>
+      <div class="library-nav">
+        <button id="btnArchive" class="library-link">🗄️ Archivo</button>
+        <button id="btnTrash" class="library-link">🗑️ Papelera</button>
+      </div>
     </aside>
 
     <main id="transcript">

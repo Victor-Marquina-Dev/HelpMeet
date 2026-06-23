@@ -3,9 +3,18 @@ let recording = false;
 let live = false;
 let transTimer = null;
 let activeInitiativeId = null;
+let screenRec = false;
+let screenRecTimer = null;
+let micMuted = false;
 
 function setStatus(text) {
   $("status").textContent = text || "";
+}
+
+// Refresca la miniatura de la vista previa mientras se graba la pantalla.
+function setPreview(b64) {
+  const img = document.getElementById("previewImg");
+  if (img) img.src = "data:image/png;base64," + b64;
 }
 
 function clearTranscript() {
@@ -54,6 +63,8 @@ async function loadSidebar() {
         { label: "📖 Ver glosario", onClick: () => showGlossary(ini.id, ini.name) },
         { label: "✏️ Renombrar iniciativa", onClick: () => renameInitiative(ini.id, ini.name) },
         { label: "⬆ Exportar iniciativa a otra carpeta…", onClick: () => exportInitiativeTo(ini.id) },
+        { label: "🗄️ Archivar iniciativa", onClick: () => archiveItem("initiative", ini.id, ini.name) },
+        { label: "🗑️ Mover a Papelera", onClick: () => trashItem("initiative", ini.id, ini.name) },
       ]);
     };
     box.append(row, meetList);
@@ -113,6 +124,8 @@ async function onInitiativeClick(box, row, arrow, meetList, iniId) {
           { label: "✏️ Renombrar reunión", onClick: () => renameMeeting(m.id, m.title) },
           { label: "📁 Mover a otra iniciativa", onClick: () => moveMeeting(m.id) },
           { label: "⬆ Exportar a otra carpeta…", onClick: () => exportMeetingTo(m.id) },
+          { label: "🗄️ Archivar reunión", onClick: () => archiveItem("meeting", m.id, m.title) },
+          { label: "🗑️ Mover a Papelera", onClick: () => trashItem("meeting", m.id, m.title) },
         ]);
       };
       meetList.appendChild(item);
@@ -240,12 +253,117 @@ async function moveMeeting(mid) {
   alert("✓ Reunión movida.");
 }
 
+/* ---------- Archivo y papelera ---------- */
+async function archiveItem(kind, id, title) {
+  const r = await window.pywebview.api.archive_item(kind, id);
+  if (!r.ok) { alert(r.error || "No se pudo archivar."); return; }
+  if ((kind === "initiative" && activeInitiativeId === id)) resetActiveInitiative();
+  await loadSidebar();
+  setStatus(`🗄️ “${title}” archivado`);
+  setTimeout(() => setStatus(""), 1800);
+}
+
+async function trashItem(kind, id, title, fromLibrary = false) {
+  if (!confirm(`¿Mover “${title}” a la Papelera?\n\nPodrás restaurarlo después.`)) return;
+  const r = await window.pywebview.api.trash_item(kind, id);
+  if (!r.ok) { alert(r.error || "No se pudo mover a la Papelera."); return; }
+  if (kind === "initiative" && activeInitiativeId === id) resetActiveInitiative();
+  await loadSidebar();
+  if (fromLibrary) await showLibrary("archive");
+  else showLibrary("trash");
+}
+
+function resetActiveInitiative() {
+  activeInitiativeId = null;
+  $("btnExp").disabled = true;
+}
+
+async function restoreLibraryItem(kind, id, view) {
+  const r = await window.pywebview.api.restore_item(kind, id);
+  if (!r.ok) { alert("No se pudo restaurar el elemento."); return; }
+  await loadSidebar();
+  await showLibrary(view);
+}
+
+async function permanentlyDeleteItem(kind, id, title) {
+  const noun = kind === "initiative" ? "la iniciativa y todas sus reuniones" : "la reunión";
+  if (!confirm(`Eliminar definitivamente ${noun} “${title}”?\n\nEsta acción no se puede deshacer.`)) return;
+  const r = await window.pywebview.api.permanently_delete_item(kind, id);
+  if (!r.ok) { alert(r.error || "No se pudo eliminar."); return; }
+  await showLibrary("trash");
+}
+
+async function showLibrary(view) {
+  const isArchive = view === "archive";
+  const rows = await window.pywebview.api.list_library(view);
+  clearTranscript();
+  const head = document.createElement("div");
+  head.className = "meeting-header";
+  const h = document.createElement("h2");
+  h.textContent = isArchive ? "🗄️ Archivo" : "🗑️ Papelera";
+  const meta = document.createElement("span");
+  meta.className = "meta";
+  meta.textContent = isArchive
+    ? "Elementos ocultos que puedes restaurar o enviar a la Papelera."
+    : "Los archivos exportados en tu disco no se eliminan automáticamente.";
+  head.append(h, meta);
+  $("transcript").appendChild(head);
+
+  if (!rows.length) {
+    const empty = document.createElement("div");
+    empty.className = "library-empty";
+    empty.textContent = isArchive ? "El Archivo está vacío." : "La Papelera está vacía.";
+    $("transcript").appendChild(empty);
+    return;
+  }
+
+  for (const row of rows) {
+    const card = document.createElement("div");
+    card.className = "library-card";
+    const info = document.createElement("div");
+    info.className = "library-info";
+    const title = document.createElement("strong");
+    title.textContent = (row.kind === "initiative" ? "◆ " : "🎙️ ") + row.title;
+    const detail = document.createElement("span");
+    detail.textContent = row.kind === "initiative"
+      ? `${row.meeting_count} reunión(es) · ${row.date}`
+      : `${row.initiative} · ${row.date}`;
+    info.append(title, detail);
+
+    const actions = document.createElement("div");
+    actions.className = "library-actions";
+    const restore = document.createElement("button");
+    restore.className = "btn cap";
+    restore.textContent = "↩ Restaurar";
+    restore.onclick = () => restoreLibraryItem(row.kind, row.id, view);
+    actions.appendChild(restore);
+
+    const remove = document.createElement("button");
+    if (isArchive) {
+      remove.className = "btn ghost-action";
+      remove.textContent = "🗑️ Papelera";
+      remove.onclick = () => trashItem(row.kind, row.id, row.title, true);
+    } else {
+      remove.className = "btn danger";
+      remove.textContent = "Eliminar definitivamente";
+      remove.onclick = () => permanentlyDeleteItem(row.kind, row.id, row.title);
+    }
+    actions.appendChild(remove);
+    card.append(info, actions);
+    $("transcript").appendChild(card);
+  }
+}
+
 async function openMeeting(mid, el) {
   document.querySelectorAll(".meet.active").forEach((m) => m.classList.remove("active"));
   if (el) el.classList.add("active");
   const data = await window.pywebview.api.get_transcript(mid);
   clearTranscript();
   addMeetingHeader(data.title, data.started_at, mid);
+  // Si es una grabación de pantalla, muestra el video (y opción de transcribir).
+  if (data.video_path) {
+    appendVideoPanel(data.video_path, mid, data.utterances.length > 0);
+  }
   for (const u of data.utterances) addUtterance(u.speaker, u.text);
 }
 
@@ -463,6 +581,9 @@ $("newIni").onclick = async () => {
   }
 };
 
+$("btnArchive").onclick = () => showLibrary("archive");
+$("btnTrash").onclick = () => showLibrary("trash");
+
 $("btnRec").onclick = async () => {
   if (!recording) {
     if (!activeInitiativeId) { alert("Elige una iniciativa en el panel de la izquierda primero."); return; }
@@ -510,14 +631,20 @@ $("btnImport").onclick = async () => {
 $("btnCap").onclick = async () => {
   const mon = $("monitor").value || 1;
   const r = await window.pywebview.api.take_capture(mon);
-  if (r.ok) addCaptureMark();
+  if (r.ok) {
+    if (screenRec) { setStatus("📷 Captura guardada"); setTimeout(() => setStatus(""), 1500); }
+    else addCaptureMark();
+  }
 };
 
 $("btnNote").onclick = async () => {
   const text = prompt("Escribe una nota para este momento:");
   if (text && text.trim()) {
     const r = await window.pywebview.api.add_note(text.trim());
-    if (r.ok) addNoteMark(text.trim());
+    if (r.ok) {
+      if (screenRec) { setStatus("📝 Nota guardada"); setTimeout(() => setStatus(""), 1500); }
+      else addNoteMark(text.trim());
+    }
   }
 };
 
@@ -530,4 +657,179 @@ $("btnExp").onclick = async () => {
   // Refresca la carpeta de la iniciativa seleccionada y la abre en el Explorador.
   const e = await window.pywebview.api.export_initiative_by_id(activeInitiativeId);
   await openExport(e, "No se pudo abrir la carpeta.");
+};
+
+/* ---------- Grabar pantalla (video) ---------- */
+const fmtClock = (s) =>
+  `${String(Math.floor(s / 60)).padStart(2, "0")}:${String(s % 60).padStart(2, "0")}`;
+
+// Al detener: muestra el video grabado y deja elegir si transcribirlo.
+function showRecordingResult(r) {
+  clearTranscript();
+  const head = document.createElement("div");
+  head.className = "meeting-header";
+  head.innerHTML =
+    "<h2>🎥 Grabación guardada</h2>" +
+    '<span class="meta">El video está en la carpeta de la iniciativa' +
+    (r.audio === false ? " · (sin sonido)" : "") + "</span>";
+  $("transcript").appendChild(head);
+  appendVideoPanel(r.path, r.meeting_id, false);
+  refreshActiveMeetings();   // que aparezca la reunión en el panel
+}
+
+// Panel reutilizable: video + (si aún no hay transcripción) botón para transcribir.
+// Se usa tanto al terminar de grabar como al abrir una grabación guardada.
+function appendVideoPanel(videoPath, meetingId, hasTranscript) {
+  const cont = $("transcript");
+  const actions = document.createElement("div");
+  actions.className = "rec-actions";
+
+  // Reproductor incrustado; si el motor no puede cargar el archivo local,
+  // se sustituye por un botón para abrirlo con el reproductor del sistema.
+  const video = document.createElement("video");
+  video.className = "rec-video";
+  video.controls = true;
+  video.src = "file:///" + String(videoPath).replace(/\\/g, "/");
+  video.onerror = () => {
+    video.remove();
+    const open = document.createElement("button");
+    open.className = "btn cap";
+    open.textContent = "▶ Abrir video";
+    open.onclick = () => window.pywebview.api.open_path(videoPath);
+    actions.prepend(open);
+  };
+  cont.appendChild(video);
+  cont.appendChild(actions);
+
+  if (!hasTranscript) {
+    const bTrans = document.createElement("button");
+    bTrans.className = "btn cap";
+    bTrans.textContent = "📝 Transcribir este video";
+    bTrans.onclick = () => transcribeVideo(meetingId);
+    actions.appendChild(bTrans);
+  }
+
+  const bFolder = document.createElement("button");
+  bFolder.className = "btn exp";
+  bFolder.textContent = "📂 Abrir carpeta";
+  bFolder.onclick = () => window.pywebview.api.reveal_path(videoPath);
+  actions.appendChild(bFolder);
+
+  if (!hasTranscript) {
+    const hint = document.createElement("p");
+    hint.className = "rec-hint";
+    hint.textContent =
+      "El video está guardado. Pulsa “Transcribir este video” para obtener el texto.";
+    cont.appendChild(hint);
+  }
+}
+
+async function transcribeVideo(meetingId) {
+  showProgress(true);
+  setStatus("📝 Transcribiendo…");
+  const f = await window.pywebview.api.transcribe_meeting_video(meetingId);
+  showProgress(false);
+  setStatus("");
+  if (f.ok) {
+    openMeeting(meetingId, null);   // recargar mostrando la transcripción
+    refreshActiveMeetings();
+    if (f.error) alert(f.error);
+  } else {
+    alert(f.error || "No se pudo transcribir el video.");
+  }
+}
+
+$("btnScreenRec").onclick = async () => {
+  if (!screenRec) {
+    if (!activeInitiativeId) {
+      alert("Elige una iniciativa en el panel de la izquierda primero.");
+      return;
+    }
+    const monSel = $("monitor");
+    const mon = monSel.value || 1;
+    const monLabel = monSel.selectedOptions[0]
+      ? monSel.selectedOptions[0].textContent : ("Pantalla " + mon);
+    const r = await window.pywebview.api.start_screen_recording(activeInitiativeId, mon);
+    if (!r.ok) { alert(r.error || "No se pudo iniciar la grabación."); return; }
+
+    screenRec = true;
+    micMuted = false;
+    // El selector queda activo: cambiarlo salta a la otra pantalla en caliente.
+    const btn = $("btnScreenRec");
+    btn.classList.add("recording");
+    btn.innerHTML = `<span class="rec-dot"></span>⏹ Detener (${fmtClock(0)})`;
+    let secs = 0;
+    screenRecTimer = setInterval(() => {
+      secs++;
+      btn.innerHTML = `<span class="rec-dot"></span>⏹ Detener (${fmtClock(secs)})`;
+    }, 1000);
+
+    // Activar micro / captura / nota durante la grabación de pantalla.
+    const mic = $("btnMic");
+    mic.hidden = false;
+    mic.classList.remove("muted");
+    mic.textContent = "🎤 Micro";
+    $("btnCap").disabled = false;
+    $("btnNote").disabled = false;
+
+    // Panel de vista previa (indica qué pantalla se está grabando).
+    clearTranscript();
+    const pane = document.createElement("div");
+    pane.className = "preview-pane";
+    const label = document.createElement("div");
+    label.className = "preview-label";
+    label.innerHTML = '<span class="rec-dot"></span> Grabando ';
+    label.append(monLabel + " — vista previa");
+    const previewImg = document.createElement("img");
+    previewImg.id = "previewImg";
+    previewImg.className = "preview-img";
+    previewImg.alt = "vista previa de la grabación";
+    pane.append(label, previewImg);
+    $("transcript").appendChild(pane);
+  } else {
+    clearInterval(screenRecTimer);
+    const btn = $("btnScreenRec");
+    btn.disabled = true;
+    setStatus("🎥 Guardando el video…");
+    const r = await window.pywebview.api.stop_screen_recording();
+
+    screenRec = false;
+    btn.classList.remove("recording");
+    btn.textContent = "🎥 Grabar pantalla";
+    btn.disabled = false;
+    $("btnMic").hidden = true;
+    $("btnCap").disabled = true;
+    $("btnNote").disabled = true;
+    clearTranscript();
+
+    if (!r.ok) {
+      setStatus("");
+      alert(r.error || "No se pudo guardar el video.");
+      return;
+    }
+    setStatus("");
+    showRecordingResult(r);   // muestra el video + elegir si transcribir
+  }
+};
+
+$("btnMic").onclick = async () => {
+  micMuted = !micMuted;
+  await window.pywebview.api.toggle_screen_mic_mute(micMuted);
+  const b = $("btnMic");
+  b.classList.toggle("muted", micMuted);
+  b.textContent = micMuted ? "🔇 Micro silenciado" : "🎤 Micro";
+};
+
+// Cambiar el selector de pantalla EN PLENA grabación salta a esa pantalla.
+$("monitor").onchange = async () => {
+  if (!screenRec) return;
+  const sel = $("monitor");
+  await window.pywebview.api.set_screen_monitor(sel.value || 1);
+  const lbl = document.querySelector(".preview-label");
+  if (lbl) {
+    const name = sel.selectedOptions[0]
+      ? sel.selectedOptions[0].textContent : ("Pantalla " + sel.value);
+    lbl.innerHTML = '<span class="rec-dot"></span> Grabando ';
+    lbl.append(name + " — vista previa");
+  }
 };

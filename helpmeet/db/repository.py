@@ -12,14 +12,100 @@ def create_initiative(session: Session, name: str, description: str | None = Non
 
 
 def list_initiatives(session: Session) -> list[Initiative]:
-    return list(session.scalars(select(Initiative).order_by(Initiative.created_at)))
+    stmt = select(Initiative).where(
+        Initiative.archived_at.is_(None), Initiative.deleted_at.is_(None)
+    ).order_by(Initiative.created_at)
+    return list(session.scalars(stmt))
+
+
+def list_archived(session: Session) -> list[dict]:
+    """Iniciativas y reuniones archivadas, sin incluir elementos en papelera."""
+    initiatives = list(session.scalars(
+        select(Initiative).where(
+            Initiative.archived_at.is_not(None), Initiative.deleted_at.is_(None)
+        ).order_by(Initiative.archived_at.desc())
+    ))
+    meetings = list(session.scalars(
+        select(Meeting).join(Meeting.initiative).where(
+            Meeting.archived_at.is_not(None), Meeting.deleted_at.is_(None),
+            Initiative.archived_at.is_(None), Initiative.deleted_at.is_(None),
+        ).order_by(Meeting.archived_at.desc())
+    ))
+    return ([{"kind": "initiative", "item": item} for item in initiatives] +
+            [{"kind": "meeting", "item": item} for item in meetings])
+
+
+def list_trash(session: Session) -> list[dict]:
+    """Elementos en papelera; no duplica reuniones dentro de una iniciativa eliminada."""
+    initiatives = list(session.scalars(
+        select(Initiative).where(Initiative.deleted_at.is_not(None))
+        .order_by(Initiative.deleted_at.desc())
+    ))
+    meetings = list(session.scalars(
+        select(Meeting).join(Meeting.initiative).where(
+            Meeting.deleted_at.is_not(None), Initiative.deleted_at.is_(None)
+        ).order_by(Meeting.deleted_at.desc())
+    ))
+    return ([{"kind": "initiative", "item": item} for item in initiatives] +
+            [{"kind": "meeting", "item": item} for item in meetings])
 
 
 def list_meetings(session: Session, initiative_id: int) -> list[Meeting]:
     ini = session.get(Initiative, initiative_id)
-    if ini is None:
+    if ini is None or ini.archived_at is not None or ini.deleted_at is not None:
         return []
-    return sorted(ini.meetings, key=lambda m: m.started_at, reverse=True)
+    return sorted(
+        (m for m in ini.meetings if m.archived_at is None and m.deleted_at is None),
+        key=lambda m: m.started_at, reverse=True,
+    )
+
+
+def archive_item(session: Session, kind: str, item_id: int) -> bool:
+    item = _get_item(session, kind, item_id)
+    if item is None:
+        return False
+    item.archived_at = datetime.now()
+    item.deleted_at = None
+    session.commit()
+    return True
+
+
+def trash_item(session: Session, kind: str, item_id: int) -> bool:
+    item = _get_item(session, kind, item_id)
+    if item is None:
+        return False
+    item.deleted_at = datetime.now()
+    item.archived_at = None
+    session.commit()
+    return True
+
+
+def restore_item(session: Session, kind: str, item_id: int) -> bool:
+    item = _get_item(session, kind, item_id)
+    if item is None:
+        return False
+    item.archived_at = None
+    item.deleted_at = None
+    # Restaurar una reunión también reactiva su iniciativa contenedora.
+    if kind == "meeting":
+        item.initiative.archived_at = None
+        item.initiative.deleted_at = None
+    session.commit()
+    return True
+
+
+def permanently_delete_item(session: Session, kind: str, item_id: int) -> bool:
+    item = _get_item(session, kind, item_id)
+    if item is None or item.deleted_at is None:
+        return False
+    session.delete(item)
+    session.commit()
+    return True
+
+
+def _get_item(session: Session, kind: str, item_id: int):
+    model = Initiative if kind == "initiative" else Meeting if kind == "meeting" else None
+    return session.get(model, item_id) if model is not None else None
 
 
 def rename_initiative(session: Session, initiative_id: int, name: str) -> Initiative:
@@ -99,10 +185,18 @@ def search(session: Session, query: str) -> list[dict]:
         return []
     like = f"%{query}%"
     results: list[dict] = []
-    for u in session.scalars(select(Utterance).where(Utterance.text.ilike(like))):
+    active = (
+        Meeting.archived_at.is_(None), Meeting.deleted_at.is_(None),
+        Initiative.archived_at.is_(None), Initiative.deleted_at.is_(None),
+    )
+    utterance_stmt = (select(Utterance).join(Utterance.meeting).join(Meeting.initiative)
+                      .where(Utterance.text.ilike(like), *active))
+    for u in session.scalars(utterance_stmt):
         results.append({"meeting": u.meeting, "kind": "frase",
                         "speaker": u.speaker, "text": u.text})
-    for n in session.scalars(select(Note).where(Note.text.ilike(like))):
+    note_stmt = (select(Note).join(Note.meeting).join(Meeting.initiative)
+                 .where(Note.text.ilike(like), *active))
+    for n in session.scalars(note_stmt):
         results.append({"meeting": n.meeting, "kind": "nota",
                         "speaker": None, "text": n.text})
     return results

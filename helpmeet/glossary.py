@@ -61,4 +61,6 @@ def build_glossary(session, initiative_id: int, min_count: int = 2,
     ini = session.get(Initiative, initiative_id)
     if ini is None:
         return []
-    return glossary_from_meetings(ini.meetings, min_count=min_count, limit=limit)
+    meetings = [m for m in ini.meetings
+                if m.archived_at is None and m.deleted_at is None]
+    return glossary_from_meetings(meetings, min_count=min_count, limit=limit)

@@ -11,8 +11,19 @@ def list_monitors() -> list[dict]:
     out = []
     for i in range(1, len(mons)):
         m = mons[i]
-        out.append({"index": i, "width": m["width"], "height": m["height"]})
+        out.append({
+            "index": i, "left": m["left"], "top": m["top"],
+            "width": m["width"], "height": m["height"],
+        })
     return out
+
+
+def monitor_geometry(monitor_index: int = 1) -> dict:
+    """Geometría (left, top, width, height) del monitor indicado."""
+    with mss.mss() as sct:
+        m = sct.monitors[monitor_index]
+    return {"left": m["left"], "top": m["top"],
+            "width": m["width"], "height": m["height"]}
 
 
 def take_screenshot(dest_dir, monitor_index: int = 1) -> str:

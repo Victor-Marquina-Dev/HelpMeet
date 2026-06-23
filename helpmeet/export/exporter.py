@@ -118,6 +118,13 @@ def meeting_export_dir(meeting: Meeting, base_dir: Path) -> Path:
     return Path(base_dir) / _slug(meeting.initiative.name)
 
 
+def initiative_export_dir(initiative: Initiative, base_dir: Path) -> Path:
+    """Carpeta de exportación de una iniciativa (la crea si no existe)."""
+    out_dir = Path(base_dir) / _slug(initiative.name)
+    out_dir.mkdir(parents=True, exist_ok=True)
+    return out_dir
+
+
 def _export_initiative_folder(ini: Initiative, base_dir: Path) -> Path:
     """Exporta TODA una iniciativa a una sola carpeta `<iniciativa>/`.
 
@@ -127,10 +134,12 @@ def _export_initiative_folder(ini: Initiative, base_dir: Path) -> Path:
     - `<fecha>_<hora>_<titulo>.md`: un archivo por cada grabación.
     - `capturas/`: compartida (nombres con prefijo `rNN-` para no pisarse).
     """
-    meetings = sorted(ini.meetings, key=lambda m: m.started_at)
-    out_dir = Path(base_dir) / _slug(ini.name)
+    meetings = sorted(
+        (m for m in ini.meetings if m.archived_at is None and m.deleted_at is None),
+        key=lambda m: m.started_at,
+    )
+    out_dir = initiative_export_dir(ini, base_dir)
     captures_dir = out_dir / "capturas"
-    out_dir.mkdir(parents=True, exist_ok=True)
     captures_dir.mkdir(parents=True, exist_ok=True)
 
     total_utts = sum(len(m.utterances) for m in meetings)

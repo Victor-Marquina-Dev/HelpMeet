@@ -33,6 +33,13 @@ WHISPER_INITIAL_PROMPT = None
 # Atajo global para captura de pantalla
 SCREENSHOT_HOTKEY = "<ctrl>+<shift>+s"
 
+# Grabación de pantalla (video)
+VIDEO_FPS = 30
+VIDEO_CODEC = "libx264"
+VIDEO_PRESET = "veryfast"   # rápido para no soltar fotogramas al grabar
+VIDEO_CRF = "18"            # calidad alta (menor = mejor; 18 ≈ sin pérdida visible)
+VIDEO_AUDIO_RATE = 48000
+
 
 def ensure_dirs() -> None:
     DATA_DIR.mkdir(parents=True, exist_ok=True)

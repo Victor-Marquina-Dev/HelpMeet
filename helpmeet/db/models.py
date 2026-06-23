@@ -13,6 +13,8 @@ class Initiative(Base):
     name: Mapped[str] = mapped_column(String(200))
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now)
+    archived_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    deleted_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     meetings: Mapped[list["Meeting"]] = relationship(
         back_populates="initiative", cascade="all, delete-orphan"
     )
@@ -26,6 +28,8 @@ class Meeting(Base):
     started_at: Mapped[datetime] = mapped_column(DateTime)
     ended_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     audio_path: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    archived_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    deleted_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     initiative: Mapped["Initiative"] = relationship(back_populates="meetings")
     utterances: Mapped[list["Utterance"]] = relationship(
         back_populates="meeting", cascade="all, delete-orphan"

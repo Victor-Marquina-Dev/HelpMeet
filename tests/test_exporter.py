@@ -163,3 +163,29 @@ def test_export_initiative_merges_captures_without_collision(session, tmp_path):
     captures = list((out_dir / "capturas").iterdir())
     # las dos capturas se copian con nombres distintos (no se pisan)
     assert len(captures) == 2
+
+
+def test_initiative_export_dir_uses_slug_and_creates(session, tmp_path):
+    from helpmeet.export.exporter import initiative_export_dir
+    ini = repo.create_initiative(session, "Mi Proyecto Nuevo")
+    out = initiative_export_dir(ini, tmp_path)
+    assert out == tmp_path / "mi-proyecto-nuevo"
+    assert out.exists() and out.is_dir()
+
+
+def test_export_ignores_archived_and_trashed_meetings(session, tmp_path):
+    ini = repo.create_initiative(session, "Proyecto limpio")
+    active = repo.start_meeting(session, ini.id, "Visible")
+    archived = repo.start_meeting(session, ini.id, "Archivada")
+    trashed = repo.start_meeting(session, ini.id, "Eliminada")
+    repo.add_utterance(session, active.id, "me", "contenido visible", 0, 1)
+    repo.add_utterance(session, archived.id, "me", "contenido archivado", 0, 1)
+    repo.add_utterance(session, trashed.id, "me", "contenido eliminado", 0, 1)
+    repo.archive_item(session, "meeting", archived.id)
+    repo.trash_item(session, "meeting", trashed.id)
+
+    out = export_initiative(session, ini.id, tmp_path / "out")
+    content = (out / "contexto.md").read_text(encoding="utf-8")
+    assert "contenido visible" in content
+    assert "contenido archivado" not in content
+    assert "contenido eliminado" not in content

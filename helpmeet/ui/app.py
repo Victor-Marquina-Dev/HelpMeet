@@ -39,6 +39,24 @@ def _open_in_explorer(path: str) -> None:
         pass
 
 
+def _reveal_in_explorer(path: str) -> None:
+    """Abre la CARPETA que contiene el archivo, con el archivo seleccionado.
+
+    En Windows `os.startfile` sobre un .mp4 lo reproduce; esto en cambio muestra
+    la carpeta y resalta el archivo, para que el usuario lo encuentre.
+    """
+    p = str(path)
+    try:
+        if sys.platform.startswith("win"):
+            subprocess.Popen(f'explorer /select,"{p}"')
+        elif sys.platform == "darwin":
+            subprocess.Popen(["open", "-R", p])
+        else:
+            subprocess.Popen(["xdg-open", os.path.dirname(p)])
+    except Exception:
+        pass
+
+
 class Api:
     def __init__(self):
         init_db()
@@ -47,6 +65,9 @@ class Api:
         self._engine = None
         self._local_engine = None
         self._recorder = None
+        self._screen_rec = None
+        self._screen_active = False     # True mientras se graba pantalla
+        self._screen_meeting_id = None  # reunión asociada a la grabación de pantalla
         self._window = None
 
     def set_window(self, window):
@@ -54,6 +75,56 @@ class Api:
 
     def list_initiatives(self):
         return [{"id": i.id, "name": i.name} for i in repo.list_initiatives(self._session)]
+
+    def list_library(self, view):
+        """Lista el archivo o la papelera en un formato listo para la UI."""
+        rows = repo.list_archived(self._session) if view == "archive" else repo.list_trash(self._session)
+        result = []
+        for row in rows:
+            item = row["item"]
+            kind = row["kind"]
+            stamp = item.archived_at if view == "archive" else item.deleted_at
+            result.append({
+                "kind": kind,
+                "id": item.id,
+                "title": item.name if kind == "initiative" else item.title,
+                "initiative": "" if kind == "initiative" else item.initiative.name,
+                "date": stamp.strftime("%d/%m/%Y %H:%M") if stamp else "",
+                "meeting_count": len(item.meetings) if kind == "initiative" else 0,
+            })
+        return result
+
+    def archive_item(self, kind, item_id):
+        if self._item_in_use(kind, int(item_id)):
+            return {"ok": False, "error": "Detén la grabación antes de archivar este elemento."}
+        return {"ok": repo.archive_item(self._session, kind, int(item_id))}
+
+    def trash_item(self, kind, item_id):
+        if self._item_in_use(kind, int(item_id)):
+            return {"ok": False, "error": "Detén la grabación antes de mover este elemento."}
+        return {"ok": repo.trash_item(self._session, kind, int(item_id))}
+
+    def restore_item(self, kind, item_id):
+        return {"ok": repo.restore_item(self._session, kind, int(item_id))}
+
+    def permanently_delete_item(self, kind, item_id):
+        if self._item_in_use(kind, int(item_id)):
+            return {"ok": False, "error": "Detén la grabación antes de eliminar este elemento."}
+        return {"ok": repo.permanently_delete_item(self._session, kind, int(item_id))}
+
+    def _item_in_use(self, kind, item_id):
+        meeting_ids = set()
+        if self._recorder and self._recorder.meeting:
+            meeting_ids.add(self._recorder.meeting.id)
+        if self._screen_meeting_id:
+            meeting_ids.add(self._screen_meeting_id)
+        if kind == "meeting":
+            return item_id in meeting_ids
+        if kind == "initiative":
+            return any((repo.get_meeting(self._session, mid) and
+                        repo.get_meeting(self._session, mid).initiative_id == item_id)
+                       for mid in meeting_ids)
+        return False
 
     def create_initiative(self, name):
         i = repo.create_initiative(self._session, name)
@@ -101,7 +172,9 @@ class Api:
     def get_transcript(self, meeting_id):
         m = repo.get_meeting(self._session, int(meeting_id))
         if m is None:
-            return {"title": "", "started_at": "", "utterances": []}
+            return {"title": "", "started_at": "", "utterances": [], "video_path": None}
+        video = m.audio_path if (m.audio_path and str(m.audio_path).lower().endswith(".mp4")
+                                 and os.path.exists(m.audio_path)) else None
         return {
             "title": m.title,
             "started_at": m.started_at.strftime("%Y-%m-%d %H:%M"),
@@ -109,6 +182,7 @@ class Api:
                 {"speaker": u.speaker, "text": u.text}
                 for u in sorted(m.utterances, key=lambda u: u.start_time)
             ],
+            "video_path": video,
         }
 
     def export_meeting_by_id(self, meeting_id):
@@ -184,11 +258,22 @@ class Api:
             safe = text.replace("\\", "\\\\").replace("'", "\\'")
             self._window.evaluate_js(f"setStatus('{safe}')")
 
+    def _push_preview(self, b64):
+        # base64 estándar no lleva comillas ni \, es seguro interpolarlo.
+        if self._window:
+            self._window.evaluate_js(f"setPreview('{b64}')")
+
     def list_monitors(self):
         from helpmeet.screenshot.capture import list_monitors
         return list_monitors()
 
     def take_capture(self, monitor_index=1):
+        # Durante una grabación de pantalla, las capturas van a SU reunión.
+        if self._screen_active and self._screen_meeting_id:
+            from helpmeet.screenshot.capture import take_screenshot
+            path = take_screenshot(config.CAPTURES_DIR, int(monitor_index))
+            repo.add_capture(self._session, self._screen_meeting_id, path)
+            return {"ok": True}
         if self._recorder:
             self._recorder.capture_screenshot(int(monitor_index))
             return {"ok": True}
@@ -196,8 +281,174 @@ class Api:
 
     def add_note(self, text):
         text = (text or "").strip()
-        if self._recorder and text:
+        if not text:
+            return {"ok": False}
+        if self._screen_active and self._screen_meeting_id:
+            repo.add_note(self._session, self._screen_meeting_id, text)
+            return {"ok": True}
+        if self._recorder:
             self._recorder.add_note(text)
+            return {"ok": True}
+        return {"ok": False}
+
+    # ---------- Grabación de pantalla (video) ----------
+    def start_screen_recording(self, initiative_id, monitor_index=1):
+        """Graba la pantalla a .mp4 (en la carpeta de la iniciativa) y crea una
+        reunión para anclar capturas/notas y, opcionalmente al terminar, la
+        transcripción."""
+        from datetime import datetime
+        from helpmeet.db.models import Initiative
+        from helpmeet.video.recorder import ScreenVideoRecorder
+        from helpmeet.screenshot.capture import monitor_geometry
+        from helpmeet.export.exporter import initiative_export_dir
+
+        if self._screen_rec is not None:
+            return {"ok": False, "error": "Ya hay una grabación de pantalla en curso."}
+        if self._recorder is not None:
+            return {"ok": False,
+                    "error": "Termina la grabación de reunión antes de grabar pantalla."}
+        ini = self._session.get(Initiative, int(initiative_id))
+        if ini is None:
+            return {"ok": False, "error": "Selecciona una iniciativa primero."}
+
+        mon = monitor_geometry(int(monitor_index))
+        folder = initiative_export_dir(ini, settings.get_export_dir())
+        dest = folder / f"{datetime.now():%Y-%m-%d_%H-%M-%S}_grabacion.mp4"
+        meeting = repo.start_meeting(self._session, ini.id, "Grabación de pantalla")
+        rec = ScreenVideoRecorder(dest, mon, on_status=self._push_status,
+                                  on_preview=self._push_preview)
+        try:
+            rec.start()
+        except Exception as exc:  # noqa: BLE001
+            repo.end_meeting(self._session, meeting.id)
+            return {"ok": False, "error": str(exc)}
+        self._screen_rec = rec
+        self._screen_active = True
+        self._screen_meeting_id = meeting.id
+        self._push_status("🎥 Grabando pantalla…")
+        return {"ok": True, "meeting_id": meeting.id}
+
+    def toggle_screen_mic_mute(self, muted):
+        """Silencia/activa el micrófono durante la grabación de pantalla."""
+        if self._screen_rec is not None:
+            self._screen_rec.set_mic_muted(bool(muted))
+            return {"ok": True, "muted": bool(muted)}
+        return {"ok": False}
+
+    def set_screen_monitor(self, monitor_index):
+        """Cambia en caliente la pantalla que se está grabando (1 o 2)."""
+        if self._screen_rec is not None and self._screen_active:
+            from helpmeet.screenshot.capture import monitor_geometry
+            self._screen_rec.set_monitor(monitor_geometry(int(monitor_index)))
+            return {"ok": True}
+        return {"ok": False}
+
+    def stop_screen_recording(self):
+        """Detiene la grabación, muxea el .mp4, lo guarda en la reunión y la
+        finaliza. La transcripción es aparte (transcribe_meeting_video), así que
+        puede pedirse ahora o más tarde al abrir la reunión."""
+        rec = self._screen_rec
+        if rec is None:
+            return {"ok": False, "error": "No hay grabación de pantalla en curso."}
+        self._screen_active = False
+        meeting_id = self._screen_meeting_id
+        result = rec.stop()
+        rec.cleanup()                 # ya no hacen falta las pistas sueltas
+        self._reset_screen_state()    # no queda nada pendiente
+        if meeting_id:
+            path = result.get("path")
+            if result.get("ok") and path:
+                m = repo.get_meeting(self._session, meeting_id)
+                if m is not None:
+                    m.audio_path = path   # ruta del video, para transcribir luego
+                    self._session.commit()
+            repo.end_meeting(self._session, meeting_id)  # duración = tiempo real
+            result["folder"] = str(Path(path).parent) if path else None
+            result["meeting_id"] = meeting_id
+        return result
+
+    def _finish_meeting_info(self, meeting_id):
+        m = repo.get_meeting(self._session, meeting_id)
+        if m is None:
+            return {"meeting_id": meeting_id, "title": "", "started_at": "", "utterances": []}
+        return {
+            "meeting_id": meeting_id,
+            "title": m.title,
+            "started_at": m.started_at.strftime("%Y-%m-%d %H:%M"),
+            "utterances": [{"speaker": u.speaker, "text": u.text}
+                           for u in sorted(m.utterances, key=lambda u: u.start_time)],
+        }
+
+    def transcribe_meeting_video(self, meeting_id):
+        """Transcribe en local el .mp4 de una reunión de grabación de pantalla.
+        Funciona en cualquier momento: justo al grabar o al abrir la reunión."""
+        from helpmeet.media import extract_audio_to_wav
+        m = repo.get_meeting(self._session, int(meeting_id))
+        if m is None or not m.audio_path or not os.path.exists(m.audio_path):
+            return {"ok": False, "error": "No se encontró el video de esta reunión."}
+        if m.utterances:  # ya estaba transcrita
+            return {"ok": True, "already": True, **self._finish_meeting_info(m.id)}
+
+        tmp_dir = config.DATA_DIR / "tmp_audio"
+        tmp_dir.mkdir(parents=True, exist_ok=True)
+        wav = tmp_dir / "video_transcribe.wav"
+        try:
+            self._push_status("📝 Extrayendo el audio del video…")
+            extract_audio_to_wav(m.audio_path, str(wav))
+            engine = self._get_local_engine()
+
+            def _progress(frac):
+                self._push_status(f"📝 Transcribiendo… {int(frac * 100)}%")
+                if self._window:
+                    self._window.evaluate_js(f"setProgress({frac})")
+
+            # no_speech_max=1.0: el VAD ya salta silencios (y el micro muteado).
+            for seg in engine.transcribe_file(str(wav), on_progress=_progress,
+                                              no_speech_max=1.0):
+                if seg.text:
+                    repo.add_utterance(self._session, m.id, "others",
+                                       seg.text, seg.start, seg.end)
+            self._link_screen_captures(m.id)
+        except Exception as exc:  # noqa: BLE001 - se informa al usuario
+            self._push_status("")
+            return {"ok": False, "error": str(exc)}
+        finally:
+            try:
+                if wav.exists():
+                    wav.unlink()
+            except Exception:
+                pass
+        self._push_status("")
+        return {"ok": True, **self._finish_meeting_info(m.id)}
+
+    def _link_screen_captures(self, meeting_id):
+        """Ancla cada captura a la frase de su momento (por tiempo)."""
+        m = repo.get_meeting(self._session, meeting_id)
+        utts = sorted(m.utterances, key=lambda u: u.start_time)
+        if not utts:
+            return
+        for cap in m.captures:
+            if cap.near_utterance_id is not None:
+                continue
+            offset = (cap.taken_at - m.started_at).total_seconds()
+            best = utts[0]
+            for u in utts:
+                if u.start_time <= offset:
+                    best = u
+                else:
+                    break
+            cap.near_utterance_id = best.id
+        self._session.commit()
+
+    def _reset_screen_state(self):
+        self._screen_rec = None
+        self._screen_active = False
+        self._screen_meeting_id = None
+
+    def reveal_path(self, path):
+        """Abre el Explorador con el archivo seleccionado (no lo reproduce)."""
+        if path:
+            _reveal_in_explorer(path)
             return {"ok": True}
         return {"ok": False}
 

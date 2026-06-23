@@ -13,6 +13,16 @@ class DualAudioRecorder:
         self._pa = pyaudio.PyAudio()
         self._running = False
         self._threads = []
+        self._mic_muted = False
+
+    def set_mic_muted(self, muted: bool) -> None:
+        """Silencia/activa el micrófono ('me') sin cortar la grabación.
+
+        Mientras está muteado se escribe silencio en la pista del micro, así la
+        línea de tiempo no se desfasa y tu voz no entra ni en el video ni en la
+        transcripción. El audio del sistema ('others') no se ve afectado.
+        """
+        self._mic_muted = bool(muted)
 
     def _default_loopback(self):
         """Encuentra el dispositivo loopback asociado a la salida de audio por defecto."""
@@ -38,7 +48,10 @@ class DualAudioRecorder:
             frames_per_buffer=1024,
         )
         while self._running:
-            wf.writeframes(stream.read(1024, exception_on_overflow=False))
+            data = stream.read(1024, exception_on_overflow=False)
+            if label == "me" and self._mic_muted:
+                data = b"\x00" * len(data)   # silencio mientras el micro está muteado
+            wf.writeframes(data)
         stream.stop_stream()
         stream.close()
         wf.close()

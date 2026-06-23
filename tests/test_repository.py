@@ -86,3 +86,67 @@ def test_search_finds_utterances_and_notes(session):
 
     # sin resultados
     assert repo.search(session, "kubernetes") == []
+
+
+def test_archive_and_restore_meeting(session):
+    ini = repo.create_initiative(session, "Proyecto")
+    meeting = repo.start_meeting(session, ini.id, "Reunión antigua")
+
+    assert repo.archive_item(session, "meeting", meeting.id)
+    assert repo.list_meetings(session, ini.id) == []
+    archived = repo.list_archived(session)
+    assert [(row["kind"], row["item"].id) for row in archived] == [("meeting", meeting.id)]
+
+    assert repo.restore_item(session, "meeting", meeting.id)
+    assert repo.list_meetings(session, ini.id)[0].id == meeting.id
+    assert repo.list_archived(session) == []
+
+
+def test_trash_initiative_hides_children_and_can_restore(session):
+    ini = repo.create_initiative(session, "Proyecto")
+    meeting = repo.start_meeting(session, ini.id, "Reunión")
+
+    assert repo.trash_item(session, "initiative", ini.id)
+    assert repo.list_initiatives(session) == []
+    trash = repo.list_trash(session)
+    assert [(row["kind"], row["item"].id) for row in trash] == [("initiative", ini.id)]
+
+    assert repo.restore_item(session, "initiative", ini.id)
+    assert repo.list_initiatives(session)[0].id == ini.id
+    assert repo.list_meetings(session, ini.id)[0].id == meeting.id
+
+
+def test_permanent_delete_only_works_from_trash(session):
+    ini = repo.create_initiative(session, "Proyecto")
+    meeting = repo.start_meeting(session, ini.id, "Reunión")
+    repo.add_utterance(session, meeting.id, "me", "texto", 0, 1)
+
+    assert not repo.permanently_delete_item(session, "meeting", meeting.id)
+    repo.trash_item(session, "meeting", meeting.id)
+    assert repo.permanently_delete_item(session, "meeting", meeting.id)
+    assert repo.get_meeting(session, meeting.id) is None
+
+
+def test_permanent_delete_initiative_cascades_all_database_content(session):
+    ini = repo.create_initiative(session, "Proyecto")
+    meeting = repo.start_meeting(session, ini.id, "Reunión")
+    utterance = repo.add_utterance(session, meeting.id, "me", "texto", 0, 1)
+    repo.add_note(session, meeting.id, "nota")
+    repo.add_capture(session, meeting.id, "captura.png", near_utterance_id=utterance.id)
+
+    repo.trash_item(session, "initiative", ini.id)
+    assert repo.permanently_delete_item(session, "initiative", ini.id)
+    assert repo.get_meeting(session, meeting.id) is None
+
+
+def test_search_ignores_archived_and_trashed_content(session):
+    ini = repo.create_initiative(session, "Proyecto")
+    active = repo.start_meeting(session, ini.id, "Activa")
+    archived = repo.start_meeting(session, ini.id, "Archivada")
+    trashed = repo.start_meeting(session, ini.id, "Papelera")
+    for meeting in (active, archived, trashed):
+        repo.add_utterance(session, meeting.id, "others", "palabra especial", 0, 1)
+    repo.archive_item(session, "meeting", archived.id)
+    repo.trash_item(session, "meeting", trashed.id)
+
+    assert [row["meeting"].id for row in repo.search(session, "especial")] == [active.id]
