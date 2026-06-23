@@ -94,6 +94,10 @@ def _render_meeting(meeting: Meeting, captures_dir: Path, prefix: str = "") -> l
         lines.append(f"- Capturas: {len(meeting.captures)}")
     if meeting.notes:
         lines.append(f"- Notas: {len(meeting.notes)}")
+    if meeting.audio_path and str(meeting.audio_path).lower().endswith(".mp4"):
+        video = Path(meeting.audio_path)
+        if video.exists():
+            lines.append(f"- Video: [{video.name}]({video.name})")
     lines.append("")
 
     for utt in sorted_utts:

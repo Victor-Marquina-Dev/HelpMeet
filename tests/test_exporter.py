@@ -165,6 +165,21 @@ def test_export_initiative_merges_captures_without_collision(session, tmp_path):
     assert len(captures) == 2
 
 
+def test_export_includes_screen_recording_video_link(session, tmp_path):
+    ini = repo.create_initiative(session, "Con video")
+    meeting = repo.start_meeting(session, ini.id, "Grabación de pantalla")
+    video = tmp_path / "grabacion.mp4"
+    video.write_bytes(b"video")
+    meeting.audio_path = str(video)
+    session.commit()
+
+    out_dir = export_meeting(session, meeting.id, tmp_path / "out")
+    content = (out_dir / "contexto.md").read_text(encoding="utf-8")
+
+    assert "Video:" in content
+    assert "grabacion.mp4" in content
+
+
 def test_initiative_export_dir_uses_slug_and_creates(session, tmp_path):
     from helpmeet.export.exporter import initiative_export_dir
     ini = repo.create_initiative(session, "Mi Proyecto Nuevo")
