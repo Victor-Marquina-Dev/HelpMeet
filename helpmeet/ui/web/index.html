@@ -2,80 +2,71 @@
 <html lang="es">
 <head>
   <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Helpmeet</title>
   <link rel="stylesheet" href="style.css">
 </head>
-<body>
-  <header>
-    <button id="toggleSidebar" class="icon-btn" title="Mostrar/ocultar panel">☰</button>
-    <span class="logo">◆ Helpmeet</span>
-    <span class="spacer"></span>
-    <span id="status" class="status"></span>
-    <select id="monitor" class="monitor" title="Pantalla a capturar"></select>
-    <button id="btnRec" class="btn rec">● Grabar</button>
-    <button id="btnImport" class="btn import">📹 Subir video</button>
-    <button id="btnScreenRec" class="btn screenrec">🎥 Grabar pantalla</button>
-    <button id="btnMic" class="btn mic" hidden>🎤 Micro</button>
-    <button id="btnCap" class="btn cap" disabled>📷 Captura</button>
-    <button id="btnNote" class="btn note" disabled>📝 Nota</button>
-    <button id="btnExp" class="btn exp" disabled>📂 Abrir carpeta</button>
-    <button id="btnSettings" class="icon-btn" title="Ajustes">⚙️</button>
+<body data-app-state="idle" data-screen="welcome">
+
+  <!-- Rail rojo persistente durante grabación/captura de pantalla -->
+  <div class="rec-rail" id="recRail" aria-hidden="true"></div>
+
+  <!-- ============ BARRA SUPERIOR GLOBAL ============ -->
+  <header class="topbar">
+    <button class="icon-btn" id="btnToggleSidebar" aria-label="Mostrar u ocultar panel" title="Mostrar/ocultar panel (Ctrl+B)"></button>
+    <div class="brand">
+      <span class="brand-mark" aria-hidden="true">H</span>
+      <span class="brand-name">Helpmeet</span>
+    </div>
+    <form class="search" id="searchForm" role="search">
+      <span class="search-ico" aria-hidden="true"></span>
+      <input id="searchInput" type="search" placeholder="Buscar en todas las reuniones…" aria-label="Buscar frases y notas" autocomplete="off">
+      <kbd>Ctrl K</kbd>
+    </form>
+    <div class="topbar-status" id="topbarStatus" aria-live="polite"></div>
+    <button class="btn btn-ghost" id="btnSettings">
+      <span class="ico ico-settings" aria-hidden="true"></span> Ajustes
+    </button>
   </header>
 
-  <div id="progress" class="progress hidden"><div class="progress-bar"></div></div>
-
+  <!-- ============ CUERPO ============ -->
   <div class="body">
-    <aside id="sidebar">
-      <div class="side-head">
-        <span class="side-title">Iniciativas</span>
-        <button id="newIni" class="ghost-sm" title="Nueva iniciativa">+ Nueva</button>
+    <!-- Sidebar de iniciativas/reuniones -->
+    <aside class="sidebar" id="sidebar" aria-label="Iniciativas y reuniones">
+      <div class="sidebar-head">
+        <span class="sidebar-title">INICIATIVAS</span>
+        <button class="icon-btn sm" id="btnNewInitiative" aria-label="Nueva iniciativa" title="Nueva iniciativa (Ctrl+N)"></button>
       </div>
-      <input id="search" class="search-box" type="search"
-             placeholder="🔎 Buscar en todo (Enter)…">
-      <div id="iniList" class="ini-list"></div>
-      <div class="library-nav">
-        <button id="btnArchive" class="library-link">🗄️ Archivo</button>
-        <button id="btnTrash" class="library-link">🗑️ Papelera</button>
+      <nav class="sidebar-tree" id="sidebarTree" aria-label="Lista de iniciativas">
+        <!-- inyectado por app.js -->
+      </nav>
+      <div class="sidebar-foot">
+        <button class="side-link" id="btnArchive"><span class="ico ico-archive"></span>Archivo<span class="count" id="archiveCount">0</span></button>
+        <button class="side-link" id="btnTrash"><span class="ico ico-trash"></span>Papelera<span class="count" id="trashCount">0</span></button>
       </div>
     </aside>
 
-    <main id="transcript">
-      <div class="empty">
-        <div class="empty-icon">🎙️</div>
-        <p>Elige una iniciativa en el panel y pulsa <b>Grabar</b>.</p>
-      </div>
+    <!-- Rail colapsado -->
+    <aside class="sidebar-rail" id="sidebarRail" aria-label="Panel colapsado" hidden>
+      <button class="icon-btn" id="btnNewInitiativeRail" aria-label="Nueva iniciativa"></button>
+    </aside>
+
+    <!-- Área principal -->
+    <main class="main" id="main" tabindex="-1">
+      <!-- inyectado por app.js: welcome | initiative | meeting | search | glossary | archive | trash -->
     </main>
   </div>
 
-  <div id="ctxmenu" class="ctxmenu hidden"></div>
+  <!-- ============ BARRA DE ACCIONES CONTEXTUAL ============ -->
+  <footer class="actionbar" id="actionbar" aria-label="Acciones">
+    <!-- inyectado por app.js según el estado global -->
+  </footer>
 
-  <div id="settings" class="modal hidden">
-    <div class="modal-card">
-      <div class="modal-head">
-        <h3>⚙️ Ajustes</h3>
-        <button id="closeSettings" class="icon-btn" title="Cerrar">✕</button>
-      </div>
+  <!-- ============ OVERLAYS ============ -->
+  <div class="overlay" id="overlayRoot" hidden></div>
+  <div class="toasts" id="toasts" aria-live="polite" aria-atomic="false"></div>
 
-      <div class="field">
-        <label for="apiToken">API key de Replicate</label>
-        <div class="field-row">
-          <input id="apiToken" type="password" placeholder="r8_…">
-          <button id="saveToken" class="btn cap">Guardar</button>
-        </div>
-        <small id="tokenStatus" class="hint"></small>
-      </div>
-
-      <div class="field">
-        <label for="exportDir">Carpeta de exportación</label>
-        <div class="field-row">
-          <input id="exportDir" type="text" readonly>
-          <button id="chooseDir" class="btn cap">Elegir…</button>
-        </div>
-        <small class="hint">Aquí se guardan los .md y las carpetas de capturas.</small>
-      </div>
-    </div>
-  </div>
-
+  <!-- Plantillas SVG de iconos (Lucide). Inyectadas por app.js -->
   <script src="app.js"></script>
 </body>
 </html>

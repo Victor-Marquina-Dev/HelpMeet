@@ -10,3 +10,8 @@ assets/models/
 *.sqlite
 *.sqlite3
 .pytest_cache/
+
+# Artefactos de diseno (no versionar)
+Helpmeet — Rediseño de interfaz/
+Helpmeet — Rediseño de interfaz.zip
+node_modules/
