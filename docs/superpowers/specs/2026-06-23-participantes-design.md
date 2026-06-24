@@ -39,7 +39,10 @@ corrompe datos. La asignación manual se guarda y tiene prioridad sobre las regl
 
 - `id` (PK)
 - `initiative_id` (FK → initiatives)
-- `name` (texto)
+- `name` (texto) — **nombre completo** (nombre + apellido, p. ej. "Víctor
+  Marquina"), para distinguir a varias personas que comparten nombre de pila
+  (en una reunión puede haber 3-4 "Víctor"). El nombre completo es la clave de
+  unicidad dentro de la iniciativa.
 - `is_me` (bool, por defecto False) — marca al participante que es el usuario.
   Como mucho uno por iniciativa con `is_me = True`.
 - `created_at`

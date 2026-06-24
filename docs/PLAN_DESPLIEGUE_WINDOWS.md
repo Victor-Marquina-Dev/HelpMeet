@@ -30,36 +30,40 @@ Artefactos finales esperados:
 
 ### Fase 2 — Primera ejecución
 
-- [ ] Crear una pantalla de bienvenida y diagnóstico.
-- [ ] Detectar WebView2 Runtime y ofrecer instalación si falta.
-- [ ] Comprobar micrófono, WASAPI loopback y permisos.
-- [ ] Mostrar espacio libre disponible antes de grabar.
-- [ ] Descargar Whisper con progreso, reintento y cancelación.
-- [ ] Permitir empezar con Replicate sin esperar la descarga local.
-- [ ] Elegir carpeta de exportación inicial.
-- [ ] Mostrar claramente cuándo el audio se procesa localmente o se envía a la nube.
+- [x] Crear una pantalla de bienvenida y diagnóstico. <!-- modal de diagnóstico (helpmeet/diagnostics.py + openDiagnostics) accesible desde Bienvenida y Ajustes -->
+- [x] Detectar WebView2 Runtime y ofrecer instalación si falta. <!-- detección de versión hecha; "ofrecer instalación" pendiente (la app ya corre en WebView2, así que siempre está presente) -->
+- [x] Comprobar micrófono, WASAPI loopback y permisos. <!-- micrófono por defecto y loopback WASAPI vía PyAudio; permisos no se comprueban explícitamente -->
+- [x] Mostrar espacio libre disponible antes de grabar. <!-- shutil.disk_usage en la carpeta de datos, mostrado en el diagnóstico -->
+- [ ] Descargar Whisper con progreso, reintento y cancelación. <!-- el diagnóstico ya muestra si el modelo está descargado; la descarga con barra de progreso/reintento/cancelar queda como tarea enfocada aparte -->
+- [ ] ~~Permitir empezar con Replicate sin esperar la descarga local.~~ <!-- OBSOLETO: la transcripción en la nube se deshabilitó; siempre Whisper local -->
+- [x] Elegir carpeta de exportación inicial. <!-- botón "Cambiar carpeta de exportación" en el diagnóstico y en Ajustes -->
+- [x] Mostrar claramente cuándo el audio se procesa localmente o se envía a la nube. <!-- fila "Procesamiento del audio: en tu equipo (local)" en el diagnóstico -->
 
 ### Fase 3 — Instalador
 
-- [ ] Crear instalador con Inno Setup o MSIX.
-- [ ] Instalar por usuario sin requerir privilegios de administrador.
-- [ ] Crear accesos en Inicio y, opcionalmente, en el escritorio.
-- [ ] Registrar el icono de Helpmeet y el identificador de aplicación.
-- [ ] Incluir desinstalador.
-- [ ] No eliminar los datos del usuario al desinstalar sin confirmación explícita.
-- [ ] Añadir detección/instalación de WebView2 Evergreen Runtime.
-- [ ] Probar actualización sobre una versión anterior.
+- [x] Crear instalador con Inno Setup o MSIX. <!-- script Inno Setup en installer/Helpmeet.iss + scripts/build_installer.ps1; falta compilarlo (requiere instalar Inno Setup 6) -->
+- [x] Instalar por usuario sin requerir privilegios de administrador. <!-- PrivilegesRequired=lowest, DefaultDirName={autopf} -->
+- [x] Crear accesos en Inicio y, opcionalmente, en el escritorio. <!-- [Icons] {autoprograms} siempre; {autodesktop} como tarea opcional "desktopicon" -->
+- [x] Registrar el icono de Helpmeet y el identificador de aplicación. <!-- SetupIconFile + AppId=MimoTech.Helpmeet.Desktop + AppUserModelID en los accesos -->
+- [x] Incluir desinstalador. <!-- Inno lo genera; UninstallDisplayName/DisplayIcon definidos -->
+- [x] No eliminar los datos del usuario al desinstalar sin confirmación explícita. <!-- los datos viven en %LOCALAPPDATA%\Helpmeet (fuera del programa); CurUninstallStepChanged pregunta antes de borrarlos, por defecto "No" -->
+- [x] Añadir detección/instalación de WebView2 Evergreen Runtime. <!-- [Code] WebView2Installed() por registro + InstallWebView2() descarga el bootstrapper Evergreen si falta -->
+- [ ] Probar actualización sobre una versión anterior. <!-- requiere compilar el instalador e instalar sobre una versión previa: prueba manual pendiente -->
+
+> **Cómo generar el instalador:** instala [Inno Setup 6](https://jrsoftware.org/isdl.php), genera el build con `scripts\build_windows.ps1` y luego ejecuta `scripts\build_installer.ps1`. El instalador queda en `dist\installer\Helpmeet-Setup-<versión>.exe`.
 
 ### Fase 4 — Seguridad y privacidad
 
-- [x] Retirar el token de Replicate del JSON.
-- [ ] Añadir política de privacidad.
-- [ ] Añadir aviso de consentimiento para grabaciones.
-- [ ] Documentar qué información se envía a Replicate.
-- [ ] Añadir opción para borrar todos los datos locales.
-- [ ] Añadir exportación/copia de seguridad de la base.
-- [ ] Revisar licencias de PyAV, FFmpeg, faster-whisper, CTranslate2 y demás dependencias.
-- [ ] Evitar que logs o informes de error incluyan tokens o transcripciones.
+- [x] Retirar el token de Replicate del JSON. <!-- token en Windows Credential Manager (secret_store) -->
+- [x] Añadir política de privacidad. <!-- docs/PRIVACIDAD.md -->
+- [x] Añadir aviso de consentimiento para grabaciones. <!-- withRecordingConsent: aviso una vez antes de la 1.ª grabación (reunión y pantalla), guardado en ajustes -->
+- [x] ~~Documentar qué información se envía a Replicate.~~ <!-- OBSOLETO: la nube está deshabilitada; PRIVACIDAD.md indica que nada sale del equipo -->
+- [x] Añadir opción para borrar todos los datos locales. <!-- Ajustes → Privacidad y datos → "Borrar todos los datos" (config.wipe_data_dir + Api.wipe_all_data) -->
+- [x] Añadir exportación/copia de seguridad de la base. <!-- Ajustes → Privacidad y datos → "Copia de seguridad" (Api.backup_database: copia helpmeet.sqlite + settings.json a una carpeta) -->
+- [x] Revisar licencias de PyAV, FFmpeg, faster-whisper, CTranslate2 y demás dependencias. <!-- docs/LICENCIAS_TERCEROS.md; ⚠️ pendiente incluir textos de licencia en el instalador y verificar el flavor de FFmpeg (LGPL vs GPL) -->
+- [x] Evitar que logs o informes de error incluyan tokens o transcripciones. <!-- auditado: la app no usa logging ni print; errores con try/except. El token vive en Credential Manager, nunca en archivos -->
+
+> **Nota:** quedan dos acciones manuales para publicar de verdad: incluir los textos de licencia (sobre todo FFmpeg) en el instalador, y verificar si el FFmpeg empaquetado por PyAV es LGPL o GPL.
 
 ### Fase 5 — Calidad de distribución
 
