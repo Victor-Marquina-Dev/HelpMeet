@@ -71,9 +71,12 @@ begin
 end;
 
 function WebView2Installed(): Boolean;
-const
-  Guid = '{F3017226-FE2A-4295-8BDF-00C3A9A7E4C5}';
+var
+  Guid: String;
 begin
+  { GUID del cliente WebView2 en EdgeUpdate. Construido con Chr() para evitar
+    llaves literales (que Inno interpretaría como constantes). }
+  Guid := Chr(123) + 'F3017226-FE2A-4295-8BDF-00C3A9A7E4C5' + Chr(125);
   { Per-machine (HKLM) registra bajo WOW6432Node en Windows de 64 bits;
     per-user (HKCU) registra sin WOW6432Node. Comprobamos ambos. }
   Result :=
