@@ -67,14 +67,17 @@ Artefactos finales esperados:
 
 ### Fase 5 — Calidad de distribución
 
-- [ ] Probar Windows 10 x64 y Windows 11 x64.
-- [ ] Probar sin Python, Git ni herramientas de desarrollo instaladas.
-- [ ] Probar micrófonos USB, Bluetooth y dispositivos sin loopback.
-- [ ] Probar uno y varios monitores con escalado DPI diferente.
-- [ ] Probar grabaciones largas y recuperación tras cierre forzado.
-- [ ] Probar funcionamiento sin internet.
-- [ ] Probar rutas con espacios, acentos y usuarios sin permisos administrativos.
-- [ ] Medir tiempo de inicio, RAM, CPU y espacio en disco.
+> Plan de pruebas y mediciones en **docs/PRUEBAS_DISTRIBUCION.md**. Lo
+> automatizable está cubierto con tests; el resto es manual en máquinas reales.
+
+- [ ] Probar Windows 10 x64 y Windows 11 x64. <!-- manual; checklist en PRUEBAS_DISTRIBUCION.md -->
+- [ ] Probar sin Python, Git ni herramientas de desarrollo instaladas. <!-- manual: copiar dist\Helpmeet o el instalador a una máquina limpia -->
+- [ ] Probar micrófonos USB, Bluetooth y dispositivos sin loopback. <!-- manual (hardware) -->
+- [ ] Probar uno y varios monitores con escalado DPI diferente. <!-- manual (hardware) -->
+- [~] Probar grabaciones largas y recuperación tras cierre forzado. <!-- recuperación cubierta por tests/test_recovery.py; grabación larga = prueba manual -->
+- [x] Probar funcionamiento sin internet. <!-- tests/test_offline.py: bloquea la red y verifica grabar/exportar/diagnóstico -->
+- [x] Probar rutas con espacios y acentos. <!-- tests/test_paths_robustness.py; "usuario sin permisos admin" = manual -->
+- [x] Medir tiempo de inicio, RAM, CPU y espacio en disco. <!-- medido y documentado en PRUEBAS_DISTRIBUCION.md (build 261 MB, RAM ~129 MB, arranque ~0,47 s); CPU y .exe recompilado a medir en la máquina objetivo -->
 
 ### Fase 6 — Publicación
 
