@@ -8,6 +8,7 @@ devuelve un estado degradado, para que la pantalla de diagnóstico siempre cargu
 from __future__ import annotations
 
 import shutil
+import os
 from pathlib import Path
 
 # Por debajo de esto avisamos: una grabación larga + su vídeo pueden ocupar varios GB.
@@ -47,10 +48,25 @@ def whisper_model_status(model_name: str) -> dict:
         except Exception:
             cache = Path.home() / ".cache" / "huggingface" / "hub"
         folder = cache / ("models--" + repo.replace("/", "--"))
-        downloaded = folder.exists() and any(folder.glob("snapshots/*/"))
-        if downloaded:
-            return {"status": "ok", "model": model_name, "downloaded": True,
-                    "label": f"Modelo «{model_name}» descargado"}
+        snapshots = list(folder.glob("snapshots/*/")) if folder.exists() else []
+        if snapshots:
+            # Existe la carpeta: comprobamos que model.bin esté completo (no a medias
+            # por una descarga interrumpida), porque si no la transcripción fallará.
+            complete = False
+            for snap in snapshots:
+                model_bin = snap / "model.bin"
+                try:
+                    if model_bin.exists() and model_bin.stat().st_size > 0:
+                        complete = True
+                        break
+                except OSError:
+                    continue
+            if complete:
+                return {"status": "ok", "model": model_name, "downloaded": True,
+                        "label": f"Modelo «{model_name}» descargado"}
+            return {"status": "warn", "model": model_name, "downloaded": False,
+                    "label": f"Modelo «{model_name}» quedó incompleto; se volverá a "
+                             "descargar en la próxima transcripción"}
         return {"status": "warn", "model": model_name, "downloaded": False,
                 "label": f"Modelo «{model_name}» se descargará en la 1.ª transcripción"}
     except Exception as exc:  # noqa: BLE001 - el diagnóstico nunca debe romper
@@ -118,8 +134,87 @@ def webview2_status() -> dict:
                 continue
         # No está en el registro pero la app corre: damos por presente.
         return {"status": "ok", "label": "WebView2 presente"}
-    except Exception:  # noqa: BLE001
+    except Exception:  # noqa: BLE001 - el diagnóstico nunca debe romper
         return {"status": "ok", "label": "WebView2 presente"}
+
+
+def writable_folder(path) -> dict:
+    """Comprueba que Helpmeet puede crear archivos en el destino real."""
+    try:
+        target = Path(path)
+        target.mkdir(parents=True, exist_ok=True)
+        if not os.access(target, os.W_OK):
+            return {"status": "error", "label": f"Sin permiso de escritura: {target}"}
+        return {"status": "ok", "path": str(target), "label": str(target)}
+    except OSError as exc:
+        return {"status": "error", "path": str(path),
+                "label": f"No se puede escribir en la carpeta ({exc})"}
+
+
+def video_encoder_status() -> dict:
+    """Comprueba el codificador que utiliza la grabación de pantalla."""
+    try:
+        import av
+        codec = av.codec.Codec("libx264", "w")
+        return {"status": "ok", "label": f"MP4 · H.264 ({codec.name})"}
+    except Exception as exc:  # noqa: BLE001
+        return {"status": "error", "label": f"Codificador H.264 no disponible ({exc})"}
+
+
+def recording_preflight(kind: str, data_dir, export_dir, model_name: str,
+                        monitor: dict | None = None, fps: int = 30) -> dict:
+    """Chequeos dinámicos justo antes de una grabación concreta."""
+    kind = "screen" if kind == "screen" else "meeting"
+    audio = audio_devices()
+    target = Path(export_dir) if kind == "screen" else Path(data_dir)
+    disk = disk_space(target)
+    # Una captura de pantalla puede crecer varios GB; por debajo de 2 GB no se
+    # permite comenzar. Para audio el mínimo crítico es 500 MB.
+    critical_gb = 2.0 if kind == "screen" else 0.5
+    if disk.get("free_gb", 0) < critical_gb:
+        disk["status"] = "error"
+        disk["label"] += f" · se requieren al menos {critical_gb:g} GB"
+
+    if kind == "screen":
+        mon = monitor or {}
+        monitor_info = ({
+            "status": "ok",
+            "label": (f"Pantalla {mon.get('index', '')} · "
+                      f"{mon.get('width', 0)}×{mon.get('height', 0)} · {fps} fps"),
+        } if mon.get("width") and mon.get("height") else {
+            "status": "error", "label": "No se encontró la pantalla seleccionada",
+        })
+        checks = [
+            {"key": "monitor", "title": "Pantalla", "required": True, **monitor_info},
+            {"key": "encoder", "title": "Formato de vídeo", "required": True,
+             **video_encoder_status()},
+            {"key": "disk", "title": "Espacio", "required": True, **disk},
+            {"key": "destination", "title": "Carpeta", "required": True,
+             **writable_folder(export_dir)},
+            {"key": "mic", "title": "Micrófono", "required": True, **audio["mic"]},
+            {"key": "loopback", "title": "Audio del sistema", "required": False,
+             **audio["loopback"]},
+        ]
+        title = "Grabar pantalla"
+        action = "Empezar"
+    else:
+        checks = [
+            {"key": "disk", "title": "Espacio", "required": True, **disk},
+            {"key": "data", "title": "Carpeta", "required": True,
+             **writable_folder(data_dir)},
+            {"key": "mic", "title": "Micrófono", "required": True, **audio["mic"]},
+            {"key": "loopback", "title": "Audio del sistema", "required": False,
+             **audio["loopback"]},
+            {"key": "model", "title": "Transcripción", "required": False,
+             **whisper_model_status(model_name)},
+        ]
+        title = "Grabar reunión"
+        action = "Continuar"
+
+    can_start = not any(item.get("required") and item.get("status") == "error"
+                        for item in checks)
+    return {"kind": kind, "title": title, "action": action,
+            "checks": checks, "can_start": can_start}
 
 
 def run_diagnostics(data_dir, export_dir, model_name: str) -> dict:

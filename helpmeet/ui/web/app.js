@@ -52,6 +52,10 @@ const ICONS = {
   pin: '<path d="M12 17v5M9 10.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24V16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V7a1 1 0 0 1 1-1 2 2 0 0 0 0-4H8a2 2 0 0 0 0 4 1 1 0 0 1 1 1z"/>',
   mic: '<path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2M12 19v3"/>',
   micOff: '<path d="m2 2 20 20"/><path d="M9 9v3a3 3 0 0 0 5.1 2.1M15 9.3V5a3 3 0 0 0-5.9-.7"/><path d="M19 10v2a7 7 0 0 1-.6 2.8M12 19v3M5 10v2a7 7 0 0 0 11 5.7"/>',
+  star: '<path d="M12 2 15.09 8.26 22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>',
+  fitContain: '<rect x="3" y="6" width="18" height="12" rx="1.5"/><rect x="7" y="9" width="10" height="6" rx="1"/>',
+  fitFill: '<rect x="3" y="5" width="18" height="14" rx="1.5"/><path d="M8 5v14M16 5v14"/>',
+  fitStretch: '<rect x="3" y="5" width="18" height="14" rx="1.5"/><path d="M8 12h8M10 10l-2 2 2 2M14 10l2 2-2 2"/>',
 };
 function svg(name, size) {
   size = size || 15;
@@ -117,6 +121,7 @@ const api = {
   openPath: (p) => call('open_path', p),
   getSettings: () => call('get_settings'),
   getDiagnostics: () => call('get_diagnostics'),
+  getRecordingPreflight: (kind, monitor) => call('get_recording_preflight', kind, monitor),
   backupDatabase: () => call('backup_database'),
   wipeAllData: () => call('wipe_all_data'),
   markConsentSeen: () => call('mark_consent_seen'),
@@ -129,6 +134,7 @@ const api = {
   transcribeMeetingVideo: (mid, force) => call('transcribe_meeting_video', mid, !!force),
   toggleScreenMicMute: (m) => call('toggle_screen_mic_mute', m),
   setScreenMonitor: (idx) => call('set_screen_monitor', idx),
+  setScreenScaleMode: (mode) => call('set_screen_scale_mode', mode),
   revealPath: (p) => call('reveal_path', p),
   listLibrary: (view) => call('list_library', view),
   archiveItem: (kind, id) => call('archive_item', kind, id),
@@ -223,6 +229,7 @@ const MOCK = (() => {
     cancel_current_job: () => wait({ ok: true }),
     list_recoverable_recordings: () => wait([]),
     get_audio_devices: () => wait({ inputs: [{ id: 'mic1', name: 'Realtek HD Audio' }], outputs: [{ id: 'spk1', name: 'Altavoces (loopback)' }] }),
+    get_recording_preflight: (kind) => wait({ kind, title: kind === 'screen' ? 'Antes de grabar la pantalla' : 'Antes de grabar la reunión', action: 'Continuar', can_start: true, checks: [] }),
     list_meeting_assets: () => wait({ captures: [
       { id: 'c1', time: '00:48', note: 'arquitectura' }, { id: 'c2', time: '14:02', note: 'esquema BD' }, { id: 'c3', time: '22:31', note: 'flujo auth' },
     ], audio: [{ id: 'a1', name: 'mezcla.wav', dur: '34:12', size: '58 MB', kept: true }] }),
@@ -249,6 +256,7 @@ const STATE = {
   provider: 'auto',      // auto | local | replicate (V2)
   monitors: [],
   monitorIdx: 0,
+  screenScaleMode: load('hm.screenScaleMode', 'fit'),
   recElapsed: 0,
   recTimer: null,
   jobProgress: 0,
@@ -521,7 +529,7 @@ async function copyMeetingContext(mid, btn) {
     }
     const ok = await copyText(r.text);
     const kb = Math.max(1, Math.round(r.text.length / 1024));
-    toast(ok ? 'ok' : 'err', ok ? `Contexto de la reunión copiado (~${kb} KB) · pégalo en Claude` : 'No se pudo copiar al portapapeles');
+    toast(ok ? 'ok' : 'err', ok ? `Transcripción .md copiada (~${kb} KB) · pégala en Claude` : 'No se pudo copiar al portapapeles');
   } catch (e) {
     toast('err', 'No se pudo preparar el contexto');
   } finally {
@@ -572,9 +580,9 @@ function viewMeeting() {
     </div>
     <div class="meta-line">${esc(t ? t.started_at : '')}${t && t.utterances ? ' · ' + t.utterances.filter(u => !u.kind || u.kind === 'utterance').length + ' frases' : ''}</div>
     <div class="mhead-row mhead-actions">
-      <button class="btn btn-primary" id="mCopy">${svg('copy', 14)} Copiar contexto</button>
-      <button class="btn" id="mExport">${svg('download', 14)} Exportar</button>
-      <button class="btn" id="mOpen">${svg('folder', 14)} Abrir carpeta</button>
+      <button class="btn btn-primary" id="mCopy" title="Copiar la transcripción en Markdown">${svg('copy', 14)} Copiar MD</button>
+      <button class="btn" id="mExport" title="Exportar la reunión">${svg('download', 14)} Exportar</button>
+      <button class="btn" id="mOpen" title="Abrir la carpeta de la reunión">${svg('folder', 14)} Carpeta</button>
       <button class="btn" id="mParts">${svg('users', 14)} Participantes</button>
       <button class="icon-btn" id="mMenu" aria-label="Más acciones de la reunión">${svg('dots', 16)}</button>
     </div>
@@ -628,7 +636,7 @@ function renderTranscript(t) {
   if (us.length && !recording) {
     const bar = el('div', 'tx-search');
     bar.innerHTML = `<span class="tx-search-ico" aria-hidden="true">${svg('search', 14)}</span>
-      <input id="txSearch" type="search" placeholder="Buscar en esta transcripción…" aria-label="Buscar en la transcripción" autocomplete="off">
+      <input id="txSearch" type="search" placeholder="Buscar…" aria-label="Buscar en la transcripción" autocomplete="off">
       <span class="tx-count" id="txCount"></span>
       <button class="icon-btn sm" id="txClear" title="Limpiar búsqueda" aria-label="Limpiar" hidden>${svg('x', 13)}</button>`;
     r.appendChild(bar);
@@ -678,14 +686,15 @@ function videoPanel(t) {
     actions.prepend(open);
   };
   wrap.appendChild(vid); wrap.appendChild(actions);
-  const bt = el('button', hasTx ? 'btn' : 'btn btn-primary', hasTx ? 'Volver a transcribir' : 'Transcribir este vídeo');
+  const bt = el('button', hasTx ? 'btn' : 'btn btn-primary', hasTx ? 'Retranscribir' : 'Transcribir este vídeo');
+  if (hasTx) bt.title = 'Volver a transcribir este vídeo';
   bt.onclick = () => {
     if (hasTx) {
-      confirmModal('Volver a transcribir', 'Se reemplazará la transcripción actual usando el motor de mayor calidad disponible.', 'Volver a transcribir', () => transcribeScreenVideo(STATE.selMeeting, true));
+      confirmModal('Retranscribir', 'Se reemplazará la transcripción actual usando el motor de mayor calidad disponible.', 'Retranscribir', () => transcribeScreenVideo(STATE.selMeeting, true));
     } else transcribeScreenVideo(STATE.selMeeting, false);
   };
   actions.appendChild(bt);
-  const bf = el('button', 'btn'); bf.innerHTML = svg('folder', 14) + ' Abrir carpeta';
+  const bf = el('button', 'btn'); bf.title = 'Abrir la carpeta del vídeo'; bf.innerHTML = svg('folder', 14) + ' Carpeta';
   bf.onclick = () => api.revealPath(t.video_path);
   actions.appendChild(bf);
   return wrap;
@@ -717,10 +726,10 @@ function utterance(u) {
       <div class="who">${esc(u.display_name || (u.speaker === 'me' ? 'Yo' : 'Los demás'))}</div>
       <div class="text">${esc(u.text)}</div>
       <div class="uactions">
-        <button class="u-act" data-act="edit">Editar</button>
-        <button class="u-act" data-act="speaker">Cambiar hablante</button>
-        <button class="u-act${u.highlighted ? ' on' : ''}" data-act="star">★ Importante</button>
-        <button class="u-act danger" data-act="del">Eliminar</button>
+        <button class="u-act u-rest${u.highlighted ? ' on' : ''}" data-act="star" title="Marcar como importante" aria-label="Marcar como importante">${svg('star', 15)}</button>
+        <button class="u-act" data-act="edit" title="Editar" aria-label="Editar">${svg('edit', 15)}</button>
+        <button class="u-act" data-act="speaker" title="Cambiar hablante" aria-label="Cambiar hablante">${svg('users', 15)}</button>
+        <button class="u-act danger" data-act="del" title="Eliminar" aria-label="Eliminar">${svg('trash', 15)}</button>
       </div>
     </div>`;
   d.querySelectorAll('.u-act').forEach(b => b.onclick = () => utteranceAction(b.dataset.act, u, d));
@@ -1039,8 +1048,8 @@ function renderActionBar() {
       <div class="ab-spacer"></div>
       <span class="btn-disabled-hint">${svg('camera', 14)}Captura</span>
       <span class="btn-disabled-hint">${svg('note', 14)}Nota</span>`;
-    bar.querySelector('#abRecord').onclick = () => canRecord && withRecordingConsent(startMeetingRecording);
-    bar.querySelector('#abScreen').onclick = () => canRecord && withRecordingConsent(openScreenPanel);
+    bar.querySelector('#abRecord').onclick = () => canRecord && withRecordingConsent(() => openRecordingPreflight('meeting', startMeetingRecording));
+    bar.querySelector('#abScreen').onclick = () => canRecord && withRecordingConsent(() => openRecordingPreflight('screen', openScreenPanel));
     bar.querySelector('#abUpload').onclick = () => canRecord && doImport(bar.querySelector('#abUpload'));
     const ms = bar.querySelector('#monitorSel'); if (ms) ms.onchange = (e) => STATE.monitorIdx = +e.target.value;
   } else if (s === 'recording' || s === 'recording-local' || s === 'recording-cloud') {
@@ -1418,9 +1427,19 @@ function showScreenPanel() {
       <span class="rec-clock" id="screenClock">${fmt(STATE.recElapsed)}</span>
       <div class="monitor-select" style="margin-left:auto">${svg('monitor', 14)}<select id="scMon" aria-label="Pantalla a grabar">${monitorOptions()}</select></div>
     </div>
+    <div class="screen-setup">
+      <input id="scName" class="field" placeholder="Nombre de la reunión" autocomplete="off">
+      <div class="monitor-select screen-fit-select" title="Cómo encajar la pantalla en el vídeo">
+        <span>Encuadre</span>
+        <select id="scFit" aria-label="Encuadre de la pantalla">
+          <option value="fit" ${STATE.screenScaleMode === 'fit' ? 'selected' : ''}>Ajustar</option>
+          <option value="fill" ${STATE.screenScaleMode === 'fill' ? 'selected' : ''}>Rellenar</option>
+          <option value="stretch" ${STATE.screenScaleMode === 'stretch' ? 'selected' : ''}>Estirar</option>
+        </select>
+      </div>
+    </div>
     <div class="screen-preview"><span class="tag-tl">preview en vivo · ~3–4 fps</span><span class="tag-bottom">no representa el frame rate final (30 fps)</span></div>
-    <div class="warn-note">${svg('warn', 15)}<span>La máxima nitidez a resolución nativa puede generar archivos de varios GB.</span></div>
-    <div style="padding:12px 20px 0"><input id="scName" class="field" placeholder="Nombre de la reunión (opcional)" autocomplete="off"></div>
+    <div class="warn-note">${svg('warn', 15)}<span>Al cambiar a una pantalla de otro tamaño: Ajustar conserva todo; Rellenar recorta los bordes; Estirar puede deformar.</span></div>
     <div style="padding:14px 20px 18px;display:flex;gap:10px;align-items:center;flex-wrap:wrap">
       <button class="btn btn-stop" id="scStop"><span class="sq"></span>Detener vídeo</button>
       <button class="btn btn-lg ${STATE.micMuted ? 'btn-danger' : ''}" id="scMic">${STATE.micMuted ? 'Activar micro' : 'Silenciar micro'}</button>
@@ -1438,6 +1457,14 @@ function showScreenPanel() {
   m.querySelector('#scCap').onclick = () => api.takeCapture(STATE.monitorIdx).then(() => toast('ok', 'Captura guardada'));
   m.querySelector('#scNote').onclick = () => promptNote();
   m.querySelector('#scMon').onchange = (e) => { STATE.monitorIdx = +e.target.value; api.setScreenMonitor(STATE.monitorIdx); };
+  m.querySelector('#scFit').onchange = (e) => {
+    STATE.screenScaleMode = e.target.value;
+    save('hm.screenScaleMode', STATE.screenScaleMode);
+    api.setScreenScaleMode(STATE.screenScaleMode);
+    applyScreenPreviewFit(m.querySelector('.screen-preview'));
+  };
+  api.setScreenScaleMode(STATE.screenScaleMode);
+  applyScreenPreviewFit(m.querySelector('.screen-preview'));
   // Nombre de la reunión: se guarda al salir del campo (rename en caliente).
   m.querySelector('#scName').onblur = (e) => {
     const v = e.target.value.trim();
@@ -1668,7 +1695,20 @@ window.onAppStateChanged = function (s) { if (s && s.state) setAppState(s.state)
 window.onJobProgress = function (job) { if (job && typeof job.progress === 'number') { STATE.jobStage = job.stage || STATE.jobStage; window.setProgress(job.progress / 100); } };
 window.onAudioLevels = function (levels) { /* actualizar medidores en vivo cuando exista get_audio_levels */ };
 window.onRecoveryDetected = function (rec) { showRecoveryBanner(rec); };
-window.setScreenPreview = function (b64) { const p = document.querySelector('.screen-preview'); if (p && b64) { p.style.backgroundImage = 'url(data:image/png;base64,' + b64 + ')'; p.style.backgroundSize = 'cover'; p.style.backgroundPosition = 'center'; } };
+function applyScreenPreviewFit(p) {
+  if (!p) return;
+  p.style.backgroundSize = STATE.screenScaleMode === 'fit' ? 'contain' :
+    (STATE.screenScaleMode === 'fill' ? 'cover' : '100% 100%');
+  p.style.backgroundPosition = 'center';
+  p.style.backgroundRepeat = 'no-repeat';
+}
+window.setScreenPreview = function (b64) {
+  const p = document.querySelector('.screen-preview');
+  if (p && b64) {
+    p.style.backgroundImage = 'url(data:image/png;base64,' + b64 + ')';
+    applyScreenPreviewFit(p);
+  }
+};
 // Tu backend (grabación de pantalla) llama setPreview(); es el mismo destino.
 window.setPreview = window.setScreenPreview;
 
@@ -1700,11 +1740,102 @@ function showRecoveryBanner(rec) {
 /* Pantalla de diagnóstico (primera ejecución): comprueba que el equipo está
    listo — disco, modelo de transcripción, micrófono, audio del sistema, carpeta
    de exportación y dónde se procesa el audio. */
+async function openRecordingPreflight(kind, proceed) {
+  if (STATE.appState !== 'idle') return;
+  const isScreen = kind === 'screen';
+  const m = el('div', 'modal wide preflight-modal');
+  m.setAttribute('role', 'dialog');
+  m.setAttribute('aria-label', isScreen ? 'Comprobar grabación de pantalla' : 'Comprobar grabación de reunión');
+  m.innerHTML = `
+    <div class="modal-head"><h3>${svg(isScreen ? 'monitorDot' : 'mic', 16)} <span id="preTitle">Comprobando…</span></h3><button class="icon-btn sm" data-x aria-label="Cerrar">${svg('x', 14)}</button></div>
+    <div class="modal-body">
+      <div class="pre-cfg" id="preCfg">
+        <div class="pre-cfg-row"><span class="pre-cfg-lbl">Idioma</span><div class="cfg-chips" id="cfgLang"></div></div>
+        <div class="pre-cfg-row"><span class="pre-cfg-lbl">Modelo</span><div class="cfg-chips" id="cfgModel"></div></div>
+      </div>
+      <div id="preflightList" class="diag-list"><p style="color:var(--text-muted);font-size:13px">Comprobando equipo…</p></div>
+      <div class="preflight-foot">
+        <div class="help" id="preflightHelp"></div>
+        ${isScreen ? '<button class="btn" id="preFolder">Cambiar carpeta</button>' : ''}
+        <button class="btn" id="preReload">Recomprobar</button>
+        <button class="btn btn-primary" id="preStart" disabled>Comprobando…</button>
+      </div>
+    </div>`;
+  const list = m.querySelector('#preflightList');
+  const title = m.querySelector('#preTitle');
+  const start = m.querySelector('#preStart');
+  let current = null;
+
+  // Configuración de transcripción (idioma + modelo) tal como está en Ajustes,
+  // editable aquí mismo en forma de chips. Lo que se elija queda guardado por
+  // defecto y se usa para esta grabación.
+  let cfg = await api.getSettings() || {};
+  const byLang = cfg.models_by_lang || {};
+  function renderCfgChips() {
+    const langBox = m.querySelector('#cfgLang');
+    const modelBox = m.querySelector('#cfgModel');
+    if (!langBox || !modelBox) return;
+    langBox.innerHTML = (cfg.languages || []).map(lg =>
+      `<button class="cfg-chip ${lg.id === cfg.language ? 'on' : ''}" data-lang="${lg.id}">${esc(lg.label)}</button>`).join('');
+    modelBox.innerHTML = (byLang[cfg.language] || cfg.models || []).map(mo =>
+      `<button class="cfg-chip ${mo.tier === cfg.tier ? 'on' : ''}" data-tier="${mo.tier}" title="${esc(mo.label)} · ${esc(mo.download)}">${esc(mo.id)}</button>`).join('');
+    langBox.querySelectorAll('[data-lang]').forEach(b => b.onclick = async () => {
+      if (b.dataset.lang === cfg.language) return;
+      cfg = await api.v2.setTranscriptionSettings({ language: b.dataset.lang }) || cfg;
+      renderCfgChips(); toast('ok', `Idioma: ${cfg.language_label || b.dataset.lang}`);
+    });
+    modelBox.querySelectorAll('[data-tier]').forEach(b => b.onclick = async () => {
+      if (b.dataset.tier === cfg.tier) return;
+      cfg = await api.v2.setTranscriptionSettings({ tier: b.dataset.tier }) || cfg;
+      renderCfgChips(); toast('ok', `Modelo: ${cfg.model || b.dataset.tier}`);
+      load();  // refresca el chequeo del modelo (puede cambiar el estado de descarga)
+    });
+  }
+  if (v2Available('set_transcription_settings')) renderCfgChips();
+  else m.querySelector('#preCfg').hidden = true;
+
+  async function load() {
+    start.disabled = true; start.textContent = 'Comprobando…';
+    list.innerHTML = '<p style="color:var(--text-muted);font-size:13px">Comprobando equipo…</p>';
+    try {
+      current = await api.getRecordingPreflight(kind, STATE.monitorIdx) || {};
+      title.textContent = current.title || 'Comprobación previa';
+      list.replaceChildren();
+      (current.checks || []).forEach(info => {
+        const status = info.status || 'warn';
+        const ico = status === 'ok' ? svg('check', 14) : status === 'error' ? svg('x', 14) : svg('warn', 14);
+        const row = el('div', 'diag-row ' + status);
+        row.innerHTML = `<span class="diag-ico">${ico}</span><div class="diag-body"><div class="diag-label">${esc(info.title || '')}${info.required ? '' : '<span class="diag-opt">opcional</span>'}</div><div class="diag-detail" title="${esc(info.label || '')}">${esc(info.label || '')}</div></div>`;
+        list.appendChild(row);
+      });
+      start.textContent = current.action || 'Continuar';
+      start.disabled = !current.can_start;
+      m.querySelector('#preflightHelp').textContent = current.can_start
+        ? 'Todo listo.'
+        : 'Corrige lo marcado en rojo.';
+    } catch (e) {
+      list.innerHTML = '<div class="error-box"><p>No se pudo comprobar el equipo.</p></div>';
+      start.textContent = 'No disponible';
+    }
+  }
+  m.querySelector('[data-x]').onclick = closeModal;
+  m.querySelector('#preReload').onclick = load;
+  const folder = m.querySelector('#preFolder');
+  if (folder) folder.onclick = async () => { const r = await api.chooseExportDir(); if (r && r.ok) load(); };
+  start.onclick = () => {
+    if (!current || !current.can_start) return;
+    closeModal();
+    setTimeout(proceed, 0);
+  };
+  openModal(m);
+  load();
+}
+
 async function openDiagnostics() {
   const m = el('div', 'modal wide');
   m.setAttribute('role', 'dialog'); m.setAttribute('aria-label', 'Diagnóstico del sistema');
   m.innerHTML = `
-    <div class="modal-head"><h3>${svg('check', 16)} Diagnóstico del sistema</h3><button class="icon-btn sm" data-x aria-label="Cerrar">${svg('x', 14)}</button></div>
+    <div class="modal-head"><h3>${svg('check', 16)} Diagnóstico</h3><button class="icon-btn sm" data-x aria-label="Cerrar">${svg('x', 14)}</button></div>
     <div class="modal-body">
       <div id="diagList" class="diag-list"><p style="color:var(--text-muted);font-size:13px">Comprobando…</p></div>
       <div class="row-inline" style="margin-top:14px"><div class="help" style="flex:1">Comprueba que tu equipo está listo para grabar y transcribir.</div><button class="btn" id="diagFolder">Cambiar carpeta de exportación</button><button class="btn" id="diagReload">Volver a comprobar</button></div>
@@ -1745,34 +1876,47 @@ async function openSettings() {
   STATE.settings = s;
   const hasTx = v2Available('get_transcription_settings');
   const hasDev = v2Available('get_audio_devices');
-  const m = el('div', 'modal wide'); m.setAttribute('role', 'dialog'); m.setAttribute('aria-label', 'Ajustes');
+  const m = el('div', 'modal settings-modal'); m.setAttribute('role', 'dialog'); m.setAttribute('aria-label', 'Ajustes');
   m.innerHTML = `
-    <div class="modal-head"><h3>Ajustes</h3><button class="icon-btn sm" data-x aria-label="Cerrar">${svg('x', 14)}</button></div>
-    <div class="modal-body">
-      <div class="settings-section">
-        <div class="sec-head"><label style="margin:0">TRANSCRIPCIÓN</label>${hasTx ? '' : '<span class="pending-badge">PENDIENTE · PYTHON</span>'}</div>
-        <div class="seg" style="margin-bottom:10px"><span class="${STATE.provider==='local'?'on':''}" data-prov="local">Local</span></div>
-        <div class="help" style="margin:-3px 0 10px">La transcripción se hace en tu equipo con Whisper local (gratis y privado).</div>
-        <div class="row-inline"><div class="field" style="display:flex;align-items:center">Modelo local: small · videos con alta precisión</div><div class="field" style="display:flex;align-items:center">Idioma: Español</div></div>
-        <label class="check-row"><input type="checkbox" id="setDefaultMute" ${s.default_mic_muted ? 'checked' : ''}><span><b>Silenciar mi audio por defecto</b><small>Podrás activarlo o silenciarlo durante cada grabación.</small></span></label>
+    <div class="modal-head settings-head">
+      <div><h3>Ajustes</h3><p>Personaliza cómo graba, transcribe y exporta Helpmeet.</p></div>
+      <button class="icon-btn sm" data-x aria-label="Cerrar">${svg('x', 14)}</button>
+    </div>
+    <div class="modal-body settings-body">
+      <div class="settings-section settings-card settings-card-primary">
+        <div class="settings-section-head">
+          <span class="settings-section-icon">${svg('mic', 17)}</span>
+          <div class="settings-section-copy"><h4>Transcripción</h4><p>Configura el idioma y el equilibrio entre velocidad y precisión.</p></div>
+          ${hasTx ? '<span class="privacy-badge"><i></i>Local y privado</span>' : '<span class="pending-badge">PENDIENTE · PYTHON</span>'}
+        </div>
+        <div class="cfg-rows">
+          <div class="pre-cfg-row"><span class="pre-cfg-lbl">Idioma</span><div class="cfg-chips" id="setLangChips"></div></div>
+          <div class="pre-cfg-row"><span class="pre-cfg-lbl">Modelo</span><div class="cfg-chips" id="setModelChips"></div></div>
+        </div>
+        <div class="help" id="setModelHelp">Más calidad requiere más tiempo y espacio. El modelo se descarga (una sola vez) la primera vez que lo usas.</div>
+        <label class="toggle-row" for="setDefaultMute">
+          <span class="toggle-copy"><b>Iniciar con micrófono silenciado</b><small>Podrás activarlo durante cualquier grabación.</small></span>
+          <input type="checkbox" id="setDefaultMute" ${s.default_mic_muted ? 'checked' : ''}>
+          <span class="toggle-ui" aria-hidden="true"><i></i></span>
+        </label>
       </div>
-      <div class="settings-section">
+      <div class="settings-section settings-card">
         <label>INSTRUCCIONES PARA LA IA</label>
         <textarea id="setAiInstr" class="obj-text" rows="4" placeholder="Instrucciones que se ponen al principio de todo contexto que exportas…">${esc(s.ai_instructions || '')}</textarea>
         <div class="row-inline" style="margin-top:8px"><div class="help" style="flex:1">Cabecera que orienta a Claude en cada exportación. Déjala vacía para volver a la de por defecto.</div><button class="btn" id="setAiReset">Restablecer</button><button class="btn btn-primary" id="setAiSave">Guardar</button></div>
       </div>
-      <div class="settings-section">
+      <div class="settings-section settings-card">
         <label>CARPETA DE EXPORTACIÓN</label>
         <div class="row-inline"><div class="field mono" style="display:flex;align-items:center;overflow:hidden;white-space:nowrap;color:var(--text-secondary)">${esc(s.export_dir || '—')}</div><button class="btn" id="setDir">Elegir…</button></div>
       </div>
-      <div class="settings-section">
-        <label>DIAGNÓSTICO DEL SISTEMA</label>
+      <div class="settings-section settings-card">
+        <label>DIAGNÓSTICO</label>
         <div class="row-inline"><div class="help" style="flex:1">Comprueba disco, modelo de transcripción, micrófono, audio del sistema y carpeta de exportación.</div><button class="btn" id="setDiag">${svg('check', 14)} Abrir diagnóstico</button></div>
       </div>
-      <div class="settings-section">
+      <div class="settings-section settings-card settings-danger-zone">
         <label>PRIVACIDAD Y DATOS</label>
         <div class="row-inline"><div class="help" style="flex:1">Copia de seguridad de tu contenido (iniciativas, reuniones, transcripciones). No incluye grabaciones ni capturas.</div><button class="btn" id="setBackup">${svg('download', 14)} Copia de seguridad</button></div>
-        <div class="row-inline" style="margin-top:8px"><div class="help" style="flex:1">Borra <b>todos</b> tus datos locales y deja la app como recién instalada. No se puede deshacer. No toca tu carpeta de exportación.</div><button class="btn btn-danger" id="setWipe">${svg('trash', 14)} Borrar todos los datos</button></div>
+        <div class="row-inline" style="margin-top:8px"><div class="help" style="flex:1">Borra <b>todos</b> tus datos locales y deja la app como recién instalada. No se puede deshacer. No toca tu carpeta de exportación.</div><button class="btn btn-danger" id="setWipe">${svg('trash', 14)} Borrar datos</button></div>
       </div>
     </div>`;
   m.querySelector('[data-x]').onclick = closeModal;
@@ -1785,6 +1929,30 @@ async function openSettings() {
     await api.v2.setTranscriptionSettings({ default_mic_muted: e.target.checked });
     toast('ok', e.target.checked ? 'Tu audio empezará silenciado' : 'Tu audio empezará activo');
   };
+  // Configuración de transcripción como chips (idioma + modelo), igual que en el
+  // panel de grabar. Lo elegido se guarda como predeterminado.
+  let scfg = s;
+  const sByLang = scfg.models_by_lang || {};
+  function renderSettingsChips() {
+    const langBox = m.querySelector('#setLangChips');
+    const modelBox = m.querySelector('#setModelChips');
+    if (!langBox || !modelBox) return;
+    langBox.innerHTML = (scfg.languages || []).map(lg =>
+      `<button class="cfg-chip ${lg.id === scfg.language ? 'on' : ''}" data-lang="${lg.id}">${esc(lg.label)}</button>`).join('');
+    modelBox.innerHTML = (sByLang[scfg.language] || scfg.models || []).map(mo =>
+      `<button class="cfg-chip ${mo.tier === scfg.tier ? 'on' : ''}" data-tier="${mo.tier}" title="${esc(mo.label)} · ${esc(mo.download)}">${esc(mo.id)}</button>`).join('');
+    langBox.querySelectorAll('[data-lang]').forEach(b => b.onclick = async () => {
+      if (b.dataset.lang === scfg.language) return;
+      scfg = await api.v2.setTranscriptionSettings({ language: b.dataset.lang }) || scfg;
+      renderSettingsChips(); toast('ok', `Idioma: ${scfg.language_label || b.dataset.lang}`);
+    });
+    modelBox.querySelectorAll('[data-tier]').forEach(b => b.onclick = async () => {
+      if (b.dataset.tier === scfg.tier) return;
+      scfg = await api.v2.setTranscriptionSettings({ tier: b.dataset.tier }) || scfg;
+      renderSettingsChips(); toast('ok', `Modelo: ${scfg.model || b.dataset.tier}`);
+    });
+  }
+  if (hasTx) renderSettingsChips();
   m.querySelector('#setAiSave').onclick = async () => { await api.setAiInstructions(m.querySelector('#setAiInstr').value); toast('ok', 'Instrucciones guardadas'); };
   m.querySelector('#setAiReset').onclick = async () => { const r = await api.setAiInstructions(''); m.querySelector('#setAiInstr').value = (r && r.text) || ''; toast('ok', 'Instrucciones restablecidas'); };
   m.querySelector('#setDir').onclick = async () => { const r = await api.chooseExportDir(); if (r && r.ok) { toast('ok', 'Carpeta actualizada'); closeModal(); } };

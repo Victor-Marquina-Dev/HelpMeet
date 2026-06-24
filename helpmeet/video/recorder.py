@@ -39,6 +39,7 @@ class ScreenVideoRecorder:
         self._tmp_video = self._tmp_dir / TEMP_VIDEO
         self._audio = None
         self._mic_muted = False
+        self._scale_mode = "fit"
         self._frames = 0
         self._error = None
 
@@ -71,6 +72,40 @@ class ScreenVideoRecorder:
             self.monitor = dict(monitor)
         self._monitor_changed.set()
 
+    def set_scale_mode(self, mode: str) -> None:
+        """Ajusta la fuente al lienzo fijo como OBS: fit, fill o stretch."""
+        mode = mode if mode in {"fit", "fill", "stretch"} else "fit"
+        with self._monitor_lock:
+            self._scale_mode = mode
+        self._monitor_changed.set()
+
+    def _scale_filter(self, template, mode):
+        """Crea filtros FFmpeg nativos para conservar proporción sin usar NumPy."""
+        graph = av.filter.Graph()
+        source = graph.add_buffer(template=template)
+        if mode == "fill":
+            scale = graph.add(
+                "scale", f"{self._out_w}:{self._out_h}:force_original_aspect_ratio=increase"
+            )
+            framing = graph.add(
+                "crop", f"{self._out_w}:{self._out_h}:(iw-ow)/2:(ih-oh)/2"
+            )
+        else:
+            scale = graph.add(
+                "scale", f"{self._out_w}:{self._out_h}:force_original_aspect_ratio=decrease"
+            )
+            framing = graph.add(
+                "pad", f"{self._out_w}:{self._out_h}:(ow-iw)/2:(oh-ih)/2:black"
+            )
+        pixel_format = graph.add("format", "pix_fmts=yuv420p")
+        sink = graph.add("buffersink")
+        source.link_to(scale)
+        scale.link_to(framing)
+        framing.link_to(pixel_format)
+        pixel_format.link_to(sink)
+        graph.configure()
+        return graph, source, sink
+
     def audio_channels(self):
         """Pistas de audio capturadas (para transcribir tras parar)."""
         return [("me", self._tmp_dir / MIC_WAV),
@@ -98,6 +133,7 @@ class ScreenVideoRecorder:
             while self._running:
                 with self._monitor_lock:
                     mon = dict(self.monitor)
+                    scale_mode = self._scale_mode
                 self._monitor_changed.clear()
                 w = mon["width"] - (mon["width"] % 2)
                 h = mon["height"] - (mon["height"] % 2)
@@ -114,14 +150,21 @@ class ScreenVideoRecorder:
                     self._status("🎥 Error al iniciar la grabación")
                     break
                 in_stream = inp.streams.video[0]
+                scale_filter = None
                 try:
                     for frame in inp.decode(in_stream):
                         if not self._running or self._monitor_changed.is_set():
                             break  # parar, o saltar a otra pantalla (reabre arriba)
-                        # Se escala al tamaño de salida fijo (por si el otro monitor
-                        # tiene distinta resolución) y PTS incremental propio (CFR).
-                        img = frame.reformat(width=self._out_w, height=self._out_h,
-                                             format="yuv420p")
+                        # Lienzo fijo + transformación de fuente estilo OBS.
+                        if scale_mode == "stretch":
+                            img = frame.reformat(width=self._out_w, height=self._out_h,
+                                                 format="yuv420p")
+                        else:
+                            if scale_filter is None:
+                                scale_filter = self._scale_filter(frame, scale_mode)
+                            _, source, sink = scale_filter
+                            source.push(frame)
+                            img = sink.pull()
                         img.pts = idx
                         img.time_base = Fraction(1, self.fps)
                         idx += 1

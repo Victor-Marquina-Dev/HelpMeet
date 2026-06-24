@@ -136,6 +136,7 @@ class Api:
         self._session = get_session()
         self._engine = None
         self._engine_provider = None
+        self._engine_model = None
         self._local_engine = None
         self._recorder = None
         self._last_meeting_id = None
@@ -544,17 +545,22 @@ class Api:
         # Transcripción en la nube (Replicate) DESHABILITADA: se usa siempre el
         # motor local de Whisper (faster-whisper), ignorando cualquier
         # preferencia antigua de "replicate" guardada en los ajustes.
-        if self._engine is None or self._engine_provider != "local":
+        # Si el usuario cambió el modelo en Ajustes, se reconstruye el motor.
+        model = settings.get_transcription_model()
+        if (self._engine is None or self._engine_provider != "local"
+                or self._engine_model != model):
             from helpmeet.transcription.engine import TranscriptionEngine
-            self._engine = TranscriptionEngine()
+            self._engine = TranscriptionEngine(model)
             self._engine_provider = "local"
+            self._engine_model = model
         return self._engine
 
     def _get_local_engine(self):
         """Motor LOCAL (faster-whisper) para videos subidos: gratis, sin límites."""
-        if self._local_engine is None:
+        model = settings.get_transcription_model()
+        if self._local_engine is None or self._local_engine.model_name != model:
             from helpmeet.transcription.engine import TranscriptionEngine
-            self._local_engine = TranscriptionEngine()
+            self._local_engine = TranscriptionEngine(model)
         return self._local_engine
 
     def start_recording(self, initiative_id, title):
@@ -707,6 +713,13 @@ class Api:
             return {"ok": True}
         return {"ok": False}
 
+    def set_screen_scale_mode(self, mode):
+        """Ajusta la pantalla al lienzo: fit, fill o stretch."""
+        if self._screen_rec is not None and self._screen_active:
+            self._screen_rec.set_scale_mode(str(mode))
+            return {"ok": True, "mode": str(mode)}
+        return {"ok": False}
+
     def stop_screen_recording(self):
         """Detiene la grabación y devuelve enseguida: el muxeo del .mp4 (que puede
         tardar varios segundos) se hace en SEGUNDO PLANO, para no bloquear la app.
@@ -838,11 +851,13 @@ class Api:
                 # Nube deshabilitada: siempre Whisper local, sin importar el token.
                 engine = self._get_local_engine()
 
+            from helpmeet.transcription.progress import WeightedProgress
+            weighted = WeightedProgress([path for _, path in tracks])
             for index, (speaker, audio_path) in enumerate(tracks):
                 on_status(f"Transcribiendo pista {index + 1} de {len(tracks)}…")
                 if getattr(engine, "supports_progress", False):
                     def _progress(frac, track=index):
-                        on_progress((track + frac) / len(tracks))
+                        on_progress(weighted.at(track, frac))
                     segments = engine.transcribe_file(
                         str(audio_path), on_progress=_progress,
                         no_speech_max=0.95, quality="accurate"
@@ -1045,7 +1060,25 @@ class Api:
         """Informe de "primera ejecución": disco, modelo, audio, WebView2 y export."""
         from helpmeet import diagnostics
         return diagnostics.run_diagnostics(
-            config.DATA_DIR, settings.get_export_dir(), config.WHISPER_MODEL,
+            config.DATA_DIR, settings.get_export_dir(),
+            settings.get_transcription_model(),
+        )
+
+    def get_recording_preflight(self, kind, monitor_index=1):
+        """Diagnóstico específico que se recalcula antes de cada grabación."""
+        from helpmeet import diagnostics
+        monitor = None
+        if kind == "screen":
+            try:
+                from helpmeet.screenshot.capture import monitor_geometry
+                monitor = monitor_geometry(int(monitor_index))
+                monitor["index"] = int(monitor_index)
+            except Exception:
+                monitor = None
+        return diagnostics.recording_preflight(
+            str(kind), config.DATA_DIR, settings.get_export_dir(),
+            settings.get_transcription_model(), monitor=monitor,
+            fps=config.VIDEO_FPS,
         )
 
     def backup_database(self):
@@ -1095,6 +1128,7 @@ class Api:
         self._engine = None
         self._local_engine = None
         self._engine_provider = None
+        self._engine_model = None
         return {"ok": True}
 
     def get_settings(self):
@@ -1145,8 +1179,10 @@ class Api:
 
     def set_transcription_settings(self, values):
         result = settings.set_transcription_settings(values or {})
+        # El motor se reconstruye en el próximo uso (puede haber cambiado el modelo).
         self._engine = None
         self._engine_provider = None
+        self._engine_model = None
         return {"ok": True, **result}
 
     def _pick_folder(self):
