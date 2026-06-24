@@ -303,6 +303,14 @@ class Api:
                     "video_path": None}
         video = m.audio_path if (m.audio_path and str(m.audio_path).lower().endswith(".mp4")
                                  and os.path.exists(m.audio_path)) else None
+        video_duration = ""
+        if video:
+            from helpmeet.media import media_duration
+            secs = int(media_duration(video))
+            if secs > 0:
+                hours, rem = divmod(secs, 3600)
+                mins, sec = divmod(rem, 60)
+                video_duration = f"{hours}:{mins:02d}:{sec:02d}" if hours else f"{mins}:{sec:02d}"
 
         def stamp(seconds):
             minutes, secs = divmod(max(0, int(seconds or 0)), 60)
@@ -353,6 +361,7 @@ class Api:
             "utterances": timeline,
             "assets": {"captures": captures, "notes": notes, "video": video},
             "video_path": video,
+            "video_duration": video_duration,
         }
 
     def update_utterance(self, utterance_id, changes):
@@ -668,9 +677,9 @@ class Api:
 
         if self._screen_rec is not None:
             return {"ok": False, "error": "Ya hay una grabación de pantalla en curso."}
-        if self._screen_saving:
-            return {"ok": False,
-                    "error": "Espera unos segundos: se está guardando el vídeo anterior."}
+        # Ya NO se bloquea por un guardado anterior: cada grabación usa su propia
+        # carpeta temporal, así que la nueva puede empezar mientras la anterior se
+        # mezcla en segundo plano.
         if self._recorder is not None:
             return {"ok": False,
                     "error": "Termina la grabación de reunión antes de grabar pantalla."}
@@ -683,8 +692,11 @@ class Api:
         folder = initiative_month_dir(ini, settings.get_export_dir(), now)
         dest = folder / f"{now:%Y-%m-%d_%H-%M-%S}_grabacion.mp4"
         meeting = repo.start_meeting(self._session, ini.id, _spanish_date(now))
+        # Carpeta temporal propia de ESTA grabación: evita choques con un vídeo
+        # anterior que aún se esté guardando en segundo plano.
+        work_dir = config.DATA_DIR / "tmp_video" / f"{now:%Y%m%d_%H%M%S_%f}"
         rec = ScreenVideoRecorder(dest, mon, on_status=self._push_status,
-                                  on_preview=self._push_preview)
+                                  on_preview=self._push_preview, work_dir=work_dir)
         mic_muted = settings.get_transcription_settings()["default_mic_muted"]
         rec.set_mic_muted(mic_muted)
         try:
@@ -995,12 +1007,33 @@ class Api:
             try:
                 self._job_event(meeting_id, state="running", stage="Transcribiendo…")
                 run()
+                # Al terminar la transcripción se genera ya la carpeta organizada
+                # (contexto.md + .md por reunión + capturas/ + vídeo), sin esperar a
+                # que el usuario pulse Exportar.
+                self._job_event(meeting_id, stage="Organizando exportación…")
+                self._auto_export(meeting_id)
                 self._job_event(meeting_id, state="done", progress=1.0, stage="Listo")
             except Exception as exc:  # noqa: BLE001 - se informa al usuario
                 self._job_event(meeting_id, state="error", stage=f"Error: {exc}")
             finally:
                 self._jobs.task_done()
                 self._finish_job(meeting_id)
+
+    def _auto_export(self, meeting_id):
+        """Regenera la carpeta organizada de la iniciativa de esta reunión en la
+        carpeta de exportación. Corre en el hilo worker, con su propia sesión, y
+        nunca interrumpe la transcripción si algo falla."""
+        try:
+            from helpmeet.db.database import get_session
+            s = get_session()
+            try:
+                m = repo.get_meeting(s, int(meeting_id))
+                if m is not None:
+                    export_initiative(s, m.initiative_id, settings.get_export_dir())
+            finally:
+                s.close()
+        except Exception:
+            pass
 
     def _job_event(self, mid, **changes):
         with self._jobs_lock:

@@ -11,6 +11,26 @@ from av.audio.resampler import AudioResampler
 TARGET_RATE = 16000
 
 
+def media_duration(src_path: str) -> float:
+    """Duración en segundos de un archivo de audio/vídeo (0 si no se puede leer).
+
+    Lee solo la cabecera del contenedor: no decodifica, así que es instantáneo
+    incluso con vídeos largos."""
+    try:
+        container = av.open(src_path)
+        try:
+            if container.duration:  # microsegundos (av.time_base)
+                return container.duration / 1_000_000
+            stream = (container.streams.video or container.streams.audio or [None])[0]
+            if stream is not None and stream.duration and stream.time_base:
+                return float(stream.duration * stream.time_base)
+        finally:
+            container.close()
+    except Exception:
+        pass
+    return 0.0
+
+
 def extract_audio_to_wav(src_path: str, dest_path: str, rate: int = TARGET_RATE) -> str:
     """Extrae audio a WAV mono sin cargar el archivo completo en memoria.
 

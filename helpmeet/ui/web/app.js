@@ -258,6 +258,7 @@ const STATE = {
   monitorIdx: 0,
   screenScaleMode: load('hm.screenScaleMode', 'fit'),
   recElapsed: 0,
+  recStartedAt: 0,
   recTimer: null,
   jobProgress: 0,
   jobStage: '',
@@ -578,9 +579,9 @@ function viewMeeting() {
       <h1 class="mtitle-h">${esc(t ? t.title : 'Reunión')}</h1>
       <span class="pill pill-done"><span class="pd"></span>Finalizada</span>
     </div>
-    <div class="meta-line">${esc(t ? t.started_at : '')}${t && t.utterances ? ' · ' + t.utterances.filter(u => !u.kind || u.kind === 'utterance').length + ' frases' : ''}</div>
+    <div class="meta-line">${esc(t ? t.started_at : '')}${t && t.utterances ? ' · ' + t.utterances.filter(u => !u.kind || u.kind === 'utterance').length + ' frases' : ''}${t && t.video_duration ? ` · <span style="vertical-align:-1px">${svg('play', 11)}</span> ${esc(t.video_duration)}` : ''}</div>
     <div class="mhead-row mhead-actions">
-      <button class="btn btn-primary" id="mCopy" title="Copiar la transcripción en Markdown">${svg('copy', 14)} Copiar MD</button>
+      <button class="btn btn-primary" id="mCopy" title="Copiar la transcripción en Markdown">${svg('copy', 14)} Copiar transcripción .md</button>
       <button class="btn" id="mExport" title="Exportar la reunión">${svg('download', 14)} Exportar</button>
       <button class="btn" id="mOpen" title="Abrir la carpeta de la reunión">${svg('folder', 14)} Carpeta</button>
       <button class="btn" id="mParts">${svg('users', 14)} Participantes</button>
@@ -694,9 +695,6 @@ function videoPanel(t) {
     } else transcribeScreenVideo(STATE.selMeeting, false);
   };
   actions.appendChild(bt);
-  const bf = el('button', 'btn'); bf.title = 'Abrir la carpeta del vídeo'; bf.innerHTML = svg('folder', 14) + ' Carpeta';
-  bf.onclick = () => api.revealPath(t.video_path);
-  actions.appendChild(bf);
   return wrap;
 }
 
@@ -1556,8 +1554,20 @@ function cancelJob() {
 }
 
 /* ---- Cronómetro ---- */
-function startTimer() { STATE.recElapsed = 0; clearInterval(STATE.recTimer); STATE.recTimer = setInterval(() => { STATE.recElapsed++; renderTopStatus(); const c = $('#screenClock'); if (c) c.textContent = fmt(STATE.recElapsed); }, 1000); }
-function stopTimer() { clearInterval(STATE.recTimer); }
+function tickTimer() {
+  // El tiempo se calcula desde la hora de inicio real (no sumando ticks): si el
+  // sistema ralentiza el temporizador al minimizar la ventana, al volver muestra
+  // igualmente el tiempo correcto en vez de atrasarse.
+  if (!STATE.recStartedAt) return;
+  STATE.recElapsed = Math.floor((Date.now() - STATE.recStartedAt) / 1000);
+  renderTopStatus();
+  const c = $('#screenClock'); if (c) c.textContent = fmt(STATE.recElapsed);
+}
+function startTimer() { STATE.recStartedAt = Date.now(); STATE.recElapsed = 0; clearInterval(STATE.recTimer); STATE.recTimer = setInterval(tickTimer, 1000); }
+function stopTimer() { clearInterval(STATE.recTimer); STATE.recStartedAt = 0; }
+// Al volver a enfocar/mostrar la ventana, corrige el reloj al instante.
+document.addEventListener('visibilitychange', () => { if (!document.hidden) tickTimer(); });
+window.addEventListener('focus', tickTimer);
 function fmt(s) { const m = Math.floor(s / 60); return String(m).padStart(2, '0') + ':' + String(s % 60).padStart(2, '0'); }
 
 /* ============================================================

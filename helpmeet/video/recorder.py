@@ -1,3 +1,4 @@
+import shutil
 import threading
 from fractions import Fraction
 from pathlib import Path
@@ -36,6 +37,10 @@ class ScreenVideoRecorder:
         self._out_w = monitor["width"] - monitor["width"] % 2
         self._out_h = monitor["height"] - monitor["height"] % 2
         self._tmp_dir = Path(work_dir) if work_dir else config.DATA_DIR / "tmp_video"
+        # Carpeta propia (work_dir dedicado): se puede borrar entera al limpiar, lo
+        # que permite que varias grabaciones convivan sin pisarse los temporales
+        # (una guardándose en 2.º plano mientras empieza otra).
+        self._dedicated_dir = work_dir is not None
         self._tmp_video = self._tmp_dir / TEMP_VIDEO
         self._audio = None
         self._mic_muted = False
@@ -311,3 +316,7 @@ class ScreenVideoRecorder:
                     p.unlink()
             except Exception:
                 pass
+        # Si esta grabación tenía su propia carpeta, se elimina entera (incluido
+        # cualquier residuo), dejando limpio el directorio de temporales.
+        if self._dedicated_dir:
+            shutil.rmtree(self._tmp_dir, ignore_errors=True)
