@@ -81,15 +81,15 @@ Artefactos finales esperados:
 
 ### Fase 6 — Publicación
 
-- [ ] Elegir nombre del editor: `MimoTech`.
-- [ ] Comprar certificado de firma de código.
-- [ ] Firmar `Helpmeet.exe` y el instalador.
-- [ ] Crear `CHANGELOG.md`, `LICENSE` y notas de versión.
-- [ ] Generar SHA-256 de cada descarga.
-- [ ] Crear una página oficial de descarga.
-- [ ] Preparar canal estable y, si se necesita, canal beta.
-- [ ] Implementar comprobación de actualizaciones firmadas.
-- [ ] Configurar CI para compilar una versión desde cada tag.
+- [x] Elegir nombre del editor: `MimoTech`. <!-- usado como AppPublisher en el instalador y AppUserModelID -->
+- [ ] Comprar certificado de firma de código. <!-- compra manual (DigiCert/Sectigo…); EV recomendado para evitar SmartScreen desde el día 1 -->
+- [ ] Firmar `Helpmeet.exe` y el instalador. <!-- requiere el certificado: signtool sign /fd sha256 /tr <TSA> /td sha256 /a dist\Helpmeet\Helpmeet.exe y el instalador -->
+- [x] Crear `CHANGELOG.md`, `LICENSE` y notas de versión. <!-- CHANGELOG.md, LICENSE (propietaria por defecto) y docs/GUIA_INSTALACION.md -->
+- [x] Generar SHA-256 de cada descarga. <!-- scripts/generate_checksums.ps1 → dist/SHA256SUMS.txt -->
+- [ ] Crear una página oficial de descarga. <!-- pendiente -->
+- [ ] Preparar canal estable y, si se necesita, canal beta. <!-- pendiente -->
+- [ ] Implementar comprobación de actualizaciones firmadas. <!-- pendiente -->
+- [ ] Configurar CI para compilar una versión desde cada tag. <!-- pendiente -->
 
 ## Estructura de datos después de la migración
 

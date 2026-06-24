@@ -1,0 +1,23 @@
+Helpmeet
+Copyright (c) 2026 MimoTech. Todos los derechos reservados.
+
+Este software y su código fuente son propiedad de MimoTech. No se concede
+ninguna licencia para copiar, distribuir, modificar, descompilar, realizar
+ingeniería inversa ni crear obras derivadas sin el permiso previo y por escrito
+de MimoTech.
+
+EL SOFTWARE SE PROPORCIONA "TAL CUAL", SIN GARANTÍA DE NINGÚN TIPO, EXPRESA O
+IMPLÍCITA, INCLUIDAS ENTRE OTRAS LAS GARANTÍAS DE COMERCIABILIDAD, IDONEIDAD
+PARA UN FIN DETERMINADO Y NO INFRACCIÓN. EN NINGÚN CASO MIMOTECH SERÁ
+RESPONSABLE DE NINGUNA RECLAMACIÓN, DAÑO U OTRA RESPONSABILIDAD DERIVADA DEL USO
+DEL SOFTWARE.
+
+Este programa incluye software de terceros distribuido bajo sus propias
+licencias (entre ellas FFmpeg y pynput bajo LGPL). Consulta
+docs/LICENCIAS_TERCEROS.md para el detalle y las obligaciones correspondientes.
+
+---
+
+Nota: esta es una licencia PROPIETARIA por defecto. Si prefieres publicar
+Helpmeet como software libre (p. ej. MIT o Apache-2.0) o con otro modelo,
+sustituye este archivo por la licencia elegida.
