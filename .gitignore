@@ -10,6 +10,8 @@ assets/models/
 *.sqlite
 *.sqlite3
 .pytest_cache/
+build/
+dist/
 
 # Artefactos de diseno (no versionar)
 Helpmeet — Rediseño de interfaz/

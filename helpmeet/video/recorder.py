@@ -19,7 +19,8 @@ class ScreenVideoRecorder:
     mientras se graba; el audio se captura aparte (WASAPI) y se une al final.
     """
 
-    def __init__(self, dest_path, monitor, fps=None, on_status=None, on_preview=None):
+    def __init__(self, dest_path, monitor, fps=None, on_status=None, on_preview=None,
+                 work_dir=None):
         self.dest_path = Path(dest_path)
         self.monitor = dict(monitor)  # monitor actual (puede cambiarse en caliente)
         self.fps = fps or config.VIDEO_FPS
@@ -34,7 +35,7 @@ class ScreenVideoRecorder:
         # luego se cambia a un monitor de otra resolución, se escala a este tamaño.
         self._out_w = monitor["width"] - monitor["width"] % 2
         self._out_h = monitor["height"] - monitor["height"] % 2
-        self._tmp_dir = config.DATA_DIR / "tmp_video"
+        self._tmp_dir = Path(work_dir) if work_dir else config.DATA_DIR / "tmp_video"
         self._tmp_video = self._tmp_dir / TEMP_VIDEO
         self._audio = None
         self._mic_muted = False
@@ -76,7 +77,12 @@ class ScreenVideoRecorder:
                 ("others", self._tmp_dir / SYS_WAV)]
 
     def _record_video(self):
-        out = av.open(str(self._tmp_video), "w")
+        # MP4 fragmentado: escribe cabeceras reproducibles desde el inicio. Así
+        # el archivo temporal sigue siendo recuperable aunque el proceso no
+        # alcance `out.close()` por un apagado o cierre forzado.
+        out = av.open(str(self._tmp_video), "w", options={
+            "movflags": "frag_keyframe+empty_moov+default_base_moof",
+        })
         stream = out.add_stream(config.VIDEO_CODEC, rate=self.fps)
         stream.width = self._out_w
         stream.height = self._out_h
@@ -223,6 +229,34 @@ class ScreenVideoRecorder:
             vin.close()
             if ain is not None:
                 ain.close()
+
+    def recover(self):
+        """Finaliza una captura fragmentada conservada tras un cierre abrupto."""
+        from helpmeet.recovery import repair_wav
+
+        for _, audio_path in self.audio_channels():
+            repair_wav(audio_path)
+        if not self._tmp_video.exists() or self._tmp_video.stat().st_size == 0:
+            return {"ok": False, "error": "No se encontró video recuperable."}
+
+        self._status("Recuperando el video…")
+        mixed = self._tmp_dir / MIXED_WAV
+        has_audio = mix_wavs(self._tmp_dir / MIC_WAV,
+                             self._tmp_dir / SYS_WAV,
+                             mixed, rate=config.VIDEO_AUDIO_RATE)
+        try:
+            self._mux(mixed if has_audio else None)
+        except Exception as exc:  # conservar al menos el fragmento de video
+            try:
+                self.dest_path.parent.mkdir(parents=True, exist_ok=True)
+                if self.dest_path.exists():
+                    self.dest_path.unlink()
+                self._tmp_video.replace(self.dest_path)
+            except Exception:
+                return {"ok": False, "error": f"No se pudo recuperar el video: {exc}"}
+            return {"ok": True, "path": str(self.dest_path), "audio": False,
+                    "warning": str(exc)}
+        return {"ok": True, "path": str(self.dest_path), "audio": has_audio}
 
     def cleanup(self):
         """Borra los temporales (video y pistas de audio). Llamar tras decidir

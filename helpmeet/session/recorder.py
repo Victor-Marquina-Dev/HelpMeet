@@ -1,8 +1,12 @@
 import threading
 import time
+import uuid
+import shutil
 import wave
+from pathlib import Path
 import numpy as np
 from helpmeet import config
+from helpmeet import recovery
 from helpmeet.db.database import get_session
 from helpmeet.db import repository as repo
 from helpmeet.audio.capture import DualAudioRecorder
@@ -37,10 +41,50 @@ class MeetingRecorder:
         self._last_utterance_id = None
         self._thread = None
         self._recorder = None
-        self._tmp = config.DATA_DIR / "tmp_audio"
+        # Carpeta de audio ÚNICA por grabación: así, si esta reunión se
+        # transcribe en segundo plano mientras grabas otra, sus WAV no se pisan.
+        self._tmp = recovery.recovery_dir() / uuid.uuid4().hex
+        self._tmp.mkdir(parents=True, exist_ok=True)
+
+    @classmethod
+    def from_recovery(cls, data: dict, engine, on_status=None, on_progress=None):
+        """Reconstruye el procesador de una grabación persistida sin recapturar."""
+        obj = cls.__new__(cls)
+        obj.initiative_id = int(data["initiative_id"])
+        obj.title = data.get("title") or "Reunión recuperada"
+        obj.engine = engine
+        obj.live = False
+        obj.chunk_seconds = 0
+        obj.on_utterance = None
+        obj.on_status = on_status
+        obj.on_progress = on_progress
+        obj._mic_muted = False
+        obj._running = False
+        obj._session = get_session()
+        obj.meeting = repo.get_meeting(obj._session, int(data["meeting_id"]))
+        if obj.meeting is None:
+            obj._session.close()
+            raise ValueError("La reunión asociada ya no existe.")
+        obj._last_utterance_id = None
+        obj._thread = None
+        obj._recorder = None
+        obj._tmp = Path(data["work_dir"])
+        for _, filename in _CHANNELS:
+            recovery.repair_wav(obj._tmp / filename)
+        return obj
 
     def start(self):
         self.meeting = repo.start_meeting(self._session, self.initiative_id, self.title)
+        recovery.write_manifest(self._tmp, {
+            "version": 1,
+            "id": self._tmp.name,
+            "kind": "audio",
+            "meeting_id": self.meeting.id,
+            "initiative_id": self.meeting.initiative_id,
+            "title": self.meeting.title,
+            "started_at": self.meeting.started_at.isoformat(),
+            "state": "recording",
+        })
         self._running = True
         if self.live:
             self._thread = threading.Thread(target=self._live_loop, daemon=True)
@@ -127,6 +171,7 @@ class MeetingRecorder:
             for label, fname in _CHANNELS
             if (self._tmp / fname).exists() and self._has_audio(self._tmp / fname)
         ]
+        failures = []
         for index, (label, wav) in enumerate(tracks):
             try:
                 if self.on_status:
@@ -141,6 +186,7 @@ class MeetingRecorder:
                 else:
                     segments = self.engine.transcribe_file(str(wav))
             except Exception as exc:  # noqa: BLE001 - se informa al usuario
+                failures.append(exc)
                 if self.on_status:
                     self.on_status(f"No se pudo transcribir una pista: {exc}")
                 continue
@@ -154,6 +200,8 @@ class MeetingRecorder:
                     self.on_utterance(label, seg.text, u.start_time, u.end_time)
         if self.on_progress and tracks and getattr(self.engine, "supports_progress", False):
             self.on_progress(1.0)
+        if tracks and len(failures) == len(tracks):
+            raise RuntimeError(f"No se pudo transcribir el audio: {failures[-1]}")
 
     def _link_captures_by_time(self):
         """Asigna cada captura a la frase de su momento (por tiempo)."""
@@ -173,16 +221,39 @@ class MeetingRecorder:
             cap.near_utterance_id = best.id
         self._session.commit()
 
-    def stop(self):
+    def stop_capture(self):
+        """Detiene SOLO la captura de audio (rápido) y deja los WAV listos.
+
+        Marca la reunión como terminada (su duración). La transcripción se hace
+        aparte con `transcribe()`, normalmente desde un worker en segundo plano,
+        para no bloquear ni impedir empezar otra grabación."""
         self._running = False
         if self.live:
             if self._thread:
                 self._thread.join(timeout=60)
-        else:
-            # parar grabación y transcribir TODO el audio de una vez
+        elif self._recorder:
             self._recorder.stop()
+        repo.end_meeting(self._session, self.meeting.id)
+        recovery.update_session(self._tmp, state="captured")
+
+    def transcribe(self):
+        """Transcribe el audio ya grabado y enlaza las capturas por tiempo.
+
+        Se llama después de `stop_capture()`. Al terminar limpia su carpeta de
+        audio temporal. En modo live el texto ya se generó durante la grabación."""
+        if not self.live:
             if self.on_status:
                 self.on_status("Preparando la transcripción…")
             self._transcribe_channels()
         self._link_captures_by_time()
-        repo.end_meeting(self._session, self.meeting.id)
+        # Solo se elimina al completar todo. Si Python/Windows se cierra o el
+        # motor falla, el manifiesto y los WAV quedan disponibles al reiniciar.
+        self._cleanup_tmp()
+
+    def _cleanup_tmp(self):
+        shutil.rmtree(self._tmp, ignore_errors=True)
+
+    def stop(self):
+        """Compatibilidad: detiene y transcribe de forma síncrona (un solo paso)."""
+        self.stop_capture()
+        self.transcribe()

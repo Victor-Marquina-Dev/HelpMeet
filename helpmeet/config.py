@@ -1,8 +1,18 @@
+import json
+import os
+import shutil
+import sys
+from datetime import datetime
 from pathlib import Path
 
-# Raíz del proyecto y carpeta de datos
-PROJECT_ROOT = Path(__file__).resolve().parent.parent
-DATA_DIR = PROJECT_ROOT / "data"
+# Los recursos viajan con el programa; los datos personales NO. En una versión
+# empaquetada, PROJECT_ROOT apunta al directorio temporal de PyInstaller, por lo
+# que nunca debe usarse para SQLite, ajustes o grabaciones.
+SOURCE_ROOT = Path(__file__).resolve().parent.parent
+PROJECT_ROOT = Path(getattr(sys, "_MEIPASS", SOURCE_ROOT))
+LEGACY_DATA_DIR = SOURCE_ROOT / "data"
+_LOCAL_APPDATA = Path(os.environ.get("LOCALAPPDATA", Path.home() / "AppData" / "Local"))
+DATA_DIR = Path(os.environ.get("HELPMEET_DATA_DIR", _LOCAL_APPDATA / "Helpmeet"))
 CAPTURES_DIR = DATA_DIR / "captures"
 DB_PATH = DATA_DIR / "helpmeet.sqlite"
 
@@ -41,6 +51,42 @@ VIDEO_CRF = "18"            # calidad alta (menor = mejor; 18 ≈ sin pérdida v
 VIDEO_AUDIO_RATE = 48000
 
 
+def migrate_legacy_state() -> bool:
+    """Copia el estado esencial de la versión de desarrollo una sola vez.
+
+    No duplica `exports/`, `captures/` ni temporales (pueden ocupar varios GB).
+    Sus rutas absolutas permanecen válidas en la BD y en settings. Las nuevas
+    capturas y la nueva base sí se guardan desde ahora en LOCALAPPDATA.
+    """
+    if DATA_DIR.resolve() == LEGACY_DATA_DIR.resolve() or not LEGACY_DATA_DIR.exists():
+        return False
+    marker = DATA_DIR / ".legacy-migration-v1.json"
+    if marker.exists():
+        return False
+    DATA_DIR.mkdir(parents=True, exist_ok=True)
+    copied = []
+    for name in ("helpmeet.sqlite", "settings.json"):
+        source = LEGACY_DATA_DIR / name
+        target = DATA_DIR / name
+        if source.exists() and not target.exists():
+            shutil.copy2(source, target)
+            copied.append(name)
+    # Una recuperación pendiente sí debe acompañar a la BD; normalmente es
+    # pequeña y borrarla equivaldría a perder una grabación interrumpida.
+    legacy_recovery = LEGACY_DATA_DIR / "recovery"
+    target_recovery = DATA_DIR / "recovery"
+    if legacy_recovery.exists() and any(legacy_recovery.iterdir()):
+        shutil.copytree(legacy_recovery, target_recovery, dirs_exist_ok=True)
+        copied.append("recovery/")
+    marker.write_text(json.dumps({
+        "migrated_at": datetime.now().isoformat(),
+        "legacy_data_dir": str(LEGACY_DATA_DIR),
+        "copied": copied,
+    }, ensure_ascii=False, indent=2), encoding="utf-8")
+    return bool(copied)
+
+
 def ensure_dirs() -> None:
+    migrate_legacy_state()
     DATA_DIR.mkdir(parents=True, exist_ok=True)
     CAPTURES_DIR.mkdir(parents=True, exist_ok=True)
