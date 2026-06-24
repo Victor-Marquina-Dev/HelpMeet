@@ -577,7 +577,9 @@ class Api:
             return {"ok": False, "error": "Ya hay una grabación de reunión en curso."}
         if self._screen_rec is not None:
             return {"ok": False, "error": "Detén la grabación de pantalla antes de grabar una reunión."}
-        self._get_engine()
+        # P-01: NO se carga Whisper aquí. Como `live=False`, el modelo solo se usa
+        # al detener; se pasa la factory `_get_engine` y el grabador lo carga en su
+        # worker al transcribir. Así el botón Grabar no espera a que cargue/descargue.
         title = (title or "").strip() or "Reunión"
         prefs = settings.get_transcription_settings()
         provider = prefs["provider"]
@@ -589,7 +591,7 @@ class Api:
         live = False
         mic_muted = prefs["default_mic_muted"]
         self._recorder = MeetingRecorder(
-            int(initiative_id), title, self._engine,
+            int(initiative_id), title, self._get_engine,  # factory: carga perezosa
             live=live,
             chunk_seconds=config.CHUNK_SECONDS,
             on_utterance=self._push_utterance,
@@ -887,9 +889,12 @@ class Api:
                 for utterance in list(m.utterances):
                     session.delete(utterance)
                 session.commit()
-            for speaker, seg in new_segments:
-                repo.add_utterance(session, m.id, speaker,
-                                   seg.text, seg.start, seg.end)
+            # P-02: una sola transacción para todas las frases del vídeo.
+            repo.add_utterances(session, m.id, [
+                {"speaker": speaker, "text": seg.text,
+                 "start_time": seg.start, "end_time": seg.end}
+                for speaker, seg in new_segments
+            ])
             self._link_screen_captures(m.id, session)
         finally:
             try:
@@ -1151,6 +1156,7 @@ class Api:
             pass
         database.dispose_engine()
         config.wipe_data_dir()
+        settings.invalidate_cache()  # los ajustes en memoria ya no son válidos
         try:
             from helpmeet import secret_store
             secret_store.delete_secret()

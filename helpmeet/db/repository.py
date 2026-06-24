@@ -193,6 +193,24 @@ def add_utterance(session: Session, meeting_id: int, speaker: str, text: str,
     return utt
 
 
+def add_utterances(session: Session, meeting_id: int, rows) -> list[Utterance]:
+    """Inserta varias frases en UNA sola transacción (P-02).
+
+    `rows`: iterable de dicts con speaker/text/start_time/end_time. Un commit por
+    pista/reunión en vez de uno por frase: una reunión con cientos de segmentos
+    pasa de cientos de escrituras sincronizadas a una sola."""
+    objects = [
+        Utterance(meeting_id=meeting_id, speaker=row["speaker"], text=row["text"],
+                  start_time=row["start_time"], end_time=row["end_time"])
+        for row in rows
+    ]
+    if not objects:
+        return []
+    session.add_all(objects)
+    session.commit()
+    return objects
+
+
 def get_utterance(session: Session, utterance_id: int) -> Utterance | None:
     return session.get(Utterance, int(utterance_id))
 

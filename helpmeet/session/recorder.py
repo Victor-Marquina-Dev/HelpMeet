@@ -124,23 +124,37 @@ class MeetingRecorder:
     # ---------- común ----------
     @staticmethod
     def _has_audio(wav, threshold: float = 30.0) -> bool:
-        """True si el WAV tiene sonido real (evita transcribir silencio)."""
+        """True si el WAV tiene sonido real (evita transcribir silencio).
+
+        P-03: se lee por bloques y se acumula la suma de cuadrados, así una
+        reunión larga no carga toda la pista en memoria. Además corta en cuanto
+        un bloque supera claramente el umbral (hay voz)."""
         try:
+            total_sq = 0.0
+            total = 0
             with wave.open(str(wav), "rb") as wf:
-                frames = wf.readframes(wf.getnframes())
-            if not frames:
+                while True:
+                    chunk = wf.readframes(8192)
+                    if not chunk:
+                        break
+                    data = np.frombuffer(chunk, dtype=np.int16).astype(np.float64)
+                    if data.size == 0:
+                        continue
+                    block_rms = np.sqrt(np.dot(data, data) / data.size)
+                    if block_rms > threshold * 2:  # voz clara: no hace falta seguir
+                        return True
+                    total_sq += float(np.dot(data, data))
+                    total += data.size
+            if total == 0:
                 return False
-            samples = np.frombuffer(frames, dtype=np.int16)
-            if samples.size == 0:
-                return False
-            rms = np.sqrt(np.mean(samples.astype(np.float64) ** 2))
-            return rms > threshold
+            return np.sqrt(total_sq / total) > threshold
         except Exception:
             return True  # ante la duda, intenta transcribir
 
     def _store_segments(self, label, wav, elapsed):
         if not wav.exists() or not self._has_audio(wav):
             return
+        self._resolve_engine()
         for seg in self.engine.transcribe_file(str(wav)):
             if not seg.text:
                 continue
@@ -192,14 +206,17 @@ class MeetingRecorder:
                 if self.on_status:
                     self.on_status(f"No se pudo transcribir una pista: {exc}")
                 continue
-            for seg in segments:
-                if not seg.text:
-                    continue
-                u = repo.add_utterance(self._session, self.meeting.id, label,
-                                       seg.text, seg.start, seg.end)
-                self._last_utterance_id = u.id
-                if self.on_utterance:
-                    self.on_utterance(label, seg.text, u.start_time, u.end_time)
+            rows = [
+                {"speaker": label, "text": seg.text,
+                 "start_time": seg.start, "end_time": seg.end}
+                for seg in segments if seg.text
+            ]
+            created = repo.add_utterances(self._session, self.meeting.id, rows)
+            if created:
+                self._last_utterance_id = created[-1].id
+            if self.on_utterance:  # modo live: avisar de cada frase
+                for u in created:
+                    self.on_utterance(u.speaker, u.text, u.start_time, u.end_time)
         if self.on_progress and tracks and getattr(self.engine, "supports_progress", False):
             self.on_progress(1.0)
         if tracks and len(failures) == len(tracks):
@@ -238,12 +255,23 @@ class MeetingRecorder:
         repo.end_meeting(self._session, self.meeting.id)
         recovery.update_session(self._tmp, state="captured")
 
+    def _resolve_engine(self):
+        """Carga el motor de forma perezosa. `engine` puede ser una instancia o
+        una *factory* (callable que la crea). Así empezar a grabar NO espera a que
+        Whisper cargue: el modelo se carga al comenzar a transcribir (al detener)."""
+        if not hasattr(self.engine, "transcribe_file") and callable(self.engine):
+            if self.on_status:
+                self.on_status("Cargando el modelo…")
+            self.engine = self.engine()
+        return self.engine
+
     def transcribe(self):
         """Transcribe el audio ya grabado y enlaza las capturas por tiempo.
 
         Se llama después de `stop_capture()`. Al terminar limpia su carpeta de
         audio temporal. En modo live el texto ya se generó durante la grabación."""
         if not self.live:
+            self._resolve_engine()
             if self.on_status:
                 self.on_status("Preparando la transcripción…")
             self._transcribe_channels()

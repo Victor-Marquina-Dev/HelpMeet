@@ -11,19 +11,44 @@ from helpmeet import secret_store
 
 SETTINGS_PATH = config.DATA_DIR / "settings.json"
 
+# P-11: caché en memoria de settings.json. Muchos getters lo leían en cada
+# llamada (get_transcription_settings invoca varios). Se carga una vez y se
+# refresca al guardar; `invalidate_cache()` lo limpia tras borrar/restaurar datos.
+import threading as _threading
+_cache_lock = _threading.Lock()
+_cache: dict | None = None
+_cache_path = None  # ruta para la que es válida la caché (los tests cambian SETTINGS_PATH)
+
 
 def _load() -> dict:
-    try:
-        return json.loads(SETTINGS_PATH.read_text(encoding="utf-8"))
-    except Exception:
-        return {}
+    global _cache, _cache_path
+    with _cache_lock:
+        if _cache is None or _cache_path != SETTINGS_PATH:
+            try:
+                _cache = json.loads(SETTINGS_PATH.read_text(encoding="utf-8"))
+            except Exception:
+                _cache = {}
+            _cache_path = SETTINGS_PATH
+        return dict(_cache)  # copia: el llamador no muta la caché por accidente
 
 
 def _save(data: dict) -> None:
+    global _cache, _cache_path
     config.ensure_dirs()
     temporary = SETTINGS_PATH.with_suffix(".json.tmp")
     temporary.write_text(json.dumps(data, indent=2, ensure_ascii=False), encoding="utf-8")
     temporary.replace(SETTINGS_PATH)
+    with _cache_lock:
+        _cache = dict(data)
+        _cache_path = SETTINGS_PATH
+
+
+def invalidate_cache() -> None:
+    """Olvida la caché; el próximo acceso releerá del disco (tras borrar/restaurar)."""
+    global _cache, _cache_path
+    with _cache_lock:
+        _cache = None
+        _cache_path = None
 
 
 def _scrub_legacy_plaintext_token() -> None:
