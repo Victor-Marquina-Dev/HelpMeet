@@ -1420,6 +1420,7 @@ function showScreenPanel() {
     </div>
     <div class="screen-preview"><span class="tag-tl">preview en vivo · ~3–4 fps</span><span class="tag-bottom">no representa el frame rate final (30 fps)</span></div>
     <div class="warn-note">${svg('warn', 15)}<span>La máxima nitidez a resolución nativa puede generar archivos de varios GB.</span></div>
+    <div style="padding:12px 20px 0"><input id="scName" class="field" placeholder="Nombre de la reunión (opcional)" autocomplete="off"></div>
     <div style="padding:14px 20px 18px;display:flex;gap:10px;align-items:center;flex-wrap:wrap">
       <button class="btn btn-stop" id="scStop"><span class="sq"></span>Detener vídeo</button>
       <button class="btn btn-lg ${STATE.micMuted ? 'btn-danger' : ''}" id="scMic">${STATE.micMuted ? 'Activar micro' : 'Silenciar micro'}</button>
@@ -1437,26 +1438,44 @@ function showScreenPanel() {
   m.querySelector('#scCap').onclick = () => api.takeCapture(STATE.monitorIdx).then(() => toast('ok', 'Captura guardada'));
   m.querySelector('#scNote').onclick = () => promptNote();
   m.querySelector('#scMon').onchange = (e) => { STATE.monitorIdx = +e.target.value; api.setScreenMonitor(STATE.monitorIdx); };
+  // Nombre de la reunión: se guarda al salir del campo (rename en caliente).
+  m.querySelector('#scName').onblur = (e) => {
+    const v = e.target.value.trim();
+    if (v && STATE.screenMeetingId) api.renameMeeting(STATE.screenMeetingId, v);
+  };
   const root = $('#overlayRoot'); root.replaceChildren(m); root.hidden = false; root.onclick = null;
 }
 async function stopScreenRecording() {
   STATE.screenPanelOpen = false;   // evitar que closeModal re-muestre el panel
+  // Aplica el nombre escrito en el panel (si lo hay) antes de cerrar.
+  const nameField = document.getElementById('scName');
+  if (nameField && nameField.value.trim() && STATE.screenMeetingId) {
+    api.renameMeeting(STATE.screenMeetingId, nameField.value.trim());
+  }
   stopTimer();
   closeModal();
-  beginProcessing('Guardando y mezclando el vídeo');
+  setAppState('idle');
   let res = null;
   try { res = await api.stopScreenRecording(); } catch (e) {}
-  endProcessing();
-  await refreshMeetings(STATE.selInit);
-  const mid = (res && res.meeting_id) || STATE.screenMeetingId;
   STATE.screenMeetingId = null;
-  if (res && res.ok && mid) {
-    await openMeeting(mid);   // abre la reunión: muestra el vídeo + opción Transcribir
-    toast(res.audio === false ? 'info' : 'ok', res.audio === false ? 'Vídeo guardado (sin sonido)' : 'Vídeo guardado');
+  if (res && res.ok) {
+    // El muxeo va en segundo plano; no bloqueamos. Avisará onScreenVideoSaved.
+    toast('info', 'Guardando el vídeo en segundo plano… puedes seguir usando la app');
+    await refreshMeetings(STATE.selInit);
   } else {
-    toast('err', (res && res.error) || 'No se pudo guardar el vídeo');
+    toast('err', (res && res.error) || 'No se pudo detener la grabación');
   }
 }
+// El vídeo terminó de guardarse/mezclarse en segundo plano.
+window.onScreenVideoSaved = async function (meetingId, initiativeId, ok, audio) {
+  if (initiativeId && STATE.meetingsByInit[initiativeId] !== undefined) {
+    await refreshMeetings(initiativeId);
+  } else if (STATE.selInit) {
+    await refreshMeetings(STATE.selInit);
+  }
+  if (ok) toast(audio === false ? 'info' : 'ok', audio === false ? 'Vídeo guardado (sin sonido)' : 'Vídeo guardado');
+  else toast('err', 'No se pudo guardar el vídeo');
+};
 
 /* ============================================================
    7d. PROCESAMIENTO (con barra; Cancelar es V2)

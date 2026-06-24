@@ -141,6 +141,7 @@ class Api:
         self._last_meeting_id = None
         self._screen_rec = None
         self._screen_active = False     # True mientras se graba pantalla
+        self._screen_saving = False     # True mientras se muxea el vídeo en 2.º plano
         self._screen_meeting_id = None  # reunión asociada a la grabación de pantalla
         self._window = None
         # Transcripción en segundo plano: cola serie + hilo worker. Permite
@@ -661,6 +662,9 @@ class Api:
 
         if self._screen_rec is not None:
             return {"ok": False, "error": "Ya hay una grabación de pantalla en curso."}
+        if self._screen_saving:
+            return {"ok": False,
+                    "error": "Espera unos segundos: se está guardando el vídeo anterior."}
         if self._recorder is not None:
             return {"ok": False,
                     "error": "Termina la grabación de reunión antes de grabar pantalla."}
@@ -704,36 +708,76 @@ class Api:
         return {"ok": False}
 
     def stop_screen_recording(self):
-        """Detiene la grabación, muxea el .mp4, lo guarda en la reunión y la
-        finaliza. La transcripción es aparte (transcribe_meeting_video), así que
-        puede pedirse ahora o más tarde al abrir la reunión."""
+        """Detiene la grabación y devuelve enseguida: el muxeo del .mp4 (que puede
+        tardar varios segundos) se hace en SEGUNDO PLANO, para no bloquear la app.
+        Al terminar avisa a la UI con `window.onScreenVideoSaved`."""
         rec = self._screen_rec
         if rec is None:
             return {"ok": False, "error": "No hay grabación de pantalla en curso."}
         self._screen_active = False
         meeting_id = self._screen_meeting_id
-        result = rec.stop()
-        path = result.get("path")
-        # Conservamos micrófono y sistema por separado junto al MP4. Whisper
-        # entiende mucho mejor cada pista aislada que la mezcla final del video.
-        if result.get("ok") and path:
-            video_path = Path(path)
-            for label, source in rec.audio_channels():
-                if source.exists() and source.stat().st_size > 44:
-                    suffix = ".mic.wav" if label == "me" else ".system.wav"
-                    shutil.copy2(source, video_path.with_suffix(suffix))
-        rec.cleanup()
-        self._reset_screen_state()    # no queda nada pendiente
+        initiative_id = None
         if meeting_id:
-            if result.get("ok") and path:
-                m = repo.get_meeting(self._session, meeting_id)
-                if m is not None:
-                    m.audio_path = path   # ruta del video, para transcribir luego
-                    self._session.commit()
-            repo.end_meeting(self._session, meeting_id)  # duración = tiempo real
-            result["folder"] = str(Path(path).parent) if path else None
-            result["meeting_id"] = meeting_id
-        return result
+            m = repo.get_meeting(self._session, meeting_id)
+            initiative_id = m.initiative_id if m is not None else None
+        audio_channels = list(rec.audio_channels())
+        # Libera el estado de grabación; el guardado va aparte. Bloqueamos solo
+        # una NUEVA grabación de pantalla hasta que termine de muxearse esta.
+        self._reset_screen_state()
+        self._screen_saving = True
+        threading.Thread(
+            target=self._save_screen_video_bg,
+            args=(rec, meeting_id, initiative_id, audio_channels),
+            daemon=True,
+        ).start()
+        return {"ok": True, "meeting_id": meeting_id, "saving": True}
+
+    def _save_screen_video_bg(self, rec, meeting_id, initiative_id, audio_channels):
+        """Muxea el vídeo y lo asocia a la reunión sin bloquear la interfaz.
+        Usa su propia sesión de BD (corre en un hilo aparte)."""
+        ok = False
+        audio = True
+        try:
+            result = rec.stop()
+            path = result.get("path")
+            ok = bool(result.get("ok") and path)
+            audio = result.get("audio", True)
+            if ok:
+                video_path = Path(path)
+                # Pistas de micro y sistema por separado: Whisper transcribe
+                # mucho mejor cada una aislada que la mezcla final del vídeo.
+                for label, source in audio_channels:
+                    if source.exists() and source.stat().st_size > 44:
+                        suffix = ".mic.wav" if label == "me" else ".system.wav"
+                        shutil.copy2(source, video_path.with_suffix(suffix))
+            try:
+                rec.cleanup()
+            except Exception:
+                pass
+            if meeting_id:
+                from helpmeet.db.database import get_session
+                session = get_session()
+                try:
+                    meeting = repo.get_meeting(session, meeting_id)
+                    if meeting is not None and ok:
+                        meeting.audio_path = path
+                        session.commit()
+                    repo.end_meeting(session, meeting_id)
+                finally:
+                    session.close()
+        except Exception:
+            ok = False
+        finally:
+            self._screen_saving = False
+            self._notify_screen_saved(meeting_id, initiative_id, ok, audio)
+
+    def _notify_screen_saved(self, meeting_id, initiative_id, ok, audio):
+        if self._window:
+            self._window.evaluate_js(
+                "window.onScreenVideoSaved && window.onScreenVideoSaved("
+                f"{json.dumps(meeting_id)}, {json.dumps(initiative_id)}, "
+                f"{json.dumps(bool(ok))}, {json.dumps(bool(audio))})"
+            )
 
     def _finish_meeting_info(self, meeting_id):
         m = repo.get_meeting(self._session, meeting_id)
