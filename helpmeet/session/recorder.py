@@ -171,6 +171,8 @@ class MeetingRecorder:
             for label, fname in _CHANNELS
             if (self._tmp / fname).exists() and self._has_audio(self._tmp / fname)
         ]
+        from helpmeet.transcription.progress import WeightedProgress
+        weighted = WeightedProgress([wav for _, wav in tracks])
         failures = []
         for index, (label, wav) in enumerate(tracks):
             try:
@@ -178,8 +180,8 @@ class MeetingRecorder:
                     self.on_status(f"Transcribiendo pista {index + 1} de {len(tracks)}…")
                 if getattr(self.engine, "supports_progress", False):
                     def track_progress(fraction, track=index):
-                        if self.on_progress and tracks:
-                            self.on_progress((track + fraction) / len(tracks))
+                        if self.on_progress:
+                            self.on_progress(weighted.at(track, fraction))
                     segments = self.engine.transcribe_file(
                         str(wav), on_progress=track_progress, quality="fast"
                     )

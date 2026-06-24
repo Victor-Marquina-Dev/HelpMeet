@@ -120,6 +120,62 @@ def set_ai_instructions(text: str) -> None:
     _save(data)
 
 
+# ---------- Idioma y modelo de transcripción ----------
+# El idioma se elige PRIMERO y de él depende qué modelos hay: el inglés usa los
+# modelos ".en" (optimizados solo para inglés, más precisos en ese idioma); el
+# español usa los multilingües.
+WHISPER_LANGUAGES = {
+    "es": "Español",
+    "en": "Inglés",
+}
+
+# Niveles de calidad, de menor a mayor. Cada nivel es el mismo concepto en los dos
+# idiomas; solo cambia el modelo concreto que se descarga. `download` es el tamaño
+# aproximado que se baja la primera vez que se usa ese modelo.
+WHISPER_TIERS = [
+    {"tier": "fast",     "label": "Rápido — menos preciso",         "download": "~145 MB"},
+    {"tier": "balanced", "label": "Equilibrado (recomendado)",      "download": "~480 MB"},
+    {"tier": "accurate", "label": "Más preciso — más lento",        "download": "~1,5 GB"},
+    {"tier": "max",      "label": "Máxima calidad — lento, pesado", "download": "~3 GB"},
+]
+
+# Modelo concreto de faster-whisper para cada (idioma, nivel). No existe "large.en":
+# el modelo grande es multilingüe, así que el nivel máximo usa "large-v3" en ambos.
+WHISPER_MODELS_BY_LANG = {
+    "es": {"fast": "base",    "balanced": "small",    "accurate": "medium",    "max": "large-v3"},
+    "en": {"fast": "base.en", "balanced": "small.en", "accurate": "medium.en", "max": "large-v3"},
+}
+
+DEFAULT_TIER = "balanced"
+_TIER_IDS = {t["tier"] for t in WHISPER_TIERS}
+
+
+def get_transcription_language() -> str:
+    """Idioma elegido. Por defecto "es"."""
+    value = _load().get("transcription_language")
+    return value if value in WHISPER_LANGUAGES else "es"
+
+
+def get_transcription_tier() -> str:
+    """Nivel de calidad elegido (fast/balanced/accurate/max). Por defecto balanced."""
+    value = _load().get("transcription_tier")
+    return value if value in _TIER_IDS else DEFAULT_TIER
+
+
+def get_transcription_model() -> str:
+    """Modelo concreto de faster-whisper, derivado del idioma y el nivel elegidos."""
+    return WHISPER_MODELS_BY_LANG[get_transcription_language()][get_transcription_tier()]
+
+
+def _models_for(language: str) -> list:
+    """Lista de niveles con el modelo concreto que les toca en ese idioma."""
+    return [
+        {"tier": t["tier"], "id": WHISPER_MODELS_BY_LANG[language][t["tier"]],
+         "label": t["label"], "download": t["download"]}
+        for t in WHISPER_TIERS
+    ]
+
+
 # ---------- Preferencias de transcripción y audio ----------
 def get_transcription_settings() -> dict:
     data = _load()
@@ -127,11 +183,21 @@ def get_transcription_settings() -> dict:
     # Replicate (nube) deshabilitado: cualquier valor que no sea local cae a local.
     if provider not in {"auto", "local"}:
         provider = "local"
+    language = get_transcription_language()
+    tier = get_transcription_tier()
     return {
         "provider": provider,
         "default_mic_muted": bool(data.get("default_mic_muted", False)),
         "video_quality": "accurate",
-        "language": config.WHISPER_LANGUAGE,
+        "language": language,
+        "language_label": WHISPER_LANGUAGES[language],
+        "languages": [{"id": lid, "label": label} for lid, label in WHISPER_LANGUAGES.items()],
+        "tier": tier,
+        "model": get_transcription_model(),  # id concreto (para diagnóstico y motor)
+        # Modelos por idioma, para que la UI cambie la lista al cambiar de idioma
+        # sin volver a llamar a Python.
+        "models": _models_for(language),
+        "models_by_lang": {lang: _models_for(lang) for lang in WHISPER_LANGUAGES},
     }
 
 
@@ -157,5 +223,15 @@ def set_transcription_settings(values: dict) -> dict:
         current["transcription_provider"] = provider
     if "default_mic_muted" in values:
         current["default_mic_muted"] = bool(values["default_mic_muted"])
+    if "language" in values:
+        language = str(values["language"])
+        if language not in WHISPER_LANGUAGES:
+            raise ValueError("Idioma de transcripción no válido.")
+        current["transcription_language"] = language
+    if "tier" in values:
+        tier = str(values["tier"])
+        if tier not in _TIER_IDS:
+            raise ValueError("Nivel de transcripción no válido.")
+        current["transcription_tier"] = tier
     _save(current)
     return get_transcription_settings()
