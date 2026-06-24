@@ -3,6 +3,9 @@ import sys
 import time
 import wave
 import json
+import base64
+import queue
+import threading
 import tempfile
 import subprocess
 import shutil
@@ -14,9 +17,72 @@ from helpmeet.db import repository as repo
 from helpmeet.transcription.engine import TranscriptionEngine
 from helpmeet.transcription.replicate_engine import ReplicateTranscriptionEngine
 from helpmeet.session.recorder import MeetingRecorder
-from helpmeet.export.exporter import export_meeting, export_initiative, meeting_export_dir
+from helpmeet.export.exporter import (
+    export_meeting, export_initiative, meeting_export_dir, build_meeting_context,
+)
 from helpmeet import config
 from helpmeet import settings
+
+
+_MONTHS_ES = (
+    "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
+    "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre",
+)
+
+_NATIVE_ICON_REFS = []
+
+
+def _set_windows_app_identity() -> None:
+    """Separa Helpmeet de Python en la barra de tareas de Windows."""
+    if not sys.platform.startswith("win"):
+        return
+    try:
+        import ctypes
+        ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(
+            "MimoTech.Helpmeet.Desktop"
+        )
+    except Exception:
+        pass
+
+
+def _apply_native_window_icon(window, icon_path: Path) -> None:
+    """Aplica el .ico a WinForms después de que pywebview cree la ventana."""
+    if not sys.platform.startswith("win") or not window.events.shown.wait(15):
+        return
+    try:
+        from System import Action
+        from System.Drawing import Icon
+        from webview.platforms.winforms import BrowserView
+
+        form = BrowserView.instances.get(window.uid)
+        if form is None:
+            return
+        icon = Icon(str(icon_path), 256, 256)
+        _NATIVE_ICON_REFS.append(icon)  # conservar el handle durante toda la app
+
+        def assign():
+            form.Icon = icon
+
+        if form.InvokeRequired:
+            form.Invoke(Action(assign))
+        else:
+            assign()
+    except Exception:
+        # El favicon SVG sigue funcionando aunque cambie el backend de pywebview.
+        pass
+
+
+def _spanish_date(value) -> str:
+    return f"{value.day} de {_MONTHS_ES[value.month - 1]} {value.year}"
+
+
+def _spanish_month(value) -> str:
+    return f"{_MONTHS_ES[value.month - 1]} {value.year}"
+
+
+def _fmt_12h(value) -> str:
+    """Hora en formato 12h con AM/PM y sin cero inicial (ej. `7:08 PM`)."""
+    return value.strftime("%I:%M %p").lstrip("0")
 
 
 def _wav_seconds(path) -> float:
@@ -74,12 +140,25 @@ class Api:
         self._screen_active = False     # True mientras se graba pantalla
         self._screen_meeting_id = None  # reunión asociada a la grabación de pantalla
         self._window = None
+        # Transcripción en segundo plano: cola serie + hilo worker. Permite
+        # detener una grabación y empezar otra al instante mientras la anterior
+        # se transcribe por detrás (una a una).
+        self._jobs = None
+        self._jobs_lock = threading.Lock()
+        self._jobs_info = {}   # meeting_id -> {meeting_id, title, initiative_id, state, progress, stage}
+        self._worker = None
 
     def set_window(self, window):
         self._window = window
 
     def list_initiatives(self):
-        return [{"id": i.id, "name": i.name} for i in repo.list_initiatives(self._session)]
+        return [{"id": i.id, "name": i.name, "description": i.description or ""}
+                for i in repo.list_initiatives(self._session)]
+
+    def set_initiative_description(self, initiative_id, description):
+        """Guarda el objetivo/contexto de una iniciativa (va a la cabecera del export)."""
+        repo.set_initiative_description(self._session, int(initiative_id), description)
+        return {"ok": True}
 
     def list_library(self, view):
         """Lista el archivo o la papelera en un formato listo para la UI."""
@@ -153,19 +232,34 @@ class Api:
         return [{"term": t, "count": c} for t, c in glos]
 
     def list_meetings(self, initiative_id):
+        # Refrescar por si una transcripción en segundo plano (otra sesión)
+        # acaba de añadir frases a alguna reunión.
+        self._session.expire_all()
         meetings = repo.list_meetings(self._session, int(initiative_id))
+        with self._jobs_lock:
+            transcribing = {mid for mid, info in self._jobs_info.items()
+                            if info.get("state") in ("queued", "running")}
         result = []
         for m in meetings:
             total = int((m.ended_at - m.started_at).total_seconds()) if m.ended_at else 0
             mm, ss = divmod(max(0, total), 60)
             is_video = bool(m.audio_path and str(m.audio_path).lower().endswith(".mp4"))
+            if m.id in transcribing:
+                status = "processing"   # transcribiéndose en segundo plano
+            elif is_video and not m.utterances:
+                status = "pending"
+            elif m.ended_at:
+                status = "done"
+            else:
+                status = "pending"
             result.append({
                 "id": m.id,
                 "title": m.title,
                 "date": m.started_at.strftime("%d/%m/%Y %H:%M"),
-                "status": "pending" if is_video and not m.utterances else (
-                    "done" if m.ended_at else "pending"
-                ),
+                "time": _fmt_12h(m.started_at),
+                "month_key": m.started_at.strftime("%Y-%m"),
+                "month_label": _spanish_month(m.started_at),
+                "status": status,
                 "frases": len(m.utterances),
                 "dur": f"{mm:02d}:{ss:02d}" if m.ended_at else "—",
                 "has_video": is_video,
@@ -188,6 +282,7 @@ class Api:
         return out
 
     def get_transcript(self, meeting_id):
+        self._session.expire_all()  # ver frases añadidas en segundo plano
         m = repo.get_meeting(self._session, int(meeting_id))
         if m is None:
             return {"title": "", "started_at": "", "utterances": [],
@@ -205,6 +300,7 @@ class Api:
             timeline.append({
                 "id": u.id, "kind": "utterance", "speaker": u.speaker,
                 "text": u.text, "start": u.start_time, "end": u.end_time,
+                "highlighted": bool(u.highlighted),
                 "time": stamp(u.start_time), "_sort": float(u.start_time),
             })
         captures = []
@@ -212,6 +308,8 @@ class Api:
             offset = max(0.0, (cap.taken_at - m.started_at).total_seconds())
             item = {
                 "id": cap.id, "kind": "capture", "time": stamp(offset),
+                "clock": _fmt_12h(cap.taken_at) if cap.taken_at else "",
+                "code": cap.code,
                 "offset": offset, "path": cap.image_path, "note": cap.note or "",
                 "_sort": offset,
             }
@@ -237,6 +335,47 @@ class Api:
             "assets": {"captures": captures, "notes": notes, "video": video},
             "video_path": video,
         }
+
+    def update_utterance(self, utterance_id, changes):
+        """Edita una frase: texto y/o hablante. `changes` es un dict con
+        opcionalmente `text` y/o `speaker` ("me"|"others")."""
+        changes = changes or {}
+        utt = repo.update_utterance(
+            self._session, int(utterance_id),
+            text=changes.get("text"), speaker=changes.get("speaker"),
+        )
+        if utt is None:
+            return {"ok": False, "error": "La frase ya no existe."}
+        return {"ok": True, "id": utt.id, "text": utt.text, "speaker": utt.speaker}
+
+    def toggle_utterance_highlight(self, utterance_id):
+        """Marca/desmarca una frase como importante (★). Devuelve el nuevo estado."""
+        state = repo.toggle_utterance_highlight(self._session, int(utterance_id))
+        if state is None:
+            return {"ok": False, "error": "La frase ya no existe."}
+        return {"ok": True, "id": int(utterance_id), "highlighted": bool(state)}
+
+    def delete_utterance(self, utterance_id):
+        """Elimina una frase de la transcripción."""
+        ok = repo.delete_utterance(self._session, int(utterance_id))
+        return {"ok": bool(ok)}
+
+    def get_capture_image(self, capture_id):
+        """Devuelve la imagen de una captura como data URL base64.
+
+        WebView2 bloquea la carga de `file://` como sub-recurso, así que las
+        miniaturas no se ven con una ruta de archivo. Incrustarlas en base64
+        (igual que la previsualización) evita ese bloqueo. Se cargan bajo
+        demanda (una por tarjeta) para no inflar `get_transcript`."""
+        cap = repo.get_capture(self._session, int(capture_id))
+        if cap is None or not cap.image_path or not os.path.exists(cap.image_path):
+            return {"ok": False, "data_url": ""}
+        ext = os.path.splitext(cap.image_path)[1].lower()
+        mime = {"png": "image/png", "jpg": "image/jpeg", "jpeg": "image/jpeg"}.get(
+            ext.lstrip("."), "application/octet-stream")
+        with open(cap.image_path, "rb") as fh:
+            b64 = base64.b64encode(fh.read()).decode("ascii")
+        return {"ok": True, "data_url": f"data:{mime};base64,{b64}"}
 
     def export_meeting_by_id(self, meeting_id):
         out = export_meeting(self._session, int(meeting_id), settings.get_export_dir())
@@ -270,16 +409,12 @@ class Api:
         return {"ok": True, "path": str(folder)}
 
     def _get_engine(self):
-        prefs = settings.get_transcription_settings()
-        provider = prefs["provider"]
-        if provider == "auto":
-            provider = "local"
-        if self._engine is None or self._engine_provider != provider:
-            if provider == "replicate" and not settings.get_api_token():
-                raise ValueError("Configura la API key de Replicate o elige transcripción local.")
-            self._engine = (ReplicateTranscriptionEngine() if provider == "replicate"
-                            else TranscriptionEngine())
-            self._engine_provider = provider
+        # Transcripción en la nube (Replicate) DESHABILITADA: se usa siempre el
+        # motor local de Whisper (faster-whisper), ignorando cualquier
+        # preferencia antigua de "replicate" guardada en los ajustes.
+        if self._engine is None or self._engine_provider != "local":
+            self._engine = TranscriptionEngine()
+            self._engine_provider = "local"
         return self._engine
 
     def _get_local_engine(self):
@@ -389,7 +524,7 @@ class Api:
         from helpmeet.db.models import Initiative
         from helpmeet.video.recorder import ScreenVideoRecorder
         from helpmeet.screenshot.capture import monitor_geometry
-        from helpmeet.export.exporter import initiative_export_dir
+        from helpmeet.export.exporter import initiative_month_dir
 
         if self._screen_rec is not None:
             return {"ok": False, "error": "Ya hay una grabación de pantalla en curso."}
@@ -401,9 +536,10 @@ class Api:
             return {"ok": False, "error": "Selecciona una iniciativa primero."}
 
         mon = monitor_geometry(int(monitor_index))
-        folder = initiative_export_dir(ini, settings.get_export_dir())
-        dest = folder / f"{datetime.now():%Y-%m-%d_%H-%M-%S}_grabacion.mp4"
-        meeting = repo.start_meeting(self._session, ini.id, "Grabación de pantalla")
+        now = datetime.now()
+        folder = initiative_month_dir(ini, settings.get_export_dir(), now)
+        dest = folder / f"{now:%Y-%m-%d_%H-%M-%S}_grabacion.mp4"
+        meeting = repo.start_meeting(self._session, ini.id, _spanish_date(now))
         rec = ScreenVideoRecorder(dest, mon, on_status=self._push_status,
                                   on_preview=self._push_preview)
         mic_muted = settings.get_transcription_settings()["default_mic_muted"]
@@ -479,18 +615,29 @@ class Api:
         }
 
     def transcribe_meeting_video(self, meeting_id, force=False):
-        """Transcribe o vuelve a transcribir el video de una reunión.
-
-        Las grabaciones nuevas usan las pistas aisladas de micrófono/sistema.
-        Para videos antiguos (solo mezcla MP4), se prioriza Replicate cuando hay
-        token porque ofrece mejor precisión con una única petición.
-        """
-        from helpmeet.media import extract_audio_to_wav
+        """Encola la transcripción del vídeo en SEGUNDO PLANO y vuelve enseguida,
+        para poder seguir grabando otro vídeo sin esperar."""
         m = repo.get_meeting(self._session, int(meeting_id))
         if m is None or not m.audio_path or not os.path.exists(m.audio_path):
             return {"ok": False, "error": "No se encontró el video de esta reunión."}
         if m.utterances and not force:
-            return {"ok": True, "already": True, **self._finish_meeting_info(m.id)}
+            return {"ok": True, "already": True, "meeting_id": m.id}
+        self._enqueue_video_job(m.id, m.title, m.initiative_id, bool(force))
+        return {"ok": True, "queued": True, "meeting_id": m.id}
+
+    def _transcribe_video(self, session, meeting_id, force=False,
+                          on_status=None, on_progress=None):
+        """Transcribe el .mp4 de una reunión usando `session` (la del worker).
+
+        Las grabaciones nuevas usan las pistas aisladas de micrófono/sistema.
+        Para videos antiguos (solo mezcla MP4), se prioriza Replicate cuando hay
+        token porque ofrece mejor precisión con una única petición."""
+        from helpmeet.media import extract_audio_to_wav
+        on_status = on_status or (lambda *_: None)
+        on_progress = on_progress or (lambda *_: None)
+        m = repo.get_meeting(session, int(meeting_id))
+        if m is None or not m.audio_path or not os.path.exists(m.audio_path):
+            return {"ok": False, "error": "No se encontró el video de esta reunión."}
 
         tmp_dir = config.DATA_DIR / "tmp_audio"
         tmp_dir.mkdir(parents=True, exist_ok=True)
@@ -508,18 +655,17 @@ class Api:
             if tracks:
                 engine = self._get_local_engine()
             else:
-                self._push_status("Extrayendo el audio del video…")
+                on_status("Extrayendo el audio del video…")
                 extract_audio_to_wav(m.audio_path, str(wav))
                 tracks = [("others", wav)]
-                engine = (ReplicateTranscriptionEngine() if settings.get_api_token()
-                          else self._get_local_engine())
+                # Nube deshabilitada: siempre Whisper local, sin importar el token.
+                engine = self._get_local_engine()
 
             for index, (speaker, audio_path) in enumerate(tracks):
-                self._push_status(f"Transcribiendo pista {index + 1} de {len(tracks)}…")
+                on_status(f"Transcribiendo pista {index + 1} de {len(tracks)}…")
                 if getattr(engine, "supports_progress", False):
                     def _progress(frac, track=index):
-                        overall = (track + frac) / len(tracks)
-                        self._push_progress(overall)
+                        on_progress((track + frac) / len(tracks))
                     segments = engine.transcribe_file(
                         str(audio_path), on_progress=_progress,
                         no_speech_max=0.95, quality="accurate"
@@ -535,27 +681,24 @@ class Api:
 
             if force:
                 for utterance in list(m.utterances):
-                    self._session.delete(utterance)
-                self._session.commit()
+                    session.delete(utterance)
+                session.commit()
             for speaker, seg in new_segments:
-                repo.add_utterance(self._session, m.id, speaker,
+                repo.add_utterance(session, m.id, speaker,
                                    seg.text, seg.start, seg.end)
-            self._link_screen_captures(m.id)
-        except Exception as exc:  # noqa: BLE001 - se informa al usuario
-            self._push_status("")
-            return {"ok": False, "error": str(exc)}
+            self._link_screen_captures(m.id, session)
         finally:
             try:
                 if wav.exists():
                     wav.unlink()
             except Exception:
                 pass
-        self._push_status("")
-        return {"ok": True, **self._finish_meeting_info(m.id)}
+        return {"ok": True, "meeting_id": m.id}
 
-    def _link_screen_captures(self, meeting_id):
+    def _link_screen_captures(self, meeting_id, session=None):
         """Ancla cada captura a la frase de su momento (por tiempo)."""
-        m = repo.get_meeting(self._session, meeting_id)
+        session = session or self._session
+        m = repo.get_meeting(session, meeting_id)
         utts = sorted(m.utterances, key=lambda u: u.start_time)
         if not utts:
             return
@@ -570,7 +713,7 @@ class Api:
                 else:
                     break
             cap.near_utterance_id = best.id
-        self._session.commit()
+        session.commit()
 
     def _reset_screen_state(self):
         self._screen_rec = None
@@ -588,25 +731,129 @@ class Api:
         if not self._recorder:
             return {"ok": False, "duration": ""}
         recorder = self._recorder
-        try:
-            recorder.stop()
-        finally:
-            # Tras parar, capturas/notas deben dejar de apuntar a esta reunión y
-            # una grabación de pantalla debe poder iniciarse normalmente.
-            self._recorder = None
+        # 1) Detener SOLO la captura (rápido) y liberar el carril al instante:
+        #    capturas/notas dejan de apuntar a esta reunión y ya puedes empezar
+        #    otra grabación enseguida.
+        recorder.stop_capture()
+        self._recorder = None
         m = recorder.meeting
+        duration = self._meeting_duration(m)
+        # 2) La transcripción se hace en segundo plano (cola serie).
+        self._queue_transcription(recorder)
+        return {"ok": True, "meeting_id": m.id, "duration": duration,
+                "queued": True, "utterances": []}
+
+    @staticmethod
+    def _meeting_duration(m):
         if m.ended_at and m.started_at:
             total = int((m.ended_at - m.started_at).total_seconds())
             mm, ss = divmod(total, 60)
-            duration = f"{mm} min {ss} s"
-        else:
-            duration = ""
-        utterances = [
-            {"speaker": u.speaker, "text": u.text}
-            for u in sorted(m.utterances, key=lambda u: u.start_time)
-        ]
-        return {"ok": True, "meeting_id": m.id, "duration": duration,
-                "utterances": utterances}
+            return f"{mm} min {ss} s"
+        return ""
+
+    # ---------- Transcripción en segundo plano (cola serie) ----------
+    def _ensure_worker(self):
+        if self._jobs is None:
+            self._jobs = queue.Queue()
+            self._worker = threading.Thread(target=self._job_worker, daemon=True)
+            self._worker.start()
+
+    def _enqueue_job(self, meeting_id, title, initiative_id, run):
+        """Encola un trabajo de transcripción (grabación o vídeo) en segundo plano.
+
+        `run` es un invocable que hace la transcripción usando SU propia sesión
+        de BD (no la del hilo principal)."""
+        self._ensure_worker()
+        with self._jobs_lock:
+            self._jobs_info[meeting_id] = {
+                "meeting_id": meeting_id, "title": title,
+                "initiative_id": initiative_id,
+                "state": "queued", "progress": 0.0, "stage": "En cola",
+            }
+        self._push_jobs()
+        self._jobs.put((meeting_id, run))
+
+    def _queue_transcription(self, recorder):
+        """Encola una grabación ya detenida para transcribirla por detrás."""
+        m = recorder.meeting
+        mid = m.id
+        # Redirigir los avisos del recorder al indicador de segundo plano
+        # (no a la barra de 'procesando', que ya no se usa al detener).
+        recorder.on_utterance = None
+        recorder.on_status = lambda text, _mid=mid: self._job_event(_mid, stage=text)
+        recorder.on_progress = lambda frac, _mid=mid: self._job_event(_mid, progress=frac)
+        self._enqueue_job(mid, m.title, m.initiative_id, recorder.transcribe)
+
+    def _enqueue_video_job(self, meeting_id, title, initiative_id, force):
+        """Encola la transcripción del .mp4 de una reunión en segundo plano."""
+        on_status = lambda text, _mid=meeting_id: self._job_event(_mid, stage=text)
+        on_progress = lambda frac, _mid=meeting_id: self._job_event(_mid, progress=frac)
+
+        def run():
+            s = get_session()   # sesión propia del worker (otro hilo)
+            try:
+                self._transcribe_video(s, meeting_id, force, on_status, on_progress)
+            finally:
+                s.close()
+        self._enqueue_job(meeting_id, title, initiative_id, run)
+
+    def _job_worker(self):
+        while True:
+            meeting_id, run = self._jobs.get()
+            try:
+                self._job_event(meeting_id, state="running", stage="Transcribiendo…")
+                run()
+                self._job_event(meeting_id, state="done", progress=1.0, stage="Listo")
+            except Exception as exc:  # noqa: BLE001 - se informa al usuario
+                self._job_event(meeting_id, state="error", stage=f"Error: {exc}")
+            finally:
+                self._jobs.task_done()
+                self._finish_job(meeting_id)
+
+    def _job_event(self, mid, **changes):
+        with self._jobs_lock:
+            info = self._jobs_info.get(mid)
+            if info is None:
+                return
+            for key, value in changes.items():
+                if value is not None:
+                    info[key] = float(value) if key == "progress" else value
+        self._push_jobs()
+
+    def _finish_job(self, mid):
+        with self._jobs_lock:
+            info = dict(self._jobs_info.get(mid, {}))
+        ok = info.get("state") == "done"
+        ini_id = info.get("initiative_id")
+        if self._window:
+            self._window.evaluate_js(
+                f"window.onJobFinished && window.onJobFinished("
+                f"{json.dumps(mid)}, {json.dumps(ini_id)}, {json.dumps(bool(ok))})"
+            )
+
+        def _drop():
+            time.sleep(4)  # deja ver "Listo"/"Error" un momento
+            with self._jobs_lock:
+                self._jobs_info.pop(mid, None)
+            self._push_jobs()
+        threading.Thread(target=_drop, daemon=True).start()
+
+    def _push_jobs(self):
+        if not self._window:
+            return
+        with self._jobs_lock:
+            jobs = list(self._jobs_info.values())
+        try:
+            self._window.evaluate_js(
+                f"window.onBackgroundJobs && window.onBackgroundJobs({json.dumps(jobs)})"
+            )
+        except Exception:
+            pass
+
+    def get_background_jobs(self):
+        """Estado actual de las transcripciones en segundo plano (para la UI)."""
+        with self._jobs_lock:
+            return list(self._jobs_info.values())
 
     def export(self):
         meeting_id = (self._recorder.meeting.id if self._recorder and self._recorder.meeting
@@ -623,8 +870,30 @@ class Api:
             "export_dir": str(settings.get_export_dir()),
             "has_token": bool(token),
             "token_hint": ("…" + token[-4:]) if token else "",
+            "ai_instructions": settings.get_ai_instructions(),
             **settings.get_transcription_settings(),
         }
+
+    def set_ai_instructions(self, text):
+        """Guarda la cabecera de instrucciones para la IA (vacío = plantilla por defecto)."""
+        settings.set_ai_instructions(text or "")
+        return {"ok": True, "text": settings.get_ai_instructions()}
+
+    def copy_initiative_context(self, initiative_id):
+        """Refresca el export y devuelve el texto de `contexto.md` para copiarlo.
+
+        Reutiliza la exportación normal (deja la carpeta al día) y lee el
+        documento combinado, que ya incluye la cabecera de instrucciones,
+        el objetivo, el glosario y todas las reuniones."""
+        out = export_initiative(self._session, int(initiative_id), settings.get_export_dir())
+        ctx = Path(out) / "contexto.md"
+        text = ctx.read_text(encoding="utf-8") if ctx.exists() else ""
+        return {"ok": bool(text.strip()), "text": text, "path": str(out)}
+
+    def copy_meeting_context(self, meeting_id):
+        """Devuelve el texto de UNA reunión (con cabecera para la IA) para copiarlo."""
+        text = build_meeting_context(self._session, int(meeting_id))
+        return {"ok": bool(text.strip()), "text": text}
 
     def set_api_token(self, token):
         settings.set_api_token(token)
@@ -766,11 +1035,13 @@ class Api:
 
 
 def run():
+    _set_windows_app_identity()
     api = Api()
     web_dir = Path(__file__).parent / "web"
+    icon_path = web_dir / "assets" / "helpmeet.ico"
     window = webview.create_window(
         "Helpmeet", str(web_dir / "index.html"),
         js_api=api, width=1100, height=720,
     )
     api.set_window(window)
-    webview.start()
+    webview.start(_apply_native_window_icon, args=(window, icon_path))

@@ -116,6 +116,25 @@ def rename_initiative(session: Session, initiative_id: int, name: str) -> Initia
     return ini
 
 
+def get_initiative(session: Session, initiative_id: int) -> Initiative | None:
+    return session.get(Initiative, initiative_id)
+
+
+def get_capture(session: Session, capture_id: int) -> Capture | None:
+    return session.get(Capture, capture_id)
+
+
+def set_initiative_description(session: Session, initiative_id: int,
+                              description: str | None) -> Initiative:
+    """Guarda el objetivo/contexto de la iniciativa (vacío = sin descripción)."""
+    ini = session.get(Initiative, initiative_id)
+    if ini:
+        text = (description or "").strip()
+        ini.description = text or None
+        session.commit()
+    return ini
+
+
 def rename_meeting(session: Session, meeting_id: int, title: str) -> Meeting:
     m = session.get(Meeting, meeting_id)
     if m and title and title.strip():
@@ -156,6 +175,44 @@ def add_utterance(session: Session, meeting_id: int, speaker: str, text: str,
     session.add(utt)
     session.commit()
     return utt
+
+
+def get_utterance(session: Session, utterance_id: int) -> Utterance | None:
+    return session.get(Utterance, int(utterance_id))
+
+
+def update_utterance(session: Session, utterance_id: int, *, text: str | None = None,
+                     speaker: str | None = None) -> Utterance | None:
+    """Edita el texto y/o el hablante de una frase. Ignora valores no enviados."""
+    utt = session.get(Utterance, int(utterance_id))
+    if utt is None:
+        return None
+    if text is not None:
+        utt.text = text
+    if speaker in ("me", "others"):
+        utt.speaker = speaker
+    session.commit()
+    return utt
+
+
+def toggle_utterance_highlight(session: Session, utterance_id: int) -> bool | None:
+    """Marca/desmarca una frase como importante. Devuelve el nuevo estado."""
+    utt = session.get(Utterance, int(utterance_id))
+    if utt is None:
+        return None
+    utt.highlighted = not bool(utt.highlighted)
+    session.commit()
+    return utt.highlighted
+
+
+def delete_utterance(session: Session, utterance_id: int) -> bool:
+    """Elimina una frase. Devuelve True si existía."""
+    utt = session.get(Utterance, int(utterance_id))
+    if utt is None:
+        return False
+    session.delete(utt)
+    session.commit()
+    return True
 
 
 def add_capture(session: Session, meeting_id: int, image_path: str,

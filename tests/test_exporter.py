@@ -1,5 +1,7 @@
 from helpmeet.db import repository as repo
-from helpmeet.export.exporter import export_meeting, export_initiative, meeting_export_dir
+from helpmeet.export.exporter import (
+    export_meeting, export_initiative, meeting_export_dir, month_folder_name,
+)
 
 
 def test_export_creates_md_and_captures_folder(session, tmp_path):
@@ -20,9 +22,10 @@ def test_export_creates_md_and_captures_folder(session, tmp_path):
     assert "Sistema de Login" in content
     assert "Yo:" in content and "Los demás:" in content
     assert "error 500" in content
-    assert (out_dir / "capturas").exists()
-    assert any((out_dir / "capturas").iterdir())  # se copió la imagen
-    assert "capturas/" in content  # referencia a la captura en el md
+    month_dir = out_dir / month_folder_name(meeting.started_at)
+    assert (month_dir / "capturas").exists()
+    assert any((month_dir / "capturas").iterdir())  # se copió la imagen
+    assert f"{month_folder_name(meeting.started_at)}/capturas/" in content
 
 
 def test_export_orders_utterances_by_time(session, tmp_path):
@@ -86,7 +89,7 @@ def test_export_meeting_writes_contexto_and_dated_file(session, tmp_path):
 
     out_dir = export_meeting(session, m.id, tmp_path / "out")
     assert (out_dir / "contexto.md").exists()
-    dated = [p for p in out_dir.glob("*.md") if p.name != "contexto.md"]
+    dated = [p for p in out_dir.rglob("*.md") if p.name != "contexto.md"]
     assert len(dated) == 1
     assert dated[0].name.startswith(f"{m.started_at:%Y-%m-%d_%H-%M-%S}")
 
@@ -104,18 +107,19 @@ def test_export_meeting_same_day_does_not_overwrite(session, tmp_path):
     out2 = export_meeting(session, m2.id, tmp_path / "out")
 
     assert out1 == out2  # mismo día -> misma carpeta
-    dated = [p for p in out2.glob("*.md") if p.name != "contexto.md"]
+    dated = [p for p in out2.rglob("*.md") if p.name != "contexto.md"]
     assert len(dated) == 2  # las dos grabaciones se conservan, no se pisan
 
 
 def test_meeting_export_dir_matches_export_meeting(session, tmp_path):
     ini = repo.create_initiative(session, "Mi Proyecto")
     meeting = repo.start_meeting(session, ini.id, "R1")
-    # la ruta calculada debe coincidir con la que crea export_meeting
+    # La iniciativa conserva contexto.md en la raíz y la reunión vive en su mes.
     expected = meeting_export_dir(meeting, tmp_path)
     out = export_meeting(session, meeting.id, tmp_path)
-    assert out == expected
+    assert expected.parent == out
     assert out.exists()
+    assert expected.exists()
 
 
 def test_export_initiative_writes_one_md_per_meeting(session, tmp_path):
@@ -132,7 +136,7 @@ def test_export_initiative_writes_one_md_per_meeting(session, tmp_path):
     # sigue existiendo el documento combinado (1 para todo)
     assert (out_dir / "contexto.md").exists()
     # además, un .md por reunión
-    per_meeting = [p for p in out_dir.glob("*.md") if p.name != "contexto.md"]
+    per_meeting = [p for p in out_dir.rglob("*.md") if p.name != "contexto.md"]
     assert len(per_meeting) == 2
     # cada archivo lleva en el nombre la fecha y la hora de su reunión
     expected1 = f"{m1.started_at:%Y-%m-%d_%H-%M-%S}"
@@ -160,7 +164,8 @@ def test_export_initiative_merges_captures_without_collision(session, tmp_path):
     repo.end_meeting(session, m2.id)
 
     out_dir = export_initiative(session, ini.id, tmp_path / "out")
-    captures = list((out_dir / "capturas").iterdir())
+    month_dir = out_dir / month_folder_name(m1.started_at)
+    captures = list((month_dir / "capturas").iterdir())
     # las dos capturas se copian con nombres distintos (no se pisan)
     assert len(captures) == 2
 
@@ -178,6 +183,77 @@ def test_export_includes_screen_recording_video_link(session, tmp_path):
 
     assert "Video:" in content
     assert "grabacion.mp4" in content
+
+
+def test_export_includes_ai_instructions_and_objective(session, tmp_path):
+    ini = repo.create_initiative(session, "Con objetivo")
+    repo.set_initiative_description(session, ini.id, "Ayudar al cliente con su web.")
+    m = repo.start_meeting(session, ini.id, "Kickoff")
+    repo.add_utterance(session, m.id, "me", "empezamos", 1.0, 2.0)
+    repo.end_meeting(session, m.id)
+
+    out_dir = export_initiative(session, ini.id, tmp_path / "out")
+    content = (out_dir / "contexto.md").read_text(encoding="utf-8")
+
+    # cabecera de instrucciones para la IA (plantilla por defecto, siempre presente)
+    assert "# Instrucciones para la IA" in content
+    # objetivo de la iniciativa, antes del contenido de las reuniones
+    assert "## Objetivo de esta iniciativa" in content
+    assert "Ayudar al cliente con su web." in content
+    assert content.index("# Instrucciones para la IA") < content.index("empezamos")
+
+
+def test_build_meeting_context_has_header_and_only_that_meeting(session, tmp_path):
+    from helpmeet.export.exporter import build_meeting_context
+    ini = repo.create_initiative(session, "Proyecto Z")
+    repo.set_initiative_description(session, ini.id, "Objetivo del proyecto Z.")
+    m1 = repo.start_meeting(session, ini.id, "Primera")
+    repo.add_utterance(session, m1.id, "me", "contenido de la primera", 1.0, 2.0)
+    repo.end_meeting(session, m1.id)
+    m2 = repo.start_meeting(session, ini.id, "Segunda")
+    repo.add_utterance(session, m2.id, "others", "contenido de la segunda", 1.0, 2.0)
+    repo.end_meeting(session, m2.id)
+
+    text = build_meeting_context(session, m1.id)
+    assert "# Instrucciones para la IA" in text
+    assert "## Objetivo de esta iniciativa" in text
+    assert "Objetivo del proyecto Z." in text
+    assert "contenido de la primera" in text
+    # solo esta reunión, no la otra
+    assert "contenido de la segunda" not in text
+    # no escribió nada en disco (no se le pasó carpeta de exportación)
+    assert not list(tmp_path.iterdir())
+
+
+def test_set_initiative_description_round_trip(session):
+    ini = repo.create_initiative(session, "Sin objetivo")
+    assert ini.description is None
+    repo.set_initiative_description(session, ini.id, "  Objetivo nuevo  ")
+    assert repo.get_initiative(session, ini.id).description == "Objetivo nuevo"
+    # vaciar lo deja en None (vuelve a usar la plantilla por defecto en el export)
+    repo.set_initiative_description(session, ini.id, "   ")
+    assert repo.get_initiative(session, ini.id).description is None
+
+
+def test_capture_exported_with_unique_code_name(session, tmp_path):
+    ini = repo.create_initiative(session, "Con capturas con código")
+    m = repo.start_meeting(session, ini.id, "R1")
+    u = repo.add_utterance(session, m.id, "me", "mira esto", 1.0, 2.0)
+    img = tmp_path / "shot.png"
+    img.write_bytes(b"PNG")
+    cap = repo.add_capture(session, m.id, str(img), near_utterance_id=u.id)
+    repo.end_meeting(session, m.id)
+
+    # el código es estable, único y no es un simple 1/2/3
+    assert cap.code.startswith("CAP-")
+    assert cap.code != "CAP-0001" or cap.id == 1  # depende del id real, pero con formato
+
+    out_dir = export_initiative(session, ini.id, tmp_path / "out")
+    content = (out_dir / "contexto.md").read_text(encoding="utf-8")
+    # el archivo de la captura se llama con el código y el markdown lo referencia
+    assert f"{cap.code}.png" in content
+    month_dir = out_dir / month_folder_name(m.started_at)
+    assert (month_dir / "capturas" / f"{cap.code}.png").exists()
 
 
 def test_initiative_export_dir_uses_slug_and_creates(session, tmp_path):

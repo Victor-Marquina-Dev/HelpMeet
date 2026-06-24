@@ -2,6 +2,14 @@ import os
 import helpmeet.settings as settings
 
 
+def _fake_secret_store(monkeypatch):
+    box = {"value": ""}
+    monkeypatch.setattr(settings.secret_store, "get_secret", lambda: box["value"])
+    monkeypatch.setattr(settings.secret_store, "set_secret",
+                        lambda value: box.update(value=(value or "").strip()))
+    return box
+
+
 def test_export_dir_default_and_set(monkeypatch, tmp_path):
     monkeypatch.setattr(settings, "SETTINGS_PATH", tmp_path / "settings.json")
     # por defecto, una subcarpeta 'exports'
@@ -14,6 +22,7 @@ def test_export_dir_default_and_set(monkeypatch, tmp_path):
 
 def test_api_token_set_and_env(monkeypatch, tmp_path):
     monkeypatch.setattr(settings, "SETTINGS_PATH", tmp_path / "settings.json")
+    _fake_secret_store(monkeypatch)
     monkeypatch.delenv("REPLICATE_API_TOKEN", raising=False)
     settings.set_api_token("r8_test_token")
     assert settings.get_api_token() == "r8_test_token"
@@ -23,10 +32,24 @@ def test_api_token_set_and_env(monkeypatch, tmp_path):
 
 def test_apply_env_loads_saved_token(monkeypatch, tmp_path):
     monkeypatch.setattr(settings, "SETTINGS_PATH", tmp_path / "settings.json")
+    _fake_secret_store(monkeypatch)
     settings.set_api_token("r8_guardado")
     monkeypatch.delenv("REPLICATE_API_TOKEN", raising=False)
     settings.apply_env()
     assert os.environ["REPLICATE_API_TOKEN"] == "r8_guardado"
+
+
+def test_legacy_plaintext_token_is_moved_to_secure_store(monkeypatch, tmp_path):
+    import json
+
+    path = tmp_path / "settings.json"
+    path.write_text(json.dumps({"api_token": "r8_antiguo", "export_dir": "X:/docs"}))
+    monkeypatch.setattr(settings, "SETTINGS_PATH", path)
+    box = _fake_secret_store(monkeypatch)
+
+    assert settings.get_api_token() == "r8_antiguo"
+    assert box["value"] == "r8_antiguo"
+    assert "api_token" not in json.loads(path.read_text())
 
 
 def test_transcription_preferences_are_persistent(monkeypatch, tmp_path):

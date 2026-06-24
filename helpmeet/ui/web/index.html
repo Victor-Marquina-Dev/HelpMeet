@@ -4,6 +4,8 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Helpmeet</title>
+  <link rel="icon" type="image/svg+xml" href="assets/helpmeet-app-icon.svg">
+  <link rel="alternate icon" type="image/x-icon" href="assets/helpmeet.ico">
   <link rel="stylesheet" href="style.css">
 </head>
 <body data-app-state="idle" data-screen="welcome">
@@ -15,18 +17,27 @@
   <header class="topbar">
     <button class="icon-btn" id="btnToggleSidebar" aria-label="Mostrar u ocultar panel" title="Mostrar/ocultar panel (Ctrl+B)"></button>
     <div class="brand">
-      <span class="brand-mark" aria-hidden="true">H</span>
+      <span class="brand-mark" aria-hidden="true"><img src="assets/helpmeet-app-icon.svg" alt=""></span>
       <span class="brand-name">Helpmeet</span>
     </div>
-    <form class="search" id="searchForm" role="search">
-      <span class="search-ico" aria-hidden="true"></span>
-      <input id="searchInput" type="search" placeholder="Buscar en todas las reuniones…" aria-label="Buscar frases y notas" autocomplete="off">
-      <kbd>Ctrl K</kbd>
-    </form>
+    <div class="topbar-sep" aria-hidden="true"></div>
+
+    <!-- Centro: contexto activo (iniciativa › reunión) en reposo · estado de grabación/proceso cuando hay actividad -->
     <div class="topbar-status" id="topbarStatus" aria-live="polite"></div>
-    <button class="btn btn-ghost" id="btnSettings">
-      <span class="ico ico-settings" aria-hidden="true"></span> Ajustes
-    </button>
+
+    <!-- Cluster derecho: silenciar micro · buscar · ajustes -->
+    <div class="topbar-right">
+      <button class="audio-chip" id="btnMic" aria-pressed="false" aria-label="Silenciar micrófono" title="Silenciar micrófono">
+        <span class="mic-ico" aria-hidden="true"></span>
+        <span class="eq mini" aria-hidden="true"><i></i><i></i><i></i></span>
+      </button>
+      <div class="search" id="search" role="search">
+        <span class="search-ico" aria-hidden="true"></span>
+        <input id="searchInput" type="search" placeholder="Buscar en todas las reuniones…" aria-label="Buscar frases y notas" autocomplete="off">
+        <kbd id="searchKbd">Ctrl K</kbd>
+      </div>
+      <button class="icon-btn" id="btnSettings" aria-label="Ajustes" title="Ajustes"></button>
+    </div>
   </header>
 
   <!-- ============ CUERPO ============ -->

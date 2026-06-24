@@ -1,5 +1,5 @@
 from datetime import datetime
-from sqlalchemy import String, Float, DateTime, ForeignKey, Text
+from sqlalchemy import String, Float, DateTime, ForeignKey, Text, Boolean
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
 
@@ -50,6 +50,7 @@ class Utterance(Base):
     text: Mapped[str] = mapped_column(Text)
     start_time: Mapped[float] = mapped_column(Float)
     end_time: Mapped[float] = mapped_column(Float)
+    highlighted: Mapped[bool] = mapped_column(Boolean, default=False)  # ★ Importante
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now)
     meeting: Mapped["Meeting"] = relationship(back_populates="utterances")
 
@@ -65,6 +66,21 @@ class Capture(Base):
     )
     note: Mapped[str | None] = mapped_column(Text, nullable=True)
     meeting: Mapped["Meeting"] = relationship(back_populates="captures")
+
+    @property
+    def code(self) -> str:
+        """Código corto, único y estable de la captura (p. ej. `CAP-007Y`).
+
+        Deriva del id en base36, así nunca es un simple 1, 2, 3 y no se
+        confunde aunque haya muchas imágenes. Sirve de identificador en la
+        app y de nombre del archivo al exportar."""
+        n = self.id or 0
+        digits = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+        s = ""
+        while n:
+            n, r = divmod(n, 36)
+            s = digits[r] + s
+        return "CAP-" + (s or "0").rjust(4, "0")
 
 
 class Note(Base):

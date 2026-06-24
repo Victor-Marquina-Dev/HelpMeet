@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-labelledby="title">
+  <title id="title">Helpmeet</title>
+  <defs>
+    <linearGradient id="helpmeet-icon-gradient" x1="7" y1="5" x2="57" y2="61" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#6D8CFF"/>
+      <stop offset="1" stop-color="#8A6DFF"/>
+    </linearGradient>
+  </defs>
+  <rect width="64" height="64" rx="14" fill="url(#helpmeet-icon-gradient)"/>
+  <rect x="20" y="21" width="24" height="6" rx="3" fill="#FFFFFF"/>
+  <rect x="20" y="29.5" width="24" height="6" rx="3" fill="#FFFFFF"/>
+  <rect x="20" y="38" width="17" height="6" rx="3" fill="#FFFFFF"/>
+</svg>

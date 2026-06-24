@@ -47,6 +47,9 @@ const ICONS = {
   check: '<path d="M20 6 9 17l-5-5"/>',
   x: '<path d="M18 6 6 18M6 6l12 12"/>',
   edit: '<path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.1 2.1 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>',
+  copy: '<rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>',
+  mic: '<path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2M12 19v3"/>',
+  micOff: '<path d="m2 2 20 20"/><path d="M9 9v3a3 3 0 0 0 5.1 2.1M15 9.3V5a3 3 0 0 0-5.9-.7"/><path d="M19 10v2a7 7 0 0 1-.6 2.8M12 19v3M5 10v2a7 7 0 0 0 11 5.7"/>',
 };
 function svg(name, size) {
   size = size || 15;
@@ -98,6 +101,12 @@ const api = {
   exportInitiativeById: (iid) => call('export_initiative_by_id', iid),
   exportMeetingTo: (mid) => call('export_meeting_to', mid),
   exportInitiativeTo: (iid) => call('export_initiative_to', iid),
+  setInitiativeDescription: (iid, d) => call('set_initiative_description', iid, d),
+  copyInitiativeContext: (iid) => call('copy_initiative_context', iid),
+  copyMeetingContext: (mid) => call('copy_meeting_context', mid),
+  getCaptureImage: (cid) => call('get_capture_image', cid),
+  getBackgroundJobs: () => call('get_background_jobs'),
+  setAiInstructions: (t) => call('set_ai_instructions', t),
   openMeetingFolder: (mid) => call('open_meeting_folder', mid),
   openPath: (p) => call('open_path', p),
   getSettings: () => call('get_settings'),
@@ -265,9 +274,44 @@ function renderTopStatus() {
     const progressText = STATE.jobDeterminate ? Math.round(STATE.jobProgress) + '%' : processingElapsed();
     root.innerHTML = `<div class="status-proc"><span class="spinner"></span>${esc(STATE.jobStage)} · ${progressText}</div>`;
   } else {
-    root.innerHTML = `<div class="status-pill"><span class="dot-ok"></span>Listo</div>`;
+    // Reposo: pastilla de contexto (dónde estás: iniciativa › reunión)
+    const it = STATE.initiatives.find(x => x.id === STATE.selInit);
+    let ctx;
+    if (STATE.screen === 'meeting' && STATE.transcript) {
+      ctx = `<span class="ctx-init">${esc(it ? it.name : '')}</span>${svg('chevron', 12)}<span class="ctx-meet">${esc(STATE.transcript.title)}</span>`;
+    } else if (it) {
+      ctx = `<span class="ctx-meet">${esc(it.name)}</span>`;
+    } else {
+      ctx = null;   // sin iniciativa seleccionada: no se muestra la miga de pan
+    }
+    root.innerHTML = ctx ? `<div class="context-pill"><span class="dot-ok"></span>${ctx}</div>` : '';
   }
+  updateMicChip();
 }
+
+/* Chip de micrófono del header: silenciar/activar mi audio.
+   - Durante una grabación: silencia en vivo (reunión o pantalla).
+   - En reposo: queda como preferencia para la próxima grabación. */
+async function toggleMic() {
+  STATE.micMuted = !STATE.micMuted;
+  updateMicChip();
+  const s = STATE.appState;
+  try {
+    if (s === 'screen-recording') await api.toggleScreenMicMute(STATE.micMuted);
+    else if (s === 'recording' || s === 'recording-local' || s === 'recording-cloud') await api.toggleMeetingMicMute(STATE.micMuted);
+    else if (api.v2 && api.v2.setTranscriptionSettings) await api.v2.setTranscriptionSettings({ default_mic_muted: STATE.micMuted });
+  } catch (e) { /* no romper la UI por el guardado */ }
+  toast('info', STATE.micMuted ? 'Micrófono silenciado' : 'Micrófono activo');
+}
+function updateMicChip() {
+  const b = $('#btnMic'); if (!b) return;
+  b.classList.toggle('muted', !!STATE.micMuted);
+  b.setAttribute('aria-pressed', STATE.micMuted ? 'true' : 'false');
+  b.setAttribute('aria-label', STATE.micMuted ? 'Activar micrófono' : 'Silenciar micrófono');
+  b.setAttribute('title', STATE.micMuted ? 'Activar micrófono' : 'Silenciar micrófono');
+  const i = b.querySelector('.mic-ico'); if (i) i.innerHTML = svg(STATE.micMuted ? 'micOff' : 'mic', 15);
+}
+function openSearch() { const s = $('#search'); if (!s) return; s.classList.add('expanded'); $('#searchInput').focus(); }
 
 function renderMain() {
   const main = $('#main');
@@ -304,17 +348,51 @@ function viewInitiative() {
   const it = STATE.initiatives.find(x => x.id === STATE.selInit);
   const ms = STATE.meetingsByInit[STATE.selInit] || [];
   const wrap = el('div');
+  wrap.style.cssText = 'display:flex;flex-direction:column;flex:1;min-height:0';
   const head = el('div', 'mhead');
   const last = ms[0];
   head.innerHTML = `
     <div class="mhead-row">
       <h1 class="mtitle-h title-lg">${esc(it ? it.name : '')}</h1>
       <div class="spacer"></div>
+      <button class="btn btn-primary ${ms.length ? '' : 'is-disabled'}" id="initCopy" title="${ms.length ? 'Copiar el contexto al portapapeles' : 'Aún no hay reuniones que copiar'}">${svg('copy', 14)} Copiar contexto</button>
+      <button class="btn ${ms.length ? '' : 'is-disabled'}" id="initExport" title="${ms.length ? 'Exportar el contexto' : 'Aún no hay reuniones que exportar'}">${svg('download', 14)} Exportar</button>
       <button class="icon-btn" id="initMenu" aria-label="Más acciones de la iniciativa">${svg('dots', 16)}</button>
     </div>
     <div class="meta-line">${ms.length} reuniones${last ? ' · última el ' + esc(last.date) : ''}</div>`;
-  const recents = el('div'); recents.style.padding = '4px 28px 0';
+
+  const scroll = el('div', 'content');
+
+  // Objetivo / contexto: se exporta como cabecera del contexto.md para la IA.
+  const objBox = el('div', 'obj-box');
+  objBox.innerHTML = `
+    <label class="section-label" for="initObjetivo">OBJETIVO / CONTEXTO PARA LA IA</label>
+    <textarea id="initObjetivo" class="obj-text" rows="2"
+      placeholder="¿De qué va esta iniciativa y qué quieres que la IA tenga en cuenta? Se añade al principio del contexto que envías a Claude."></textarea>
+    <div class="obj-hint">Se guarda solo al salir del campo y se incluye al principio del contexto exportado.</div>`;
+  const ta = objBox.querySelector('#initObjetivo');
+  ta.value = (it && it.description) || '';
+  ta.onblur = async () => {
+    const val = ta.value.trim();
+    if (it && val === ((it.description) || '')) return;     // sin cambios, no molestar
+    await api.setInitiativeDescription(STATE.selInit, val);
+    if (it) it.description = val;                            // reflejar en memoria
+    toast('ok', 'Objetivo guardado');
+  };
+  scroll.appendChild(objBox);
+
+  const recents = el('div');
   recents.appendChild(el('div', 'section-label', 'REUNIONES RECIENTES'));
+
+  // Buscador de TODA la iniciativa: busca frases y notas en todas sus reuniones.
+  const searchBar = el('div', 'tx-search');
+  searchBar.style.margin = '0 0 12px';
+  searchBar.innerHTML = `<span class="tx-search-ico" aria-hidden="true">${svg('search', 14)}</span>
+    <input id="initSearch" type="search" placeholder="Buscar en toda la iniciativa…" aria-label="Buscar en la iniciativa" autocomplete="off">
+    <span class="tx-count" id="initSearchCount"></span>
+    <button class="icon-btn sm" id="initSearchClear" title="Limpiar búsqueda" aria-label="Limpiar" hidden>${svg('x', 13)}</button>`;
+  if (ms.length) recents.appendChild(searchBar);
+
   const list = el('div', 'list');
   if (!ms.length) {
     list.appendChild(el('p', null, '<span style="color:var(--text-muted);font-size:13px">Aún no hay reuniones. Pulsa <b>Grabar reunión</b> o <b>Subir archivo</b> para empezar.</span>'));
@@ -322,6 +400,7 @@ function viewInitiative() {
     ms.forEach(m => {
       const c = el('div', 'row-card' + (m.status === 'pending' ? ' warn' : ''));
       const pill = m.status === 'done' ? '<span class="pill pill-done"><span class="pd"></span>Finalizada</span>'
+        : m.status === 'processing' ? '<span class="pill pill-proc"><span class="spinner sm"></span>Transcribiendo…</span>'
         : m.status === 'error' ? '<span class="pill pill-error"><span class="pd"></span>Error</span>'
         : '<span class="pill pill-pending"><span class="pd"></span>Pendiente</span>';
       c.innerHTML = `<div class="rc-body"><div class="rc-title">${esc(m.title)}</div><div class="rc-meta">${esc(m.date)} · ${esc(m.dur || '—')}${m.frases ? ' · ' + m.frases + ' frases' : ''}</div></div>${pill}`;
@@ -330,13 +409,133 @@ function viewInitiative() {
     });
   }
   recents.appendChild(list);
+
+  // Resultados de la búsqueda (oculto hasta que se escribe algo).
+  const results = el('div', 'list'); results.hidden = true;
+  recents.appendChild(results);
+  scroll.appendChild(recents);
+
+  if (ms.length) wireInitiativeSearch(searchBar, list, results, ms);
+
   head.querySelector('#initMenu').onclick = (e) => openInitiativeMenu(e, STATE.selInit);
-  wrap.appendChild(head); wrap.appendChild(recents);
-  wrap.style.display = 'flex'; wrap.style.flexDirection = 'column'; wrap.style.flex = '1'; wrap.style.minHeight = '0';
-  // dejamos el área scrollable
-  const scroll = el('div', 'content'); scroll.appendChild(recents);
+  head.querySelector('#initCopy').onclick = (e) => ms.length && copyInitiativeContext(STATE.selInit, e.currentTarget);
+  head.querySelector('#initExport').onclick = (e) => ms.length && exportInitiativeNow(STATE.selInit, e.currentTarget);
   wrap.replaceChildren(head, scroll);
   return wrap;
+}
+
+/* Conecta el buscador de una iniciativa: busca frases y notas en TODAS sus
+   reuniones (reusa el backend de búsqueda global, filtrado a esta iniciativa).
+   Con texto: muestra resultados y oculta la lista de reuniones. Sin texto:
+   vuelve a mostrar la lista normal. */
+function wireInitiativeSearch(bar, list, results, ms) {
+  const input = bar.querySelector('#initSearch');
+  const countEl = bar.querySelector('#initSearchCount');
+  const clearBtn = bar.querySelector('#initSearchClear');
+  const ids = new Set(ms.map(m => m.id));
+  let deb, token = 0;
+
+  const reset = () => {
+    results.hidden = true; results.replaceChildren();
+    list.hidden = false; countEl.textContent = ''; clearBtn.hidden = true;
+  };
+
+  async function doSearch(q) {
+    q = (q || '').trim();
+    clearBtn.hidden = !q;
+    if (q.length < 2) { reset(); return; }
+    const mine = ++token;                       // ignora respuestas viejas
+    const all = await api.search(q) || [];
+    if (mine !== token) return;                 // llegó otra búsqueda después
+    const hits = all.filter(r => ids.has(r.meeting_id));
+    list.hidden = true; results.hidden = false; results.replaceChildren();
+    countEl.textContent = hits.length ? `${hits.length} resultado${hits.length > 1 ? 's' : ''}` : 'Sin resultados';
+    if (!hits.length) {
+      results.innerHTML = '<p style="color:var(--text-muted);font-size:13px">Sin resultados en esta iniciativa.</p>';
+      return;
+    }
+    hits.forEach(r => {
+      const kind = r.kind || 'frase';
+      const speaker = kind === 'nota' ? 'NOTA' : (r.speaker === 'me' ? 'YO' : 'LOS DEMÁS');
+      const c = el('div', 'result');
+      c.innerHTML = `<div class="res-meta">${esc(r.meeting_title || r.meeting || '')} · ${esc(r.date)} · ${esc(kind)} · ${speaker}</div><div class="res-text">${highlight(r.text, q)}</div>`;
+      c.onclick = () => { if (r.meeting_id) openMeeting(r.meeting_id); };
+      results.appendChild(c);
+    });
+  }
+
+  input.addEventListener('input', (e) => { clearTimeout(deb); const v = e.target.value; deb = setTimeout(() => doSearch(v), 300); });
+  input.addEventListener('keydown', (e) => { if (e.key === 'Enter') { clearTimeout(deb); doSearch(e.target.value); } });
+  clearBtn.onclick = () => { input.value = ''; reset(); input.focus(); };
+}
+
+/* Copia el contexto.md completo de la iniciativa al portapapeles (para pegarlo
+   directo en Claude Code). Refresca antes el export para llevar lo último. */
+async function copyInitiativeContext(iid, btn) {
+  if (btn) btn.classList.add('is-loading');
+  try {
+    const r = await api.copyInitiativeContext(iid);
+    if (!r || !r.text || !r.text.trim()) {
+      toast('info', 'Aún no hay nada que copiar en esta iniciativa.');
+      return;
+    }
+    const ok = await copyText(r.text);
+    const kb = Math.max(1, Math.round(r.text.length / 1024));
+    toast(ok ? 'ok' : 'err', ok ? `Contexto copiado (~${kb} KB) · pégalo en Claude` : 'No se pudo copiar al portapapeles');
+  } catch (e) {
+    toast('err', 'No se pudo preparar el contexto');
+  } finally {
+    if (btn) btn.classList.remove('is-loading');
+  }
+}
+
+/* Copia el contexto de UNA reunión (con cabecera para la IA) al portapapeles. */
+async function copyMeetingContext(mid, btn) {
+  if (btn) btn.classList.add('is-loading');
+  try {
+    const r = await api.copyMeetingContext(mid);
+    if (!r || !r.text || !r.text.trim()) {
+      toast('info', 'Esta reunión aún no tiene contenido que copiar.');
+      return;
+    }
+    const ok = await copyText(r.text);
+    const kb = Math.max(1, Math.round(r.text.length / 1024));
+    toast(ok ? 'ok' : 'err', ok ? `Contexto de la reunión copiado (~${kb} KB) · pégalo en Claude` : 'No se pudo copiar al portapapeles');
+  } catch (e) {
+    toast('err', 'No se pudo preparar el contexto');
+  } finally {
+    if (btn) btn.classList.remove('is-loading');
+  }
+}
+
+async function exportInitiativeNow(iid, btn) {
+  if (btn) btn.classList.add('is-loading');
+  try {
+    const r = await api.exportInitiativeById(iid);
+    if (r && r.path) { await api.openPath(r.path); toast('ok', 'Contexto exportado · carpeta abierta'); }
+    else toast('err', 'La exportación no devolvió una carpeta.');
+  } catch (e) { toast('err', 'No se pudo exportar la iniciativa'); }
+  finally { if (btn) btn.classList.remove('is-loading'); }
+}
+
+/* Copia texto al portapapeles con respaldo para WebView (file://, sin HTTPS). */
+function copyText(text) {
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    return navigator.clipboard.writeText(text).then(() => true).catch(() => fallbackCopy(text));
+  }
+  return Promise.resolve(fallbackCopy(text));
+}
+function fallbackCopy(text) {
+  try {
+    const t = document.createElement('textarea');
+    t.value = text;
+    t.style.cssText = 'position:fixed;top:0;left:0;opacity:0';
+    document.body.appendChild(t);
+    t.focus(); t.select();
+    const ok = document.execCommand('copy');
+    document.body.removeChild(t);
+    return ok;
+  } catch (e) { return false; }
 }
 
 function viewMeeting() {
@@ -350,6 +549,7 @@ function viewMeeting() {
       <h1 class="mtitle-h">${esc(t ? t.title : 'Reunión')}</h1>
       <span class="pill pill-done"><span class="pd"></span>Finalizada</span>
       <div class="spacer"></div>
+      <button class="btn btn-primary" id="mCopy">${svg('copy', 14)} Copiar contexto</button>
       <button class="btn" id="mExport">${svg('download', 14)} Exportar</button>
       <button class="btn" id="mOpen">${svg('folder', 14)} Abrir carpeta</button>
       <button class="icon-btn" id="mMenu" aria-label="Más acciones de la reunión">${svg('dots', 16)}</button>
@@ -364,6 +564,7 @@ function viewMeeting() {
   const content = el('div', 'content');
   content.appendChild(renderTab(STATE.activeTab, t));
   // eventos
+  head.querySelector('#mCopy').onclick = (e) => copyMeetingContext(STATE.selMeeting, e.currentTarget);
   head.querySelector('#mExport').onclick = (e) => doExportMeeting(e.currentTarget);
   head.querySelector('#mOpen').onclick = (e) => doOpenFolder(e.currentTarget);
   head.querySelector('#mMenu').onclick = (e) => openMeetingMenu(e, STATE.selMeeting);
@@ -394,11 +595,45 @@ function renderTranscript(t) {
     r.appendChild(b);
   }
   const us = (t && t.utterances) || [];
-  if (!us.length && !(t && t.video_path)) r.appendChild(el('p', null, '<span style="color:var(--text-muted)">Sin transcripción todavía.</span>'));
+  if (!us.length && !(t && t.video_path)) { r.appendChild(el('p', null, '<span style="color:var(--text-muted)">Sin transcripción todavía.</span>')); return r; }
+
+  // Buscador DENTRO de esta transcripción: filtra las frases/notas/capturas
+  // que contienen el texto y muestra cuántas coinciden. Sólo en reposo.
+  const recording = STATE.appState === 'recording' || STATE.appState === 'recording-local' || STATE.appState === 'recording-cloud';
+  const items = [];
+  if (us.length && !recording) {
+    const bar = el('div', 'tx-search');
+    bar.innerHTML = `<span class="tx-search-ico" aria-hidden="true">${svg('search', 14)}</span>
+      <input id="txSearch" type="search" placeholder="Buscar en esta transcripción…" aria-label="Buscar en la transcripción" autocomplete="off">
+      <span class="tx-count" id="txCount"></span>
+      <button class="icon-btn sm" id="txClear" title="Limpiar búsqueda" aria-label="Limpiar" hidden>${svg('x', 13)}</button>`;
+    r.appendChild(bar);
+    const input = bar.querySelector('#txSearch');
+    const countEl = bar.querySelector('#txCount');
+    const clearBtn = bar.querySelector('#txClear');
+    const apply = () => {
+      const q = (input.value || '').trim().toLowerCase();
+      clearBtn.hidden = !q;
+      let n = 0, first = null;
+      items.forEach(it => {
+        const hit = !q || it.text.includes(q);
+        it.node.style.display = hit ? '' : 'none';
+        if (q && hit) { n++; if (!first) first = it.node; }
+      });
+      countEl.textContent = q ? (n ? `${n} resultado${n > 1 ? 's' : ''}` : 'Sin resultados') : '';
+      if (first) first.scrollIntoView({ block: 'nearest' });
+    };
+    input.addEventListener('input', apply);
+    clearBtn.onclick = () => { input.value = ''; apply(); input.focus(); };
+  }
+
   us.forEach(u => {
-    if (u.kind === 'capture') r.appendChild(captureEvent(u));
-    else if (u.kind === 'note') r.appendChild(noteEvent(u));
-    else r.appendChild(utterance(u));
+    let node, text;
+    if (u.kind === 'capture') { node = captureEvent(u); text = (u.code || '') + ' ' + (u.note || ''); }
+    else if (u.kind === 'note') { node = noteEvent(u); text = u.text || ''; }
+    else { node = utterance(u); text = u.text || ''; }
+    items.push({ node, text: String(text).toLowerCase() });
+    r.appendChild(node);
   });
   return r;
 }
@@ -433,18 +668,22 @@ function videoPanel(t) {
 }
 
 async function transcribeScreenVideo(mid, force) {
-  // El backend empuja setProgress() durante la transcripción (barra de progreso).
-  beginProcessing('Preparando la transcripción del vídeo');
+  // La transcripción del vídeo va en SEGUNDO PLANO: puedes seguir grabando otro.
   let f = null;
   try { f = await api.transcribeMeetingVideo(mid, force); }
   catch (e) { f = { ok: false, error: e && e.message }; }
-  endProcessing();
-  if (f && f.ok) { await openMeeting(mid, true); await refreshMeetings(STATE.selInit); toast('ok', 'Transcripción lista'); }
-  else { toast('err', (f && f.error) || 'No se pudo transcribir el vídeo'); }
+  if (f && f.already) { toast('info', 'Este vídeo ya está transcrito'); return; }
+  if (f && f.ok) {
+    await refreshMeetings(STATE.selInit);
+    if (STATE.screen === 'meeting' && STATE.selMeeting === mid) await openMeeting(mid, true);
+    toast('ok', 'Se transcribe en segundo plano · puedes seguir grabando');
+  } else {
+    toast('err', (f && f.error) || 'No se pudo transcribir el vídeo');
+  }
 }
 
 function utterance(u) {
-  const d = el('div', 'utterance' + (u.speaker === 'me' ? ' me' : ''));
+  const d = el('div', 'utterance' + (u.speaker === 'me' ? ' me' : '') + (u.highlighted ? ' highlighted' : ''));
   d.tabIndex = 0;
   d.dataset.id = u.id;
   d.innerHTML = `
@@ -456,9 +695,7 @@ function utterance(u) {
       <div class="uactions">
         <button class="u-act" data-act="edit">Editar</button>
         <button class="u-act" data-act="speaker">Cambiar hablante</button>
-        <button class="u-act" data-act="split">Dividir</button>
-        <button class="u-act" data-act="merge">Unir</button>
-        <button class="u-act" data-act="star">★ Importante</button>
+        <button class="u-act${u.highlighted ? ' on' : ''}" data-act="star">★ Importante</button>
         <button class="u-act danger" data-act="del">Eliminar</button>
       </div>
     </div>`;
@@ -468,7 +705,10 @@ function utterance(u) {
 function captureEvent(u) {
   const d = el('div', 'utterance');
   d.innerHTML = `<div class="time mono">${esc(u.time)}</div><div class="band" style="background:transparent"></div>
-    <div class="event-capture"><span class="thumb"></span><div style="font-size:12.5px;color:var(--text-secondary)"><span style="color:#e6eaf2;font-weight:600">Captura</span> · ${esc(u.note || '')}</div></div>`;
+    <div class="event-capture"><span class="thumb"></span><div style="font-size:12.5px;color:var(--text-secondary)"><span style="color:#e6eaf2;font-weight:600">Captura</span>${u.code ? ' <span class="cap-code">' + esc(u.code) + '</span>' : ''}${u.clock ? ' · <span class="cap-clock">' + esc(u.clock) + '</span>' : ''}${u.note ? ' · ' + esc(u.note) : ''}</div></div>`;
+  // Carga la imagen real en la miniatura; al hacer clic se amplía (lupa).
+  const thumb = d.querySelector('.thumb');
+  if (thumb && u.id != null) loadCaptureThumb(thumb, u.id);
   return d;
 }
 function noteEvent(u) {
@@ -486,15 +726,24 @@ function utteranceAction(act, u, node) {
     return;
   }
   if (act === 'del') {
-    confirmModal('Eliminar intervención', '¿Eliminar esta intervención? Podrás deshacerlo.', 'Eliminar', async () => {
-      await api.v2.deleteUtterance(u.id); node.remove(); toast('ok', 'Intervención eliminada · Deshacer', 'Deshacer');
+    confirmModal('Eliminar intervención', '¿Eliminar esta intervención? Esta acción no se puede deshacer.', 'Eliminar', async () => {
+      const r = await api.v2.deleteUtterance(u.id);
+      if (r && r.ok) { node.remove(); toast('ok', 'Intervención eliminada'); }
+      else toast('err', 'No se pudo eliminar la intervención');
     });
   } else if (act === 'speaker') {
     api.v2.updateUtterance(u.id, { speaker: u.speaker === 'me' ? 'others' : 'me' }).then(() => openMeeting(STATE.selMeeting, true));
   } else if (act === 'edit') {
     inlineEdit(u, node);
-  } else {
-    toast('info', 'Acción "' + act + '" enviada al backend.');
+  } else if (act === 'star') {
+    api.v2.toggleHighlight(u.id).then(r => {
+      if (!r || !r.ok) { toast('err', 'No se pudo marcar la intervención'); return; }
+      u.highlighted = r.highlighted;
+      node.classList.toggle('highlighted', r.highlighted);
+      const b = node.querySelector('[data-act="star"]');
+      if (b) b.classList.toggle('on', r.highlighted);
+      toast('ok', r.highlighted ? 'Marcada como importante' : 'Marca quitada');
+    });
   }
 }
 function inlineEdit(u, node) {
@@ -546,12 +795,10 @@ function renderFiles() {
   caps.forEach(c => {
     const x = el('div', 'cap-card');
     const ph = el('div', 'ph');
-    if (c.path) {
-      ph.style.backgroundImage = `url("file:///${String(c.path).replace(/\\/g, '/')}")`;
-      ph.style.backgroundSize = 'cover'; ph.style.backgroundPosition = 'center';
-    }
+    // WebView2 no carga file:// como sub-recurso → pedimos la imagen en base64.
+    loadCaptureThumb(ph, c.id);
     x.appendChild(ph);
-    x.appendChild(el('div', 'cap-meta', `<span class="mono">${esc(c.time)}</span>${c.note ? ' · ' + esc(c.note) : ''}`));
+    x.appendChild(el('div', 'cap-meta', `${c.code ? '<span class="cap-code">' + esc(c.code) + '</span> ' : ''}<span class="mono">${esc(c.time)}</span>${c.note ? ' · ' + esc(c.note) : ''}`));
     grid.appendChild(x);
   });
   if (!caps.length) grid.appendChild(el('p', null, '<span style="color:var(--text-muted);font-size:13px">No hay capturas en esta reunión.</span>'));
@@ -570,6 +817,26 @@ function renderFiles() {
     a.onclick = () => api.openPath(assets.video); d.appendChild(a);
   }
   return d;
+}
+
+/* Pide la imagen en base64 y la pone de fondo; al hacer clic, la amplía. */
+async function loadCaptureThumb(ph, captureId) {
+  try {
+    const r = await api.getCaptureImage(captureId);
+    if (!r || !r.data_url) return;
+    ph.style.backgroundImage = `url("${r.data_url}")`;
+    ph.style.backgroundSize = 'cover';
+    ph.style.backgroundPosition = 'center';
+    ph.style.cursor = 'zoom-in';
+    ph.onclick = () => openLightbox(r.data_url);
+  } catch (e) { /* sin imagen: queda el marcador por defecto */ }
+}
+
+function openLightbox(dataUrl) {
+  const m = el('div', 'lightbox');
+  m.innerHTML = `<img src="${dataUrl}" alt="Captura ampliada">`;
+  m.onclick = () => { m.remove(); };
+  document.body.appendChild(m);
 }
 
 function viewSearch() {
@@ -670,7 +937,7 @@ function renderActionBar() {
       <div class="monitor-select">${svg('monitor', 14)}<select id="monitorSel" aria-label="Seleccionar monitor">${monitorOptions()}</select></div>
       <div class="ab-divider"></div>
       <button class="btn btn-record ${canRecord ? '' : 'is-disabled'}" id="abRecord" title="${canRecord ? 'Grabar reunión' : 'Selecciona una iniciativa'}"><span class="dot"></span>Grabar reunión</button>
-      <button class="btn btn-lg ${canRecord ? '' : 'is-disabled'}" id="abScreen">${svg('monitorDot', 15)}Grabar pantalla</button>
+      <button class="btn btn-lg btn-screen ${canRecord ? '' : 'is-disabled'}" id="abScreen">${svg('monitorDot', 15)}Grabar pantalla</button>
       <button class="btn btn-lg ${canRecord ? '' : 'is-disabled'}" id="abUpload">${svg('upload', 15)}Subir archivo</button>
       <div class="ab-spacer"></div>
       <span class="btn-disabled-hint">${svg('camera', 14)}Captura</span>
@@ -683,6 +950,7 @@ function renderActionBar() {
     bar.innerHTML = `
       <button class="btn btn-stop" id="abStop"><span class="sq"></span>Detener grabación</button>
       <button class="btn btn-lg" id="abCapture">${svg('camera', 15)}Captura</button>
+      ${STATE.monitors.length > 1 ? `<div class="monitor-select" title="Pantalla de la que se toma la captura">${svg('monitor', 14)}<select id="monitorSelRec" aria-label="Pantalla para la captura">${monitorOptions()}</select></div>` : ''}
       <button class="btn btn-lg" id="abNote">${svg('note', 15)}Añadir nota</button>
       <button class="btn btn-lg ${STATE.meetingMicMuted ? 'btn-danger' : ''}" id="abMic">${STATE.meetingMicMuted ? 'Activar mi audio' : 'Silenciar mi audio'}</button>
       <div class="ab-spacer"></div>
@@ -691,6 +959,7 @@ function renderActionBar() {
     bar.querySelector('#abCapture').onclick = doCapture;
     bar.querySelector('#abNote').onclick = promptNote;
     bar.querySelector('#abMic').onclick = toggleMeetingMic;
+    const msr = bar.querySelector('#monitorSelRec'); if (msr) msr.onchange = (e) => STATE.monitorIdx = +e.target.value;
   } else if (s === 'processing') {
     const canCancel = v2Available('cancel_current_job');
     bar.innerHTML = `<div class="proc-bar">
@@ -726,9 +995,15 @@ function renderSidebar() {
     tree.appendChild(row);
     if (open) {
       const sub = el('div', 'tree-meetings');
+      let currentMonth = null;
       ms.forEach(m => {
+        const month = m.month_label || 'Sin fecha';
+        if (month !== currentMonth) {
+          currentMonth = month;
+          sub.appendChild(el('div', 'tree-month', esc(month)));
+        }
         const mr = el('div', 'tree-meeting' + (STATE.selMeeting === m.id ? ' selected' : ''));
-        mr.innerHTML = `<span class="stat ${m.status || 'done'}"></span><span class="mtitle">${esc(m.title)}</span>`;
+        mr.innerHTML = `<span class="stat ${m.status || 'done'}"></span><span class="mtitle">${esc(m.title)}</span>${m.time ? '<span class="mtime">' + esc(m.time) + '</span>' : ''}`;
         mr.onclick = (e) => { e.stopPropagation(); openMeeting(m.id); };
         mr.oncontextmenu = (e) => { e.preventDefault(); e.stopPropagation(); openMeetingMenu(e, m.id); };
         sub.appendChild(mr);
@@ -978,16 +1253,17 @@ async function toggleMeetingMic() {
 }
 async function stopMeetingRecording() {
   stopTimer();
-  beginProcessing('Deteniendo y transcribiendo');
   try {
     const r = await api.stopRecording();
-    endProcessing();
+    // La transcripción va en segundo plano: volvemos a 'idle' al instante para
+    // poder empezar otra grabación sin esperar.
+    STATE.screen = STATE.selInit ? 'initiative' : 'welcome';
+    setAppState('idle');
     await refreshMeetings(STATE.selInit);
-    if (r && r.meeting_id) await openMeeting(r.meeting_id);
-    if (r && r.ok) toast('ok', 'Reunión transcrita y guardada');
+    if (r && r.ok) toast('ok', 'Grabación detenida · se transcribe en segundo plano');
     else toast('err', (r && r.error) || 'No se pudo finalizar la reunión');
   } catch (e) {
-    endProcessing();
+    setAppState('idle');
     toast('err', 'No se pudo finalizar la reunión');
   }
 }
@@ -1209,6 +1485,36 @@ window.setProgress = function (frac) {
   renderTopStatus();
 };
 
+/* ============================================================
+   Transcripción en SEGUNDO PLANO (indicador flotante)
+   ============================================================ */
+function renderBgJobs(jobs) {
+  STATE.bgJobs = Array.isArray(jobs) ? jobs : [];
+  let host = document.getElementById('bgJobs');
+  if (!STATE.bgJobs.length) { if (host) host.remove(); return; }
+  if (!host) { host = el('div', 'bg-jobs'); host.id = 'bgJobs'; document.body.appendChild(host); }
+  const active = STATE.bgJobs.filter(j => j.state === 'queued' || j.state === 'running').length;
+  const rows = STATE.bgJobs.map(j => {
+    const pct = Math.round((j.progress || 0) * 100);
+    const icon = j.state === 'done' ? `<span class="bgj-ic ok">${svg('check', 13)}</span>`
+      : j.state === 'error' ? `<span class="bgj-ic err">${svg('x', 13)}</span>`
+      : `<span class="bgj-ic"><span class="spinner sm"></span></span>`;
+    const stage = j.state === 'running' ? `${esc(j.stage || 'Transcribiendo…')} · ${pct}%` : esc(j.stage || '');
+    const bar = j.state === 'running' ? `<div class="bgj-bar"><i style="width:${pct}%"></i></div>` : '';
+    return `<div class="bgj-item"><div class="bgj-ic-wrap">${icon}</div><div class="bgj-body"><div class="bgj-name">${esc(j.title || 'Reunión')}</div><div class="bgj-stage">${stage}</div>${bar}</div></div>`;
+  }).join('');
+  const title = active ? `Transcribiendo en segundo plano${active > 1 ? ' (' + active + ')' : ''}` : 'Transcripción';
+  host.innerHTML = `<div class="bgj-title">${esc(title)}</div>${rows}`;
+}
+window.onBackgroundJobs = renderBgJobs;
+window.onJobFinished = async function (meetingId, initiativeId, ok) {
+  try {
+    if (initiativeId != null) await refreshMeetings(initiativeId);
+    if (STATE.screen === 'meeting' && STATE.selMeeting === meetingId) await openMeeting(meetingId, true);
+  } catch (e) { /* refresco best-effort */ }
+  toast(ok ? 'ok' : 'err', ok ? 'Transcripción lista' : 'No se pudo transcribir una reunión');
+};
+
 /* ---- Adaptadores V2 opcionales (Python puede llamarlos; si no, no pasa nada) ---- */
 window.onAppStateChanged = function (s) { if (s && s.state) setAppState(s.state); };
 window.onJobProgress = function (job) { if (job && typeof job.progress === 'number') { STATE.jobStage = job.stage || STATE.jobStage; window.setProgress(job.progress / 100); } };
@@ -1256,15 +1562,15 @@ async function openSettings() {
     <div class="modal-body">
       <div class="settings-section">
         <div class="sec-head"><label style="margin:0">TRANSCRIPCIÓN</label>${hasTx ? '' : '<span class="pending-badge">PENDIENTE · PYTHON</span>'}</div>
-        <div class="seg" style="margin-bottom:10px"><span class="${STATE.provider==='auto'?'on':''}" data-prov="auto">Automático</span><span class="${STATE.provider==='local'?'on':''}" data-prov="local">Local</span><span class="${STATE.provider==='replicate'?'on':''}" data-prov="replicate">Replicate</span></div>
-        <div class="help" style="margin:-3px 0 10px">Automático usa Whisper local rápido. Elige Replicate manualmente si priorizas calidad sobre velocidad.</div>
+        <div class="seg" style="margin-bottom:10px"><span class="${STATE.provider==='local'?'on':''}" data-prov="local">Local</span></div>
+        <div class="help" style="margin:-3px 0 10px">La transcripción se hace en tu equipo con Whisper local (gratis y privado).</div>
         <div class="row-inline"><div class="field" style="display:flex;align-items:center">Modelo local: small · videos con alta precisión</div><div class="field" style="display:flex;align-items:center">Idioma: Español</div></div>
         <label class="check-row"><input type="checkbox" id="setDefaultMute" ${s.default_mic_muted ? 'checked' : ''}><span><b>Silenciar mi audio por defecto</b><small>Podrás activarlo o silenciarlo durante cada grabación.</small></span></label>
       </div>
       <div class="settings-section">
-        <label>API KEY DE REPLICATE</label>
-        <div class="row-inline"><input class="field" type="password" id="setToken" placeholder="${tokenConfigured ? '••••••••••••' : 'r8_...'}"><span class="tag-ok">${tokenConfigured ? '● Configurada' : '○ No configurada'}</span><button class="btn btn-primary" id="setTokenSave">Guardar</button></div>
-        <div class="help">Se usa para transcripción en la nube con Replicate.</div>
+        <label>INSTRUCCIONES PARA LA IA</label>
+        <textarea id="setAiInstr" class="obj-text" rows="4" placeholder="Instrucciones que se ponen al principio de todo contexto que exportas…">${esc(s.ai_instructions || '')}</textarea>
+        <div class="row-inline" style="margin-top:8px"><div class="help" style="flex:1">Cabecera que orienta a Claude en cada exportación. Déjala vacía para volver a la de por defecto.</div><button class="btn" id="setAiReset">Restablecer</button><button class="btn btn-primary" id="setAiSave">Guardar</button></div>
       </div>
       <div class="settings-section">
         <label>CARPETA DE EXPORTACIÓN</label>
@@ -1286,7 +1592,8 @@ async function openSettings() {
     await api.v2.setTranscriptionSettings({ default_mic_muted: e.target.checked });
     toast('ok', e.target.checked ? 'Tu audio empezará silenciado' : 'Tu audio empezará activo');
   };
-  m.querySelector('#setTokenSave').onclick = async (e) => { const v = m.querySelector('#setToken').value.trim(); if (!v) return; e.currentTarget.classList.add('is-loading'); await api.setApiToken(v); toast('ok', 'API key guardada'); closeModal(); };
+  m.querySelector('#setAiSave').onclick = async () => { await api.setAiInstructions(m.querySelector('#setAiInstr').value); toast('ok', 'Instrucciones guardadas'); };
+  m.querySelector('#setAiReset').onclick = async () => { const r = await api.setAiInstructions(''); m.querySelector('#setAiInstr').value = (r && r.text) || ''; toast('ok', 'Instrucciones restablecidas'); };
   m.querySelector('#setDir').onclick = async () => { const r = await api.chooseExportDir(); if (r && r.ok) { toast('ok', 'Carpeta actualizada'); closeModal(); } };
   m.querySelector('#setTest').onclick = () => { if (!hasDev) { toast('info', 'La prueba de audio requiere backend V2 (test_audio_devices).'); return; } toast('info', 'Probando audio 5 s…'); };
   openModal(m);
@@ -1297,7 +1604,7 @@ async function openSettings() {
    ============================================================ */
 document.addEventListener('keydown', (e) => {
   if (e.key === 'Escape') { if (!$('#overlayRoot').hidden) closeModal(); closeMenu(); return; }
-  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') { e.preventDefault(); $('#searchInput').focus(); }
+  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') { e.preventDefault(); openSearch(); }
   if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'n') { e.preventDefault(); promptNewInitiative(); }
   if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'b') { e.preventDefault(); STATE.sidebarOpen = !STATE.sidebarOpen; applySidebar(); }
 });
@@ -1320,7 +1627,8 @@ function wireTopbar() {
   $('#btnNewInitiative').innerHTML = svg('plus', 14);
   $('#btnNewInitiativeRail').innerHTML = svg('plus', 16);
   $('.search-ico').innerHTML = svg('search', 14);
-  $('#btnSettings').querySelector('.ico-settings')?.replaceWith(elFromHTML('<span class="ico">' + svg('settings', 15) + '</span>'));
+  $('#btnSettings').innerHTML = svg('settings', 15);
+  $('#btnMic .mic-ico').innerHTML = svg('mic', 15);
   $('#btnArchive').querySelector('.ico-archive')?.replaceWith(elFromHTML('<span class="ico">' + svg('archive', 14) + '</span>'));
   $('#btnTrash').querySelector('.ico-trash')?.replaceWith(elFromHTML('<span class="ico">' + svg('trash', 14) + '</span>'));
 
@@ -1330,7 +1638,11 @@ function wireTopbar() {
   $('#btnSettings').onclick = openSettings;
   $('#btnArchive').onclick = () => { STATE.screen = 'archive'; renderMain(); };
   $('#btnTrash').onclick = () => { STATE.screen = 'trash'; renderMain(); };
-  $('#searchForm').onsubmit = (e) => { e.preventDefault(); runSearch($('#searchInput').value); };
+  $('#btnMic').onclick = toggleMic;
+  // Buscador compacto que se expande al enfocar
+  $('#search').addEventListener('click', openSearch);
+  $('#searchInput').addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); runSearch(e.target.value); } });
+  $('#searchInput').addEventListener('blur', () => { if (!$('#searchInput').value) $('#search').classList.remove('expanded'); });
   let deb; $('#searchInput').addEventListener('input', (e) => { clearTimeout(deb); const v = e.target.value; deb = setTimeout(() => { if (v.length >= 2) runSearch(v); else if (!v) backToTree(); }, 350); });
 }
 function elFromHTML(h) { const t = el('div'); t.innerHTML = h; return t.firstChild; }
@@ -1348,6 +1660,7 @@ async function init() {
   } catch (e) { console.warn('init', e); }
   renderSidebar(); renderActionBar(); renderMain();
   updateLibraryCounts();
+  try { renderBgJobs(await api.getBackgroundJobs()); } catch (e) { /* sin jobs */ }
 
   // Recuperación al arrancar (V2). Si no hay backend, no molesta.
   if (v2Available('list_recoverable_recordings')) {
