@@ -15,9 +15,28 @@ class Initiative(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now)
     archived_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     deleted_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    pinned_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)  # anclada
     meetings: Mapped[list["Meeting"]] = relationship(
         back_populates="initiative", cascade="all, delete-orphan"
     )
+    participants: Mapped[list["Participant"]] = relationship(
+        back_populates="initiative", cascade="all, delete-orphan"
+    )
+
+
+class Participant(Base):
+    """Persona de una iniciativa, reutilizable en todas sus reuniones.
+
+    `name` es el nombre completo (nombre + apellido) para distinguir a varias
+    personas con el mismo nombre de pila. `is_me` marca al usuario (su micrófono);
+    como mucho uno por iniciativa lo tiene a True."""
+    __tablename__ = "participants"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    initiative_id: Mapped[int] = mapped_column(ForeignKey("initiatives.id"))
+    name: Mapped[str] = mapped_column(String(200))
+    is_me: Mapped[bool] = mapped_column(Boolean, default=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now)
+    initiative: Mapped["Initiative"] = relationship(back_populates="participants")
 
 
 class Meeting(Base):
@@ -51,6 +70,11 @@ class Utterance(Base):
     start_time: Mapped[float] = mapped_column(Float)
     end_time: Mapped[float] = mapped_column(Float)
     highlighted: Mapped[bool] = mapped_column(Boolean, default=False)  # ★ Importante
+    # Asignación manual a un participante concreto; si es NULL se calcula el
+    # nombre con las reglas (ver resolución de nombre en repository.py).
+    participant_id: Mapped[int | None] = mapped_column(
+        ForeignKey("participants.id"), nullable=True
+    )
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now)
     meeting: Mapped["Meeting"] = relationship(back_populates="utterances")
 

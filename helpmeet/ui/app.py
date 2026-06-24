@@ -14,11 +14,14 @@ from pathlib import Path
 from datetime import timedelta
 from helpmeet.db.database import init_db, get_session
 from helpmeet.db import repository as repo
-from helpmeet.transcription.engine import TranscriptionEngine
-from helpmeet.transcription.replicate_engine import ReplicateTranscriptionEngine
+# El motor de transcripción (faster-whisper) se importa de forma perezosa dentro
+# de los métodos que lo crean: cargarlo arrastra CTranslate2/PyAV/numpy (~1 s) y
+# la ventana no lo necesita para abrirse, solo al grabar/transcribir.
 from helpmeet.session.recorder import MeetingRecorder
 from helpmeet.export.exporter import (
     export_meeting, export_initiative, meeting_export_dir, build_meeting_context,
+    build_transcript_txt, transcript_filename, export_transcript_package,
+    transcript_package_filename,
 )
 from helpmeet import config
 from helpmeet import settings
@@ -152,8 +155,16 @@ class Api:
         self._window = window
 
     def list_initiatives(self):
-        return [{"id": i.id, "name": i.name, "description": i.description or ""}
+        return [{"id": i.id, "name": i.name, "description": i.description or "",
+                 "pinned": i.pinned_at is not None}
                 for i in repo.list_initiatives(self._session)]
+
+    def toggle_initiative_pin(self, initiative_id):
+        """Ancla/desancla una iniciativa (las ancladas salen arriba en la lista)."""
+        state = repo.toggle_initiative_pin(self._session, int(initiative_id))
+        if state is None:
+            return {"ok": False, "error": "La iniciativa ya no existe."}
+        return {"ok": True, "id": int(initiative_id), "pinned": bool(state)}
 
     def set_initiative_description(self, initiative_id, description):
         """Guarda el objetivo/contexto de una iniciativa (va a la cabecera del export)."""
@@ -295,12 +306,15 @@ class Api:
             minutes, secs = divmod(max(0, int(seconds or 0)), 60)
             return f"{minutes:02d}:{secs:02d}"
 
+        participants = repo.list_participants(self._session, m.initiative_id)
         timeline = []
         for u in m.utterances:
             timeline.append({
                 "id": u.id, "kind": "utterance", "speaker": u.speaker,
                 "text": u.text, "start": u.start_time, "end": u.end_time,
                 "highlighted": bool(u.highlighted),
+                "participant_id": u.participant_id,
+                "display_name": repo.resolved_speaker_name(u, participants),
                 "time": stamp(u.start_time), "_sort": float(u.start_time),
             })
         captures = []
@@ -331,6 +345,9 @@ class Api:
         return {
             "title": m.title,
             "started_at": m.started_at.strftime("%Y-%m-%d %H:%M"),
+            "initiative_id": m.initiative_id,
+            "participants": [{"id": p.id, "name": p.name, "is_me": bool(p.is_me)}
+                             for p in participants],
             "utterances": timeline,
             "assets": {"captures": captures, "notes": notes, "video": video},
             "video_path": video,
@@ -360,6 +377,48 @@ class Api:
         ok = repo.delete_utterance(self._session, int(utterance_id))
         return {"ok": bool(ok)}
 
+    # ---------- Participantes ----------
+    def _participants_payload(self, initiative_id):
+        return [{"id": p.id, "name": p.name, "is_me": bool(p.is_me)}
+                for p in repo.list_participants(self._session, int(initiative_id))]
+
+    def list_participants(self, initiative_id):
+        """Participantes de una iniciativa (lista reutilizable en sus reuniones)."""
+        return {"ok": True, "participants": self._participants_payload(initiative_id)}
+
+    def add_participants(self, initiative_id, names):
+        """Da de alta participantes. `names` puede ser una lista o texto con un
+        nombre por línea (para pegar varios de golpe)."""
+        repo.add_participants(self._session, int(initiative_id), names)
+        return {"ok": True, "participants": self._participants_payload(initiative_id)}
+
+    def rename_participant(self, participant_id, name):
+        p = repo.rename_participant(self._session, int(participant_id), name)
+        if p is None:
+            return {"ok": False, "error": "Nombre no válido o participante inexistente."}
+        return {"ok": True, "participants": self._participants_payload(p.initiative_id)}
+
+    def delete_participant(self, participant_id):
+        p = repo.get_participant(self._session, int(participant_id))
+        initiative_id = p.initiative_id if p else None
+        ok = repo.delete_participant(self._session, int(participant_id))
+        payload = self._participants_payload(initiative_id) if initiative_id else []
+        return {"ok": bool(ok), "participants": payload}
+
+    def set_me_participant(self, initiative_id, participant_id):
+        """Marca quién eres tú (tu micrófono) en la iniciativa."""
+        pid = int(participant_id) if participant_id not in (None, "") else None
+        repo.set_me_participant(self._session, int(initiative_id), pid)
+        return {"ok": True, "participants": self._participants_payload(initiative_id)}
+
+    def assign_utterance_participant(self, utterance_id, participant_id):
+        """Asigna una frase a un participante concreto (None = sin asignar)."""
+        pid = int(participant_id) if participant_id not in (None, "") else None
+        utt = repo.assign_utterance_participant(self._session, int(utterance_id), pid)
+        if utt is None:
+            return {"ok": False, "error": "La frase ya no existe."}
+        return {"ok": True, "id": utt.id, "participant_id": utt.participant_id}
+
     def get_capture_image(self, capture_id):
         """Devuelve la imagen de una captura como data URL base64.
 
@@ -380,6 +439,78 @@ class Api:
     def export_meeting_by_id(self, meeting_id):
         out = export_meeting(self._session, int(meeting_id), settings.get_export_dir())
         return {"path": str(out)}
+
+    def export_transcript_txt(self, meeting_id):
+        """Muestra Guardar como y exporta únicamente la transcripción en TXT."""
+        meeting = repo.get_meeting(self._session, int(meeting_id))
+        if meeting is None:
+            return {"ok": False, "error": "La reunión ya no existe."}
+        initial_dir = settings.get_export_dir()
+        result = self._window.create_file_dialog(
+            webview.SAVE_DIALOG,
+            directory=str(initial_dir) if initial_dir.exists() else "",
+            save_filename=transcript_filename(meeting),
+            file_types=("Archivo de texto (*.txt)",),
+        )
+        if not result:
+            return {"ok": False, "cancelled": True}
+        selected = result[0] if isinstance(result, (list, tuple)) else result
+        path = Path(selected)
+        if path.suffix.lower() != ".txt":
+            path = path.with_suffix(".txt")
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(build_transcript_txt(meeting), encoding="utf-8-sig")
+        return {"ok": True, "path": str(path)}
+
+    def export_transcript_package(self, meeting_id):
+        """Guarda un ZIP con la transcripción y todos sus recursos visibles."""
+        meeting = repo.get_meeting(self._session, int(meeting_id))
+        if meeting is None:
+            return {"ok": False, "error": "La reunión ya no existe."}
+        initial_dir = settings.get_export_dir()
+        result = self._window.create_file_dialog(
+            webview.SAVE_DIALOG,
+            directory=str(initial_dir) if initial_dir.exists() else "",
+            save_filename=transcript_package_filename(meeting),
+            file_types=("Paquete ZIP (*.zip)",),
+        )
+        if not result:
+            return {"ok": False, "cancelled": True}
+        selected = result[0] if isinstance(result, (list, tuple)) else result
+        path = Path(selected)
+        if path.suffix.lower() != ".zip":
+            path = path.with_suffix(".zip")
+        payload = export_transcript_package(meeting, path)
+        return {"ok": True, **payload}
+
+    def export_transcript(self, meeting_id):
+        """TXT si solo hay texto; ZIP cuando existen imágenes o archivos."""
+        meeting = repo.get_meeting(self._session, int(meeting_id))
+        if meeting is None:
+            return {"ok": False, "error": "La reunión ya no existe."}
+        has_captures = any(Path(cap.image_path).is_file() for cap in meeting.captures)
+        has_file = bool(meeting.audio_path and Path(meeting.audio_path).is_file())
+        has_assets = has_captures or has_file
+        initial_dir = settings.get_export_dir()
+        result = self._window.create_file_dialog(
+            webview.SAVE_DIALOG,
+            directory=str(initial_dir) if initial_dir.exists() else "",
+            save_filename=(transcript_package_filename(meeting) if has_assets
+                           else transcript_filename(meeting)),
+            file_types=(("Paquete ZIP (*.zip)",) if has_assets
+                        else ("Archivo de texto (*.txt)",)),
+        )
+        if not result:
+            return {"ok": False, "cancelled": True}
+        selected = result[0] if isinstance(result, (list, tuple)) else result
+        path = Path(selected).with_suffix(".zip" if has_assets else ".txt")
+        if has_assets:
+            payload = export_transcript_package(meeting, path)
+            return {"ok": True, "format": "zip", **payload}
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(build_transcript_txt(meeting), encoding="utf-8-sig")
+        return {"ok": True, "format": "txt", "path": str(path),
+                "captures": 0, "files": 0}
 
     def export_initiative_by_id(self, initiative_id):
         out = export_initiative(self._session, int(initiative_id), settings.get_export_dir())
@@ -413,6 +544,7 @@ class Api:
         # motor local de Whisper (faster-whisper), ignorando cualquier
         # preferencia antigua de "replicate" guardada en los ajustes.
         if self._engine is None or self._engine_provider != "local":
+            from helpmeet.transcription.engine import TranscriptionEngine
             self._engine = TranscriptionEngine()
             self._engine_provider = "local"
         return self._engine
@@ -420,6 +552,7 @@ class Api:
     def _get_local_engine(self):
         """Motor LOCAL (faster-whisper) para videos subidos: gratis, sin límites."""
         if self._local_engine is None:
+            from helpmeet.transcription.engine import TranscriptionEngine
             self._local_engine = TranscriptionEngine()
         return self._local_engine
 
@@ -864,6 +997,62 @@ class Api:
         return {"path": None}
 
     # ---------- Ajustes ----------
+    def get_diagnostics(self):
+        """Informe de "primera ejecución": disco, modelo, audio, WebView2 y export."""
+        from helpmeet import diagnostics
+        return diagnostics.run_diagnostics(
+            config.DATA_DIR, settings.get_export_dir(), config.WHISPER_MODEL,
+        )
+
+    def backup_database(self):
+        """Copia la base de datos y los ajustes a una carpeta elegida.
+
+        Es una copia de seguridad de tu contenido (iniciativas, reuniones,
+        transcripciones, notas…). No incluye las grabaciones ni las capturas,
+        que pueden ocupar varios GB y siguen en su sitio."""
+        dest = self._pick_folder()
+        if not dest:
+            return {"ok": False, "cancelled": True}
+        from datetime import datetime as _dt
+        stamp = _dt.now().strftime("%Y-%m-%d_%H-%M-%S")
+        backup_dir = Path(dest) / f"helpmeet-backup-{stamp}"
+        backup_dir.mkdir(parents=True, exist_ok=True)
+        try:
+            self._session.commit()  # vuelca lo pendiente antes de copiar
+        except Exception:
+            pass
+        copied = []
+        for name in ("helpmeet.sqlite", "settings.json"):
+            src = config.DATA_DIR / name
+            if src.exists():
+                shutil.copy2(src, backup_dir / name)
+                copied.append(name)
+        return {"ok": bool(copied), "path": str(backup_dir)}
+
+    def wipe_all_data(self):
+        """Borra TODOS los datos locales: base de datos, ajustes, capturas,
+        grabaciones interrumpidas, temporales y el token guardado. NO toca la
+        carpeta de exportación (son tus archivos). Deja la app como recién
+        instalada. La interfaz debe recargarse después."""
+        from helpmeet.db import database
+        try:
+            self._session.close()
+        except Exception:
+            pass
+        database.dispose_engine()
+        config.wipe_data_dir()
+        try:
+            from helpmeet import secret_store
+            secret_store.delete_secret()
+        except Exception:
+            pass
+        init_db()
+        self._session = get_session()
+        self._engine = None
+        self._local_engine = None
+        self._engine_provider = None
+        return {"ok": True}
+
     def get_settings(self):
         token = settings.get_api_token()
         return {
@@ -871,8 +1060,14 @@ class Api:
             "has_token": bool(token),
             "token_hint": ("…" + token[-4:]) if token else "",
             "ai_instructions": settings.get_ai_instructions(),
+            "consent_seen": settings.get_consent_seen(),
             **settings.get_transcription_settings(),
         }
+
+    def mark_consent_seen(self):
+        """Marca que el usuario aceptó el aviso de consentimiento de grabación."""
+        settings.set_consent_seen(True)
+        return {"ok": True}
 
     def set_ai_instructions(self, text):
         """Guarda la cabecera de instrucciones para la IA (vacío = plantilla por defecto)."""

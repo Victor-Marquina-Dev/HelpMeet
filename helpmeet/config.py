@@ -90,3 +90,32 @@ def ensure_dirs() -> None:
     migrate_legacy_state()
     DATA_DIR.mkdir(parents=True, exist_ok=True)
     CAPTURES_DIR.mkdir(parents=True, exist_ok=True)
+
+
+# Datos personales dentro de DATA_DIR. NO se incluye el marcador de migración:
+# conservarlo evita que, tras borrar, se vuelvan a copiar datos antiguos de
+# desarrollo al reiniciar.
+_WIPE_FILES = ("helpmeet.sqlite", "settings.json")
+_WIPE_DIRS = ("captures", "recovery", "tmp_video", "tmp_audio")
+
+
+def wipe_data_dir(data_dir=None) -> list[str]:
+    """Borra los datos personales (base, ajustes, capturas, recuperación y
+    temporales) de `data_dir` (por defecto DATA_DIR). Devuelve lo que borró.
+    No toca la carpeta de exportación (son archivos del usuario)."""
+    base = Path(data_dir) if data_dir else DATA_DIR
+    removed: list[str] = []
+    for name in _WIPE_FILES:
+        target = base / name
+        if target.exists():
+            try:
+                target.unlink()
+                removed.append(name)
+            except OSError:
+                pass
+    for sub in _WIPE_DIRS:
+        target = base / sub
+        if target.exists():
+            shutil.rmtree(target, ignore_errors=True)
+            removed.append(sub + "/")
+    return removed

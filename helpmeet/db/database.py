@@ -33,6 +33,26 @@ def _migrate_utterance_highlight(engine) -> None:
             )
 
 
+def _migrate_utterance_participant(engine) -> None:
+    """Añade la columna `participant_id` (asignación de hablante) a bases anteriores."""
+    with engine.begin() as connection:
+        existing = {column["name"] for column in inspect(connection).get_columns("utterances")}
+        if "participant_id" not in existing:
+            connection.exec_driver_sql(
+                "ALTER TABLE utterances ADD COLUMN participant_id INTEGER"
+            )
+
+
+def _migrate_initiative_pin(engine) -> None:
+    """Añade la columna `pinned_at` (iniciativa anclada) a bases anteriores."""
+    with engine.begin() as connection:
+        existing = {column["name"] for column in inspect(connection).get_columns("initiatives")}
+        if "pinned_at" not in existing:
+            connection.exec_driver_sql(
+                "ALTER TABLE initiatives ADD COLUMN pinned_at DATETIME"
+            )
+
+
 def init_db():
     """Crea la carpeta de datos, el engine y las tablas. Idempotente."""
     global _engine, _SessionFactory
@@ -47,6 +67,8 @@ def init_db():
     Base.metadata.create_all(_engine)
     _migrate_archive_columns(_engine)
     _migrate_utterance_highlight(_engine)
+    _migrate_utterance_participant(_engine)
+    _migrate_initiative_pin(_engine)
     _SessionFactory = sessionmaker(bind=_engine)
     return _engine
 
@@ -55,3 +77,13 @@ def get_session() -> Session:
     if _SessionFactory is None:
         init_db()
     return _SessionFactory()
+
+
+def dispose_engine() -> None:
+    """Cierra el engine y libera el archivo SQLite (para poder borrarlo o
+    restaurar una copia). Tras esto hay que volver a llamar a `init_db`."""
+    global _engine, _SessionFactory
+    if _engine is not None:
+        _engine.dispose()
+    _engine = None
+    _SessionFactory = None

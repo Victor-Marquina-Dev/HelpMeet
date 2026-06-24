@@ -1,8 +1,10 @@
 import re
 import shutil
+import zipfile
 from pathlib import Path
 from sqlalchemy.orm import Session
 from helpmeet.db.models import Meeting, Initiative
+from helpmeet.db.repository import resolved_speaker_name
 from helpmeet.glossary import glossary_from_meetings
 
 SPEAKER_LABEL = {"me": "Yo", "others": "Los demás"}
@@ -10,6 +12,96 @@ MONTHS_ES = (
     "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
     "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre",
 )
+
+
+def transcript_filename(meeting: Meeting) -> str:
+    """Nombre portable y reconocible para la transcripción de una reunión."""
+    title = _slug(meeting.title) or "reunion"
+    return f"{meeting.started_at:%Y-%m-%d_%H-%M}_{title}.txt"
+
+
+def transcript_package_filename(meeting: Meeting) -> str:
+    return Path(transcript_filename(meeting)).with_suffix(".zip").name
+
+
+def build_transcript_txt(meeting: Meeting) -> str:
+    """Transcripción legible en texto plano, sin Markdown ni recursos adjuntos."""
+    participants = list(meeting.initiative.participants)
+    utterances = sorted(meeting.utterances, key=lambda item: item.start_time)
+    lines = [
+        "TRANSCRIPCIÓN DE REUNIÓN",
+        "",
+        f"Título: {meeting.title}",
+        f"Iniciativa: {meeting.initiative.name}",
+        f"Fecha: {meeting.started_at:%d/%m/%Y %H:%M}",
+        f"Duración: {_fmt_duration(meeting)}",
+        f"Frases: {len(utterances)}",
+        "",
+        "=" * 64,
+        "",
+    ]
+    if not utterances:
+        lines.append("Sin transcripción.")
+    for utterance in utterances:
+        speaker = resolved_speaker_name(utterance, participants)
+        important = "★ " if utterance.highlighted else ""
+        text = " ".join((utterance.text or "").split())
+        lines.append(f"[{_fmt_time(utterance.start_time)}] {important}{speaker}: {text}")
+        lines.append("")
+
+    if meeting.notes or meeting.captures or meeting.audio_path:
+        lines.extend(["", "ARCHIVOS Y ANOTACIONES", "", "=" * 64, ""])
+    events = []
+    for note in meeting.notes:
+        offset = _offset(note.created_at, meeting.started_at)
+        events.append((offset, f"[{_fmt_time(offset)}] Nota: {note.text}"))
+    for capture in meeting.captures:
+        offset = _offset(capture.taken_at, meeting.started_at)
+        suffix = Path(capture.image_path).suffix or ".png"
+        name = f"{capture.code}{suffix}"
+        events.append((offset, f"[{_fmt_time(offset)}] Captura: capturas/{name}"))
+    for _, description in sorted(events, key=lambda item: item[0]):
+        lines.extend([description, ""])
+    if meeting.audio_path:
+        media = Path(meeting.audio_path)
+        lines.extend([f"Archivo asociado: archivos/{media.name}", ""])
+    return "\n".join(lines).rstrip() + "\n"
+
+
+def export_transcript_package(meeting: Meeting, destination: Path) -> dict:
+    """Crea un ZIP con TXT, capturas y el video/archivo asociado."""
+    destination = Path(destination)
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    temporary = destination.with_suffix(destination.suffix + ".tmp")
+    captures = 0
+    files = 0
+    try:
+        with zipfile.ZipFile(temporary, "w") as archive:
+            archive.writestr(
+                "transcripcion.txt",
+                build_transcript_txt(meeting).encode("utf-8-sig"),
+                compress_type=zipfile.ZIP_DEFLATED,
+            )
+            for capture in meeting.captures:
+                source = Path(capture.image_path)
+                if source.exists() and source.is_file():
+                    suffix = source.suffix or ".png"
+                    archive.write(source, f"capturas/{capture.code}{suffix}",
+                                  compress_type=zipfile.ZIP_DEFLATED)
+                    captures += 1
+            if meeting.audio_path:
+                source = Path(meeting.audio_path)
+                if source.exists() and source.is_file():
+                    # MP4/audio ya están comprimidos; guardarlos sin recomprimir
+                    # hace la exportación mucho más rápida y no pierde calidad.
+                    archive.write(source, f"archivos/{source.name}",
+                                  compress_type=zipfile.ZIP_STORED)
+                    files += 1
+        temporary.replace(destination)
+    except Exception:
+        temporary.unlink(missing_ok=True)
+        raise
+    return {"path": str(destination), "captures": captures, "files": files}
 
 
 def _slug(text: str) -> str:
@@ -30,10 +122,10 @@ def _fmt_duration(meeting: Meeting) -> str:
     return "en curso"
 
 
-def _speakers_present(meeting: Meeting) -> str:
+def _speakers_present(meeting: Meeting, participants: list) -> str:
     seen: list[str] = []
     for u in meeting.utterances:
-        label = SPEAKER_LABEL.get(u.speaker, u.speaker)
+        label = resolved_speaker_name(u, participants)
         if label not in seen:
             seen.append(label)
     return ", ".join(seen) if seen else "—"
@@ -89,6 +181,7 @@ def _render_meeting(meeting: Meeting, captures_dir: Path,
     sorted_utts = sorted(meeting.utterances, key=lambda u: u.start_time)
     captures_by_utt = _map_captures(meeting, captures_dir)
     notes_by_utt = _map_notes(meeting, sorted_utts)
+    participants = list(meeting.initiative.participants)
 
     end = f"{meeting.ended_at:%H:%M}" if meeting.ended_at else "en curso"
     # Encabezado enriquecido: datos que ayudan a Claude a situar la reunión.
@@ -97,7 +190,7 @@ def _render_meeting(meeting: Meeting, captures_dir: Path,
         f"({meeting.started_at:%H:%M}–{end})",
         f"- Duración: {_fmt_duration(meeting)}",
         f"- Frases: {len(meeting.utterances)}",
-        f"- Hablantes: {_speakers_present(meeting)}",
+        f"- Hablantes: {_speakers_present(meeting, participants)}",
     ]
     if meeting.captures:
         lines.append(f"- Capturas: {len(meeting.captures)}")
@@ -110,7 +203,7 @@ def _render_meeting(meeting: Meeting, captures_dir: Path,
     lines.append("")
 
     for utt in sorted_utts:
-        label = SPEAKER_LABEL.get(utt.speaker, utt.speaker)
+        label = resolved_speaker_name(utt, participants)
         lines.append(f"[{_fmt_time(utt.start_time)}] {label}: {utt.text}")
         for name, offset in captures_by_utt.get(utt.id, []):
             lines.append(f"        [{_fmt_time(offset)}] 📷 (ver {captures_ref}/{name})")

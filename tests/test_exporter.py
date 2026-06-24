@@ -1,7 +1,55 @@
 from helpmeet.db import repository as repo
 from helpmeet.export.exporter import (
     export_meeting, export_initiative, meeting_export_dir, month_folder_name,
+    build_transcript_txt, transcript_filename,
+    export_transcript_package, transcript_package_filename,
 )
+
+
+def test_plain_text_transcript_has_time_speaker_and_no_markdown(session):
+    ini = repo.create_initiative(session, "Proyecto TXT")
+    meeting = repo.start_meeting(session, ini.id, "Revisión técnica")
+    repo.add_utterance(session, meeting.id, "others", "primera frase", 2.0, 4.0)
+    important = repo.add_utterance(session, meeting.id, "me", "decisión final", 9.0, 11.0)
+    important.highlighted = True
+    session.commit()
+    repo.end_meeting(session, meeting.id)
+
+    content = build_transcript_txt(meeting)
+
+    assert "Título: Revisión técnica" in content
+    assert "[00:02] Los demás: primera frase" in content
+    assert "[00:09] ★ Yo: decisión final" in content
+    assert "# " not in content
+    assert transcript_filename(meeting).endswith("revisión-técnica.txt")
+
+
+def test_transcript_package_contains_txt_capture_and_video(session, tmp_path):
+    import zipfile
+
+    ini = repo.create_initiative(session, "Paquete")
+    meeting = repo.start_meeting(session, ini.id, "Demo")
+    repo.add_utterance(session, meeting.id, "me", "texto exportado", 1.0, 2.0)
+    capture_path = tmp_path / "pantalla.png"
+    capture_path.write_bytes(b"PNG")
+    capture = repo.add_capture(session, meeting.id, str(capture_path))
+    video = tmp_path / "demo.mp4"
+    video.write_bytes(b"MP4")
+    meeting.audio_path = str(video)
+    session.commit()
+
+    destination = tmp_path / transcript_package_filename(meeting)
+    payload = export_transcript_package(meeting, destination)
+
+    assert payload["captures"] == 1 and payload["files"] == 1
+    with zipfile.ZipFile(destination) as package:
+        names = package.namelist()
+        assert "transcripcion.txt" in names
+        assert f"capturas/{capture.code}.png" in names
+        assert "archivos/demo.mp4" in names
+        text = package.read("transcripcion.txt").decode("utf-8-sig")
+        assert "texto exportado" in text
+        assert f"capturas/{capture.code}.png" in text
 
 
 def test_export_creates_md_and_captures_folder(session, tmp_path):

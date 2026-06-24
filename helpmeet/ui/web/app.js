@@ -48,6 +48,8 @@ const ICONS = {
   x: '<path d="M18 6 6 18M6 6l12 12"/>',
   edit: '<path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.1 2.1 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>',
   copy: '<rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>',
+  users: '<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/>',
+  pin: '<path d="M12 17v5M9 10.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24V16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V7a1 1 0 0 1 1-1 2 2 0 0 0 0-4H8a2 2 0 0 0 0 4 1 1 0 0 1 1 1z"/>',
   mic: '<path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2M12 19v3"/>',
   micOff: '<path d="m2 2 20 20"/><path d="M9 9v3a3 3 0 0 0 5.1 2.1M15 9.3V5a3 3 0 0 0-5.9-.7"/><path d="M19 10v2a7 7 0 0 1-.6 2.8M12 19v3M5 10v2a7 7 0 0 0 11 5.7"/>',
 };
@@ -82,6 +84,7 @@ async function call(method, ...args) {
 const api = {
   // ---- Contrato ACTUAL (sección 7) ----
   listInitiatives: () => call('list_initiatives'),
+  toggleInitiativePin: (id) => call('toggle_initiative_pin', id),
   createInitiative: (name) => call('create_initiative', name),
   renameInitiative: (id, name) => call('rename_initiative', id, name),
   renameMeeting: (id, title) => call('rename_meeting', id, title),
@@ -98,6 +101,9 @@ const api = {
   toggleMeetingMicMute: (muted) => call('toggle_meeting_mic_mute', muted),
   importMedia: (iid) => call('import_media', iid),
   exportMeetingById: (mid) => call('export_meeting_by_id', mid),
+  exportTranscriptTxt: (mid) => call('export_transcript_txt', mid),
+  exportTranscriptPackage: (mid) => call('export_transcript_package', mid),
+  exportTranscript: (mid) => call('export_transcript', mid),
   exportInitiativeById: (iid) => call('export_initiative_by_id', iid),
   exportMeetingTo: (mid) => call('export_meeting_to', mid),
   exportInitiativeTo: (iid) => call('export_initiative_to', iid),
@@ -110,6 +116,10 @@ const api = {
   openMeetingFolder: (mid) => call('open_meeting_folder', mid),
   openPath: (p) => call('open_path', p),
   getSettings: () => call('get_settings'),
+  getDiagnostics: () => call('get_diagnostics'),
+  backupDatabase: () => call('backup_database'),
+  wipeAllData: () => call('wipe_all_data'),
+  markConsentSeen: () => call('mark_consent_seen'),
   setApiToken: (t) => call('set_api_token', t),
   chooseExportDir: () => call('choose_export_dir'),
 
@@ -154,6 +164,12 @@ const api = {
     searchAdvanced: (q, f) => call('search_advanced', q, f),        // @pending-python
     getTranscriptionSettings: () => call('get_transcription_settings'),   // @pending-python
     setTranscriptionSettings: (d) => call('set_transcription_settings', d), // @pending-python
+    listParticipants: (iid) => call('list_participants', iid),
+    addParticipants: (iid, names) => call('add_participants', iid, names),
+    renameParticipant: (id, name) => call('rename_participant', id, name),
+    deleteParticipant: (id) => call('delete_participant', id),
+    setMeParticipant: (iid, pid) => call('set_me_participant', iid, pid),
+    assignUtteranceParticipant: (uid, pid) => call('assign_utterance_participant', uid, pid),
   },
 };
 
@@ -191,6 +207,9 @@ const MOCK = (() => {
     add_note: () => wait({ ok: true }),
     import_media: (iid) => wait({ id: 'm' + (++mctr), title: 'Vídeo importado', initiative_id: iid, utterances: 30 }, 600),
     export_meeting_by_id: () => wait({ path: 'C:\\Helpmeet\\export' }, 500),
+    export_transcript_txt: () => wait({ ok: true, path: 'C:\\Helpmeet\\transcripcion.txt' }, 500),
+    export_transcript_package: () => wait({ ok: true, path: 'C:\\Helpmeet\\transcripcion.zip', captures: 2, files: 1 }, 500),
+    export_transcript: () => wait({ ok: true, format: 'txt', path: 'C:\\Helpmeet\\transcripcion.txt', captures: 0, files: 0 }, 500),
     export_initiative_by_id: () => wait({ path: 'C:\\Helpmeet\\export' }, 500),
     export_meeting_to: () => wait({ ok: true, path: 'D:\\Backups\\reunion' }, 500),
     export_initiative_to: () => wait({ ok: true, path: 'D:\\Backups\\alpha' }, 500),
@@ -338,9 +357,11 @@ function viewWelcome() {
     <div class="row">
       <button class="btn btn-primary btn-lg" id="wNew">Nueva iniciativa</button>
       <button class="btn btn-lg" id="wExisting">Ver existentes</button>
+      <button class="btn btn-lg" id="wDiag">${svg('check', 15)} Diagnóstico</button>
     </div>`;
   w.querySelector('#wNew').onclick = promptNewInitiative;
   w.querySelector('#wExisting').onclick = () => { STATE.sidebarOpen = true; applySidebar(); $('#sidebarTree').focus?.(); };
+  w.querySelector('#wDiag').onclick = openDiagnostics;
   return w;
 }
 
@@ -548,13 +569,15 @@ function viewMeeting() {
     <div class="mhead-row">
       <h1 class="mtitle-h">${esc(t ? t.title : 'Reunión')}</h1>
       <span class="pill pill-done"><span class="pd"></span>Finalizada</span>
-      <div class="spacer"></div>
+    </div>
+    <div class="meta-line">${esc(t ? t.started_at : '')}${t && t.utterances ? ' · ' + t.utterances.filter(u => !u.kind || u.kind === 'utterance').length + ' frases' : ''}</div>
+    <div class="mhead-row mhead-actions">
       <button class="btn btn-primary" id="mCopy">${svg('copy', 14)} Copiar contexto</button>
       <button class="btn" id="mExport">${svg('download', 14)} Exportar</button>
       <button class="btn" id="mOpen">${svg('folder', 14)} Abrir carpeta</button>
+      <button class="btn" id="mParts">${svg('users', 14)} Participantes</button>
       <button class="icon-btn" id="mMenu" aria-label="Más acciones de la reunión">${svg('dots', 16)}</button>
     </div>
-    <div class="meta-line">${esc(t ? t.started_at : '')}${t && t.utterances ? ' · ' + t.utterances.filter(u => !u.kind || u.kind === 'utterance').length + ' frases' : ''}</div>
     <div class="tabs" role="tablist">
       ${['transcript', 'resumen', 'decisiones', 'tareas', 'archivos'].map(tab => {
         const label = { transcript: 'Transcripción', resumen: 'Resumen', decisiones: 'Decisiones', tareas: 'Tareas', archivos: 'Archivos' }[tab];
@@ -567,6 +590,7 @@ function viewMeeting() {
   head.querySelector('#mCopy').onclick = (e) => copyMeetingContext(STATE.selMeeting, e.currentTarget);
   head.querySelector('#mExport').onclick = (e) => doExportMeeting(e.currentTarget);
   head.querySelector('#mOpen').onclick = (e) => doOpenFolder(e.currentTarget);
+  head.querySelector('#mParts').onclick = () => { if (STATE.transcript) participantsModal(STATE.transcript); };
   head.querySelector('#mMenu').onclick = (e) => openMeetingMenu(e, STATE.selMeeting);
   head.querySelectorAll('.tab').forEach(b => b.onclick = () => { STATE.activeTab = b.dataset.tab; renderMain(); });
   wrap.replaceChildren(head, content);
@@ -690,7 +714,7 @@ function utterance(u) {
     <div class="time mono">${esc(u.time)}</div>
     <div class="band"></div>
     <div class="body-u">
-      <div class="who">${u.speaker === 'me' ? 'YO' : 'LOS DEMÁS'}</div>
+      <div class="who">${esc(u.display_name || (u.speaker === 'me' ? 'Yo' : 'Los demás'))}</div>
       <div class="text">${esc(u.text)}</div>
       <div class="uactions">
         <button class="u-act" data-act="edit">Editar</button>
@@ -732,7 +756,7 @@ function utteranceAction(act, u, node) {
       else toast('err', 'No se pudo eliminar la intervención');
     });
   } else if (act === 'speaker') {
-    api.v2.updateUtterance(u.id, { speaker: u.speaker === 'me' ? 'others' : 'me' }).then(() => openMeeting(STATE.selMeeting, true));
+    speakerMenu(u, node);
   } else if (act === 'edit') {
     inlineEdit(u, node);
   } else if (act === 'star') {
@@ -749,7 +773,7 @@ function utteranceAction(act, u, node) {
 function inlineEdit(u, node) {
   const body = node.querySelector('.body-u');
   const orig = u.text;
-  body.innerHTML = `<div class="who">${u.speaker === 'me' ? 'YO' : 'LOS DEMÁS'}</div>
+  body.innerHTML = `<div class="who">${esc(u.display_name || (u.speaker === 'me' ? 'Yo' : 'Los demás'))}</div>
     <textarea class="field" style="height:auto;min-height:60px;padding:9px;resize:vertical">${esc(orig)}</textarea>
     <div style="display:flex;gap:8px;margin-top:8px"><button class="btn btn-primary" data-s>Guardar</button><button class="btn" data-c>Cancelar</button><span style="margin-left:auto;font-size:11px;color:var(--text-muted);align-self:center">tiempo original conservado</span></div>`;
   body.querySelector('[data-c]').onclick = () => openMeeting(STATE.selMeeting, true);
@@ -758,6 +782,79 @@ function inlineEdit(u, node) {
     await api.v2.updateUtterance(u.id, { text: v }); toast('ok', 'Cambios guardados'); openMeeting(STATE.selMeeting, true);
   };
   body.querySelector('textarea').focus();
+}
+
+/* Editor de participantes (lista por iniciativa): añadir/pegar varios, renombrar,
+   marcar quién eres tú y eliminar. Al cerrar, refresca la transcripción. */
+function participantsModal(t) {
+  const iid = t.initiative_id;
+  let dirty = false;
+  const m = el('div', 'modal wide');
+  m.setAttribute('role', 'dialog'); m.setAttribute('aria-label', 'Participantes');
+  m.innerHTML = `
+    <div class="modal-head"><h3>Participantes</h3><button class="icon-btn sm" data-x aria-label="Cerrar">${svg('x', 14)}</button></div>
+    <div class="modal-body">
+      <label>Añadir participantes</label>
+      <textarea id="partAdd" class="field" style="height:auto;min-height:54px;padding:9px" placeholder="Un nombre completo por línea (ej. Víctor Marquina)"></textarea>
+      <div class="row-inline" style="margin:8px 0 16px"><div class="help" style="flex:1">Escribe o pega varios, uno por línea. Usa nombre y apellido para no confundir a personas con el mismo nombre.</div><button class="btn btn-primary" id="partAddBtn">Añadir</button></div>
+      <label>Lista · marca con el círculo quién eres tú</label>
+      <div id="partList" style="display:flex;flex-direction:column;gap:6px;margin-top:8px"></div>
+    </div>`;
+  const listEl = m.querySelector('#partList');
+  function draw(parts) {
+    listEl.replaceChildren();
+    if (!parts.length) { listEl.innerHTML = '<p style="font-size:13px;color:var(--text-muted);margin:4px 0">Aún no hay participantes.</p>'; return; }
+    parts.forEach(p => {
+      const row = el('div', 'part-row');
+      row.innerHTML = `<label class="part-me" title="Soy yo (mi micrófono)"><input type="radio" name="me" ${p.is_me ? 'checked' : ''}><span>tú</span></label>
+        <input class="field part-name" value="${esc(p.name)}">
+        <button class="icon-btn sm part-del" title="Eliminar" aria-label="Eliminar">${svg('x', 13)}</button>`;
+      row.querySelector('input[type=radio]').onclick = async () => { await api.v2.setMeParticipant(iid, p.id); dirty = true; reload(); };
+      const nameInput = row.querySelector('.part-name');
+      nameInput.onblur = async () => { const v = nameInput.value.trim(); if (v && v !== p.name) { await api.v2.renameParticipant(p.id, v); dirty = true; } };
+      row.querySelector('.part-del').onclick = async () => { await api.v2.deleteParticipant(p.id); dirty = true; reload(); };
+      listEl.appendChild(row);
+    });
+  }
+  async function reload() { const res = await api.v2.listParticipants(iid); draw((res && res.participants) || []); }
+  m.querySelector('#partAddBtn').onclick = async () => {
+    const txt = m.querySelector('#partAdd').value;
+    if (!txt.trim()) return;
+    await api.v2.addParticipants(iid, txt);
+    m.querySelector('#partAdd').value = '';
+    dirty = true; reload();
+  };
+  const close = () => { closeModal(); if (dirty) openMeeting(STATE.selMeeting, true); };
+  m.querySelector('[data-x]').onclick = close;
+  draw((t && t.participants) || []);
+  openModal(m);
+  $('#overlayRoot').onclick = (e) => { if (e.target === $('#overlayRoot')) close(); };
+}
+
+/* Selector de hablante: lista los participantes de la iniciativa para asignar la
+   frase a uno concreto (o dejarla "Sin asignar / Los demás"). */
+function speakerMenu(u, node) {
+  const parts = (STATE.transcript && STATE.transcript.participants) || [];
+  const m = el('div', 'modal');
+  m.setAttribute('role', 'dialog'); m.setAttribute('aria-label', 'Asignar hablante');
+  const rows = parts.map(p =>
+    `<button class="btn part-pick ${u.participant_id === p.id ? 'is-current' : ''}" data-pid="${p.id}">${esc(p.name)}${p.is_me ? ' · tú' : ''}</button>`
+  ).join('');
+  m.innerHTML = `
+    <div class="modal-head"><h3>Asignar hablante</h3><button class="icon-btn sm" data-x aria-label="Cerrar">${svg('x', 14)}</button></div>
+    <div class="modal-body">
+      ${parts.length ? '<div class="part-pick-list">' + rows + '</div>'
+        : '<p style="font-size:13px;color:var(--text-secondary);margin:0 0 8px">Aún no hay participantes. Añádelos en el panel <b>Participantes</b>, arriba.</p>'}
+      <button class="btn part-pick ${!u.participant_id ? 'is-current' : ''}" data-pid="" style="margin-top:8px;width:100%">Sin asignar (Los demás)</button>
+    </div>`;
+  m.querySelector('[data-x]').onclick = closeModal;
+  m.querySelectorAll('.part-pick').forEach(b => b.onclick = async () => {
+    const pid = b.dataset.pid === '' ? null : Number(b.dataset.pid);
+    const r = await api.v2.assignUtteranceParticipant(u.id, pid);
+    if (r && r.ok) { closeModal(); openMeeting(STATE.selMeeting, true); }
+    else toast('err', 'No se pudo asignar el hablante');
+  });
+  openModal(m);
 }
 
 // V2 — pestañas de conocimiento
@@ -942,8 +1039,8 @@ function renderActionBar() {
       <div class="ab-spacer"></div>
       <span class="btn-disabled-hint">${svg('camera', 14)}Captura</span>
       <span class="btn-disabled-hint">${svg('note', 14)}Nota</span>`;
-    bar.querySelector('#abRecord').onclick = () => canRecord && startMeetingRecording();
-    bar.querySelector('#abScreen').onclick = () => canRecord && openScreenPanel();
+    bar.querySelector('#abRecord').onclick = () => canRecord && withRecordingConsent(startMeetingRecording);
+    bar.querySelector('#abScreen').onclick = () => canRecord && withRecordingConsent(openScreenPanel);
     bar.querySelector('#abUpload').onclick = () => canRecord && doImport(bar.querySelector('#abUpload'));
     const ms = bar.querySelector('#monitorSel'); if (ms) ms.onchange = (e) => STATE.monitorIdx = +e.target.value;
   } else if (s === 'recording' || s === 'recording-local' || s === 'recording-cloud') {
@@ -989,7 +1086,7 @@ function renderSidebar() {
     const open = !!STATE.openInits[it.id];
     const ms = STATE.meetingsByInit[it.id] || [];
     const row = el('div', 'tree-initiative' + (open ? ' open' : '') + (STATE.selInit === it.id && STATE.screen === 'initiative' ? ' selected' : ''));
-    row.innerHTML = `<span class="chev">${svg('chevron', 12)}</span><span class="name">${esc(it.name)}</span><span class="count">${ms.length || ''}</span>`;
+    row.innerHTML = `<span class="chev">${svg('chevron', 12)}</span><span class="name">${esc(it.name)}</span>${it.pinned ? '<span class="pin-ind" title="Anclada">' + svg('pin', 11) + '</span>' : ''}<span class="count">${ms.length || ''}</span>`;
     row.onclick = () => selectInitiative(it.id);
     row.oncontextmenu = (e) => { e.preventDefault(); openInitiativeMenu(e, it.id); };
     tree.appendChild(row);
@@ -1124,7 +1221,10 @@ function openMenu(e, items) {
 function closeMenu() { if (_ctxOpen) { _ctxOpen.remove(); _ctxOpen = null; } }
 
 function openInitiativeMenu(e, iid) {
+  const it = STATE.initiatives.find(x => x.id === iid);
+  const pinned = !!(it && it.pinned);
   openMenu(e, [
+    { label: pinned ? 'Desanclar iniciativa' : 'Anclar iniciativa', icon: 'pin', onClick: () => toggleInitiativePin(iid) },
     { label: 'Ver glosario', icon: 'search', onClick: () => openGlossary(iid) },
     { label: 'Renombrar iniciativa', icon: 'edit', onClick: () => promptRenameInitiative(iid) },
     { label: 'Exportar a otra carpeta', icon: 'download', onClick: () => exportInitiativeTo(iid) },
@@ -1190,13 +1290,18 @@ async function openGlossary(iid) {
 async function doExportMeeting(btn) {
   btn.classList.add('is-loading');
   try {
-    const r = await api.exportMeetingById(STATE.selMeeting);
-    if (!r || !r.path) throw new Error('La exportación no devolvió una carpeta.');
-    await api.openPath(r.path);
-    toast('ok', 'Markdown generado · carpeta abierta');
+    const r = await api.exportTranscript(STATE.selMeeting);
+    if (r && r.cancelled) return;
+    if (!r || !r.ok || !r.path) throw new Error((r && r.error) || 'No se guardó el archivo.');
+    if (r.format === 'zip') {
+      const detail = `${r.captures || 0} imágenes · ${r.files || 0} archivos`;
+      toast('ok', `ZIP guardado · ${detail}`);
+    } else {
+      toast('ok', 'Transcripción TXT guardada');
+    }
   }
-  catch (e) { toast('err', 'No se pudo exportar la reunión'); }
-  btn.classList.remove('is-loading');
+  catch (e) { toast('err', 'No se pudo guardar la transcripción'); }
+  finally { btn.classList.remove('is-loading'); }
 }
 async function doOpenFolder(btn) {
   btn.classList.add('is-loading');
@@ -1227,6 +1332,23 @@ async function doImport(btn) {
 /* ============================================================
    7b. GRABACIÓN DE REUNIÓN
    ============================================================ */
+/* Aviso de consentimiento antes de la PRIMERA grabación: grabar a otras personas
+   puede requerir su permiso. Solo se muestra una vez (se guarda en ajustes). */
+function withRecordingConsent(proceed) {
+  if (STATE.consentSeen) return proceed();
+  const run = (seen) => {
+    if (seen) { STATE.consentSeen = true; return proceed(); }
+    confirmModal('Antes de grabar',
+      'Grabar a otras personas puede requerir su consentimiento según las leyes de tu país o región. Asegúrate de informarles y de tener su permiso antes de grabar. Eres responsable de obtenerlo.',
+      'Entendido, continuar', async () => {
+        await api.markConsentSeen(); STATE.consentSeen = true;
+        setTimeout(proceed, 0);   // tras cerrarse este aviso, abre lo siguiente
+      }, false);
+  };
+  if (STATE.settings && 'consent_seen' in STATE.settings) run(STATE.settings.consent_seen);
+  else api.getSettings().then(s => { STATE.settings = s || {}; run(!!(s && s.consent_seen)); });
+}
+
 function startMeetingRecording() {
   if (STATE.appState !== 'idle') return;
   formModal('Nueva reunión', 'Título de la reunión', 'Reunión', 'Empezar a grabar', beginMeetingRecording);
@@ -1399,6 +1521,13 @@ function _afterRemoveFromTree(iid) {
   // Si la iniciativa abierta se archivó/eliminó, volver a la bienvenida.
   if (iid && STATE.selInit === iid) { STATE.selInit = null; STATE.selMeeting = null; STATE.screen = 'welcome'; }
 }
+async function toggleInitiativePin(iid) {
+  const r = await api.toggleInitiativePin(iid);
+  if (!r || !r.ok) { toast('err', 'No se pudo anclar la iniciativa'); return; }
+  STATE.initiatives = await api.listInitiatives() || [];   // reordena: ancladas arriba
+  renderSidebar();
+  toast('ok', r.pinned ? 'Iniciativa anclada' : 'Iniciativa desanclada');
+}
 function archiveInitiative(iid) {
   confirmModal('Archivar iniciativa', 'Se moverá al Archivo. Podrás restaurarla cuando quieras.', 'Archivar', async () => {
     const r = await api.archiveItem('initiative', iid);
@@ -1549,6 +1678,47 @@ function showRecoveryBanner(rec) {
 /* ============================================================
    AJUSTES
    ============================================================ */
+/* Pantalla de diagnóstico (primera ejecución): comprueba que el equipo está
+   listo — disco, modelo de transcripción, micrófono, audio del sistema, carpeta
+   de exportación y dónde se procesa el audio. */
+async function openDiagnostics() {
+  const m = el('div', 'modal wide');
+  m.setAttribute('role', 'dialog'); m.setAttribute('aria-label', 'Diagnóstico del sistema');
+  m.innerHTML = `
+    <div class="modal-head"><h3>${svg('check', 16)} Diagnóstico del sistema</h3><button class="icon-btn sm" data-x aria-label="Cerrar">${svg('x', 14)}</button></div>
+    <div class="modal-body">
+      <div id="diagList" class="diag-list"><p style="color:var(--text-muted);font-size:13px">Comprobando…</p></div>
+      <div class="row-inline" style="margin-top:14px"><div class="help" style="flex:1">Comprueba que tu equipo está listo para grabar y transcribir.</div><button class="btn" id="diagFolder">Cambiar carpeta de exportación</button><button class="btn" id="diagReload">Volver a comprobar</button></div>
+    </div>`;
+  m.querySelector('[data-x]').onclick = closeModal;
+  const listEl = m.querySelector('#diagList');
+  async function loadDiag() {
+    listEl.innerHTML = '<p style="color:var(--text-muted);font-size:13px">Comprobando…</p>';
+    const d = await api.getDiagnostics() || {};
+    const rows = [
+      ['Ventana (WebView2)', d.webview2],
+      ['Espacio en disco', d.disk],
+      ['Modelo de transcripción', d.whisper],
+      ['Micrófono', d.mic],
+      ['Audio del sistema', d.loopback],
+      ['Carpeta de exportación', d.export_dir],
+      ['Procesamiento del audio', d.processing],
+    ];
+    listEl.replaceChildren();
+    rows.forEach(([label, info]) => {
+      info = info || { status: 'warn', label: 'No disponible' };
+      const ico = info.status === 'ok' ? svg('check', 14) : info.status === 'error' ? svg('x', 14) : svg('warn', 14);
+      const row = el('div', 'diag-row ' + (info.status || 'warn'));
+      row.innerHTML = `<span class="diag-ico">${ico}</span><div class="diag-body"><div class="diag-label">${esc(label)}</div><div class="diag-detail">${esc(info.label || '')}${info.detail ? ' · ' + esc(info.detail) : ''}</div></div>`;
+      listEl.appendChild(row);
+    });
+  }
+  m.querySelector('#diagReload').onclick = loadDiag;
+  m.querySelector('#diagFolder').onclick = async () => { const r = await api.chooseExportDir(); if (r && r.ok) { toast('ok', 'Carpeta actualizada'); loadDiag(); } };
+  openModal(m);
+  loadDiag();
+}
+
 async function openSettings() {
   const s = await api.getSettings() || {};
   const tokenConfigured = !!(s.has_token || s.token_set);
@@ -1577,9 +1747,13 @@ async function openSettings() {
         <div class="row-inline"><div class="field mono" style="display:flex;align-items:center;overflow:hidden;white-space:nowrap;color:var(--text-secondary)">${esc(s.export_dir || '—')}</div><button class="btn" id="setDir">Elegir…</button></div>
       </div>
       <div class="settings-section">
-        <div class="sec-head"><label style="margin:0">DISPOSITIVOS DE AUDIO</label>${hasDev ? '' : '<span class="pending-badge">PENDIENTE · PYTHON</span>'}</div>
-        <div class="row-inline"><div class="field" style="display:flex;align-items:center">Mic: Realtek HD ${svg('chevronDown',13)}</div><button class="btn" id="setTest">Probar 5 s</button></div>
-        <div class="help">Comprueba micrófono y audio del sistema antes de grabar.</div>
+        <label>DIAGNÓSTICO DEL SISTEMA</label>
+        <div class="row-inline"><div class="help" style="flex:1">Comprueba disco, modelo de transcripción, micrófono, audio del sistema y carpeta de exportación.</div><button class="btn" id="setDiag">${svg('check', 14)} Abrir diagnóstico</button></div>
+      </div>
+      <div class="settings-section">
+        <label>PRIVACIDAD Y DATOS</label>
+        <div class="row-inline"><div class="help" style="flex:1">Copia de seguridad de tu contenido (iniciativas, reuniones, transcripciones). No incluye grabaciones ni capturas.</div><button class="btn" id="setBackup">${svg('download', 14)} Copia de seguridad</button></div>
+        <div class="row-inline" style="margin-top:8px"><div class="help" style="flex:1">Borra <b>todos</b> tus datos locales y deja la app como recién instalada. No se puede deshacer. No toca tu carpeta de exportación.</div><button class="btn btn-danger" id="setWipe">${svg('trash', 14)} Borrar todos los datos</button></div>
       </div>
     </div>`;
   m.querySelector('[data-x]').onclick = closeModal;
@@ -1595,7 +1769,34 @@ async function openSettings() {
   m.querySelector('#setAiSave').onclick = async () => { await api.setAiInstructions(m.querySelector('#setAiInstr').value); toast('ok', 'Instrucciones guardadas'); };
   m.querySelector('#setAiReset').onclick = async () => { const r = await api.setAiInstructions(''); m.querySelector('#setAiInstr').value = (r && r.text) || ''; toast('ok', 'Instrucciones restablecidas'); };
   m.querySelector('#setDir').onclick = async () => { const r = await api.chooseExportDir(); if (r && r.ok) { toast('ok', 'Carpeta actualizada'); closeModal(); } };
-  m.querySelector('#setTest').onclick = () => { if (!hasDev) { toast('info', 'La prueba de audio requiere backend V2 (test_audio_devices).'); return; } toast('info', 'Probando audio 5 s…'); };
+  m.querySelector('#setDiag').onclick = () => { closeModal(); openDiagnostics(); };
+  m.querySelector('#setBackup').onclick = async (e) => {
+    e.currentTarget.classList.add('is-loading');
+    try {
+      const r = await api.backupDatabase();
+      if (r && r.ok) toast('ok', 'Copia de seguridad guardada');
+      else if (r && r.cancelled) { /* el usuario canceló */ }
+      else toast('err', 'No se pudo crear la copia');
+    } finally { e.currentTarget.classList.remove('is-loading'); }
+  };
+  m.querySelector('#setWipe').onclick = () => {
+    confirmModal('Borrar todos los datos',
+      'Se borrarán TODOS tus datos locales: iniciativas, reuniones, transcripciones, notas, capturas y ajustes. Tu carpeta de exportación NO se toca. Esta acción no se puede deshacer.',
+      'Borrar todo', async () => {
+        const r = await api.wipeAllData();
+        if (r && r.ok) {
+          toast('ok', 'Todos los datos se han borrado');
+          closeModal();
+          // Recarga el estado desde cero: todo queda vacío.
+          STATE.selInit = null; STATE.selMeeting = null; STATE.screen = 'welcome';
+          STATE.meetingsByInit = {}; STATE.openInits = {}; STATE.transcript = null;
+          STATE.initiatives = await api.listInitiatives() || [];
+          await refreshAll(); renderSidebar(); renderMain();
+        } else {
+          toast('err', 'No se pudieron borrar los datos');
+        }
+      });
+  };
   openModal(m);
 }
 

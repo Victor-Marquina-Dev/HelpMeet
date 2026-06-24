@@ -68,6 +68,85 @@ def test_edit_change_speaker_highlight_and_delete_utterance(session):
     assert api.delete_utterance(u.id) == {"ok": False}
 
 
+def test_participants_lifecycle_and_resolved_names(session):
+    ini = repo.create_initiative(session, "Proyecto")
+    meeting = repo.start_meeting(session, ini.id, "Reunión")
+    mine = repo.add_utterance(session, meeting.id, "me", "hola soy yo", 1.0, 2.0)
+    theirs = repo.add_utterance(session, meeting.id, "others", "hola", 3.0, 4.0)
+    api = _api_with_session(session)
+
+    # Alta en bloque (pegar varios), ignora vacíos y duplicados
+    r = api.add_participants(ini.id, "Víctor Marquina\nMaría Pérez\n\nMaría Pérez")
+    names = [p["name"] for p in r["participants"]]
+    assert names == ["Víctor Marquina", "María Pérez"]
+
+    parts = {p["name"]: p for p in r["participants"]}
+    # Marcar quién soy yo
+    api.set_me_participant(ini.id, parts["Víctor Marquina"]["id"])
+
+    # Con 1 invitado (María), las frases "others" muestran su nombre automáticamente
+    items = {u["id"]: u for u in api.get_transcript(meeting.id)["utterances"]}
+    assert items[mine.id]["display_name"] == "Víctor Marquina"   # yo, auto
+    assert items[theirs.id]["display_name"] == "María Pérez"     # único invitado, auto
+
+    # Con 2+ invitados, "others" sin asignar vuelve a "Los demás"
+    api.add_participants(ini.id, ["Juan Soto"])
+    items = {u["id"]: u for u in api.get_transcript(meeting.id)["utterances"]}
+    assert items[theirs.id]["display_name"] == "Los demás"
+
+    # Asignación manual gana
+    api.assign_utterance_participant(theirs.id, parts["María Pérez"]["id"])
+    items = {u["id"]: u for u in api.get_transcript(meeting.id)["utterances"]}
+    assert items[theirs.id]["display_name"] == "María Pérez"
+
+    # Borrar el participante asignado: se limpia la asignación manual y vuelven
+    # las reglas. Quedan Víctor (yo) + Juan → un solo invitado → "Juan Soto".
+    api.delete_participant(parts["María Pérez"]["id"])
+    items = {u["id"]: u for u in api.get_transcript(meeting.id)["utterances"]}
+    assert items[theirs.id]["participant_id"] is None
+    assert items[theirs.id]["display_name"] == "Juan Soto"
+
+
+def test_export_uses_participant_names(session, tmp_path):
+    from helpmeet.export.exporter import build_meeting_context
+    ini = repo.create_initiative(session, "Proyecto")
+    meeting = repo.start_meeting(session, ini.id, "Reunión")
+    repo.add_utterance(session, meeting.id, "me", "abro yo", 1.0, 2.0)
+    repo.add_utterance(session, meeting.id, "others", "responde el invitado", 3.0, 4.0)
+    api = _api_with_session(session)
+    created = api.add_participants(ini.id, ["Víctor Marquina", "Cliente ACME"])["participants"]
+    api.set_me_participant(ini.id, created[0]["id"])
+    repo.end_meeting(session, meeting.id)
+
+    text = build_meeting_context(session, meeting.id)
+    assert "Víctor Marquina: abro yo" in text
+    assert "Cliente ACME: responde el invitado" in text  # único invitado → auto
+
+
+def test_pin_initiative_sorts_first(session):
+    api = _api_with_session(session)
+    repo.create_initiative(session, "Primera")
+    segunda = repo.create_initiative(session, "Segunda")
+    tercera = repo.create_initiative(session, "Tercera")
+
+    # Sin anclar: orden por creación
+    assert [i["name"] for i in api.list_initiatives()] == ["Primera", "Segunda", "Tercera"]
+
+    # Anclar la tercera: sube arriba
+    assert api.toggle_initiative_pin(tercera.id) == {"ok": True, "id": tercera.id, "pinned": True}
+    names = [i["name"] for i in api.list_initiatives()]
+    assert names[0] == "Tercera"
+    assert next(i for i in api.list_initiatives() if i["name"] == "Tercera")["pinned"] is True
+
+    # Anclar la segunda: la más recientemente anclada va primero
+    api.toggle_initiative_pin(segunda.id)
+    assert [i["name"] for i in api.list_initiatives()][:2] == ["Segunda", "Tercera"]
+
+    # Desanclar la tercera: vuelve abajo
+    assert api.toggle_initiative_pin(tercera.id)["pinned"] is False
+    assert [i["name"] for i in api.list_initiatives()] == ["Segunda", "Primera", "Tercera"]
+
+
 def test_spanish_screen_recording_date_format():
     from datetime import datetime
 

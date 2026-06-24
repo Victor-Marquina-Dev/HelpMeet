@@ -1,7 +1,9 @@
 from datetime import datetime
 from sqlalchemy import select
 from sqlalchemy.orm import Session
-from helpmeet.db.models import Initiative, Meeting, Utterance, Capture, Note
+from helpmeet.db.models import Initiative, Meeting, Utterance, Capture, Note, Participant
+
+SPEAKER_LABEL = {"me": "Yo", "others": "Los demás"}
 
 
 def create_initiative(session: Session, name: str, description: str | None = None) -> Initiative:
@@ -12,10 +14,24 @@ def create_initiative(session: Session, name: str, description: str | None = Non
 
 
 def list_initiatives(session: Session) -> list[Initiative]:
+    # Ancladas primero (las más recientemente ancladas arriba); el resto por fecha.
     stmt = select(Initiative).where(
         Initiative.archived_at.is_(None), Initiative.deleted_at.is_(None)
-    ).order_by(Initiative.created_at)
+    ).order_by(
+        Initiative.pinned_at.is_(None), Initiative.pinned_at.desc(),
+        Initiative.created_at,
+    )
     return list(session.scalars(stmt))
+
+
+def toggle_initiative_pin(session: Session, initiative_id: int) -> bool | None:
+    """Ancla/desancla una iniciativa. Devuelve el nuevo estado (anclada o no)."""
+    ini = session.get(Initiative, int(initiative_id))
+    if ini is None:
+        return None
+    ini.pinned_at = None if ini.pinned_at else datetime.now()
+    session.commit()
+    return ini.pinned_at is not None
 
 
 def list_archived(session: Session) -> list[dict]:
@@ -213,6 +229,107 @@ def delete_utterance(session: Session, utterance_id: int) -> bool:
     session.delete(utt)
     session.commit()
     return True
+
+
+# ---------- Participantes ----------
+def get_participant(session: Session, participant_id: int) -> Participant | None:
+    return session.get(Participant, int(participant_id))
+
+
+def list_participants(session: Session, initiative_id: int) -> list[Participant]:
+    stmt = (select(Participant)
+            .where(Participant.initiative_id == int(initiative_id))
+            .order_by(Participant.created_at, Participant.id))
+    return list(session.scalars(stmt))
+
+
+def add_participants(session: Session, initiative_id: int, names) -> list[Participant]:
+    """Da de alta uno o varios participantes (acepta lista o texto multilínea).
+
+    Ignora líneas vacías y nombres que ya existen en la iniciativa (sin distinguir
+    mayúsculas ni espacios sobrantes). Devuelve solo los recién creados."""
+    if isinstance(names, str):
+        names = names.replace(",", "\n").splitlines()
+    existing = {p.name.strip().lower() for p in list_participants(session, initiative_id)}
+    created: list[Participant] = []
+    seen = set(existing)
+    for raw in names or []:
+        name = (raw or "").strip()
+        key = name.lower()
+        if not name or key in seen:
+            continue
+        seen.add(key)
+        p = Participant(initiative_id=int(initiative_id), name=name)
+        session.add(p)
+        created.append(p)
+    if created:
+        session.commit()
+    return created
+
+
+def rename_participant(session: Session, participant_id: int, name: str) -> Participant | None:
+    p = session.get(Participant, int(participant_id))
+    if p is None or not (name or "").strip():
+        return None
+    p.name = name.strip()
+    session.commit()
+    return p
+
+
+def delete_participant(session: Session, participant_id: int) -> bool:
+    """Borra un participante. Las frases que lo tuvieran asignado vuelven a las
+    reglas automáticas (su participant_id queda a NULL)."""
+    p = session.get(Participant, int(participant_id))
+    if p is None:
+        return False
+    session.query(Utterance).filter(
+        Utterance.participant_id == p.id
+    ).update({Utterance.participant_id: None})
+    session.delete(p)
+    session.commit()
+    return True
+
+
+def set_me_participant(session: Session, initiative_id: int,
+                       participant_id: int | None) -> None:
+    """Marca un participante como "yo" (tu micrófono) y desmarca los demás de la
+    iniciativa. `participant_id=None` deja a nadie marcado."""
+    for p in list_participants(session, initiative_id):
+        p.is_me = (participant_id is not None and p.id == int(participant_id))
+    session.commit()
+
+
+def assign_utterance_participant(session: Session, utterance_id: int,
+                                 participant_id: int | None) -> Utterance | None:
+    """Asigna (o desasigna, con None) una frase a un participante concreto."""
+    utt = session.get(Utterance, int(utterance_id))
+    if utt is None:
+        return None
+    utt.participant_id = int(participant_id) if participant_id is not None else None
+    session.commit()
+    return utt
+
+
+def resolved_speaker_name(utterance: Utterance, participants: list[Participant]) -> str:
+    """Nombre a mostrar para una frase, aplicando las reglas (sin IA):
+
+    1. Asignación manual (participant_id) → ese nombre.
+    2. speaker == "me" → el participante marcado "yo" (o "Yo").
+    3. speaker == "others" → si hay exactamente un invitado (no-yo) → su nombre;
+       si hay 0 o 2+ → "Los demás".
+    """
+    by_id = {p.id: p for p in participants}
+    if utterance.participant_id and utterance.participant_id in by_id:
+        return by_id[utterance.participant_id].name
+    if utterance.speaker == "me":
+        me = next((p for p in participants if p.is_me), None)
+        return me.name if me else SPEAKER_LABEL["me"]
+    if utterance.speaker == "others":
+        guests = [p for p in participants if not p.is_me]
+        if len(guests) == 1:
+            return guests[0].name
+        return SPEAKER_LABEL["others"]
+    return SPEAKER_LABEL.get(utterance.speaker, utterance.speaker)
 
 
 def add_capture(session: Session, meeting_id: int, image_path: str,

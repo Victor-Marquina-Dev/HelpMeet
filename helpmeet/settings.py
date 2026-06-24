@@ -135,6 +135,17 @@ def get_transcription_settings() -> dict:
     }
 
 
+def get_consent_seen() -> bool:
+    """Si el usuario ya aceptó el aviso de consentimiento de grabación."""
+    return bool(_load().get("recording_consent_seen", False))
+
+
+def set_consent_seen(seen: bool = True) -> None:
+    current = _load()
+    current["recording_consent_seen"] = bool(seen)
+    _save(current)
+
+
 def set_transcription_settings(values: dict) -> dict:
     current = _load()
     if "provider" in values:
