@@ -21,7 +21,7 @@ from helpmeet.session.recorder import MeetingRecorder
 from helpmeet.export.exporter import (
     export_meeting, export_initiative, meeting_export_dir, build_meeting_context,
     build_transcript_txt, transcript_filename, export_transcript_package,
-    transcript_package_filename,
+    transcript_package_filename, organize_meeting_folder,
 )
 from helpmeet import config
 from helpmeet import settings
@@ -544,9 +544,10 @@ class Api:
         if m is None:
             return {"ok": False}
         exports = settings.get_export_dir()
+        # Regenera la iniciativa para migrar también las reuniones antiguas del
+        # mismo mes y retirar archivos sueltos de la estructura anterior.
+        export_meeting(self._session, m.id, exports)
         folder = meeting_export_dir(m, exports)
-        if not folder.exists():
-            export_meeting(self._session, m.id, exports)
         _open_in_explorer(folder)
         return {"ok": True, "path": str(folder)}
 
@@ -675,7 +676,6 @@ class Api:
         from helpmeet.db.models import Initiative
         from helpmeet.video.recorder import ScreenVideoRecorder
         from helpmeet.screenshot.capture import monitor_geometry
-        from helpmeet.export.exporter import initiative_month_dir
 
         if self._screen_rec is not None:
             return {"ok": False, "error": "Ya hay una grabación de pantalla en curso."}
@@ -691,9 +691,10 @@ class Api:
 
         mon = monitor_geometry(int(monitor_index))
         now = datetime.now()
-        folder = initiative_month_dir(ini, settings.get_export_dir(), now)
-        dest = folder / f"{now:%Y-%m-%d_%H-%M-%S}_grabacion.mp4"
         meeting = repo.start_meeting(self._session, ini.id, _spanish_date(now))
+        folder = meeting_export_dir(meeting, settings.get_export_dir())
+        folder.mkdir(parents=True, exist_ok=True)
+        dest = folder / "grabacion.mp4"
         # Carpeta temporal propia de ESTA grabación: evita choques con un vídeo
         # anterior que aún se esté guardando en segundo plano.
         work_dir = config.DATA_DIR / "tmp_video" / f"{now:%Y%m%d_%H%M%S_%f}"
@@ -773,10 +774,9 @@ class Api:
                 video_path = Path(path)
                 # Pistas de micro y sistema por separado: Whisper transcribe
                 # mucho mejor cada una aislada que la mezcla final del vídeo.
+                from helpmeet.media_storage import store_track
                 for label, source in audio_channels:
-                    if source.exists() and source.stat().st_size > 44:
-                        suffix = ".mic.wav" if label == "me" else ".system.wav"
-                        shutil.copy2(source, video_path.with_suffix(suffix))
+                    store_track(meeting_id, label, source)
             try:
                 rec.cleanup()
             except Exception:
@@ -789,6 +789,9 @@ class Api:
                     if meeting is not None and ok:
                         meeting.audio_path = path
                         session.commit()
+                        organize_meeting_folder(
+                            session, meeting_id, settings.get_export_dir()
+                        )
                     repo.end_meeting(session, meeting_id)
                 finally:
                     session.close()
@@ -848,12 +851,8 @@ class Api:
         tmp = tempfile.NamedTemporaryFile(dir=tmp_dir, suffix=".wav", delete=False)
         wav = Path(tmp.name)
         tmp.close()
-        video_path = Path(m.audio_path)
-        sidecars = [
-            ("me", video_path.with_suffix(".mic.wav")),
-            ("others", video_path.with_suffix(".system.wav")),
-        ]
-        tracks = [(speaker, path) for speaker, path in sidecars if path.exists()]
+        from helpmeet.media_storage import available_tracks
+        tracks = available_tracks(m.id, m.audio_path)
         new_segments = []
         try:
             if tracks:
@@ -1025,16 +1024,15 @@ class Api:
                 self._finish_job(meeting_id)
 
     def _auto_export(self, meeting_id):
-        """Regenera la carpeta organizada de la iniciativa de esta reunión en la
-        carpeta de exportación. Corre en el hilo worker, con su propia sesión, y
-        nunca interrumpe la transcripción si algo falla."""
+        """Al terminar de transcribir, organiza SOLO la carpeta de esta reunión
+        (transcripcion.md + capturas/ + vídeo) en la carpeta de exportación. Es
+        más rápido que regenerar toda la iniciativa. Corre en el hilo worker, con
+        su propia sesión, y nunca interrumpe la transcripción si algo falla."""
         try:
             from helpmeet.db.database import get_session
             s = get_session()
             try:
-                m = repo.get_meeting(s, int(meeting_id))
-                if m is not None:
-                    export_initiative(s, m.initiative_id, settings.get_export_dir())
+                organize_meeting_folder(s, int(meeting_id), settings.get_export_dir())
             finally:
                 s.close()
         except Exception:

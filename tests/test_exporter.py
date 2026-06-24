@@ -70,10 +70,10 @@ def test_export_creates_md_and_captures_folder(session, tmp_path):
     assert "Sistema de Login" in content
     assert "Yo:" in content and "Los demás:" in content
     assert "error 500" in content
-    month_dir = out_dir / month_folder_name(meeting.started_at)
-    assert (month_dir / "capturas").exists()
-    assert any((month_dir / "capturas").iterdir())  # se copió la imagen
-    assert f"{month_folder_name(meeting.started_at)}/capturas/" in content
+    meeting_dir = meeting_export_dir(meeting, tmp_path / "out")
+    assert (meeting_dir / "capturas").exists()
+    assert any((meeting_dir / "capturas").iterdir())  # se copió la imagen
+    assert f"{month_folder_name(meeting.started_at)}/{meeting_dir.name}/capturas/" in content
 
 
 def test_export_orders_utterances_by_time(session, tmp_path):
@@ -139,7 +139,8 @@ def test_export_meeting_writes_contexto_and_dated_file(session, tmp_path):
     assert (out_dir / "contexto.md").exists()
     dated = [p for p in out_dir.rglob("*.md") if p.name != "contexto.md"]
     assert len(dated) == 1
-    assert dated[0].name.startswith(f"{m.started_at:%Y-%m-%d_%H-%M-%S}")
+    assert dated[0].name == "transcripcion.md"
+    assert dated[0].parent.name.startswith(f"{m.started_at:%Y-%m-%d_%H-%M-%S}")
 
 
 def test_export_meeting_same_day_does_not_overwrite(session, tmp_path):
@@ -165,7 +166,7 @@ def test_meeting_export_dir_matches_export_meeting(session, tmp_path):
     # La iniciativa conserva contexto.md en la raíz y la reunión vive en su mes.
     expected = meeting_export_dir(meeting, tmp_path)
     out = export_meeting(session, meeting.id, tmp_path)
-    assert expected.parent == out
+    assert expected.parent.parent == out
     assert out.exists()
     assert expected.exists()
 
@@ -186,11 +187,12 @@ def test_export_initiative_writes_one_md_per_meeting(session, tmp_path):
     # además, un .md por reunión
     per_meeting = [p for p in out_dir.rglob("*.md") if p.name != "contexto.md"]
     assert len(per_meeting) == 2
-    # cada archivo lleva en el nombre la fecha y la hora de su reunión
+    # cada carpeta lleva la fecha y la hora de su reunión
     expected1 = f"{m1.started_at:%Y-%m-%d_%H-%M-%S}"
-    assert any(p.name.startswith(expected1) for p in per_meeting)
+    assert any(p.parent.name.startswith(expected1) for p in per_meeting)
     # y contiene SOLO el texto de su reunión
-    kickoff = next(p for p in per_meeting if p.name.startswith(expected1))
+    kickoff = next(p for p in per_meeting if p.parent.name.startswith(expected1)
+                   and "hola equipo" in p.read_text(encoding="utf-8"))
     text = kickoff.read_text(encoding="utf-8")
     assert "hola equipo" in text
     assert "vamos bien" not in text
@@ -212,8 +214,7 @@ def test_export_initiative_merges_captures_without_collision(session, tmp_path):
     repo.end_meeting(session, m2.id)
 
     out_dir = export_initiative(session, ini.id, tmp_path / "out")
-    month_dir = out_dir / month_folder_name(m1.started_at)
-    captures = list((month_dir / "capturas").iterdir())
+    captures = list(out_dir.rglob("capturas/*.png"))
     # las dos capturas se copian con nombres distintos (no se pisan)
     assert len(captures) == 2
 
@@ -231,6 +232,32 @@ def test_export_includes_screen_recording_video_link(session, tmp_path):
 
     assert "Video:" in content
     assert "grabacion.mp4" in content
+
+
+def test_organize_meeting_hides_audio_tracks_and_creates_clean_folder(
+        session, tmp_path, monkeypatch):
+    from helpmeet import config
+    from helpmeet.media_storage import track_path
+
+    monkeypatch.setattr(config, "MEDIA_DIR", tmp_path / "internal-media")
+    ini = repo.create_initiative(session, "Proyecto ordenado")
+    meeting = repo.start_meeting(session, ini.id, "Demo")
+    loose = tmp_path / "2026-06-24_grabacion.mp4"
+    loose.write_bytes(b"video")
+    loose.with_suffix(".mic.wav").write_bytes(b"microfono")
+    loose.with_suffix(".system.wav").write_bytes(b"sistema")
+    meeting.audio_path = str(loose)
+    session.commit()
+
+    export_meeting(session, meeting.id, tmp_path / "exports")
+    folder = meeting_export_dir(meeting, tmp_path / "exports")
+
+    assert (folder / "grabacion.mp4").exists()
+    assert (folder / "transcripcion.md").exists()
+    assert (folder / "capturas").is_dir()
+    assert not list(folder.glob("*.wav"))
+    assert track_path(meeting.id, "me").read_bytes() == b"microfono"
+    assert track_path(meeting.id, "others").read_bytes() == b"sistema"
 
 
 def test_export_includes_ai_instructions_and_objective(session, tmp_path):
@@ -300,8 +327,8 @@ def test_capture_exported_with_unique_code_name(session, tmp_path):
     content = (out_dir / "contexto.md").read_text(encoding="utf-8")
     # el archivo de la captura se llama con el código y el markdown lo referencia
     assert f"{cap.code}.png" in content
-    month_dir = out_dir / month_folder_name(m.started_at)
-    assert (month_dir / "capturas" / f"{cap.code}.png").exists()
+    meeting_dir = meeting_export_dir(m, tmp_path / "out")
+    assert (meeting_dir / "capturas" / f"{cap.code}.png").exists()
 
 
 def test_initiative_export_dir_uses_slug_and_creates(session, tmp_path):

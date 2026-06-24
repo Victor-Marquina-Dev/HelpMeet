@@ -573,6 +573,12 @@ function viewMeeting() {
   const it = STATE.initiatives.find(x => x.id === STATE.selInit);
   const wrap = el('div'); wrap.style.cssText = 'display:flex;flex-direction:column;flex:1;min-height:0';
   const head = el('div', 'mhead');
+  // Sin transcripción (p. ej. vídeo aún sin transcribir) no hay nada que copiar,
+  // exportar ni a quién asignar: esos botones se atenúan y desactivan.
+  const fraseCount = t && t.utterances ? t.utterances.filter(u => !u.kind || u.kind === 'utterance').length : 0;
+  const transcribed = fraseCount > 0;
+  const txOff = transcribed ? '' : ' is-disabled';
+  const txTip = transcribed ? '' : 'Disponible cuando transcribas el vídeo';
   head.innerHTML = `
     <div class="breadcrumb"><span>${esc(it ? it.name : '')}</span>${svg('chevron', 13)}<span>Reunión</span></div>
     <div class="mhead-row">
@@ -581,10 +587,10 @@ function viewMeeting() {
     </div>
     <div class="meta-line">${esc(t ? t.started_at : '')}${t && t.utterances ? ' · ' + t.utterances.filter(u => !u.kind || u.kind === 'utterance').length + ' frases' : ''}${t && t.video_duration ? ` · <span style="vertical-align:-1px">${svg('play', 11)}</span> ${esc(t.video_duration)}` : ''}</div>
     <div class="mhead-row mhead-actions">
-      <button class="btn btn-primary" id="mCopy" title="Copiar la transcripción en Markdown">${svg('copy', 14)} Copiar transcripción .md</button>
-      <button class="btn" id="mExport" title="Exportar la reunión">${svg('download', 14)} Exportar</button>
+      <button class="btn btn-primary${txOff}" id="mCopy" title="${txTip || 'Copiar la transcripción en Markdown'}">${svg('copy', 14)} Copiar transcripción .md</button>
+      <button class="btn${txOff}" id="mExport" title="${txTip || 'Exportar la reunión'}">${svg('download', 14)} Exportar</button>
       <button class="btn" id="mOpen" title="Abrir la carpeta de la reunión">${svg('folder', 14)} Carpeta</button>
-      <button class="btn" id="mParts">${svg('users', 14)} Participantes</button>
+      <button class="btn${txOff}" id="mParts" title="${txTip || 'Asignar participantes'}">${svg('users', 14)} Participantes</button>
       <button class="icon-btn" id="mMenu" aria-label="Más acciones de la reunión">${svg('dots', 16)}</button>
     </div>
     <div class="tabs" role="tablist">

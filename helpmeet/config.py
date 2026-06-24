@@ -14,6 +14,7 @@ LEGACY_DATA_DIR = SOURCE_ROOT / "data"
 _LOCAL_APPDATA = Path(os.environ.get("LOCALAPPDATA", Path.home() / "AppData" / "Local"))
 DATA_DIR = Path(os.environ.get("HELPMEET_DATA_DIR", _LOCAL_APPDATA / "Helpmeet"))
 CAPTURES_DIR = DATA_DIR / "captures"
+MEDIA_DIR = DATA_DIR / "media"
 DB_PATH = DATA_DIR / "helpmeet.sqlite"
 
 # Cadena de conexión (SQLite; cambiar a PostgreSQL aquí en el futuro)
@@ -90,13 +91,14 @@ def ensure_dirs() -> None:
     migrate_legacy_state()
     DATA_DIR.mkdir(parents=True, exist_ok=True)
     CAPTURES_DIR.mkdir(parents=True, exist_ok=True)
+    MEDIA_DIR.mkdir(parents=True, exist_ok=True)
 
 
 # Datos personales dentro de DATA_DIR. NO se incluye el marcador de migración:
 # conservarlo evita que, tras borrar, se vuelvan a copiar datos antiguos de
 # desarrollo al reiniciar.
 _WIPE_FILES = ("helpmeet.sqlite", "settings.json")
-_WIPE_DIRS = ("captures", "recovery", "tmp_video", "tmp_audio")
+_WIPE_DIRS = ("captures", "media", "recovery", "tmp_video", "tmp_audio")
 
 
 def wipe_data_dir(data_dir=None) -> list[str]:

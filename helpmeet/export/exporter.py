@@ -220,9 +220,14 @@ def _render_meeting(meeting: Meeting, captures_dir: Path,
 
 
 def meeting_export_dir(meeting: Meeting, base_dir: Path) -> Path:
-    """Carpeta mensual de una reunión dentro de su iniciativa."""
+    """Carpeta propia de la reunión dentro de iniciativa/año-mes."""
     return (Path(base_dir) / _slug(meeting.initiative.name) /
-            month_folder_name(meeting.started_at))
+            month_folder_name(meeting.started_at) / meeting_folder_name(meeting))
+
+
+def meeting_folder_name(meeting: Meeting) -> str:
+    """Nombre estable, cronológico y corto para la carpeta visible."""
+    return f"{meeting.started_at:%Y-%m-%d_%H-%M-%S}_{meeting.id:04d}"
 
 
 def initiative_export_dir(initiative: Initiative, base_dir: Path) -> Path:
@@ -243,23 +248,57 @@ def initiative_month_dir(initiative: Initiative, base_dir: Path, when) -> Path:
     return out_dir
 
 
-def _move_video_to_month(meeting: Meeting, month_dir: Path) -> None:
-    """Reubica videos antiguos y sus pistas auxiliares en la carpeta mensual."""
+def _move_video_to_meeting(meeting: Meeting, meeting_dir: Path) -> None:
+    """Reubica el vídeo en su carpeta y oculta las pistas técnicas antiguas."""
     if not meeting.audio_path or not str(meeting.audio_path).lower().endswith(".mp4"):
         return
     source = Path(meeting.audio_path)
-    if not source.exists() or source.parent == month_dir:
+    if not source.exists():
         return
-    destination = month_dir / source.name
-    if not destination.exists():
+    from helpmeet.media_storage import migrate_legacy_tracks
+    migrate_legacy_tracks(meeting.id, source)
+    meeting_dir.mkdir(parents=True, exist_ok=True)
+    destination = meeting_dir / "grabacion.mp4"
+    if source.resolve() == destination.resolve():
+        meeting.audio_path = str(destination)
+        return
+    if destination.exists() and destination.stat().st_size == source.stat().st_size:
+        source.unlink()
+    elif not destination.exists():
         shutil.move(str(source), str(destination))
-    for suffix in (".mic.wav", ".system.wav"):
-        sidecar = source.with_suffix(suffix)
-        if sidecar.exists():
-            target = destination.with_suffix(suffix)
-            if not target.exists():
-                shutil.move(str(sidecar), str(target))
+    else:
+        destination = meeting_dir / "grabacion-recuperada.mp4"
+        if not destination.exists():
+            shutil.move(str(source), str(destination))
     meeting.audio_path = str(destination)
+
+
+def _organize_meeting(meeting: Meeting, base_dir: Path) -> Path:
+    """Genera la carpeta visible de una reunión sin exponer pistas técnicas."""
+    folder = meeting_export_dir(meeting, base_dir)
+    folder.mkdir(parents=True, exist_ok=True)
+    _move_video_to_meeting(meeting, folder)
+    captures_dir = folder / "capturas"
+    captures_dir.mkdir(parents=True, exist_ok=True)
+    lines = _render_meeting(
+        meeting, captures_dir, captures_ref="capturas",
+        video_ref=Path(meeting.audio_path).name if meeting.audio_path else None,
+    )
+    document = [f"# Iniciativa: {meeting.initiative.name}", ""] + lines
+    (folder / "transcripcion.md").write_text(
+        "\n".join(document) + "\n", encoding="utf-8"
+    )
+    return folder
+
+
+def organize_meeting_folder(session: Session, meeting_id: int, base_dir: Path) -> Path:
+    """Organiza una reunión existente y persiste la nueva ruta del vídeo."""
+    meeting: Meeting = session.get(Meeting, int(meeting_id))
+    if meeting is None:
+        raise ValueError("La reunión ya no existe.")
+    folder = _organize_meeting(meeting, base_dir)
+    session.commit()
+    return folder
 
 
 def _context_header(ini: Initiative) -> list[str]:
@@ -340,15 +379,14 @@ def _export_initiative_folder(ini: Initiative, base_dir: Path) -> Path:
 
     for meeting in meetings:
         month_name = month_folder_name(meeting.started_at)
-        month_dir = initiative_month_dir(ini, base_dir, meeting.started_at)
-        captures_dir = month_dir / "capturas"
-        captures_dir.mkdir(parents=True, exist_ok=True)
-        _move_video_to_month(meeting, month_dir)
+        meeting_dir = _organize_meeting(meeting, base_dir)
+        captures_dir = meeting_dir / "capturas"
+        relative_dir = f"{month_name}/{meeting_dir.name}"
 
         combined_lines = _render_meeting(
             meeting, captures_dir,
-            captures_ref=f"{month_name}/capturas",
-            video_ref=(f"{month_name}/{Path(meeting.audio_path).name}"
+            captures_ref=f"{relative_dir}/capturas",
+            video_ref=(f"{relative_dir}/{Path(meeting.audio_path).name}"
                        if meeting.audio_path else None),
         )
 
@@ -357,19 +395,14 @@ def _export_initiative_folder(ini: Initiative, base_dir: Path) -> Path:
         combined += combined_lines
         combined.append("")
 
-        meeting_lines = _render_meeting(
-            meeting, captures_dir,
-            captures_ref="capturas", video_ref=Path(meeting.audio_path).name
-            if meeting.audio_path else None,
-        )
-        per = [f"# Iniciativa: {ini.name}", ""] + meeting_lines
-        fname = f"{meeting.started_at:%Y-%m-%d_%H-%M-%S}_{_slug(meeting.title)}.md"
-        (month_dir / fname).write_text("\n".join(per) + "\n", encoding="utf-8")
-
     # Limpiar la estructura antigua una vez que las copias mensuales existen.
     for old_md in out_dir.glob("*.md"):
         if old_md.name != "contexto.md":
             old_md.unlink()
+    for month in {month_folder_name(m.started_at) for m in meetings}:
+        legacy_captures = out_dir / month / "capturas"
+        if legacy_captures.exists():
+            shutil.rmtree(legacy_captures)
     legacy_captures = out_dir / "capturas"
     if legacy_captures.exists():
         shutil.rmtree(legacy_captures)
