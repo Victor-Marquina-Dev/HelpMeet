@@ -650,7 +650,17 @@ body[data-app-state="recording-cloud"] .actionbar { border-top-color: rgba(255,7
   border: 1px solid var(--border-strong); border-radius: var(--r-md);
   background: var(--bg-surface); color: var(--text-secondary); font-size: 12px;
 }
-.monitor-select select { background: transparent; border: none; color: var(--text-primary); font-family: inherit; font-size: 12px; outline: none; cursor: pointer; }
+.monitor-select select {
+  background: transparent; border: none; color: var(--text-primary);
+  font-family: inherit; font-size: 12px; outline: none; cursor: pointer;
+  /* La lista desplegable la dibuja el sistema: en modo oscuro se ve legible
+     (texto claro sobre fondo oscuro) en vez de gris sobre blanco. */
+  color-scheme: dark;
+}
+.monitor-select select option {
+  background: var(--bg-elevated); color: var(--text-primary);
+}
+.monitor-select select option:checked { background: var(--accent-soft); }
 
 /* ============ OVERLAYS / MODALS ============ */
 .overlay {
@@ -767,6 +777,40 @@ body[data-app-state="recording-cloud"] .actionbar { border-top-color: rgba(255,7
 }
 .screen-preview .tag-tl { position: absolute; top: 10px; left: 12px; font-family: var(--font-mono); font-size: 10px; color: var(--text-secondary); background: var(--bg-input); border: 1px solid var(--border-strong); border-radius: 5px; padding: 3px 7px; }
 .screen-preview .tag-bottom { margin-bottom: 12px; font-family: var(--font-mono); font-size: 11px; color: var(--text-secondary); background: rgba(13,16,23,.85); border-radius: 5px; padding: 4px 9px; }
+/* Lienzo estilo OBS: pantalla movible y estirable dentro del cuadro de grabación */
+.obs-canvas {
+  margin: 14px 20px 0; width: calc(100% - 40px); max-height: 300px;
+  border-radius: var(--r-lg); border: 1px solid var(--border-strong);
+  background-color: #000; background-repeat: no-repeat; background-position: center;
+  position: relative; overflow: hidden; user-select: none; touch-action: none;
+}
+.obs-source {
+  position: absolute; box-sizing: border-box;
+  border: 2px solid var(--accent); background-repeat: no-repeat; cursor: move;
+  box-shadow: 0 0 0 1px rgba(0,0,0,.4);
+}
+.obs-h {
+  position: absolute; width: 12px; height: 12px; background: #fff;
+  border: 2px solid var(--accent); border-radius: 3px; box-sizing: border-box;
+}
+.obs-nw { top: -7px; left: -7px; cursor: nwse-resize; }
+.obs-n  { top: -7px; left: 50%; transform: translateX(-50%); cursor: ns-resize; }
+.obs-ne { top: -7px; right: -7px; cursor: nesw-resize; }
+.obs-e  { top: 50%; right: -7px; transform: translateY(-50%); cursor: ew-resize; }
+.obs-se { bottom: -7px; right: -7px; cursor: nwse-resize; }
+.obs-s  { bottom: -7px; left: 50%; transform: translateX(-50%); cursor: ns-resize; }
+.obs-sw { bottom: -7px; left: -7px; cursor: nesw-resize; }
+.obs-w  { top: 50%; left: -7px; transform: translateY(-50%); cursor: ew-resize; }
+.obs-tag {
+  position: absolute; bottom: 8px; left: 50%; transform: translateX(-50%);
+  font-family: var(--font-mono); font-size: 10.5px; color: var(--text-secondary);
+  background: rgba(13,16,23,.85); border-radius: 5px; padding: 4px 9px; white-space: nowrap;
+  pointer-events: none;
+}
+.prep-badge {
+  display: inline-flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 600;
+  color: var(--accent);
+}
 .rec-clock { font-family: var(--font-mono); font-size: 22px; font-weight: 600; color: var(--text-primary); }
 .rec-badge { display: inline-flex; align-items: center; gap: 8px; font-family: var(--font-mono); font-size: 13px; font-weight: 700; color: #ff7a82; }
 .rec-badge .rdot { width: 10px; height: 10px; border-radius: 50%; background: var(--recording); animation: pulse 1.3s infinite; }

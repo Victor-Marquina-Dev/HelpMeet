@@ -88,6 +88,21 @@ def _fmt_12h(value) -> str:
     return value.strftime("%I:%M %p").lstrip("0")
 
 
+def _friendly_model_error(exc: Exception) -> str:
+    """Mensaje claro cuando el modelo de transcripción no se puede preparar.
+
+    El fallo típico en otro PC es que el modelo no llegó a descargarse bien (la
+    primera vez necesita internet): error «Unable to open file model.bin»."""
+    low = str(exc).lower()
+    download_hints = ("model.bin", "unable to open file", "couldn't find",
+                      "connection", "could not download", "huggingface", "timed out")
+    if any(hint in low for hint in download_hints):
+        return ("No se pudo preparar el modelo de transcripción. La primera vez "
+                "necesita conexión a internet para descargarlo (~480 MB). "
+                "Conéctate a internet y vuelve a intentarlo.")
+    return str(exc)
+
+
 def _wav_seconds(path) -> float:
     """Duración en segundos de un WAV (0 si falla)."""
     try:
@@ -144,6 +159,8 @@ class Api:
         self._screen_active = False     # True mientras se graba pantalla
         self._screen_saving = False     # True mientras se muxea el vídeo en 2.º plano
         self._screen_meeting_id = None  # reunión asociada a la grabación de pantalla
+        self._screen_preview = None     # vista previa EN ESPERA (antes de grabar)
+        self._screen_transform = None   # (x,y,w,h) normalizado: colocación libre OBS
         self._window = None
         # Transcripción en segundo plano: cola serie + hilo worker. Permite
         # detener una grabación y empezar otra al instante mientras la anterior
@@ -778,6 +795,45 @@ class Api:
             return {"ok": True}
         return {"ok": False}
 
+    # ---------- Vista previa de espera (antes de grabar) ----------
+    def start_screen_preview(self, monitor_index=1):
+        """Abre la vista previa EN ESPERA: muestra la pantalla en vivo sin grabar,
+        para que el usuario la acomode y pulse "Iniciar grabación" cuando quiera."""
+        from helpmeet.screenshot.capture import monitor_geometry
+        from helpmeet.video.preview import ScreenPreview
+        if self._screen_rec is not None:
+            return {"ok": True}  # ya se está grabando; el grabador da su propia preview
+        if self._screen_preview is None:
+            mon = monitor_geometry(int(monitor_index))
+            mon["index"] = int(monitor_index)
+            self._screen_preview = ScreenPreview(mon, self._push_preview)
+            self._screen_preview.start()
+        return {"ok": True}
+
+    def set_screen_preview_monitor(self, monitor_index):
+        """Cambia el monitor de la vista previa de espera."""
+        from helpmeet.screenshot.capture import monitor_geometry
+        if self._screen_preview is not None:
+            mon = monitor_geometry(int(monitor_index))
+            mon["index"] = int(monitor_index)
+            self._screen_preview.set_monitor(mon)
+        return {"ok": True}
+
+    def stop_screen_preview(self):
+        """Detiene la vista previa de espera (al cerrar el panel o al empezar a grabar)."""
+        if self._screen_preview is not None:
+            self._screen_preview.stop()
+            self._screen_preview = None
+        return {"ok": True}
+
+    def set_screen_transform(self, x, y, w, h):
+        """Coloca la pantalla LIBRE en el lienzo (estilo OBS). Se guarda y, si ya se
+        está grabando, se aplica al instante."""
+        self._screen_transform = (float(x), float(y), float(w), float(h))
+        if self._screen_rec is not None:
+            self._screen_rec.set_transform(*self._screen_transform)
+        return {"ok": True}
+
     # ---------- Grabación de pantalla (video) ----------
     def start_screen_recording(self, initiative_id, monitor_index=1):
         """Graba la pantalla a .mp4 (en la carpeta de la iniciativa) y crea una
@@ -814,6 +870,10 @@ class Api:
                                   profile=settings.get_video_profile())
         mic_muted = settings.get_transcription_settings()["default_mic_muted"]
         rec.set_mic_muted(mic_muted)
+        # Aplica la colocación libre (OBS) si el usuario la acomodó en la vista previa.
+        if self._screen_transform is not None:
+            rec.set_transform(*self._screen_transform)
+        self.stop_screen_preview()  # la vista previa de espera deja paso al grabador
         try:
             rec.start()
         except Exception as exc:  # noqa: BLE001
@@ -1355,82 +1415,87 @@ class Api:
         return None
 
     def import_media(self, initiative_id):
-        """Pide un video/audio, le saca el audio, lo transcribe (LOCAL) y lo guarda.
+        """Pide un vídeo/audio y lo transcribe en SEGUNDO PLANO (local, gratis).
 
-        Los videos subidos se transcriben en el PC (faster-whisper): gratis, sin
-        límite de tiempo ni de saldo, ideal para archivos grandes.
-        """
-        from helpmeet.media import extract_audio_to_wav
+        Devuelve enseguida el nombre del archivo elegido; la transcripción avanza
+        por detrás (se ve en el indicador de trabajos), así no bloquea la app ni
+        cuenta el rato que tardas en elegir el archivo."""
         src = self._pick_file()
         if not src:
-            return {"ok": False}
-
-        title = Path(src).stem or "Video importado"
+            return {"ok": False, "cancelled": True}
+        filename = Path(src).name
+        title = Path(src).stem or "Vídeo importado"
         meeting = repo.start_meeting(self._session, int(initiative_id), title)
+        self._enqueue_import_job(meeting.id, title, int(initiative_id), src)
+        return {"ok": True, "queued": True, "meeting_id": meeting.id,
+                "filename": filename}
+
+    def _enqueue_import_job(self, meeting_id, title, initiative_id, src):
+        """Encola la transcripción de un archivo importado en segundo plano."""
+        on_status = lambda text, _mid=meeting_id: self._job_event(_mid, stage=text)
+        on_progress = lambda frac, _mid=meeting_id: self._job_event(_mid, progress=frac)
+
+        def run():
+            session = get_session()  # sesión propia del worker (otro hilo)
+            try:
+                self._transcribe_import(session, meeting_id, src, on_status, on_progress)
+            finally:
+                session.close()
+        self._enqueue_job(meeting_id, title, initiative_id, run)
+
+    def _transcribe_import(self, session, meeting_id, src, on_status, on_progress):
+        """Extrae el audio del archivo importado y lo transcribe (en el worker)."""
+        from helpmeet.media import extract_audio_to_wav
+        meeting = repo.get_meeting(session, int(meeting_id))
+        if meeting is None:
+            return
         tmp_dir = config.DATA_DIR / "tmp_audio"
         tmp_dir.mkdir(parents=True, exist_ok=True)
         tmp = tempfile.NamedTemporaryFile(dir=tmp_dir, suffix=".wav", delete=False)
         wav = Path(tmp.name)
         tmp.close()
         try:
-            self._push_status("📹 Extrayendo el audio del video…")
+            if not os.path.exists(src):
+                raise ValueError("El archivo seleccionado ya no está disponible.")
+            on_status("Extrayendo el audio del archivo…")
             extract_audio_to_wav(src, str(wav))
             audio_seconds = _wav_seconds(wav)
-            self._push_status("📹 Preparando el modelo (la 1ª vez se descarga)…")
-            engine = self._get_local_engine()
+            on_status("Preparando el modelo (la 1ª vez se descarga)…")
+            try:
+                engine = self._get_local_engine()
+            except Exception as exc:  # noqa: BLE001
+                raise RuntimeError(_friendly_model_error(exc)) from exc
 
-            start = time.time()
-
-            def _progress(frac):
-                pct = int(frac * 100)
-                eta = ""
-                if frac > 0.02:
-                    rem = (time.time() - start) / frac * (1 - frac)
-                    if rem > 3:
-                        eta = f" · ~{int(rem // 60)} min {int(rem % 60)} s restantes"
-                self._push_status(f"📹 Transcribiendo… {pct}%{eta}")
-                if self._window:
-                    self._window.evaluate_js(f"setProgress({frac})")
-
-            utterances = []
-            # Para archivos priorizamos precisión: beam search más amplio y
-            # contexto entre segmentos. El filtro 0.95 solo elimina silencio claro.
-            for seg in engine.transcribe_file(str(wav), on_progress=_progress,
-                                              no_speech_max=0.95,
-                                              quality="accurate"):
-                if not seg.text:
-                    continue
-                repo.add_utterance(self._session, meeting.id, "others",
-                                   seg.text, seg.start, seg.end)
-                utterances.append({"speaker": "others", "text": seg.text})
-            if not utterances:
+            on_status("Transcribiendo…")
+            rows = []
+            for seg in engine.transcribe_file(str(wav), on_progress=on_progress,
+                                              no_speech_max=0.95, quality="accurate"):
+                if seg.text:
+                    rows.append({"speaker": "others", "text": seg.text,
+                                 "start_time": seg.start, "end_time": seg.end})
+            if not rows:
                 raise ValueError(
                     "No se detectó voz en el archivo. Comprueba que tenga audio audible."
                 )
-        except Exception as exc:  # noqa: BLE001 - se informa al usuario
-            self._session.delete(meeting)
-            self._session.commit()
-            self._push_status("")
-            return {"ok": False, "error": str(exc)}
+            repo.add_utterances(session, meeting.id, rows)
+            repo.end_meeting(session, meeting.id)
+            # La duración debe ser la del archivo, no lo que tardó en transcribir.
+            if audio_seconds:
+                meeting.ended_at = meeting.started_at + timedelta(seconds=int(audio_seconds))
+                session.commit()
+        except Exception:
+            # Reunión vacía: se borra para no dejar una reunión sin contenido.
+            try:
+                session.delete(meeting)
+                session.commit()
+            except Exception:
+                pass
+            raise  # el worker marca el trabajo como error y muestra el mensaje
         finally:
             try:
                 wav.unlink(missing_ok=True)
             except Exception:
                 pass
-
-        repo.end_meeting(self._session, meeting.id)
-        # La duración debe ser la del video, no el rato que tardó en importar.
-        if audio_seconds:
-            meeting.ended_at = meeting.started_at + timedelta(seconds=int(audio_seconds))
-            self._session.commit()
-        self._push_status("")
-        return {
-            "ok": True,
-            "meeting_id": meeting.id,
-            "title": title,
-            "started_at": meeting.started_at.strftime("%Y-%m-%d %H:%M"),
-            "utterances": utterances,
-        }
 
     def choose_export_dir(self):
         path = self._pick_folder()

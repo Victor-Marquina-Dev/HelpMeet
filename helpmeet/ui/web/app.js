@@ -140,6 +140,10 @@ const api = {
   toggleScreenMicMute: (m) => call('toggle_screen_mic_mute', m),
   setScreenMonitor: (idx) => call('set_screen_monitor', idx),
   setScreenScaleMode: (mode) => call('set_screen_scale_mode', mode),
+  startScreenPreview: (idx) => call('start_screen_preview', idx),
+  stopScreenPreview: () => call('stop_screen_preview'),
+  setScreenPreviewMonitor: (idx) => call('set_screen_preview_monitor', idx),
+  setScreenTransform: (x, y, w, h) => call('set_screen_transform', x, y, w, h),
   revealPath: (p) => call('reveal_path', p),
   listLibrary: (view) => call('list_library', view),
   archiveItem: (kind, id) => call('archive_item', kind, id),
@@ -250,6 +254,10 @@ const MOCK = (() => {
       { id: 'c1', time: '00:48', note: 'arquitectura' }, { id: 'c2', time: '14:02', note: 'esquema BD' }, { id: 'c3', time: '22:31', note: 'flujo auth' },
     ], audio: [{ id: 'a1', name: 'mezcla.wav', dur: '34:12', size: '58 MB', kept: true }] }),
     start_screen_recording: () => wait({ ok: true }),
+    start_screen_preview: () => wait({ ok: true }),
+    stop_screen_preview: () => wait({ ok: true }),
+    set_screen_preview_monitor: () => wait({ ok: true }),
+    set_screen_transform: () => wait({ ok: true }),
     stop_screen_recording: () => wait({ ok: true, path: 'C:\\Helpmeet\\export\\grabacion.mp4', tracks: ['mic', 'system'] }, 700),
     generate_meeting_summary: () => wait({ summary: 'Resumen generado de ejemplo.', decisions: [], tasks: [] }, 900),
   };
@@ -625,8 +633,8 @@ function viewMeeting() {
       <button class="icon-btn" id="mMenu" aria-label="Más acciones de la reunión">${svg('dots', 16)}</button>
     </div>
     <div class="tabs" role="tablist">
-      ${['transcript', 'resumen', 'decisiones', 'tareas', 'archivos'].map(tab => {
-        const label = { transcript: 'Transcripción', resumen: 'Resumen', decisiones: 'Decisiones', tareas: 'Tareas', archivos: 'Archivos' }[tab];
+      ${['transcript', 'archivos'].map(tab => {
+        const label = { transcript: 'Transcripción', archivos: 'Archivos' }[tab];
         return `<button class="tab ${STATE.activeTab === tab ? 'active' : ''}" data-tab="${tab}" role="tab">${label}</button>`;
       }).join('')}
     </div>`;
@@ -644,12 +652,8 @@ function viewMeeting() {
 }
 
 function renderTab(tab, t) {
-  if (tab === 'transcript') return renderTranscript(t);
   if (tab === 'archivos') return renderFiles();
-  if (tab === 'resumen') return renderSummary();
-  if (tab === 'decisiones') return renderDecisions();
-  if (tab === 'tareas') return renderTasks();
-  return el('div');
+  return renderTranscript(t);  // por defecto, la transcripción
 }
 
 function renderTranscript(t) {
@@ -1466,19 +1470,21 @@ async function exportMeetingTo(mid) { const r = await api.exportMeetingTo(mid); 
 async function exportInitiativeTo(iid) { const r = await api.exportInitiativeTo(iid); if (r && r.ok) toast('ok', 'Exportado a ' + r.path); }
 
 async function doImport(btn) {
+  // NO se arranca el cronómetro aquí: primero se elige el archivo (no debe contar
+  // el rato de selección). La transcripción va en segundo plano.
   btn.classList.add('is-loading');
-  beginProcessing('Seleccionando y procesando archivo');
   try {
     const r = await api.importMedia(STATE.selInit);
-    endProcessing();
     if (r && r.error) { toast('err', 'No se pudo importar: ' + r.error); }
+    else if (r && r.cancelled) { /* el usuario cerró el diálogo */ }
     else if (r && r.ok) {
+      // El archivo ya se está procesando por detrás; se ve en el indicador de
+      // trabajos y la reunión aparece como "procesando".
       await refreshMeetings(STATE.selInit);
-      if (r.meeting_id) await openMeeting(r.meeting_id);
-      toast('ok', 'Archivo importado y transcrito');
+      try { renderBgJobs(await api.getBackgroundJobs()); } catch (e) { /* sin jobs */ }
+      toast('ok', `Subiendo «${r.filename || 'archivo'}» · se transcribe en segundo plano`);
     }
   } catch (e) { toast('err', 'Error al importar el archivo'); }
-  if (STATE.appState === 'processing') endProcessing();
   btn.classList.remove('is-loading');
 }
 
@@ -1553,68 +1559,168 @@ function doCapture() {
 async function openScreenPanel() {
   if (STATE.appState !== 'idle') return;
   STATE.micMuted = false; STATE.recElapsed = 0;
-  const r = await api.startScreenRecording(STATE.selInit, STATE.monitorIdx);
-  if (!r || r.ok === false) { toast('err', (r && r.error) || 'No se pudo iniciar la grabación de pantalla'); return; }
-  STATE.micMuted = !!r.mic_muted;
-  STATE.screenMeetingId = r.meeting_id || null;
-  startTimer();
-  setAppState('screen-recording');
+  STATE.screenRecording = false; STATE.screenMeetingId = null; STATE.screenPanelName = '';
+  // Colocación libre (OBS): por defecto la pantalla ocupa todo el lienzo.
+  STATE.screenTransform = { x: 0, y: 0, w: 1, h: 1 };
+  const r = await api.startScreenPreview(STATE.monitorIdx);
+  if (!r || r.ok === false) { toast('err', (r && r.error) || 'No se pudo abrir la vista previa'); return; }
   showScreenPanel();
 }
+
+function clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, v)); }
+
+// Aspecto del lienzo de salida = aspecto del monitor elegido.
+function screenCanvasAspect() {
+  const mon = (STATE.monitors || []).find(x => x.index === STATE.monitorIdx) || (STATE.monitors || [])[0];
+  return (mon && mon.width && mon.height) ? (mon.width / mon.height) : (16 / 9);
+}
+
 function showScreenPanel() {
   STATE.screenPanelOpen = true;
+  const recording = !!STATE.screenRecording;
+  const t = STATE.screenTransform || { x: 0, y: 0, w: 1, h: 1 };
   const m = el('div', 'modal screen-panel');
-  m.setAttribute('role', 'dialog'); m.setAttribute('aria-label', 'Grabando pantalla');
+  m.setAttribute('role', 'dialog');
+  m.setAttribute('aria-label', recording ? 'Grabando pantalla' : 'Preparar grabación');
+
+  const head = recording
+    ? `<span class="rec-badge"><span class="rdot"></span>REC</span><span class="rec-clock" id="screenClock">${fmt(STATE.recElapsed)}</span>`
+    : `<span class="prep-badge">Vista previa · acomoda la pantalla</span>`;
+  const sourceStyle = `left:${t.x * 100}%;top:${t.y * 100}%;width:${t.w * 100}%;height:${t.h * 100}%`;
+  const handles = ['nw', 'n', 'ne', 'e', 'se', 's', 'sw', 'w']
+    .map(h => `<span class="obs-h obs-${h}" data-h="${h}"></span>`).join('');
+  const canvas = `
+    <div class="obs-canvas" id="obsCanvas" style="aspect-ratio:${screenCanvasAspect()}">
+      ${recording ? '' : `<div class="obs-source" id="obsSource" style="${sourceStyle}">${handles}</div>`}
+      <span class="obs-tag">${recording ? 'grabando · composición final' : 'arrastra para mover · tira de las esquinas para estirar'}</span>
+    </div>`;
+  const controls = recording
+    ? `<button class="btn btn-stop" id="scStop"><span class="sq"></span>Detener vídeo</button>
+       <button class="btn btn-lg ${STATE.micMuted ? 'btn-danger' : ''}" id="scMic">${STATE.micMuted ? 'Activar micro' : 'Silenciar micro'}</button>
+       <button class="btn btn-lg" id="scCap">${svg('camera', 15)}Captura</button>
+       <button class="btn btn-lg" id="scNote">${svg('note', 15)}Nota</button>`
+    : `<button class="btn btn-record" id="scStart"><span class="dot"></span>Iniciar grabación</button>
+       <button class="btn btn-lg" id="scReset">Centrar / Llenar</button>
+       <button class="btn btn-lg ${STATE.micMuted ? 'btn-danger' : ''}" id="scMic">${STATE.micMuted ? 'Activar micro' : 'Silenciar micro'}</button>
+       <button class="btn btn-ghost" id="scCancel">Cancelar</button>`;
+
   m.innerHTML = `
     <div class="modal-head">
-      <span class="rec-badge"><span class="rdot"></span>REC</span>
-      <span class="rec-clock" id="screenClock">${fmt(STATE.recElapsed)}</span>
+      ${head}
       <div class="monitor-select" style="margin-left:auto">${svg('monitor', 14)}<select id="scMon" aria-label="Pantalla a grabar">${monitorOptions()}</select></div>
     </div>
     <div class="screen-setup">
-      <input id="scName" class="field" placeholder="Nombre de la reunión" autocomplete="off">
-      <div class="monitor-select screen-fit-select" title="Cómo encajar la pantalla en el vídeo">
-        <span>Encuadre</span>
-        <select id="scFit" aria-label="Encuadre de la pantalla">
-          <option value="fit" ${STATE.screenScaleMode === 'fit' ? 'selected' : ''}>Ajustar</option>
-          <option value="fill" ${STATE.screenScaleMode === 'fill' ? 'selected' : ''}>Rellenar</option>
-          <option value="stretch" ${STATE.screenScaleMode === 'stretch' ? 'selected' : ''}>Estirar</option>
-        </select>
-      </div>
+      <input id="scName" class="field" placeholder="Nombre de la reunión" autocomplete="off" value="${esc(STATE.screenPanelName || '')}">
     </div>
-    <div class="screen-preview"><span class="tag-tl">preview en vivo · ~3–4 fps</span><span class="tag-bottom">no representa el frame rate final (30 fps)</span></div>
-    <div class="warn-note">${svg('warn', 15)}<span>Al cambiar a una pantalla de otro tamaño: Ajustar conserva todo; Rellenar recorta los bordes; Estirar puede deformar.</span></div>
+    ${canvas}
     <div style="padding:14px 20px 18px;display:flex;gap:10px;align-items:center;flex-wrap:wrap">
-      <button class="btn btn-stop" id="scStop"><span class="sq"></span>Detener vídeo</button>
-      <button class="btn btn-lg ${STATE.micMuted ? 'btn-danger' : ''}" id="scMic">${STATE.micMuted ? 'Activar micro' : 'Silenciar micro'}</button>
-      <button class="btn btn-lg" id="scCap">${svg('camera', 15)}Captura</button>
-      <button class="btn btn-lg" id="scNote">${svg('note', 15)}Nota</button>
-      <div style="flex:1"></div><span style="font-size:11px;color:var(--text-muted)">Crea reunión · transcripción opcional</span>
+      ${controls}
+      <div style="flex:1"></div><span style="font-size:11px;color:var(--text-muted)">${recording ? 'Crea reunión · transcripción opcional' : 'Acomoda y pulsa Iniciar grabación'}</span>
     </div>`;
-  m.querySelector('#scStop').onclick = stopScreenRecording;
+
+  m.querySelector('#scMon').onchange = (e) => {
+    STATE.monitorIdx = +e.target.value;
+    if (recording) api.setScreenMonitor(STATE.monitorIdx); else api.setScreenPreviewMonitor(STATE.monitorIdx);
+    const c = m.querySelector('#obsCanvas'); if (c) c.style.aspectRatio = screenCanvasAspect();
+  };
+  m.querySelector('#scName').oninput = (e) => { STATE.screenPanelName = e.target.value; };
+  m.querySelector('#scName').onblur = (e) => {
+    const v = e.target.value.trim();
+    if (v && recording && STATE.screenMeetingId) api.renameMeeting(STATE.screenMeetingId, v);
+  };
   m.querySelector('#scMic').onclick = (e) => {
     STATE.micMuted = !STATE.micMuted;
-    api.toggleScreenMicMute(STATE.micMuted);
+    if (recording) api.toggleScreenMicMute(STATE.micMuted);
     e.currentTarget.textContent = STATE.micMuted ? 'Activar micro' : 'Silenciar micro';
     e.currentTarget.classList.toggle('btn-danger', STATE.micMuted);
   };
-  m.querySelector('#scCap').onclick = () => api.takeCapture(STATE.monitorIdx).then(() => toast('ok', 'Captura guardada'));
-  m.querySelector('#scNote').onclick = () => promptNote();
-  m.querySelector('#scMon').onchange = (e) => { STATE.monitorIdx = +e.target.value; api.setScreenMonitor(STATE.monitorIdx); };
-  m.querySelector('#scFit').onchange = (e) => {
-    STATE.screenScaleMode = e.target.value;
-    save('hm.screenScaleMode', STATE.screenScaleMode);
-    api.setScreenScaleMode(STATE.screenScaleMode);
-    applyScreenPreviewFit(m.querySelector('.screen-preview'));
-  };
-  api.setScreenScaleMode(STATE.screenScaleMode);
-  applyScreenPreviewFit(m.querySelector('.screen-preview'));
-  // Nombre de la reunión: se guarda al salir del campo (rename en caliente).
-  m.querySelector('#scName').onblur = (e) => {
-    const v = e.target.value.trim();
-    if (v && STATE.screenMeetingId) api.renameMeeting(STATE.screenMeetingId, v);
-  };
+  if (recording) {
+    m.querySelector('#scStop').onclick = stopScreenRecording;
+    m.querySelector('#scCap').onclick = () => api.takeCapture(STATE.monitorIdx).then(() => toast('ok', 'Captura guardada'));
+    m.querySelector('#scNote').onclick = () => promptNote();
+  } else {
+    m.querySelector('#scStart').onclick = startScreenFromPanel;
+    m.querySelector('#scCancel').onclick = cancelScreenPanel;
+    m.querySelector('#scReset').onclick = () => { STATE.screenTransform = { x: 0, y: 0, w: 1, h: 1 }; applyObsSource(); pushTransform(); };
+    wireObsCanvas(m.querySelector('#obsCanvas'));
+  }
   const root = $('#overlayRoot'); root.replaceChildren(m); root.hidden = false; root.onclick = null;
+}
+
+function applyObsSource() {
+  const s = document.getElementById('obsSource');
+  if (!s) return;
+  const t = STATE.screenTransform;
+  s.style.left = (t.x * 100) + '%'; s.style.top = (t.y * 100) + '%';
+  s.style.width = (t.w * 100) + '%'; s.style.height = (t.h * 100) + '%';
+}
+let _txTimer;
+function pushTransform() {
+  clearTimeout(_txTimer);
+  const t = STATE.screenTransform;
+  _txTimer = setTimeout(() => api.setScreenTransform(t.x, t.y, t.w, t.h), 60);
+}
+
+// Arrastrar para mover + tirar de los tiradores para estirar (estilo OBS).
+function wireObsCanvas(canvas) {
+  if (!canvas) return;
+  const source = canvas.querySelector('#obsSource');
+  if (!source) return;
+  const MIN = 0.05;
+  let mode = null, handle = null, sx = 0, sy = 0, orig = null;
+  const onMove = (e) => {
+    const rect = canvas.getBoundingClientRect();
+    const dx = (e.clientX - sx) / rect.width;
+    const dy = (e.clientY - sy) / rect.height;
+    let { x, y, w, h } = orig;
+    if (mode === 'move') {
+      x = clamp(orig.x + dx, 0, 1 - w);
+      y = clamp(orig.y + dy, 0, 1 - h);
+    } else {
+      if (handle.includes('e')) w = clamp(orig.w + dx, MIN, 1 - orig.x);
+      if (handle.includes('s')) h = clamp(orig.h + dy, MIN, 1 - orig.y);
+      if (handle.includes('w')) { const nx = clamp(orig.x + dx, 0, orig.x + orig.w - MIN); w = orig.w + (orig.x - nx); x = nx; }
+      if (handle.includes('n')) { const ny = clamp(orig.y + dy, 0, orig.y + orig.h - MIN); h = orig.h + (orig.y - ny); y = ny; }
+    }
+    STATE.screenTransform = { x, y, w, h };
+    applyObsSource();
+  };
+  const onUp = () => {
+    window.removeEventListener('pointermove', onMove);
+    window.removeEventListener('pointerup', onUp);
+    pushTransform();
+  };
+  source.addEventListener('pointerdown', (e) => {
+    const hn = e.target.closest('.obs-h');
+    mode = hn ? 'resize' : 'move';
+    handle = hn ? hn.dataset.h : null;
+    sx = e.clientX; sy = e.clientY; orig = { ...STATE.screenTransform };
+    e.preventDefault();
+    window.addEventListener('pointermove', onMove);
+    window.addEventListener('pointerup', onUp);
+  });
+}
+
+async function startScreenFromPanel() {
+  const name = (document.getElementById('scName')?.value || '').trim();
+  const t = STATE.screenTransform;
+  await api.setScreenTransform(t.x, t.y, t.w, t.h);  // colocación elegida
+  const r = await api.startScreenRecording(STATE.selInit, STATE.monitorIdx);
+  if (!r || r.ok === false) { toast('err', (r && r.error) || 'No se pudo iniciar la grabación'); return; }
+  STATE.screenMeetingId = r.meeting_id || null;
+  STATE.micMuted = !!r.mic_muted;
+  STATE.screenRecording = true;
+  if (name && STATE.screenMeetingId) api.renameMeeting(STATE.screenMeetingId, name);
+  startTimer();
+  setAppState('screen-recording');
+  showScreenPanel();  // re-render en modo grabación
+}
+
+async function cancelScreenPanel() {
+  STATE.screenPanelOpen = false;
+  try { await api.stopScreenPreview(); } catch (e) { /* nada */ }
+  closeModal();
+  setAppState('idle');
 }
 async function stopScreenRecording() {
   STATE.screenPanelOpen = false;   // evitar que closeModal re-muestre el panel
@@ -1859,10 +1965,22 @@ function applyScreenPreviewFit(p) {
   p.style.backgroundRepeat = 'no-repeat';
 }
 window.setScreenPreview = function (b64) {
-  const p = document.querySelector('.screen-preview');
-  if (p && b64) {
-    p.style.backgroundImage = 'url(data:image/jpeg;base64,' + b64 + ')';
-    applyScreenPreviewFit(p);
+  if (!b64) return;
+  const url = 'url(data:image/jpeg;base64,' + b64 + ')';
+  const source = document.getElementById('obsSource');
+  if (source && !STATE.screenRecording) {
+    // En espera: la pantalla cruda llena la CAJA (estirada a su tamaño = como se grabará).
+    source.style.backgroundImage = url;
+    source.style.backgroundSize = '100% 100%';
+    source.style.backgroundPosition = 'center';
+    return;
+  }
+  // Grabando: la vista previa ya viene compuesta (lienzo negro + pantalla colocada).
+  const canvas = document.getElementById('obsCanvas');
+  if (canvas) {
+    canvas.style.backgroundImage = url;
+    canvas.style.backgroundSize = '100% 100%';
+    canvas.style.backgroundPosition = 'center';
   }
 };
 // Tu backend (grabación de pantalla) llama setPreview(); es el mismo destino.

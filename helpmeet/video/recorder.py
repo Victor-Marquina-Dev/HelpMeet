@@ -87,6 +87,9 @@ class ScreenVideoRecorder:
         self._audio = None
         self._mic_muted = False
         self._scale_mode = "fit"
+        # Transformación libre estilo OBS: (x, y, w, h) normalizados 0..1 sobre el
+        # lienzo. None = usar el modo de encuadre (fit/fill/stretch).
+        self._transform = None
         self._frames = 0
         self._error = None
 
@@ -124,13 +127,38 @@ class ScreenVideoRecorder:
         mode = mode if mode in {"fit", "fill", "stretch"} else "fit"
         with self._monitor_lock:
             self._scale_mode = mode
+            self._transform = None  # un modo de encuadre anula la transformación libre
         self._monitor_changed.set()
+
+    def set_transform(self, x, y, w, h) -> None:
+        """Coloca la pantalla LIBRE dentro del lienzo (estilo OBS): posición (x, y)
+        y tamaño (w, h), todo normalizado 0..1 respecto al lienzo de salida."""
+        with self._monitor_lock:
+            self._transform = (float(x), float(y), float(w), float(h))
+            self._scale_mode = "transform"
+        self._monitor_changed.set()
+
+    def _transform_pixels(self):
+        """Convierte la transformación normalizada a píxeles pares y acotados al lienzo."""
+        x, y, w, h = self._transform
+        tw = max(2, int(round(self._out_w * w)));  tw -= tw % 2
+        th = max(2, int(round(self._out_h * h)));  th -= th % 2
+        tw = min(tw, self._out_w);  th = min(th, self._out_h)
+        tx = max(0, min(int(round(self._out_w * x)), self._out_w - tw))
+        ty = max(0, min(int(round(self._out_h * y)), self._out_h - th))
+        return tw, th, tx, ty
 
     def _scale_filter(self, template, mode):
         """Crea filtros FFmpeg nativos para conservar proporción sin usar NumPy."""
         graph = av.filter.Graph()
         source = graph.add_buffer(template=template)
-        if mode == "fill":
+        if mode == "transform" and self._transform:
+            # Escala la fuente al tamaño elegido y la pega en su posición sobre
+            # un lienzo negro (el resto queda en negro), como una fuente en OBS.
+            tw, th, tx, ty = self._transform_pixels()
+            scale = graph.add("scale", f"{tw}:{th}")
+            framing = graph.add("pad", f"{self._out_w}:{self._out_h}:{tx}:{ty}:black")
+        elif mode == "fill":
             scale = graph.add(
                 "scale", f"{self._out_w}:{self._out_h}:force_original_aspect_ratio=increase"
             )
