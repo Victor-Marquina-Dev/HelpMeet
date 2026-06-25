@@ -44,6 +44,7 @@ class Meeting(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     initiative_id: Mapped[int] = mapped_column(ForeignKey("initiatives.id"))
     title: Mapped[str] = mapped_column(String(200))
+    context: Mapped[str | None] = mapped_column(Text, nullable=True)
     started_at: Mapped[datetime] = mapped_column(DateTime)
     ended_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     audio_path: Mapped[str | None] = mapped_column(String(500), nullable=True)

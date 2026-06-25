@@ -1,5 +1,5 @@
 from datetime import datetime
-from sqlalchemy import select
+from sqlalchemy import select, func, text
 from sqlalchemy.orm import Session
 from helpmeet.db.models import Initiative, Meeting, Utterance, Capture, Note, Participant
 
@@ -74,6 +74,39 @@ def list_meetings(session: Session, initiative_id: int) -> list[Meeting]:
         (m for m in ini.meetings if m.archived_at is None and m.deleted_at is None),
         key=lambda m: m.started_at, reverse=True,
     )
+
+
+def list_meetings_by_initiative(session: Session) -> dict[int, list[Meeting]]:
+    """Reuniones activas de TODAS las iniciativas activas, agrupadas por iniciativa,
+    en UNA sola consulta (P-06).
+
+    Evita el N+1 de pedir las reuniones iniciativa por iniciativa al arrancar.
+    Dentro de cada iniciativa quedan ordenadas de la más reciente a la más antigua.
+    """
+    stmt = (select(Meeting).join(Meeting.initiative).where(
+        Meeting.archived_at.is_(None), Meeting.deleted_at.is_(None),
+        Initiative.archived_at.is_(None), Initiative.deleted_at.is_(None),
+    ).order_by(Meeting.started_at.desc()))
+    grouped: dict[int, list[Meeting]] = {}
+    for m in session.scalars(stmt):
+        grouped.setdefault(m.initiative_id, []).append(m)
+    return grouped
+
+
+def utterance_counts(session: Session, meeting_ids=None) -> dict[int, int]:
+    """Nº de frases por reunión con UNA consulta `COUNT ... GROUP BY` (P-06).
+
+    Sustituye a `len(meeting.utterances)`, que cargaba TODAS las frases en memoria
+    solo para contarlas. `meeting_ids=None` cuenta todas las reuniones.
+    """
+    stmt = (select(Utterance.meeting_id, func.count(Utterance.id))
+            .group_by(Utterance.meeting_id))
+    if meeting_ids is not None:
+        ids = list(meeting_ids)
+        if not ids:
+            return {}
+        stmt = stmt.where(Utterance.meeting_id.in_(ids))
+    return dict(session.execute(stmt).all())
 
 
 def archive_item(session: Session, kind: str, item_id: int) -> bool:
@@ -157,6 +190,17 @@ def rename_meeting(session: Session, meeting_id: int, title: str) -> Meeting:
         m.title = title.strip()
         session.commit()
     return m
+
+
+def set_meeting_context(session: Session, meeting_id: int,
+                        context: str | None) -> Meeting | None:
+    """Guarda para qué sirve la reunión; vacío elimina el contexto."""
+    meeting = session.get(Meeting, int(meeting_id))
+    if meeting:
+        text = (context or "").strip()
+        meeting.context = text or None
+        session.commit()
+    return meeting
 
 
 def move_meeting(session: Session, meeting_id: int, initiative_id: int) -> Meeting:
@@ -366,21 +410,64 @@ def add_note(session: Session, meeting_id: int, text: str) -> Note:
     return note
 
 
-def search(session: Session, query: str) -> list[dict]:
-    """Busca el texto en frases y notas de TODAS las reuniones.
-
-    Devuelve una lista de dicts {meeting, kind, speaker, text}, sin distinguir
-    mayúsculas. `kind` es "frase" o "nota".
-    """
-    query = (query or "").strip()
-    if not query:
-        return []
-    like = f"%{query}%"
-    results: list[dict] = []
-    active = (
+def _active_filters():
+    return (
         Meeting.archived_at.is_(None), Meeting.deleted_at.is_(None),
         Initiative.archived_at.is_(None), Initiative.deleted_at.is_(None),
     )
+
+
+def _has_fts(session: Session) -> bool:
+    """¿Existe el índice FTS5 en esta base? (lectura barata y segura)."""
+    row = session.execute(text(
+        "SELECT 1 FROM sqlite_master WHERE type='table' AND name='utterance_fts'"
+    )).first()
+    return row is not None
+
+
+def _fts_match(query: str) -> str:
+    """Convierte el texto del usuario en una expresión FTS5 segura: cada palabra
+    entre comillas (escapando las comillas) y con `*` para casar por prefijo."""
+    tokens = query.split()
+    return " ".join('"' + tok.replace('"', '""') + '"*' for tok in tokens)
+
+
+def _fts_ids(session: Session, table: str, query: str) -> set:
+    match = _fts_match(query)
+    if not match:
+        return set()
+    rows = session.execute(
+        text(f"SELECT rowid FROM {table} WHERE {table} MATCH :m"), {"m": match}
+    )
+    return {row[0] for row in rows}
+
+
+def _search_fts(session: Session, query: str) -> list[dict]:
+    """Búsqueda rápida con el índice FTS5 (P-13). Casa por palabra/prefijo."""
+    results: list[dict] = []
+    active = _active_filters()
+    utt_ids = _fts_ids(session, "utterance_fts", query)
+    if utt_ids:
+        stmt = (select(Utterance).join(Utterance.meeting).join(Meeting.initiative)
+                .where(Utterance.id.in_(utt_ids), *active))
+        for u in session.scalars(stmt):
+            results.append({"meeting": u.meeting, "kind": "frase",
+                            "speaker": u.speaker, "text": u.text})
+    note_ids = _fts_ids(session, "note_fts", query)
+    if note_ids:
+        stmt = (select(Note).join(Note.meeting).join(Meeting.initiative)
+                .where(Note.id.in_(note_ids), *active))
+        for n in session.scalars(stmt):
+            results.append({"meeting": n.meeting, "kind": "nota",
+                            "speaker": None, "text": n.text})
+    return results
+
+
+def _search_like(session: Session, query: str) -> list[dict]:
+    """Búsqueda clásica por subcadena (fallback si no hay FTS5)."""
+    like = f"%{query}%"
+    results: list[dict] = []
+    active = _active_filters()
     utterance_stmt = (select(Utterance).join(Utterance.meeting).join(Meeting.initiative)
                       .where(Utterance.text.ilike(like), *active))
     for u in session.scalars(utterance_stmt):
@@ -392,3 +479,18 @@ def search(session: Session, query: str) -> list[dict]:
         results.append({"meeting": n.meeting, "kind": "nota",
                         "speaker": None, "text": n.text})
     return results
+
+
+def search(session: Session, query: str) -> list[dict]:
+    """Busca el texto en frases y notas de TODAS las reuniones.
+
+    Devuelve una lista de dicts {meeting, kind, speaker, text}, sin distinguir
+    mayúsculas. `kind` es "frase" o "nota". Usa el índice FTS5 si está disponible
+    (mucho más rápido con muchos datos) y, si no, recurre a LIKE.
+    """
+    query = (query or "").strip()
+    if not query:
+        return []
+    if _has_fts(session):
+        return _search_fts(session, query)
+    return _search_like(session, query)

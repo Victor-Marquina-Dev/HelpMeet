@@ -36,6 +36,7 @@ def build_transcript_txt(meeting: Meeting) -> str:
         f"Fecha: {meeting.started_at:%d/%m/%Y %H:%M}",
         f"Duración: {_fmt_duration(meeting)}",
         f"Frases: {len(utterances)}",
+        *( [f"Contexto: {meeting.context}"] if meeting.context else [] ),
         "",
         "=" * 64,
         "",
@@ -192,6 +193,8 @@ def _render_meeting(meeting: Meeting, captures_dir: Path,
         f"- Frases: {len(meeting.utterances)}",
         f"- Hablantes: {_speakers_present(meeting, participants)}",
     ]
+    if meeting.context:
+        lines += ["", "### Contexto de la reunión", "", meeting.context, ""]
     if meeting.captures:
         lines.append(f"- Capturas: {len(meeting.captures)}")
     if meeting.notes:

@@ -202,6 +202,12 @@ def _models_for(language: str) -> list:
 
 
 # ---------- Preferencias de transcripción y audio ----------
+def get_video_profile() -> str:
+    """Perfil de calidad de grabación de pantalla (light/balanced/native)."""
+    value = _load().get("video_profile")
+    return value if value in config.VIDEO_PROFILES else config.DEFAULT_VIDEO_PROFILE
+
+
 def get_transcription_settings() -> dict:
     data = _load()
     provider = data.get("transcription_provider", "auto")
@@ -210,10 +216,14 @@ def get_transcription_settings() -> dict:
         provider = "local"
     language = get_transcription_language()
     tier = get_transcription_tier()
+    video_profile = get_video_profile()
     return {
         "provider": provider,
         "default_mic_muted": bool(data.get("default_mic_muted", False)),
         "video_quality": "accurate",
+        "video_profile": video_profile,
+        "video_profiles": [{"id": pid, "label": p["label"]}
+                           for pid, p in config.VIDEO_PROFILES.items()],
         "language": language,
         "language_label": WHISPER_LANGUAGES[language],
         "languages": [{"id": lid, "label": label} for lid, label in WHISPER_LANGUAGES.items()],
@@ -258,5 +268,10 @@ def set_transcription_settings(values: dict) -> dict:
         if tier not in _TIER_IDS:
             raise ValueError("Nivel de transcripción no válido.")
         current["transcription_tier"] = tier
+    if "video_profile" in values:
+        profile = str(values["video_profile"])
+        if profile not in config.VIDEO_PROFILES:
+            raise ValueError("Perfil de vídeo no válido.")
+        current["video_profile"] = profile
     _save(current)
     return get_transcription_settings()

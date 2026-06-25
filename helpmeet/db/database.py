@@ -44,6 +44,56 @@ def _ensure_indexes(engine) -> None:
                 pass
 
 
+def _ensure_fts(engine) -> bool:
+    """Crea el índice de búsqueda de texto completo FTS5 (P-13).
+
+    Usa tablas FTS5 de "contenido externo": no duplican el texto, solo lo indexan,
+    y unos triggers las mantienen sincronizadas ante cualquier alta/edición/borrado
+    (a nivel de SQLite, así que da igual por qué ruta se modifiquen los datos).
+
+    Devuelve True si quedó disponible. Si esta build de SQLite no trae FTS5, no
+    pasa nada: la búsqueda usa el método clásico (LIKE).
+    """
+    statements = (
+        "CREATE VIRTUAL TABLE IF NOT EXISTS utterance_fts "
+        "USING fts5(text, content='utterances', content_rowid='id')",
+        "CREATE TRIGGER IF NOT EXISTS utterances_fts_ai AFTER INSERT ON utterances BEGIN "
+        "INSERT INTO utterance_fts(rowid, text) VALUES (new.id, new.text); END",
+        "CREATE TRIGGER IF NOT EXISTS utterances_fts_ad AFTER DELETE ON utterances BEGIN "
+        "INSERT INTO utterance_fts(utterance_fts, rowid, text) VALUES('delete', old.id, old.text); END",
+        "CREATE TRIGGER IF NOT EXISTS utterances_fts_au AFTER UPDATE ON utterances BEGIN "
+        "INSERT INTO utterance_fts(utterance_fts, rowid, text) VALUES('delete', old.id, old.text); "
+        "INSERT INTO utterance_fts(rowid, text) VALUES (new.id, new.text); END",
+        "CREATE VIRTUAL TABLE IF NOT EXISTS note_fts "
+        "USING fts5(text, content='notes', content_rowid='id')",
+        "CREATE TRIGGER IF NOT EXISTS notes_fts_ai AFTER INSERT ON notes BEGIN "
+        "INSERT INTO note_fts(rowid, text) VALUES (new.id, new.text); END",
+        "CREATE TRIGGER IF NOT EXISTS notes_fts_ad AFTER DELETE ON notes BEGIN "
+        "INSERT INTO note_fts(note_fts, rowid, text) VALUES('delete', old.id, old.text); END",
+        "CREATE TRIGGER IF NOT EXISTS notes_fts_au AFTER UPDATE ON notes BEGIN "
+        "INSERT INTO note_fts(note_fts, rowid, text) VALUES('delete', old.id, old.text); "
+        "INSERT INTO note_fts(rowid, text) VALUES (new.id, new.text); END",
+    )
+    try:
+        with engine.begin() as connection:
+            # ¿Es la PRIMERA vez que se crea el índice? (en FTS de contenido externo
+            # `count(*)` no sirve: refleja la tabla de origen aunque el índice esté
+            # vacío, así que detectamos la existencia previa de la tabla virtual).
+            first_time = connection.exec_driver_sql(
+                "SELECT 1 FROM sqlite_master WHERE type='table' AND name='utterance_fts'"
+            ).fetchone() is None
+            for statement in statements:
+                connection.exec_driver_sql(statement)
+            if first_time:
+                # Indexar las frases/notas que ya existieran (base de una versión
+                # anterior). Después, los triggers mantienen el índice al día.
+                connection.exec_driver_sql("INSERT INTO utterance_fts(utterance_fts) VALUES('rebuild')")
+                connection.exec_driver_sql("INSERT INTO note_fts(note_fts) VALUES('rebuild')")
+        return True
+    except Exception:  # noqa: BLE001 - sin FTS5 la búsqueda sigue funcionando con LIKE
+        return False
+
+
 def _migrate_archive_columns(engine) -> None:
     """Añade las columnas de archivo/papelera a bases creadas por versiones anteriores."""
     wanted = {
@@ -90,6 +140,16 @@ def _migrate_initiative_pin(engine) -> None:
             )
 
 
+def _migrate_meeting_context(engine) -> None:
+    """Añade el contexto/objetivo editable de cada reunión."""
+    with engine.begin() as connection:
+        existing = {column["name"] for column in inspect(connection).get_columns("meetings")}
+        if "context" not in existing:
+            connection.exec_driver_sql(
+                "ALTER TABLE meetings ADD COLUMN context TEXT"
+            )
+
+
 def init_db():
     """Crea la carpeta de datos, el engine y las tablas. Idempotente."""
     global _engine, _SessionFactory
@@ -107,7 +167,9 @@ def init_db():
     _migrate_utterance_highlight(_engine)
     _migrate_utterance_participant(_engine)
     _migrate_initiative_pin(_engine)
+    _migrate_meeting_context(_engine)
     _ensure_indexes(_engine)
+    _ensure_fts(_engine)
     _SessionFactory = sessionmaker(bind=_engine)
     return _engine
 

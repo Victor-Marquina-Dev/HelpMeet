@@ -235,6 +235,12 @@ class Api:
         repo.rename_meeting(self._session, int(meeting_id), title)
         return {"ok": True}
 
+    def set_meeting_context(self, meeting_id, context):
+        meeting = repo.set_meeting_context(self._session, int(meeting_id), context)
+        if meeting is None:
+            return {"ok": False, "error": "La reunión ya no existe."}
+        return {"ok": True, "context": meeting.context or ""}
+
     def move_meeting(self, meeting_id, initiative_id):
         repo.move_meeting(self._session, int(meeting_id), int(initiative_id))
         return {"ok": True}
@@ -244,40 +250,89 @@ class Api:
         glos = build_glossary(self._session, int(initiative_id))
         return [{"term": t, "count": c} for t, c in glos]
 
+    def _transcribing_ids(self):
+        """Reuniones que ahora mismo se están transcribiendo en segundo plano."""
+        with self._jobs_lock:
+            return {mid for mid, info in self._jobs_info.items()
+                    if info.get("state") in ("queued", "running")}
+
+    def _meeting_payload(self, m, frase_count, transcribing):
+        """Construye el dict de una reunión para la UI. `frase_count` viene de un
+        COUNT agregado (no de cargar todas las frases) y `transcribing` es el
+        conjunto de reuniones en proceso."""
+        total = int((m.ended_at - m.started_at).total_seconds()) if m.ended_at else 0
+        mm, ss = divmod(max(0, total), 60)
+        is_video = bool(m.audio_path and str(m.audio_path).lower().endswith(".mp4"))
+        if m.id in transcribing:
+            status = "processing"   # transcribiéndose en segundo plano
+        elif is_video and frase_count == 0:
+            status = "pending"
+        elif m.ended_at:
+            status = "done"
+        else:
+            status = "pending"
+        return {
+            "id": m.id,
+            "title": m.title,
+            "date": m.started_at.strftime("%d/%m/%Y %H:%M"),
+            "time": _fmt_12h(m.started_at),
+            "month_key": m.started_at.strftime("%Y-%m"),
+            "month_label": _spanish_month(m.started_at),
+            "status": status,
+            "frases": frase_count,
+            "dur": f"{mm:02d}:{ss:02d}" if m.ended_at else "—",
+            "has_video": is_video,
+        }
+
     def list_meetings(self, initiative_id):
         # Refrescar por si una transcripción en segundo plano (otra sesión)
         # acaba de añadir frases a alguna reunión.
         self._session.expire_all()
         meetings = repo.list_meetings(self._session, int(initiative_id))
+        transcribing = self._transcribing_ids()
+        counts = repo.utterance_counts(self._session, [m.id for m in meetings])
+        return [self._meeting_payload(m, counts.get(m.id, 0), transcribing)
+                for m in meetings]
+
+    def get_bootstrap_state(self):
+        """P-06: un solo viaje al backend al arrancar.
+
+        Antes la UI pedía las reuniones iniciativa por iniciativa (N+1) y además
+        monitores, archivo, papelera y trabajos por separado. Aquí se devuelve
+        todo de una vez, con las reuniones agrupadas en UNA consulta y los conteos
+        de frases agregados."""
+        self._session.expire_all()
+        initiatives = [{"id": i.id, "name": i.name, "description": i.description or "",
+                        "pinned": i.pinned_at is not None}
+                       for i in repo.list_initiatives(self._session)]
+        grouped = repo.list_meetings_by_initiative(self._session)
+        all_ids = [m.id for ms in grouped.values() for m in ms]
+        counts = repo.utterance_counts(self._session, all_ids)
+        transcribing = self._transcribing_ids()
+        meetings_by_initiative = {
+            str(iid): [self._meeting_payload(m, counts.get(m.id, 0), transcribing)
+                       for m in ms]
+            for iid, ms in grouped.items()
+        }
+        # Las iniciativas sin reuniones también deben figurar (lista vacía).
+        for i in initiatives:
+            meetings_by_initiative.setdefault(str(i["id"]), [])
+        try:
+            monitors = self.list_monitors()
+        except Exception:
+            monitors = []
         with self._jobs_lock:
-            transcribing = {mid for mid, info in self._jobs_info.items()
-                            if info.get("state") in ("queued", "running")}
-        result = []
-        for m in meetings:
-            total = int((m.ended_at - m.started_at).total_seconds()) if m.ended_at else 0
-            mm, ss = divmod(max(0, total), 60)
-            is_video = bool(m.audio_path and str(m.audio_path).lower().endswith(".mp4"))
-            if m.id in transcribing:
-                status = "processing"   # transcribiéndose en segundo plano
-            elif is_video and not m.utterances:
-                status = "pending"
-            elif m.ended_at:
-                status = "done"
-            else:
-                status = "pending"
-            result.append({
-                "id": m.id,
-                "title": m.title,
-                "date": m.started_at.strftime("%d/%m/%Y %H:%M"),
-                "time": _fmt_12h(m.started_at),
-                "month_key": m.started_at.strftime("%Y-%m"),
-                "month_label": _spanish_month(m.started_at),
-                "status": status,
-                "frases": len(m.utterances),
-                "dur": f"{mm:02d}:{ss:02d}" if m.ended_at else "—",
-                "has_video": is_video,
-            })
-        return result
+            jobs = list(self._jobs_info.values())
+        return {
+            "initiatives": initiatives,
+            "meetings_by_initiative": meetings_by_initiative,
+            "monitors": monitors,
+            "library_counts": {
+                "archive": len(repo.list_archived(self._session)),
+                "trash": len(repo.list_trash(self._session)),
+            },
+            "background_jobs": jobs,
+        }
 
     def search(self, query):
         out = []
@@ -298,7 +353,7 @@ class Api:
         self._session.expire_all()  # ver frases añadidas en segundo plano
         m = repo.get_meeting(self._session, int(meeting_id))
         if m is None:
-            return {"title": "", "started_at": "", "utterances": [],
+            return {"title": "", "context": "", "started_at": "", "utterances": [],
                     "assets": {"captures": [], "notes": [], "video": None},
                     "video_path": None}
         video = m.audio_path if (m.audio_path and str(m.audio_path).lower().endswith(".mp4")
@@ -354,6 +409,7 @@ class Api:
 
         return {
             "title": m.title,
+            "context": m.context or "",
             "started_at": m.started_at.strftime("%Y-%m-%d %H:%M"),
             "initiative_id": m.initiative_id,
             "participants": [{"id": p.id, "name": p.name, "is_me": bool(p.is_me)}
@@ -447,6 +503,32 @@ class Api:
             b64 = base64.b64encode(fh.read()).decode("ascii")
         return {"ok": True, "data_url": f"data:{mime};base64,{b64}"}
 
+    def get_capture_thumbnail(self, capture_id):
+        """Miniatura JPEG pequeña de una captura para las tarjetas (P-09).
+
+        Antes la tarjeta cargaba el PNG original completo (varios MB) solo para
+        mostrarlo a tamaño reducido. Aquí se genera una vez una miniatura ligera
+        (se cachea en `captures/thumbs`) y se reutiliza. El original solo se pide
+        al ampliar (lupa). Si la miniatura no se pudiera crear, cae al original."""
+        cap = repo.get_capture(self._session, int(capture_id))
+        if cap is None or not cap.image_path or not os.path.exists(cap.image_path):
+            return {"ok": False, "data_url": ""}
+        from helpmeet.media import make_thumbnail
+        thumbs_dir = config.CAPTURES_DIR / "thumbs"
+        thumb = thumbs_dir / f"{int(capture_id)}.jpg"
+        try:
+            fresh = (thumb.exists() and
+                     thumb.stat().st_mtime >= os.path.getmtime(cap.image_path))
+        except OSError:
+            fresh = False
+        if not fresh:
+            make_thumbnail(cap.image_path, str(thumb))
+        if thumb.exists():
+            with open(thumb, "rb") as fh:
+                b64 = base64.b64encode(fh.read()).decode("ascii")
+            return {"ok": True, "data_url": f"data:image/jpeg;base64,{b64}"}
+        return self.get_capture_image(capture_id)  # fallback al original
+
     def export_meeting_by_id(self, meeting_id):
         out = export_meeting(self._session, int(meeting_id), settings.get_export_dir())
         return {"path": str(out)}
@@ -526,6 +608,11 @@ class Api:
     def export_initiative_by_id(self, initiative_id):
         out = export_initiative(self._session, int(initiative_id), settings.get_export_dir())
         return {"path": str(out)}
+
+    def open_initiative_folder(self, initiative_id):
+        out = export_initiative(self._session, int(initiative_id), settings.get_export_dir())
+        _open_in_explorer(out)
+        return {"ok": True, "path": str(out)}
 
     def open_path(self, path):
         """Abre en el Explorador la carpeta indicada (la de una exportación)."""
@@ -699,7 +786,8 @@ class Api:
         # anterior que aún se esté guardando en segundo plano.
         work_dir = config.DATA_DIR / "tmp_video" / f"{now:%Y%m%d_%H%M%S_%f}"
         rec = ScreenVideoRecorder(dest, mon, on_status=self._push_status,
-                                  on_preview=self._push_preview, work_dir=work_dir)
+                                  on_preview=self._push_preview, work_dir=work_dir,
+                                  profile=settings.get_video_profile())
         mic_muted = settings.get_transcription_settings()["default_mic_muted"]
         rec.set_mic_muted(mic_muted)
         try:

@@ -47,13 +47,17 @@ def mix_wavs(me_wav, others_wav, out_wav, rate: int = 48000) -> bool:
     if not tracks:
         return False
     n = max(len(t) for t in tracks)
+    # Suma in situ (sin crear un array 'padded' completo por pista) y volcado a
+    # estéreo intercalado sin column_stack: menos picos de RAM en grabaciones
+    # largas, con el mismo resultado exacto.
     mixed = np.zeros(n, dtype=np.float32)
     for t in tracks:
-        padded = np.zeros(n, dtype=np.float32)
-        padded[: len(t)] = t
-        mixed += padded
-    mixed = np.clip(mixed, -32768, 32767).astype(np.int16)
-    stereo = np.column_stack([mixed, mixed]).reshape(-1)
+        mixed[: len(t)] += t.astype(np.float32, copy=False)
+    np.clip(mixed, -32768, 32767, out=mixed)
+    mono = mixed.astype(np.int16)
+    stereo = np.empty(n * 2, dtype=np.int16)
+    stereo[0::2] = mono
+    stereo[1::2] = mono
     with wave.open(str(out_wav), "wb") as w:
         w.setnchannels(2)
         w.setsampwidth(2)

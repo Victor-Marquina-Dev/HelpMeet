@@ -5,10 +5,60 @@ m4a, wav, ogg… Devuelve un WAV listo para transcribir.
 """
 import wave
 from pathlib import Path
+from fractions import Fraction
 import av
 from av.audio.resampler import AudioResampler
 
 TARGET_RATE = 16000
+
+
+def make_thumbnail(src_path: str, dest_path: str, max_width: int = 480) -> str | None:
+    """Genera una miniatura JPEG reducida de una imagen (P-09).
+
+    Las tarjetas de capturas mostraban el PNG original completo (varios MB cada
+    una) incrustado en base64. Aquí se crea una versión pequeña (ancho máximo
+    `max_width`) que pesa una fracción, usando PyAV (ffmpeg embebido) para no
+    añadir ninguna dependencia. Devuelve la ruta del thumb, o None si falla.
+    """
+    dest = Path(dest_path)
+    try:
+        container = av.open(src_path)
+        try:
+            frame = next(container.decode(video=0))
+        finally:
+            container.close()
+        width = frame.width or max_width
+        if width <= max_width:
+            new_w, new_h = width, frame.height
+        else:
+            new_w = max_width
+            new_h = max(2, int(round(frame.height * (max_width / width))))
+        new_w -= new_w % 2
+        new_h -= new_h % 2
+        small = frame.reformat(width=new_w, height=new_h, format="yuvj420p")
+        small.pts = 0
+        small.time_base = Fraction(1, 1)
+
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        out = av.open(str(dest), mode="w", format="mjpeg")
+        try:
+            stream = out.add_stream("mjpeg", rate=1)
+            stream.width, stream.height = new_w, new_h
+            stream.pix_fmt = "yuvj420p"
+            stream.time_base = Fraction(1, 1)
+            for packet in stream.encode(small):
+                out.mux(packet)
+            for packet in stream.encode():
+                out.mux(packet)
+        finally:
+            out.close()
+        return str(dest)
+    except Exception:
+        try:
+            dest.unlink(missing_ok=True)
+        except Exception:
+            pass
+        return None
 
 
 def media_duration(src_path: str) -> float:

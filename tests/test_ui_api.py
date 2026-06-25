@@ -38,6 +38,76 @@ def test_list_meetings_has_redesign_metadata(session):
     assert row["month_label"].endswith(str(meeting.started_at.year))
 
 
+def test_get_bootstrap_state_groups_meetings_and_counts(session):
+    # Dos iniciativas: una con reuniones, otra vacía.
+    a = repo.create_initiative(session, "Con reuniones")
+    b = repo.create_initiative(session, "Vacía")
+    m1 = repo.start_meeting(session, a.id, "Primera")
+    repo.add_utterances(session, m1.id, [
+        {"speaker": "me", "text": "uno", "start_time": 0.0, "end_time": 1.0},
+        {"speaker": "me", "text": "dos", "start_time": 1.0, "end_time": 2.0},
+    ])
+    repo.end_meeting(session, m1.id)
+    m2 = repo.start_meeting(session, a.id, "Segunda")  # sin frases
+
+    state = _api_with_session(session).get_bootstrap_state()
+
+    ids = {i["id"] for i in state["initiatives"]}
+    assert {a.id, b.id} <= ids
+    mbi = state["meetings_by_initiative"]
+    # Las claves llegan como str (JSON) y la iniciativa vacía aparece con [].
+    assert mbi[str(b.id)] == []
+    rows = {r["id"]: r for r in mbi[str(a.id)]}
+    assert rows[m1.id]["frases"] == 2
+    assert rows[m2.id]["frases"] == 0
+    assert "monitors" in state and "background_jobs" in state
+    assert state["library_counts"] == {"archive": 0, "trash": 0}
+
+
+def test_utterance_counts_aggregates_without_loading_rows(session):
+    ini = repo.create_initiative(session, "X")
+    m = repo.start_meeting(session, ini.id, "R")
+    repo.add_utterances(session, m.id, [
+        {"speaker": "me", "text": "a", "start_time": 0.0, "end_time": 1.0},
+        {"speaker": "others", "text": "b", "start_time": 1.0, "end_time": 2.0},
+        {"speaker": "me", "text": "c", "start_time": 2.0, "end_time": 3.0},
+    ])
+    assert repo.utterance_counts(session, [m.id]) == {m.id: 3}
+    assert repo.utterance_counts(session, []) == {}
+    assert repo.utterance_counts(session).get(m.id) == 3
+
+
+def test_make_thumbnail_shrinks_image(tmp_path):
+    import numpy as np
+    import mss.tools
+    from helpmeet.media import make_thumbnail
+    w, h = 1200, 800
+    rgb = np.random.default_rng(0).integers(0, 256, (h, w, 3), dtype="uint8")
+    src = tmp_path / "cap.png"
+    src.write_bytes(mss.tools.to_png(rgb.tobytes(), (w, h)))
+    dest = tmp_path / "thumb.jpg"
+    out = make_thumbnail(str(src), str(dest), max_width=480)
+    assert out is not None and dest.exists()
+    assert dest.stat().st_size < src.stat().st_size
+
+
+def test_get_capture_thumbnail_returns_jpeg(session, tmp_path, monkeypatch):
+    import numpy as np
+    import mss.tools
+    from helpmeet import config
+    monkeypatch.setattr(config, "CAPTURES_DIR", tmp_path)
+    ini = repo.create_initiative(session, "P")
+    m = repo.start_meeting(session, ini.id, "R")
+    src = tmp_path / "cap.png"
+    rgb = np.random.default_rng(1).integers(0, 256, (600, 900, 3), dtype="uint8")
+    src.write_bytes(mss.tools.to_png(rgb.tobytes(), (900, 600)))
+    cap = repo.add_capture(session, m.id, str(src))
+    r = _api_with_session(session).get_capture_thumbnail(cap.id)
+    assert r["ok"] and r["data_url"].startswith("data:image/jpeg;base64,")
+    # La segunda llamada reutiliza la miniatura cacheada (mismo resultado).
+    assert _api_with_session(session).get_capture_thumbnail(cap.id)["ok"]
+
+
 def test_edit_change_speaker_highlight_and_delete_utterance(session):
     ini = repo.create_initiative(session, "Proyecto")
     meeting = repo.start_meeting(session, ini.id, "Edición")
@@ -66,6 +136,21 @@ def test_edit_change_speaker_highlight_and_delete_utterance(session):
     assert api.get_transcript(meeting.id)["utterances"] == []
     # Borrar algo inexistente no rompe
     assert api.delete_utterance(u.id) == {"ok": False}
+
+
+def test_meeting_context_round_trip(session):
+    ini = repo.create_initiative(session, "Proyecto")
+    meeting = repo.start_meeting(session, ini.id, "Revisión")
+    api = _api_with_session(session)
+
+    result = api.set_meeting_context(
+        meeting.id, "  Revisar el alcance y los próximos pasos.  "
+    )
+
+    assert result == {
+        "ok": True, "context": "Revisar el alcance y los próximos pasos."
+    }
+    assert api.get_transcript(meeting.id)["context"] == result["context"]
 
 
 def test_participants_lifecycle_and_resolved_names(session):
@@ -164,6 +249,24 @@ def test_video_without_transcript_is_pending(session, tmp_path):
 
     assert row["status"] == "pending"
     assert row["has_video"] is True
+
+
+def test_open_initiative_folder_exports_and_opens_path(session, tmp_path, monkeypatch):
+    import helpmeet.ui.app as app_mod
+
+    ini = repo.create_initiative(session, "Proyecto")
+    meeting = repo.start_meeting(session, ini.id, "Reunion")
+    repo.add_utterance(session, meeting.id, "others", "hola", 0.0, 1.0)
+    repo.end_meeting(session, meeting.id)
+    opened = []
+    monkeypatch.setattr(app_mod.settings, "get_export_dir", lambda: tmp_path)
+    monkeypatch.setattr(app_mod, "_open_in_explorer", lambda path: opened.append(path))
+
+    result = _api_with_session(session).open_initiative_folder(ini.id)
+
+    assert result["ok"] is True
+    assert opened and str(opened[0]) == result["path"]
+    assert (opened[0] / "contexto.md").exists()
 
 
 def test_transcript_contains_real_timeline_and_assets(session, tmp_path):

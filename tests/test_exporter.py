@@ -300,6 +300,19 @@ def test_build_meeting_context_has_header_and_only_that_meeting(session, tmp_pat
     assert not list(tmp_path.iterdir())
 
 
+def test_export_includes_meeting_context(session, tmp_path):
+    from helpmeet.export.exporter import build_meeting_context
+
+    ini = repo.create_initiative(session, "Proyecto")
+    meeting = repo.start_meeting(session, ini.id, "Revisión")
+    repo.set_meeting_context(session, meeting.id, "Validar el nuevo proceso de pagos.")
+
+    text = build_meeting_context(session, meeting.id)
+
+    assert "### Contexto de la reunión" in text
+    assert "Validar el nuevo proceso de pagos." in text
+
+
 def test_set_initiative_description_round_trip(session):
     ini = repo.create_initiative(session, "Sin objetivo")
     assert ini.description is None

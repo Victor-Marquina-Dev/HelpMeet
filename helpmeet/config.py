@@ -51,6 +51,21 @@ VIDEO_PRESET = "veryfast"   # rápido para no soltar fotogramas al grabar
 VIDEO_CRF = "18"            # calidad alta (menor = mejor; 18 ≈ sin pérdida visible)
 VIDEO_AUDIO_RATE = 48000
 
+# Perfiles de calidad de grabación de pantalla (P-12). Permiten grabaciones más
+# ligeras (menos CPU y espacio) o de máxima nitidez. `max_w/max_h = 0` = sin
+# límite de resolución (la nativa del monitor). `crf` menor = más calidad/peso.
+VIDEO_PROFILES = {
+    "light":    {"label": "Ligero · 720p · 15 fps",       "max_w": 1280, "max_h": 720,  "fps": 15, "crf": "26"},
+    "balanced": {"label": "Equilibrado · 1080p · 30 fps",  "max_w": 1920, "max_h": 1080, "fps": 30, "crf": "23"},
+    "native":   {"label": "Nativo · máxima nitidez",       "max_w": 0,    "max_h": 0,    "fps": 30, "crf": "18"},
+}
+DEFAULT_VIDEO_PROFILE = "balanced"
+
+
+def video_profile(name):
+    """Devuelve el perfil de vídeo pedido, o el de por defecto si no es válido."""
+    return VIDEO_PROFILES.get(name, VIDEO_PROFILES[DEFAULT_VIDEO_PROFILE])
+
 
 def migrate_legacy_state() -> bool:
     """Copia el estado esencial de la versión de desarrollo una sola vez.
