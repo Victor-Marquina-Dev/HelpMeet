@@ -403,8 +403,9 @@ def add_capture(session: Session, meeting_id: int, image_path: str,
     return cap
 
 
-def add_note(session: Session, meeting_id: int, text: str) -> Note:
-    note = Note(meeting_id=meeting_id, text=text)
+def add_note(session: Session, meeting_id: int, text: str,
+             is_context: bool = False) -> Note:
+    note = Note(meeting_id=meeting_id, text=text, is_context=bool(is_context))
     session.add(note)
     session.commit()
     return note

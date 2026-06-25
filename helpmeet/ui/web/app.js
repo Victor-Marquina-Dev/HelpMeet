@@ -93,6 +93,7 @@ const api = {
   renameInitiative: (id, name) => call('rename_initiative', id, name),
   renameMeeting: (id, title) => call('rename_meeting', id, title),
   setMeetingContext: (id, text) => call('set_meeting_context', id, text),
+  addMeetingNote: (id, text) => call('add_meeting_note', id, text),
   moveMeeting: (mid, iid) => call('move_meeting', mid, iid),
   getGlossary: (iid) => call('get_glossary', iid),
   listMeetings: (iid) => call('list_meetings', iid),
@@ -674,6 +675,7 @@ function renderTranscript(t) {
   const buildItem = (u) => {
     let node, text;
     if (u.kind === 'capture') { node = captureEvent(u); text = (u.code || '') + ' ' + (u.note || ''); }
+    else if (u.kind === 'context') { node = contextEvent(u); text = u.text || ''; }
     else if (u.kind === 'note') { node = noteEvent(u); text = u.text || ''; }
     else { node = utterance(u); text = u.text || ''; }
     return { node, text: String(text).toLowerCase() };
@@ -701,34 +703,43 @@ function renderTranscript(t) {
   if (!recording && t) {
     const tools = el('div', 'meeting-tools');
     const context = el('div', 'meeting-context');
-    context.innerHTML = `<span class="meeting-context-icon" title="Contexto de la reunión">${svg('edit', 15)}</span>
-      <textarea id="meetingContext" rows="1" maxlength="2000" placeholder="Añade contexto: objetivo, tema o qué quieres revisar…" aria-label="Contexto de la reunión"></textarea>
+    context.innerHTML = `<span class="meeting-context-icon" title="Añadir a la transcripción">${svg('edit', 15)}</span>
+      <textarea id="meetingContext" rows="1" maxlength="2000" placeholder="Escribe y pulsa Enter para añadir a la transcripción…" aria-label="Añadir a la transcripción"></textarea>
       <span class="meeting-context-state" id="meetingContextState"></span>`;
     const contextInput = context.querySelector('#meetingContext');
     const contextState = context.querySelector('#meetingContextState');
-    contextInput.value = t.context || '';
-    let lastSaved = contextInput.value.trim(), contextTimer;
     const resizeContext = () => {
       contextInput.style.height = 'auto';
       contextInput.style.height = Math.min(92, contextInput.scrollHeight) + 'px';
     };
-    const saveContext = async () => {
-      clearTimeout(contextTimer);
-      const value = contextInput.value.trim();
-      if (value === lastSaved) return;
-      contextState.textContent = 'Guardando…';
-      const result = await api.setMeetingContext(STATE.selMeeting, value);
-      if (result && result.ok) {
-        lastSaved = result.context || '';
-        t.context = lastSaved;
-        contextState.textContent = 'Guardado';
-        setTimeout(() => { if (contextState.textContent === 'Guardado') contextState.textContent = ''; }, 1400);
-      } else contextState.textContent = 'Error';
+    const addToTranscript = async () => {
+      const text = contextInput.value.trim();
+      if (!text) return;
+      contextState.textContent = 'Añadiendo…';
+      const r = await api.addMeetingNote(STATE.selMeeting, text);
+      if (r && r.ok && r.note) {
+        contextInput.value = ''; resizeContext(); contextState.textContent = '';
+        // Reflejar en memoria (al principio) para que persista al cambiar de pestaña.
+        if (STATE.transcript) {
+          STATE.transcript.utterances = STATE.transcript.utterances || [];
+          STATE.transcript.utterances.unshift(r.note);
+        }
+        // Insertar el nodo ARRIBA del todo (antes de la primera entrada).
+        const reading = document.querySelector('.reading');
+        if (reading) {
+          const node = contextEvent(r.note);
+          const firstItem = reading.querySelector('.utterance');
+          if (firstItem) reading.insertBefore(node, firstItem); else reading.appendChild(node);
+          node.scrollIntoView({ block: 'nearest' });
+        }
+        toast('ok', 'Añadido como contexto');
+      } else { contextState.textContent = 'Error'; }
     };
-    contextInput.addEventListener('input', () => {
-      resizeContext(); clearTimeout(contextTimer); contextTimer = setTimeout(saveContext, 700);
+    contextInput.addEventListener('input', resizeContext);
+    // Enter = añadir a la transcripción. Shift+Enter = línea nueva.
+    contextInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); addToTranscript(); }
     });
-    contextInput.addEventListener('blur', saveContext);
     resizeContext();
     tools.appendChild(context);
 
@@ -869,6 +880,12 @@ function noteEvent(u) {
   const d = el('div', 'utterance');
   d.innerHTML = `<div class="time mono">${esc(u.time)}</div><div class="band" style="background:var(--warning)"></div>
     <div class="event-note"><strong>Nota</strong><span>${esc(u.text || '')}</span></div>`;
+  return d;
+}
+function contextEvent(u) {
+  const d = el('div', 'utterance');
+  d.innerHTML = `<div class="time mono"></div><div class="band" style="background:var(--accent)"></div>
+    <div class="event-note"><strong>Contexto</strong><span>${esc(u.text || '')}</span></div>`;
   return d;
 }
 
@@ -1172,10 +1189,7 @@ function renderActionBar() {
       <div class="ab-divider"></div>
       <button class="btn btn-record ${canRecord ? '' : 'is-disabled'}" id="abRecord" title="${canRecord ? 'Grabar reunión' : 'Selecciona una iniciativa'}"><span class="dot"></span>Grabar reunión</button>
       <button class="btn btn-lg btn-screen ${canRecord ? '' : 'is-disabled'}" id="abScreen">${svg('monitorDot', 15)}Grabar pantalla</button>
-      <button class="btn btn-lg ${canRecord ? '' : 'is-disabled'}" id="abUpload">${svg('upload', 15)}Subir archivo</button>
-      <div class="ab-spacer"></div>
-      <span class="btn-disabled-hint">${svg('camera', 14)}Captura</span>
-      <span class="btn-disabled-hint">${svg('note', 14)}Nota</span>`;
+      <button class="btn btn-lg ${canRecord ? '' : 'is-disabled'}" id="abUpload">${svg('upload', 15)}Subir archivo</button>`;
     bar.querySelector('#abRecord').onclick = () => canRecord && withRecordingConsent(() => openRecordingPreflight('meeting', startMeetingRecording));
     bar.querySelector('#abScreen').onclick = () => canRecord && withRecordingConsent(() => openRecordingPreflight('screen', openScreenPanel));
     bar.querySelector('#abUpload').onclick = () => canRecord && doImport(bar.querySelector('#abUpload'));
@@ -1183,9 +1197,9 @@ function renderActionBar() {
   } else if (s === 'recording' || s === 'recording-local' || s === 'recording-cloud') {
     bar.innerHTML = `
       <button class="btn btn-stop" id="abStop"><span class="sq"></span>Detener grabación</button>
-      <button class="btn btn-lg" id="abCapture">${svg('camera', 15)}Captura</button>
-      ${STATE.monitors.length > 1 ? `<div class="monitor-select" title="Pantalla de la que se toma la captura">${svg('monitor', 14)}<select id="monitorSelRec" aria-label="Pantalla para la captura">${monitorOptions()}</select></div>` : ''}
-      <button class="btn btn-lg" id="abNote">${svg('note', 15)}Añadir nota</button>
+      <button class="btn btn-lg ab-appear" id="abCapture" style="animation-delay:.04s">${svg('camera', 15)}Captura</button>
+      ${STATE.monitors.length > 1 ? `<div class="monitor-select ab-appear" style="animation-delay:.08s" title="Pantalla de la que se toma la captura">${svg('monitor', 14)}<select id="monitorSelRec" aria-label="Pantalla para la captura">${monitorOptions()}</select></div>` : ''}
+      <button class="btn btn-lg ab-appear" id="abNote" style="animation-delay:.12s">${svg('note', 15)}Añadir nota</button>
       <button class="btn btn-lg ${STATE.meetingMicMuted ? 'btn-danger' : ''}" id="abMic">${STATE.meetingMicMuted ? 'Activar mi audio' : 'Silenciar mi audio'}</button>
       <div class="ab-spacer"></div>
       <span class="btn-disabled-hint">Subir archivo · no disponible al grabar</span>`;
@@ -1223,6 +1237,7 @@ function renderSidebar() {
     const open = !!STATE.openInits[it.id];
     const ms = STATE.meetingsByInit[it.id] || [];
     const row = el('div', 'tree-initiative' + (open ? ' open' : '') + (STATE.selInit === it.id && STATE.screen === 'initiative' ? ' selected' : ''));
+    row.title = it.name || '';
     row.innerHTML = `<span class="chev">${svg('chevron', 12)}</span><span class="name">${esc(it.name)}</span>${it.pinned ? '<span class="pin-ind" title="Anclada">' + svg('pin', 11) + '</span>' : ''}<span class="count">${ms.length || ''}</span>`;
     row.onclick = () => selectInitiative(it.id);
     row.oncontextmenu = (e) => { e.preventDefault(); openInitiativeMenu(e, it.id); };
@@ -1237,6 +1252,7 @@ function renderSidebar() {
           sub.appendChild(el('div', 'tree-month', esc(month)));
         }
         const mr = el('div', 'tree-meeting' + (STATE.selMeeting === m.id ? ' selected' : ''));
+        mr.title = m.title || '';
         mr.innerHTML = `<span class="stat ${m.status || 'done'}"></span><span class="mtitle">${esc(m.title)}</span>${m.time ? '<span class="mtime">' + esc(m.time) + '</span>' : ''}`;
         mr.onclick = (e) => { e.stopPropagation(); openMeeting(m.id); };
         mr.oncontextmenu = (e) => { e.preventDefault(); e.stopPropagation(); openMeetingMenu(e, m.id); };

@@ -115,4 +115,7 @@ class Note(Base):
     meeting_id: Mapped[int] = mapped_column(ForeignKey("meetings.id"))
     text: Mapped[str] = mapped_column(Text)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now)
+    # Las entradas de "Contexto" (añadidas a mano) se distinguen de las notas
+    # normales: se muestran arriba de la transcripción y con la etiqueta Contexto.
+    is_context: Mapped[bool] = mapped_column(Boolean, default=False)
     meeting: Mapped["Meeting"] = relationship(back_populates="notes")

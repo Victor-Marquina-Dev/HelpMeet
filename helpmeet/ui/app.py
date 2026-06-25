@@ -241,6 +241,21 @@ class Api:
             return {"ok": False, "error": "La reunión ya no existe."}
         return {"ok": True, "context": meeting.context or ""}
 
+    def add_meeting_note(self, meeting_id, text):
+        """Añade una entrada de "Contexto" a la transcripción de una reunión.
+        Aparece arriba del todo y con la etiqueta Contexto."""
+        text = (text or "").strip()
+        if not text:
+            return {"ok": False}
+        meeting = repo.get_meeting(self._session, int(meeting_id))
+        if meeting is None:
+            return {"ok": False, "error": "La reunión ya no existe."}
+        note = repo.add_note(self._session, int(meeting_id), text, is_context=True)
+        return {"ok": True, "note": {
+            "id": note.id, "kind": "context", "time": "", "offset": 0.0,
+            "text": note.text,
+        }}
+
     def move_meeting(self, meeting_id, initiative_id):
         repo.move_meeting(self._session, int(meeting_id), int(initiative_id))
         return {"ok": True}
@@ -396,11 +411,20 @@ class Api:
             timeline.append(item)
         notes = []
         for note in m.notes:
-            offset = max(0.0, (note.created_at - m.started_at).total_seconds())
-            item = {
-                "id": note.id, "kind": "note", "time": stamp(offset),
-                "offset": offset, "text": note.text, "_sort": offset,
-            }
+            if note.is_context:
+                # Las entradas de Contexto van arriba del todo (más recientes
+                # primero) y sin marca de tiempo.
+                item = {
+                    "id": note.id, "kind": "context", "time": "",
+                    "offset": 0.0, "text": note.text,
+                    "_sort": -note.created_at.timestamp(),
+                }
+            else:
+                offset = max(0.0, (note.created_at - m.started_at).total_seconds())
+                item = {
+                    "id": note.id, "kind": "note", "time": stamp(offset),
+                    "offset": offset, "text": note.text, "_sort": offset,
+                }
             notes.append({key: value for key, value in item.items() if key != "_sort"})
             timeline.append(item)
         timeline.sort(key=lambda item: (item["_sort"], item["kind"] != "utterance"))

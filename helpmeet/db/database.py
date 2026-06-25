@@ -150,6 +150,16 @@ def _migrate_meeting_context(engine) -> None:
             )
 
 
+def _migrate_note_is_context(engine) -> None:
+    """Añade la columna `is_context` (entradas de Contexto) a bases anteriores."""
+    with engine.begin() as connection:
+        existing = {column["name"] for column in inspect(connection).get_columns("notes")}
+        if "is_context" not in existing:
+            connection.exec_driver_sql(
+                "ALTER TABLE notes ADD COLUMN is_context BOOLEAN DEFAULT 0"
+            )
+
+
 def init_db():
     """Crea la carpeta de datos, el engine y las tablas. Idempotente."""
     global _engine, _SessionFactory
@@ -168,6 +178,7 @@ def init_db():
     _migrate_utterance_participant(_engine)
     _migrate_initiative_pin(_engine)
     _migrate_meeting_context(_engine)
+    _migrate_note_is_context(_engine)
     _ensure_indexes(_engine)
     _ensure_fts(_engine)
     _SessionFactory = sessionmaker(bind=_engine)
