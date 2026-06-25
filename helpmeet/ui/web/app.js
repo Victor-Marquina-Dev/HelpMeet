@@ -92,9 +92,11 @@ const api = {
   createInitiative: (name) => call('create_initiative', name),
   renameInitiative: (id, name) => call('rename_initiative', id, name),
   renameMeeting: (id, title) => call('rename_meeting', id, title),
+  setMeetingContext: (id, text) => call('set_meeting_context', id, text),
   moveMeeting: (mid, iid) => call('move_meeting', mid, iid),
   getGlossary: (iid) => call('get_glossary', iid),
   listMeetings: (iid) => call('list_meetings', iid),
+  getBootstrapState: () => call('get_bootstrap_state'),
   search: (q) => call('search', q),
   getTranscript: (mid) => call('get_transcript', mid),
   startRecording: (iid, title) => call('start_recording', iid, title),
@@ -109,12 +111,14 @@ const api = {
   exportTranscriptPackage: (mid) => call('export_transcript_package', mid),
   exportTranscript: (mid) => call('export_transcript', mid),
   exportInitiativeById: (iid) => call('export_initiative_by_id', iid),
+  openInitiativeFolder: (iid) => call('open_initiative_folder', iid),
   exportMeetingTo: (mid) => call('export_meeting_to', mid),
   exportInitiativeTo: (iid) => call('export_initiative_to', iid),
   setInitiativeDescription: (iid, d) => call('set_initiative_description', iid, d),
   copyInitiativeContext: (iid) => call('copy_initiative_context', iid),
   copyMeetingContext: (mid) => call('copy_meeting_context', mid),
   getCaptureImage: (cid) => call('get_capture_image', cid),
+  getCaptureThumbnail: (cid) => call('get_capture_thumbnail', cid),
   getBackgroundJobs: () => call('get_background_jobs'),
   setAiInstructions: (t) => call('set_ai_instructions', t),
   openMeetingFolder: (mid) => call('open_meeting_folder', mid),
@@ -201,9 +205,19 @@ const MOCK = (() => {
     create_initiative: (name) => { const it = { id: 'i' + (++mctr), name }; inits.push(it); meetings[it.id] = []; return wait(it); },
     rename_initiative: (id, name) => { const it = inits.find(x => x.id === id); if (it) it.name = name; return wait({ ok: true }); },
     rename_meeting: (id, title) => { for (const k in meetings) { const m = meetings[k].find(x => x.id === id); if (m) m.title = title; } return wait({ ok: true }); },
+    set_meeting_context: (id, context) => { if (transcripts[id]) transcripts[id].context = context; return wait({ ok: true, context }); },
     move_meeting: () => wait({ ok: true }),
     get_glossary: (iid) => wait(glossary[iid] || []),
     list_meetings: (iid) => wait((meetings[iid] || []).slice()),
+    get_bootstrap_state: () => {
+      const mbi = {};
+      for (const it of inits) mbi[it.id] = (meetings[it.id] || []).slice();
+      return wait({
+        initiatives: inits.slice(), meetings_by_initiative: mbi,
+        monitors: [{ index: 0, width: 2560, height: 1440 }, { index: 1, width: 1920, height: 1080 }],
+        library_counts: { archive: 0, trash: 0 }, background_jobs: [],
+      });
+    },
     search: () => wait([]),
     get_transcript: (mid) => wait(transcripts[mid] || { title: 'Reunión', started_at: '', utterances: [] }),
     start_recording: (iid, title) => wait({ id: 'm' + (++mctr), title: title || 'Reunión sin título', initiative_id: iid, live: true }),
@@ -217,6 +231,7 @@ const MOCK = (() => {
     export_transcript_package: () => wait({ ok: true, path: 'C:\\Helpmeet\\transcripcion.zip', captures: 2, files: 1 }, 500),
     export_transcript: () => wait({ ok: true, format: 'txt', path: 'C:\\Helpmeet\\transcripcion.txt', captures: 0, files: 0 }, 500),
     export_initiative_by_id: () => wait({ path: 'C:\\Helpmeet\\export' }, 500),
+    open_initiative_folder: () => wait({ ok: true, path: 'C:\\Helpmeet\\export' }, 500),
     export_meeting_to: () => wait({ ok: true, path: 'D:\\Backups\\reunion' }, 500),
     export_initiative_to: () => wait({ ok: true, path: 'D:\\Backups\\alpha' }, 500),
     open_meeting_folder: () => wait({ ok: true, path: 'C:\\Helpmeet\\export' }),
@@ -387,6 +402,7 @@ function viewInitiative() {
       <div class="spacer"></div>
       <button class="btn btn-primary ${ms.length ? '' : 'is-disabled'}" id="initCopy" title="${ms.length ? 'Copiar el contexto al portapapeles' : 'Aún no hay reuniones que copiar'}">${svg('copy', 14)} Copiar contexto</button>
       <button class="btn ${ms.length ? '' : 'is-disabled'}" id="initExport" title="${ms.length ? 'Exportar el contexto' : 'Aún no hay reuniones que exportar'}">${svg('download', 14)} Exportar</button>
+      <button class="btn" id="initOpenFolder" title="Abrir la carpeta completa de la iniciativa">${svg('folder', 14)} Abrir carpeta</button>
       <button class="icon-btn" id="initMenu" aria-label="Más acciones de la iniciativa">${svg('dots', 16)}</button>
     </div>
     <div class="meta-line">${ms.length} reuniones${last ? ' · última el ' + esc(last.date) : ''}</div>`;
@@ -450,6 +466,7 @@ function viewInitiative() {
   head.querySelector('#initMenu').onclick = (e) => openInitiativeMenu(e, STATE.selInit);
   head.querySelector('#initCopy').onclick = (e) => ms.length && copyInitiativeContext(STATE.selInit, e.currentTarget);
   head.querySelector('#initExport').onclick = (e) => ms.length && exportInitiativeNow(STATE.selInit, e.currentTarget);
+  head.querySelector('#initOpenFolder').onclick = (e) => openInitiativeFolder(STATE.selInit, e.currentTarget);
   wrap.replaceChildren(head, scroll);
   return wrap;
 }
@@ -548,6 +565,19 @@ async function exportInitiativeNow(iid, btn) {
   finally { if (btn) btn.classList.remove('is-loading'); }
 }
 
+async function openInitiativeFolder(iid, btn) {
+  if (btn) btn.classList.add('is-loading');
+  try {
+    const r = await api.openInitiativeFolder(iid);
+    if (r && r.ok) toast('ok', 'Carpeta de la iniciativa abierta');
+    else toast('err', 'No se pudo abrir la carpeta de la iniciativa');
+  } catch (e) {
+    toast('err', 'No se pudo abrir la carpeta de la iniciativa');
+  } finally {
+    if (btn) btn.classList.remove('is-loading');
+  }
+}
+
 /* Copia texto al portapapeles con respaldo para WebView (file://, sin HTTPS). */
 function copyText(text) {
   if (navigator.clipboard && navigator.clipboard.writeText) {
@@ -634,65 +664,147 @@ function renderTranscript(t) {
     r.appendChild(b);
   }
   const us = (t && t.utterances) || [];
-  if (!us.length && !(t && t.video_path)) { r.appendChild(el('p', null, '<span style="color:var(--text-muted)">Sin transcripción todavía.</span>')); return r; }
 
   // Buscador DENTRO de esta transcripción: filtra las frases/notas/capturas
   // que contienen el texto y muestra cuántas coinciden. Sólo en reposo.
   const recording = STATE.appState === 'recording' || STATE.appState === 'recording-local' || STATE.appState === 'recording-cloud';
   const items = [];
-  if (us.length && !recording) {
-    const bar = el('div', 'tx-search');
-    bar.innerHTML = `<span class="tx-search-ico" aria-hidden="true">${svg('search', 14)}</span>
-      <input id="txSearch" type="search" placeholder="Buscar…" aria-label="Buscar en la transcripción" autocomplete="off">
-      <span class="tx-count" id="txCount"></span>
-      <button class="icon-btn sm" id="txClear" title="Limpiar búsqueda" aria-label="Limpiar" hidden>${svg('x', 13)}</button>`;
-    r.appendChild(bar);
-    const input = bar.querySelector('#txSearch');
-    const countEl = bar.querySelector('#txCount');
-    const clearBtn = bar.querySelector('#txClear');
-    const apply = () => {
-      const q = (input.value || '').trim().toLowerCase();
-      clearBtn.hidden = !q;
-      let n = 0, first = null;
-      items.forEach(it => {
-        const hit = !q || it.text.includes(q);
-        it.node.style.display = hit ? '' : 'none';
-        if (q && hit) { n++; if (!first) first = it.node; }
-      });
-      countEl.textContent = q ? (n ? `${n} resultado${n > 1 ? 's' : ''}` : 'Sin resultados') : '';
-      if (first) first.scrollIntoView({ block: 'nearest' });
-    };
-    input.addEventListener('input', apply);
-    clearBtn.onclick = () => { input.value = ''; apply(); input.focus(); };
-  }
 
-  us.forEach(u => {
+  // Construye el nodo (frase/captura/nota) y su texto en minúsculas para buscar.
+  const buildItem = (u) => {
     let node, text;
     if (u.kind === 'capture') { node = captureEvent(u); text = (u.code || '') + ' ' + (u.note || ''); }
     else if (u.kind === 'note') { node = noteEvent(u); text = u.text || ''; }
     else { node = utterance(u); text = u.text || ''; }
-    items.push({ node, text: String(text).toLowerCase() });
-    r.appendChild(node);
-  });
+    return { node, text: String(text).toLowerCase() };
+  };
+
+  // P-10: en reposo se paginan las frases para no crear miles de nodos de golpe
+  // al abrir una reunión muy larga. Se muestran PAGE y "Mostrar más" carga el resto.
+  const PAGE = 150;
+  let drawn = 0;
+  const moreBtn = el('button', 'btn tx-more');
+  const drawBatch = (count) => {
+    const end = Math.min(drawn + count, us.length);
+    for (let i = drawn; i < end; i++) {
+      const it = buildItem(us[i]);
+      items.push(it);
+      r.insertBefore(it.node, moreBtn);
+    }
+    drawn = end;
+    const left = us.length - drawn;
+    moreBtn.hidden = left <= 0;
+    moreBtn.textContent = `Mostrar ${Math.min(PAGE, left)} más · quedan ${left}`;
+  };
+  const drawAll = () => { if (drawn < us.length) drawBatch(us.length - drawn); };
+
+  if (!recording && t) {
+    const tools = el('div', 'meeting-tools');
+    const context = el('div', 'meeting-context');
+    context.innerHTML = `<span class="meeting-context-icon" title="Contexto de la reunión">${svg('edit', 15)}</span>
+      <textarea id="meetingContext" rows="1" maxlength="2000" placeholder="Añade contexto: objetivo, tema o qué quieres revisar…" aria-label="Contexto de la reunión"></textarea>
+      <span class="meeting-context-state" id="meetingContextState"></span>`;
+    const contextInput = context.querySelector('#meetingContext');
+    const contextState = context.querySelector('#meetingContextState');
+    contextInput.value = t.context || '';
+    let lastSaved = contextInput.value.trim(), contextTimer;
+    const resizeContext = () => {
+      contextInput.style.height = 'auto';
+      contextInput.style.height = Math.min(92, contextInput.scrollHeight) + 'px';
+    };
+    const saveContext = async () => {
+      clearTimeout(contextTimer);
+      const value = contextInput.value.trim();
+      if (value === lastSaved) return;
+      contextState.textContent = 'Guardando…';
+      const result = await api.setMeetingContext(STATE.selMeeting, value);
+      if (result && result.ok) {
+        lastSaved = result.context || '';
+        t.context = lastSaved;
+        contextState.textContent = 'Guardado';
+        setTimeout(() => { if (contextState.textContent === 'Guardado') contextState.textContent = ''; }, 1400);
+      } else contextState.textContent = 'Error';
+    };
+    contextInput.addEventListener('input', () => {
+      resizeContext(); clearTimeout(contextTimer); contextTimer = setTimeout(saveContext, 700);
+    });
+    contextInput.addEventListener('blur', saveContext);
+    resizeContext();
+    tools.appendChild(context);
+
+    if (us.length) {
+      const bar = el('div', 'tx-search tx-search-compact');
+      bar.innerHTML = `<button class="tx-search-open" id="txOpen" title="Buscar en la transcripción" aria-label="Buscar en la transcripción" aria-expanded="false">${svg('search', 15)}</button>
+        <input id="txSearch" type="search" placeholder="Buscar…" aria-label="Buscar en la transcripción" autocomplete="off">
+        <span class="tx-count" id="txCount"></span>
+        <button class="icon-btn sm" id="txClear" title="Limpiar búsqueda" aria-label="Limpiar" hidden>${svg('x', 13)}</button>`;
+      tools.appendChild(bar);
+      const openSearch = () => {
+        bar.classList.add('open');
+        bar.querySelector('#txOpen').setAttribute('aria-expanded', 'true');
+        input.focus();
+      };
+      const input = bar.querySelector('#txSearch');
+      const countEl = bar.querySelector('#txCount');
+      const clearBtn = bar.querySelector('#txClear');
+      const apply = () => {
+        const q = (input.value || '').trim().toLowerCase();
+        clearBtn.hidden = !q;
+        if (q) drawAll();
+        let n = 0, first = null;
+        items.forEach(it => {
+          const hit = !q || it.text.includes(q);
+          it.node.style.display = hit ? '' : 'none';
+          if (q && hit) { n++; if (!first) first = it.node; }
+        });
+        countEl.textContent = q ? (n ? `${n} resultado${n > 1 ? 's' : ''}` : 'Sin resultados') : '';
+        if (first) first.scrollIntoView({ block: 'nearest' });
+      };
+      bar.querySelector('#txOpen').onclick = openSearch;
+      let deb; input.addEventListener('input', () => { clearTimeout(deb); deb = setTimeout(apply, 180); });
+      input.addEventListener('blur', () => setTimeout(() => {
+        if (!input.value && !bar.contains(document.activeElement)) {
+          bar.classList.remove('open');
+          bar.querySelector('#txOpen').setAttribute('aria-expanded', 'false');
+        }
+      }, 120));
+      clearBtn.onclick = () => { input.value = ''; clearTimeout(deb); apply(); input.focus(); };
+    }
+    r.appendChild(tools);
+  }
+
+  if (!us.length && !(t && t.video_path)) {
+    r.appendChild(el('p', null, '<span style="color:var(--text-muted)">Sin transcripción todavía.</span>'));
+    return r;
+  }
+
+  if (recording) {
+    // En grabación las frases llegan en vivo (window.addUtterance): se pintan todas.
+    us.forEach(u => { const it = buildItem(u); items.push(it); r.appendChild(it.node); });
+  } else {
+    r.appendChild(moreBtn);
+    moreBtn.onclick = () => drawBatch(PAGE);
+    drawBatch(PAGE);
+  }
   return r;
 }
 
-// Panel del vídeo de una grabación de pantalla: reproductor + (si aún no hay
-// texto) botón para transcribir el .mp4, y abrir su carpeta.
+// Barra compacta del vídeo. No incrusta el reproductor al cambiar de reunión:
+// el usuario decide cuándo abrirlo en su reproductor habitual.
 function videoPanel(t) {
   const hasTx = !!(t.utterances && t.utterances.some(u => !u.kind || u.kind === 'utterance'));
   const wrap = el('div', 'video-panel');
-  const vid = document.createElement('video');
-  vid.className = 'rec-video'; vid.controls = true;
-  vid.src = 'file:///' + String(t.video_path).replace(/\\/g, '/');
+  const name = String(t.video_path || '').split(/[\\/]/).pop() || 'grabacion.mp4';
+  wrap.innerHTML = `<div class="video-file">
+    <span class="video-file-icon">${svg('play', 15)}</span>
+    <div class="video-file-copy"><b>Grabación de pantalla</b><small>${esc(name)}</small></div>
+    <div class="rec-actions"></div>
+  </div>`;
   const actions = el('div', 'rec-actions');
-  vid.onerror = () => {
-    vid.remove();
-    const open = el('button', 'btn'); open.innerHTML = svg('play', 14) + ' Abrir vídeo';
-    open.onclick = () => api.openPath(t.video_path);
-    actions.prepend(open);
-  };
-  wrap.appendChild(vid); wrap.appendChild(actions);
+  const open = el('button', 'btn');
+  open.innerHTML = svg('play', 14) + ' Abrir vídeo';
+  open.onclick = () => api.openPath(t.video_path);
+  actions.appendChild(open);
   const bt = el('button', hasTx ? 'btn' : 'btn btn-primary', hasTx ? 'Retranscribir' : 'Transcribir este vídeo');
   if (hasTx) bt.title = 'Volver a transcribir este vídeo';
   bt.onclick = () => {
@@ -701,6 +813,11 @@ function videoPanel(t) {
     } else transcribeScreenVideo(STATE.selMeeting, false);
   };
   actions.appendChild(bt);
+  const folder = el('button', 'btn');
+  folder.innerHTML = svg('folder', 14) + ' Carpeta';
+  folder.onclick = () => api.revealPath(t.video_path);
+  actions.appendChild(folder);
+  wrap.querySelector('.rec-actions').replaceWith(actions);
   return wrap;
 }
 
@@ -929,16 +1046,23 @@ function renderFiles() {
   return d;
 }
 
-/* Pide la imagen en base64 y la pone de fondo; al hacer clic, la amplía. */
+/* P-09: la tarjeta usa una MINIATURA ligera; el original (pesado) solo se pide
+   al ampliar con la lupa. Si el backend no tiene thumbnails, cae al original. */
 async function loadCaptureThumb(ph, captureId) {
   try {
-    const r = await api.getCaptureImage(captureId);
+    const useThumb = !HAS_PYWEBVIEW() || typeof window.pywebview.api.get_capture_thumbnail === 'function';
+    const r = useThumb ? await api.getCaptureThumbnail(captureId) : await api.getCaptureImage(captureId);
     if (!r || !r.data_url) return;
     ph.style.backgroundImage = `url("${r.data_url}")`;
     ph.style.backgroundSize = 'cover';
     ph.style.backgroundPosition = 'center';
     ph.style.cursor = 'zoom-in';
-    ph.onclick = () => openLightbox(r.data_url);
+    ph.onclick = async () => {
+      // Cargar el original a tamaño completo solo cuando se amplía.
+      let full = useThumb ? null : r.data_url;
+      if (!full) { try { const o = await api.getCaptureImage(captureId); full = o && o.data_url; } catch (e) { /* usa thumb */ } }
+      openLightbox(full || r.data_url);
+    };
   } catch (e) { /* sin imagen: queda el marcador por defecto */ }
 }
 
@@ -1721,7 +1845,7 @@ function applyScreenPreviewFit(p) {
 window.setScreenPreview = function (b64) {
   const p = document.querySelector('.screen-preview');
   if (p && b64) {
-    p.style.backgroundImage = 'url(data:image/png;base64,' + b64 + ')';
+    p.style.backgroundImage = 'url(data:image/jpeg;base64,' + b64 + ')';
     applyScreenPreviewFit(p);
   }
 };
@@ -1917,6 +2041,16 @@ async function openSettings() {
         </label>
       </div>
       <div class="settings-section settings-card">
+        <div class="settings-section-head">
+          <span class="settings-section-icon">${svg('monitor', 17)}</span>
+          <div class="settings-section-copy"><h4>Calidad de grabación de pantalla</h4><p>Equilibra nitidez, uso de CPU y espacio en disco.</p></div>
+        </div>
+        <div class="cfg-rows">
+          <div class="pre-cfg-row"><span class="pre-cfg-lbl">Perfil</span><div class="cfg-chips" id="setVideoChips"></div></div>
+        </div>
+        <div class="help">«Ligero» ahorra CPU y espacio (ideal en reuniones largas); «Nativo» da la máxima nitidez.</div>
+      </div>
+      <div class="settings-section settings-card">
         <label>INSTRUCCIONES PARA LA IA</label>
         <textarea id="setAiInstr" class="obj-text" rows="4" placeholder="Instrucciones que se ponen al principio de todo contexto que exportas…">${esc(s.ai_instructions || '')}</textarea>
         <div class="row-inline" style="margin-top:8px"><div class="help" style="flex:1">Cabecera que orienta a Claude en cada exportación. Déjala vacía para volver a la de por defecto.</div><button class="btn" id="setAiReset">Restablecer</button><button class="btn btn-primary" id="setAiSave">Guardar</button></div>
@@ -1968,7 +2102,19 @@ async function openSettings() {
       renderSettingsChips(); toast('ok', `Modelo: ${scfg.model || b.dataset.tier}`);
     });
   }
-  if (hasTx) renderSettingsChips();
+  // Perfil de calidad de grabación de pantalla (chips). Se guarda como predeterminado.
+  function renderVideoChips() {
+    const box = m.querySelector('#setVideoChips');
+    if (!box) return;
+    box.innerHTML = (scfg.video_profiles || []).map(vp =>
+      `<button class="cfg-chip ${vp.id === scfg.video_profile ? 'on' : ''}" data-vprof="${vp.id}">${esc(vp.label)}</button>`).join('');
+    box.querySelectorAll('[data-vprof]').forEach(b => b.onclick = async () => {
+      if (b.dataset.vprof === scfg.video_profile) return;
+      scfg = await api.v2.setTranscriptionSettings({ video_profile: b.dataset.vprof }) || scfg;
+      renderVideoChips(); toast('ok', 'Calidad de grabación guardada');
+    });
+  }
+  if (hasTx) { renderSettingsChips(); renderVideoChips(); }
   m.querySelector('#setAiSave').onclick = async () => { await api.setAiInstructions(m.querySelector('#setAiInstr').value); toast('ok', 'Instrucciones guardadas'); };
   m.querySelector('#setAiReset').onclick = async () => { const r = await api.setAiInstructions(''); m.querySelector('#setAiInstr').value = (r && r.text) || ''; toast('ok', 'Instrucciones restablecidas'); };
   m.querySelector('#setDir').onclick = async () => { const r = await api.chooseExportDir(); if (r && r.ok) { toast('ok', 'Carpeta actualizada'); closeModal(); } };
@@ -2024,7 +2170,42 @@ window.addEventListener('beforeunload', (e) => {
    REFRESCOS / INIT
    ============================================================ */
 async function refreshMeetings(iid) { if (!iid) return; STATE.meetingsByInit[iid] = await api.listMeetings(iid) || []; renderSidebar(); if (STATE.screen === 'initiative') renderMain(); }
-async function refreshAll() { for (const it of STATE.initiatives) STATE.meetingsByInit[it.id] = await api.listMeetings(it.id) || []; renderSidebar(); }
+
+// ¿El backend trae el arranque único (P-06)? En el navegador (MOCK) siempre sí.
+function bootstrapAvailable() {
+  return !HAS_PYWEBVIEW() || typeof window.pywebview.api.get_bootstrap_state === 'function';
+}
+
+// Vuelca el estado de arranque (iniciativas, reuniones, monitores y contadores)
+// que llega en UNA sola llamada al backend.
+function applyBootstrap(b) {
+  STATE.initiatives = b.initiatives || [];
+  STATE.meetingsByInit = {};
+  const mbi = b.meetings_by_initiative || {};
+  for (const it of STATE.initiatives) STATE.meetingsByInit[it.id] = mbi[it.id] || mbi[String(it.id)] || [];
+  STATE.monitors = b.monitors || [];
+  if (STATE.monitors.length) STATE.monitorIdx = STATE.monitors[0].index;  // índice real (1 = principal)
+  const lc = b.library_counts || {};
+  STATE.archiveCount = lc.archive || 0; STATE.trashCount = lc.trash || 0;
+  const ac = $('#archiveCount'), tc = $('#trashCount');
+  if (ac) ac.textContent = STATE.archiveCount; if (tc) tc.textContent = STATE.trashCount;
+}
+
+async function refreshAll() {
+  if (bootstrapAvailable()) {
+    try {
+      const b = await api.getBootstrapState();
+      if (b) {
+        const mbi = b.meetings_by_initiative || {};
+        for (const it of STATE.initiatives) STATE.meetingsByInit[it.id] = mbi[it.id] || mbi[String(it.id)] || [];
+        renderSidebar();
+        return;
+      }
+    } catch (e) { /* si falla, usa el camino antiguo de abajo */ }
+  }
+  for (const it of STATE.initiatives) STATE.meetingsByInit[it.id] = await api.listMeetings(it.id) || [];
+  renderSidebar();
+}
 
 function wireTopbar() {
   $('#btnToggleSidebar').innerHTML = svg('panel', 16);
@@ -2055,16 +2236,30 @@ async function init() {
   applySidebar();
   wireTopbar();
   setAppState('idle');
+  let booted = false;
   try {
-    STATE.initiatives = await api.listInitiatives() || [];
-    STATE.monitors = await api.listMonitors() || [];
-    if (STATE.monitors.length) STATE.monitorIdx = STATE.monitors[0].index;  // índice real (1 = principal)
-    // precargar reuniones del primero para el árbol
-    for (const it of STATE.initiatives) STATE.meetingsByInit[it.id] = await api.listMeetings(it.id) || [];
+    if (bootstrapAvailable()) {
+      // P-06: un solo viaje al backend en vez de una llamada por iniciativa.
+      const b = await api.getBootstrapState();
+      if (b) {
+        applyBootstrap(b);
+        booted = true;
+        try { renderBgJobs(b.background_jobs || []); } catch (e) { /* sin jobs */ }
+      }
+    }
+    if (!booted) {
+      // Backend antiguo: camino anterior (una llamada por iniciativa).
+      STATE.initiatives = await api.listInitiatives() || [];
+      STATE.monitors = await api.listMonitors() || [];
+      if (STATE.monitors.length) STATE.monitorIdx = STATE.monitors[0].index;  // índice real (1 = principal)
+      for (const it of STATE.initiatives) STATE.meetingsByInit[it.id] = await api.listMeetings(it.id) || [];
+    }
   } catch (e) { console.warn('init', e); }
   renderSidebar(); renderActionBar(); renderMain();
-  updateLibraryCounts();
-  try { renderBgJobs(await api.getBackgroundJobs()); } catch (e) { /* sin jobs */ }
+  if (!booted) {
+    updateLibraryCounts();
+    try { renderBgJobs(await api.getBackgroundJobs()); } catch (e) { /* sin jobs */ }
+  }
 
   // Recuperación al arrancar (V2). Si no hay backend, no molesta.
   if (v2Available('list_recoverable_recordings')) {

@@ -368,7 +368,7 @@ body[data-sidebar="collapsed"] .sidebar-rail { display: flex !important; }
 
 /* Content scroller */
 .content { flex: 1; overflow-y: auto; min-height: 0; padding: 24px 28px 28px; }
-.reading { max-width: 820px; margin: 0 auto; display: flex; flex-direction: column; gap: 24px; }
+.reading { max-width: 820px; margin: 0 auto; display: flex; flex-direction: column; gap: 20px; }
 
 /* Transcript */
 .utterance { display: flex; gap: 15px; }
@@ -522,19 +522,67 @@ mark { background: rgba(241,184,75,.3); color: #ffe9b0; border-radius: 3px; padd
 
 /* Buscador dentro de la transcripción */
 .tx-search {
-  display: flex; align-items: center; gap: 9px;
-  margin: 0; padding: 0 11px; height: 38px;
-  border: 1px solid var(--border-strong); border-radius: var(--r-md);
-  background: var(--bg-input);
+  display: flex; align-items: center; gap: 10px;
+  margin: 0; padding: 0 13px; height: 44px;
+  border: 1px solid var(--border-strong); border-radius: 9px;
+  background: var(--bg-input); transition: border-color .15s, background-color .15s, box-shadow .15s;
 }
-.tx-search:focus-within { border-color: var(--accent); }
-.tx-search-ico { color: var(--text-muted); display: flex; flex: none; }
+.tx-search:focus-within {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px rgba(109,140,255,.10);
+}
+.tx-search-ico { width: 18px; height: 18px; color: var(--text-muted); display: grid; place-items: center; flex: none; }
 .tx-search input {
   flex: 1; min-width: 0; border: none; background: transparent;
   color: var(--text-primary); font: inherit; font-size: 13px; outline: none;
 }
 .tx-search input::placeholder { color: var(--text-muted); }
 .tx-count { font-size: 12px; color: var(--text-muted); white-space: nowrap; font-family: var(--font-mono, monospace); flex: none; }
+.meeting-tools { display: flex; align-items: flex-start; gap: 10px; width: 100%; }
+.meeting-context {
+  min-height: 44px; flex: 1; min-width: 0; display: flex; align-items: flex-start; gap: 10px;
+  padding: 11px 13px; border: 1px solid var(--border-strong); border-radius: 9px;
+  background: var(--bg-input); transition: border-color .15s, background-color .15s, box-shadow .15s;
+}
+.meeting-context:focus-within {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px rgba(109,140,255,.10);
+}
+.meeting-context-icon {
+  width: 18px; height: 20px; flex: none; display: grid; place-items: center;
+  color: var(--text-muted);
+}
+.meeting-context textarea {
+  min-width: 0; min-height: 20px; max-height: 92px; flex: 1; resize: none; overflow-y: auto;
+  padding: 0; border: none; outline: none; background: transparent; color: var(--text-primary);
+  font: inherit; font-size: 12.5px; line-height: 20px;
+}
+.meeting-context textarea::placeholder { color: var(--text-muted); }
+.meeting-context-state { flex: none; color: var(--text-faint); font-size: 10px; line-height: 20px; }
+.tx-search-compact {
+  width: 44px; height: 44px; flex: 0 0 44px; justify-content: center; gap: 8px; padding: 0;
+  overflow: hidden; transition: width .18s ease, flex-basis .18s ease, border-color .15s, box-shadow .15s;
+}
+/* Colapsada: sin gap, para que el icono quede centrado (el input oculto no debe
+   dejar un hueco que lo desplace). */
+.tx-search-compact:not(.open) { gap: 0; }
+.tx-search-open {
+  width: 42px; height: 42px; flex: none; display: grid; place-items: center; padding: 0;
+  border: none; outline: none; background: transparent; color: var(--text-muted); cursor: pointer;
+}
+.tx-search-open:hover { color: var(--text-primary); background: rgba(255,255,255,.025); }
+.tx-search-compact input { width: 0; max-width: 0; flex: 0; opacity: 0; pointer-events: none; }
+.tx-search-compact .tx-count, .tx-search-compact #txClear { display: none; }
+.tx-search-compact.open { width: min(330px, 42vw); flex-basis: min(330px, 42vw); justify-content: flex-start; padding: 0 10px 0 1px; }
+.tx-search-compact.open input { width: auto; max-width: none; flex: 1; opacity: 1; pointer-events: auto; }
+.tx-search-compact.open .tx-count, .tx-search-compact.open #txClear:not([hidden]) { display: inline-flex; }
+@media (max-width: 680px) {
+  .meeting-tools { flex-wrap: wrap; }
+  .tx-search-compact.open { width: 100%; flex-basis: 100%; }
+}
+/* Botón "Mostrar más" de la transcripción paginada (P-10). */
+.tx-more { display: block; width: 100%; margin: 14px 0 4px; }
+.tx-more[hidden] { display: none; }
 
 /* ============================================================
    Indicador de transcripción en segundo plano (flotante)
@@ -792,15 +840,25 @@ body[data-app-state="recording-cloud"] .actionbar { border-top-color: rgba(255,7
 }
 
 /* ============================================================
-   Reproductor de vídeo de una grabación de pantalla
+   Archivo de vídeo de una grabación de pantalla
    ============================================================ */
 .video-panel { margin: 0; max-width: 860px; }
-.rec-video {
-  width: 100%; display: block; background: #000;
-  border: 1px solid var(--border-subtle); border-radius: var(--r-lg);
+.video-file {
+  min-height: 58px; display: flex; align-items: center; gap: 11px; padding: 10px 12px;
+  border: 1px solid var(--border-subtle); border-radius: var(--r-lg); background: var(--bg-surface);
 }
-.rec-actions { display: flex; flex-wrap: wrap; gap: 9px; margin-top: 11px; }
-.video-panel > .rec-actions:first-child { margin-top: 0; }
+.video-file-icon {
+  width: 34px; height: 34px; flex: none; display: grid; place-items: center;
+  color: #b9c6ff; background: var(--accent-soft); border-radius: var(--r-md);
+}
+.video-file-copy { min-width: 120px; flex: 1; display: flex; flex-direction: column; }
+.video-file-copy b { font-size: 12.5px; color: var(--text-primary); }
+.video-file-copy small { overflow: hidden; color: var(--text-muted); font-size: 10.5px; text-overflow: ellipsis; white-space: nowrap; }
+.rec-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 7px; }
+@media (max-width: 680px) {
+  .video-file { align-items: flex-start; flex-wrap: wrap; }
+  .video-file .rec-actions { width: 100%; justify-content: flex-start; padding-left: 45px; }
+}
 
 /* ============================================================
    Objetivo de la iniciativa e instrucciones para la IA
