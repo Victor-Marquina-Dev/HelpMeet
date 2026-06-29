@@ -5,10 +5,12 @@ import wave
 import json
 import base64
 import queue
+import logging
 import threading
 import tempfile
 import subprocess
 import shutil
+import traceback
 import webview
 from pathlib import Path
 from datetime import timedelta
@@ -26,6 +28,47 @@ from helpmeet.export.exporter import (
 from helpmeet import config
 from helpmeet import settings
 from helpmeet.version import __version__
+
+# Log de errores en %LOCALAPPDATA%\Helpmeet\helpmeet.log
+def _setup_logger():
+    log_path = config.DATA_DIR / "helpmeet.log"
+    try:
+        config.DATA_DIR.mkdir(parents=True, exist_ok=True)
+        h = logging.FileHandler(log_path, encoding="utf-8")
+        h.setFormatter(logging.Formatter("%(asctime)s %(levelname)s %(name)s %(message)s"))
+        lg = logging.getLogger("helpmeet")
+        lg.setLevel(logging.DEBUG)
+        lg.addHandler(h)
+    except Exception:
+        pass
+
+_setup_logger()
+_log = logging.getLogger("helpmeet")
+
+
+def _hook_exceptions():
+    """Captura excepciones no manejadas en el hilo principal y en hilos secundarios."""
+    def _excepthook(exc_type, exc_value, exc_tb):
+        if issubclass(exc_type, KeyboardInterrupt):
+            sys.__excepthook__(exc_type, exc_value, exc_tb)
+            return
+        _log.critical("Excepción no capturada", exc_info=(exc_type, exc_value, exc_tb))
+    sys.excepthook = _excepthook
+
+    def _thread_excepthook(args):
+        if args.exc_type and not issubclass(args.exc_type, SystemExit):
+            _log.critical(
+                "Excepción no capturada en hilo '%s'",
+                getattr(args.thread, 'name', '?'),
+                exc_info=(args.exc_type, args.exc_value, args.exc_tb),
+            )
+    threading.excepthook = _thread_excepthook
+
+_hook_exceptions()
+
+
+class _JobCancelled(Exception):
+    """Excepción interna: el usuario canceló la transcripción."""
 
 
 _MONTHS_ES = (
@@ -220,8 +263,17 @@ def _reveal_in_explorer(path: str) -> None:
 
 
 class Api:
+    import os as _os
+    _LICENSE_SERVER = _os.environ.get("HELPMEET_LICENSE_SERVER", "http://127.0.0.1:8765")
+
     def __init__(self):
-        init_db()
+        _log.info("Inicializando base de datos")
+        try:
+            init_db()
+            _log.info("Base de datos lista")
+        except Exception:
+            _log.exception("Error al inicializar la base de datos")
+            raise
         settings.apply_env()  # vuelca el token guardado a la variable de entorno
         self._session = get_session()
         self._engine = None
@@ -237,12 +289,14 @@ class Api:
         self._screen_preview = None     # vista previa EN ESPERA (antes de grabar)
         self._screen_transform = None   # (x,y,w,h) normalizado: colocación libre OBS
         self._window = None
+        self._setup_running = False     # True mientras run_setup() trabaja en 2.º plano
         # Transcripción en segundo plano: cola serie + hilo worker. Permite
         # detener una grabación y empezar otra al instante mientras la anterior
         # se transcribe por detrás (una a una).
         self._jobs = None
         self._jobs_lock = threading.Lock()
         self._jobs_info = {}   # meeting_id -> {meeting_id, title, initiative_id, state, progress, stage}
+        self._cancel_jobs = set()  # meeting_ids marcados para cancelar
         self._worker = None
 
     def set_window(self, window):
@@ -350,6 +404,25 @@ class Api:
             "text": note.text,
         }}
 
+    def add_note_post(self, meeting_id, text):
+        """Añade una nota normal a una reunión ya terminada (no es 'contexto')."""
+        text = (text or "").strip()
+        if not text:
+            return {"ok": False}
+        meeting = repo.get_meeting(self._session, int(meeting_id))
+        if meeting is None:
+            return {"ok": False, "error": "La reunión ya no existe."}
+        note = repo.add_note(self._session, int(meeting_id), text, is_context=False)
+        offset = max(0.0, (note.created_at - meeting.started_at).total_seconds())
+        def _stamp(s):
+            m, sec = divmod(int(s), 60); h, m = divmod(m, 60)
+            return f"{h:02d}:{m:02d}:{sec:02d}" if h else f"{m:02d}:{sec:02d}"
+        return {"ok": True, "note": {
+            "id": note.id, "kind": "note", "time": _stamp(offset),
+            "wall_time": note.created_at.strftime("%H:%M"),
+            "offset": offset, "text": note.text,
+        }}
+
     def move_meeting(self, meeting_id, initiative_id):
         repo.move_meeting(self._session, int(meeting_id), int(initiative_id))
         return {"ok": True}
@@ -444,6 +517,9 @@ class Api:
             },
             "background_jobs": jobs,
             "default_mic_muted": bool(settings.get_transcription_settings().get("default_mic_muted", False)),
+            "screen_recording": self._screen_rec is not None,
+            "screen_meeting_id": self._screen_meeting_id,
+            "setup_done": settings.get_setup_done(),
         }
 
     def search(self, query):
@@ -522,21 +598,32 @@ class Api:
         notes = []
         for note in m.notes:
             if note.is_context:
-                # Las entradas de Contexto van arriba del todo (más recientes
-                # primero) y sin marca de tiempo.
+                # Las entradas de Contexto van al timeline (arriba del todo,
+                # más recientes primero) y sin marca de tiempo.
                 item = {
                     "id": note.id, "kind": "context", "time": "",
                     "offset": 0.0, "text": note.text,
                     "_sort": -note.created_at.timestamp(),
                 }
+                notes.append({key: value for key, value in item.items() if key != "_sort"})
+                timeline.append(item)
             else:
-                offset = max(0.0, (note.created_at - m.started_at).total_seconds())
+                # Las notas normales van a assets.notes (tab Notas) y también
+                # al timeline para que no se pierdan al exportar/copiar contexto.
+                if note.created_at and m.started_at:
+                    offset = max(0.0, (note.created_at - m.started_at).total_seconds())
+                    wall_time = note.created_at.strftime("%H:%M")
+                else:
+                    offset = 0.0
+                    wall_time = ""
                 item = {
                     "id": note.id, "kind": "note", "time": stamp(offset),
-                    "offset": offset, "text": note.text, "_sort": offset,
+                    "wall_time": wall_time,
+                    "offset": offset, "text": note.text,
+                    "_sort": offset,
                 }
-            notes.append({key: value for key, value in item.items() if key != "_sort"})
-            timeline.append(item)
+                notes.append({key: value for key, value in item.items() if key != "_sort"})
+                timeline.append(item)
         timeline.sort(key=lambda item: (item["_sort"], item["kind"] != "utterance"))
         for item in timeline:
             item.pop("_sort", None)
@@ -791,7 +878,8 @@ class Api:
     def _get_local_engine(self):
         """Motor LOCAL (faster-whisper) para videos subidos: gratis, sin límites."""
         model = settings.get_transcription_model()
-        if self._local_engine is None or self._local_engine.model_name != model:
+        requested = getattr(self._local_engine, "requested_model_name", None)
+        if self._local_engine is None or requested != model:
             from helpmeet.transcription.engine import TranscriptionEngine
             self._local_engine = TranscriptionEngine(model)
         return self._local_engine
@@ -899,7 +987,7 @@ class Api:
         from helpmeet.screenshot.capture import monitor_geometry
         from helpmeet.video.preview import ScreenPreview
         if self._screen_rec is not None:
-            return {"ok": True}  # ya se está grabando; el grabador da su propia preview
+            return {"ok": True, "recording": True, "meeting_id": self._screen_meeting_id}
         if self._screen_preview is None:
             mon = monitor_geometry(int(monitor_index))
             mon["index"] = int(monitor_index)
@@ -955,10 +1043,12 @@ class Api:
 
         mon = monitor_geometry(int(monitor_index))
         now = datetime.now()
-        meeting = repo.start_meeting(self._session, ini.id, _spanish_date(now))
+        short_date = f"{now.day:02d}/{now.month:02d}/{str(now.year)[-2:]}"
+        safe_stamp = f"{now.day:02d}-{now.month:02d}-{str(now.year)[-2:]} {now.hour:02d}-{now.minute:02d}-{now.second:02d}"
+        meeting = repo.start_meeting(self._session, ini.id, short_date)
         folder = meeting_export_dir(meeting, settings.get_export_dir())
         folder.mkdir(parents=True, exist_ok=True)
-        dest = folder / "grabacion.mp4"
+        dest = folder / f"{safe_stamp}.mp4"
         # Carpeta temporal propia de ESTA grabación: evita choques con un vídeo
         # anterior que aún se esté guardando en segundo plano.
         work_dir = config.DATA_DIR / "tmp_video" / f"{now:%Y%m%d_%H%M%S_%f}"
@@ -976,6 +1066,16 @@ class Api:
         except Exception as exc:  # noqa: BLE001
             repo.end_meeting(self._session, meeting.id)
             return {"ok": False, "error": str(exc)}
+        try:
+            (work_dir / "_recovery_info.json").write_text(
+                json.dumps({
+                    "meeting_id": meeting.id, "initiative_id": ini.id,
+                    "dest_path": str(dest), "started_at": now.isoformat(),
+                    "title": meeting.title,
+                }, ensure_ascii=False), encoding="utf-8"
+            )
+        except Exception:
+            pass
         self._screen_rec = rec
         self._screen_active = True
         self._screen_meeting_id = meeting.id
@@ -1125,28 +1225,36 @@ class Api:
         new_segments = []
         try:
             if tracks:
-                engine = self._get_local_engine()
+                on_status("Cargando el modelo de transcripción…")
             else:
                 on_status("Extrayendo el audio del video…")
                 extract_audio_to_wav(m.audio_path, str(wav))
                 tracks = [("others", wav)]
-                # Nube deshabilitada: siempre Whisper local, sin importar el token.
+                on_status("Cargando el modelo de transcripción…")
+            try:
                 engine = self._get_local_engine()
+            except Exception as exc:
+                raise RuntimeError(_friendly_model_error(exc)) from exc
 
             from helpmeet.transcription.progress import WeightedProgress
             weighted = WeightedProgress([path for _, path in tracks])
             for index, (speaker, audio_path) in enumerate(tracks):
+                if self._is_job_cancelled(meeting_id):
+                    raise _JobCancelled()
                 on_status(f"Transcribiendo pista {index + 1} de {len(tracks)}…")
                 if getattr(engine, "supports_progress", False):
                     def _progress(frac, track=index):
                         on_progress(weighted.at(track, frac))
                     segments = engine.transcribe_file(
                         str(audio_path), on_progress=_progress,
-                        no_speech_max=0.95, quality="accurate"
+                        no_speech_max=1.0,   # no filtrar por prob. de silencio (videos con música)
+                        quality="accurate"
                     )
                 else:
                     segments = engine.transcribe_file(str(audio_path))
                 for seg in segments:
+                    if self._is_job_cancelled(meeting_id):
+                        raise _JobCancelled()
                     if seg.text:
                         new_segments.append((speaker, seg))
 
@@ -1197,6 +1305,147 @@ class Api:
         self._screen_active = False
         self._screen_meeting_id = None
 
+    # ---------- Recuperación de grabaciones interrumpidas ----------
+
+    def list_recoverable_recordings(self):
+        """Busca carpetas temporales con video_temp.mp4 de sesiones anteriores
+        que se cerraron antes de guardar. Excluye la grabación activa si la hay."""
+        from helpmeet.video.recorder import TEMP_VIDEO, MIC_WAV, SYS_WAV
+        tmp_root = config.DATA_DIR / "tmp_video"
+        if not tmp_root.exists():
+            return []
+        active_dir = (str(self._screen_rec._tmp_dir)
+                      if self._screen_rec is not None else None)
+        result = []
+        for subdir in sorted(tmp_root.iterdir()):
+            if not subdir.is_dir():
+                continue
+            if active_dir and str(subdir) == active_dir:
+                continue
+            video_temp = subdir / TEMP_VIDEO
+            if not video_temp.exists() or video_temp.stat().st_size == 0:
+                continue
+            info = {}
+            info_file = subdir / "_recovery_info.json"
+            if info_file.exists():
+                try:
+                    info = json.loads(info_file.read_text(encoding="utf-8"))
+                except Exception:
+                    pass
+            started_at = info.get("started_at", "")
+            date_str = ""
+            if started_at:
+                try:
+                    from datetime import datetime as _dt
+                    dt = _dt.fromisoformat(started_at)
+                    date_str = f"{dt.day} de {_MONTHS_ES[dt.month-1]} {dt.year} · {_fmt_12h(dt)}"
+                except Exception:
+                    date_str = started_at
+            tracks = []
+            if (subdir / MIC_WAV).exists() and (subdir / MIC_WAV).stat().st_size > 1000:
+                tracks.append("mic")
+            if (subdir / SYS_WAV).exists() and (subdir / SYS_WAV).stat().st_size > 1000:
+                tracks.append("system")
+            result.append({
+                "id": str(subdir),
+                "title": info.get("title", "Reunión sin título"),
+                "date": date_str,
+                "tracks": tracks,
+                "meeting_id": info.get("meeting_id"),
+                "initiative_id": info.get("initiative_id"),
+                "dest_path": info.get("dest_path"),
+            })
+        return result
+
+    def recover_recording(self, work_dir_id):
+        """Recupera el video de una grabación interrumpida y encola la transcripción."""
+        from helpmeet.video.recorder import ScreenVideoRecorder
+        work_dir = Path(work_dir_id)
+        info = {}
+        info_file = work_dir / "_recovery_info.json"
+        if info_file.exists():
+            try:
+                info = json.loads(info_file.read_text(encoding="utf-8"))
+            except Exception:
+                pass
+
+        meeting_id = info.get("meeting_id")
+        initiative_id = info.get("initiative_id")
+        dest_path = info.get("dest_path")
+
+        if not dest_path:
+            from datetime import datetime as _dt
+            now = _dt.now()
+            recover_dir = Path(settings.get_export_dir()) / "Recuperados"
+            recover_dir.mkdir(parents=True, exist_ok=True)
+            dest_path = str(recover_dir / f"Grabacion_{now:%Y%m%d_%H%M%S}.mp4")
+
+        dummy_monitor = {"left": 0, "top": 0, "width": 1920, "height": 1080}
+        rec = ScreenVideoRecorder(dest_path, dummy_monitor, work_dir=str(work_dir))
+        audio_channels = list(rec.audio_channels())
+
+        result = rec.recover()
+        if not result.get("ok"):
+            return {"ok": False, "error": result.get("error", "No se pudo recuperar la grabación.")}
+
+        path = result.get("path")
+
+        if meeting_id:
+            try:
+                from helpmeet.db.database import get_session as _get_session
+                from helpmeet.media_storage import store_track
+                session = _get_session()
+                try:
+                    meeting = repo.get_meeting(session, meeting_id)
+                    if meeting is not None and path:
+                        meeting.audio_path = path
+                        session.commit()
+                        try:
+                            organize_meeting_folder(session, meeting_id, settings.get_export_dir())
+                        except Exception:
+                            pass
+                    repo.end_meeting(session, meeting_id)
+                    for label, source in audio_channels:
+                        if source.exists() and source.stat().st_size > 0:
+                            store_track(meeting_id, label, source)
+                finally:
+                    session.close()
+                m_ref = repo.get_meeting(self._session, meeting_id)
+                title = m_ref.title if m_ref else "Grabación recuperada"
+                if path:
+                    self._enqueue_video_job(meeting_id, title, initiative_id, False)
+            except Exception:
+                _log.error("recover_recording BD:\n%s", traceback.format_exc())
+
+        try:
+            rec.cleanup()
+        except Exception:
+            pass
+
+        return {"ok": True, "meeting_id": meeting_id, "initiative_id": initiative_id}
+
+    def discard_recoverable_recording(self, work_dir_id):
+        """Descarta una grabación interrumpida: elimina los temporales y cierra la reunión en BD."""
+        work_dir = Path(work_dir_id)
+        info_file = work_dir / "_recovery_info.json"
+        meeting_id = None
+        if info_file.exists():
+            try:
+                info = json.loads(info_file.read_text(encoding="utf-8"))
+                meeting_id = info.get("meeting_id")
+            except Exception:
+                pass
+        if meeting_id:
+            try:
+                repo.end_meeting(self._session, meeting_id)
+            except Exception:
+                pass
+        try:
+            shutil.rmtree(work_dir, ignore_errors=True)
+        except Exception:
+            pass
+        return {"ok": True}
+
     def reveal_path(self, path):
         """Abre el Explorador con el archivo seleccionado (no lo reproduce)."""
         if path:
@@ -1229,7 +1478,12 @@ class Api:
         return ""
 
     # ---------- Transcripción en segundo plano (cola serie) ----------
+    def _is_job_cancelled(self, meeting_id) -> bool:
+        return int(meeting_id) in getattr(self, "_cancel_jobs", set())
+
     def _ensure_worker(self):
+        if not hasattr(self, "_cancel_jobs"):
+            self._cancel_jobs = set()
         if self._jobs is None:
             self._jobs = queue.Queue()
             self._worker = threading.Thread(target=self._job_worker, daemon=True)
@@ -1277,18 +1531,29 @@ class Api:
     def _job_worker(self):
         while True:
             meeting_id, run = self._jobs.get()
+            cancelled = False
             try:
-                self._job_event(meeting_id, state="running", stage="Transcribiendo…")
-                run()
-                # Al terminar la transcripción se genera ya la carpeta organizada
-                # (contexto.md + .md por reunión + capturas/ + vídeo), sin esperar a
-                # que el usuario pulse Exportar.
-                self._job_event(meeting_id, stage="Organizando exportación…")
-                self._auto_export(meeting_id)
-                self._job_event(meeting_id, state="done", progress=1.0, stage="Listo")
+                if self._is_job_cancelled(meeting_id):
+                    cancelled = True
+                else:
+                    self._job_event(meeting_id, state="running", stage="Transcribiendo…")
+                    run()
+                    if self._is_job_cancelled(meeting_id):
+                        cancelled = True
+                    else:
+                        self._job_event(meeting_id, stage="Organizando exportación…")
+                        self._auto_export(meeting_id)
+                        self._job_event(meeting_id, state="done", progress=1.0, stage="Listo")
+            except _JobCancelled:
+                cancelled = True
             except Exception as exc:  # noqa: BLE001 - se informa al usuario
-                self._job_event(meeting_id, state="error", stage=f"Error: {exc}")
+                _log.error("Job %s falló:\n%s", meeting_id, traceback.format_exc())
+                self._job_event(meeting_id, state="error",
+                                stage=f"Error [{type(exc).__name__}]: {exc}")
             finally:
+                getattr(self, "_cancel_jobs", set()).discard(meeting_id)
+                if cancelled:
+                    self._job_event(meeting_id, state="done", progress=1.0, stage="Cancelado")
                 self._jobs.task_done()
                 self._finish_job(meeting_id)
 
@@ -1352,6 +1617,15 @@ class Api:
         with self._jobs_lock:
             return list(self._jobs_info.values())
 
+    def cancel_meeting_job(self, meeting_id):
+        """Solicita la cancelación de la transcripción de una reunión."""
+        mid = int(meeting_id)
+        if not hasattr(self, "_cancel_jobs"):
+            self._cancel_jobs = set()
+        self._cancel_jobs.add(mid)
+        self._job_event(mid, stage="Cancelando…")
+        return {"ok": True}
+
     def export(self):
         meeting_id = (self._recorder.meeting.id if self._recorder and self._recorder.meeting
                       else self._last_meeting_id)
@@ -1359,6 +1633,116 @@ class Api:
             out = export_meeting(self._session, meeting_id, settings.get_export_dir())
             return {"path": str(out)}
         return {"path": None}
+
+    # ---------- Licencias ----------
+    # El socket crudo tarda ~8ms (verificado en logs). Llamada síncrona es OK.
+
+    def _get_device_id(self) -> str:
+        import hashlib, socket, platform
+        raw = f"{socket.gethostname()}-{platform.machine()}-{platform.node()}"
+        return hashlib.sha256(raw.encode()).hexdigest()[:32]
+
+    def _license_socket(self, path: str, body: dict) -> dict:
+        import socket as _s, json as _j
+        try:
+            server = self._LICENSE_SERVER.rstrip("/")
+            # Parse host and port from the server URL (supports http:// and https://)
+            host_part = server.split("://", 1)[-1]  # strip scheme
+            if ":" in host_part:
+                _host, _port_str = host_part.rsplit(":", 1)
+                _port = int(_port_str)
+            else:
+                _host = host_part
+                _port = 443 if server.startswith("https") else 80
+            b = _j.dumps(body).encode()
+            req = (f"POST {path} HTTP/1.0\r\nHost: {host_part}\r\n"
+                   f"Content-Type: application/json\r\nContent-Length: {len(b)}\r\n\r\n").encode() + b
+            with _s.socket(_s.AF_INET, _s.SOCK_STREAM) as s:
+                s.settimeout(8)
+                s.connect((_host, _port))
+                s.sendall(req)
+                data = b""
+                while True:
+                    chunk = s.recv(8192)
+                    if not chunk:
+                        break
+                    data += chunk
+            sep = data.find(b"\r\n\r\n")
+            return _j.loads(data[sep + 4:] if sep >= 0 else data)
+        except Exception as exc:
+            return {"_error": str(exc)}
+
+    def check_license(self):
+        from datetime import datetime, timezone, timedelta
+        token = settings.get_license_token()
+        if not token:
+            return {"ok": False, "reason": "no_license"}
+        r = self._license_socket("/api/license/validate", {
+            "activation_token": token, "device_id": self._get_device_id(),
+        })
+        if "_error" not in r:
+            # Servidor respondió — actualiza marca de tiempo del último check
+            settings.set_last_license_check(datetime.now(timezone.utc).isoformat())
+            return {"ok": bool(r.get("ok")), "plan": r.get("plan")}
+        # Servidor no disponible — gracia offline de 7 días
+        last_check = settings.get_last_license_check()
+        if last_check:
+            try:
+                last_dt = datetime.fromisoformat(last_check)
+                if (datetime.now(timezone.utc) - last_dt) < timedelta(days=7):
+                    return {"ok": True, "plan": "offline", "offline": True}
+            except Exception:
+                pass
+        return {"ok": False, "reason": "offline_expired"}
+
+    def get_license_info(self):
+        """Retorna info de la licencia activa para mostrar en Ajustes."""
+        token = settings.get_license_token()
+        if not token:
+            return {"active": False}
+        try:
+            import base64, json as _j
+            parts = token.split(".")
+            pad = parts[1] + "=" * (4 - len(parts[1]) % 4)
+            payload = _j.loads(base64.urlsafe_b64decode(pad))
+            return {
+                "active": True,
+                "plan": payload.get("plan", "personal"),
+            }
+        except Exception:
+            return {"active": True, "plan": "personal"}
+
+    def deactivate_license(self):
+        """Borra el token guardado y desactiva la licencia en este dispositivo."""
+        token = settings.get_license_token()
+        if token:
+            self._license_socket("/api/license/deactivate", {
+                "activation_token": token,
+                "device_id": self._get_device_id(),
+            })
+        settings.set_license_token("")
+        return {"ok": True}
+
+    def activate_license(self, key: str):
+        from datetime import datetime, timezone
+        import socket, platform
+        r = self._license_socket("/api/license/activate", {
+            "license_key": (key or "").strip().upper(),
+            "device_id": self._get_device_id(),
+            "device_name": socket.gethostname(),
+            "os": f"{platform.system()} {platform.release()}",
+            "app_version": __version__,
+        })
+        if "_error" in r:
+            return {"ok": False, "error": "No se pudo conectar al servidor."}
+        if r.get("ok"):
+            settings.set_license_token(r["activation_token"])
+            settings.set_last_license_check(datetime.now(timezone.utc).isoformat())
+            return {"ok": True, "plan": r.get("plan")}
+        _em = {"not_found": "Key no encontrada.", "revoked": "Licencia revocada."}
+        err = r.get("error", "unknown")
+        return {"ok": False, "error": _em.get(err, f"Error: {err}")}
+
 
     # ---------- Ajustes ----------
     def get_diagnostics(self):
@@ -1368,6 +1752,94 @@ class Api:
             config.DATA_DIR, settings.get_export_dir(),
             settings.get_transcription_model(),
         )
+
+    def run_setup(self):
+        """Descarga y pre-carga el motor de transcripción en segundo plano.
+
+        Emite window.onSetupProgress({stage, pct, model?, size_label?, error?})
+        conforme avanza. Una vez completado marca setup_done=True en settings y
+        el motor queda caliente: la primera grabación no espera."""
+        if self._setup_running:
+            return {"ok": True, "already_running": True}
+        self._setup_running = True
+
+        _MODEL_SIZES_MB = {
+            "base": 145, "base.en": 145,
+            "small": 480, "small.en": 480,
+            "medium": 1500, "medium.en": 1500,
+            "large-v3": 3000,
+        }
+
+        def _push(payload):
+            if self._window:
+                try:
+                    self._window.evaluate_js(
+                        f"window.onSetupProgress && window.onSetupProgress({json.dumps(payload)})"
+                    )
+                except Exception:
+                    pass
+
+        def _poll(model, expected_mb, stop):
+            """Monitorea el tamaño de la carpeta HuggingFace mientras descarga."""
+            try:
+                from huggingface_hub import constants
+                cache = Path(constants.HF_HUB_CACHE)
+            except Exception:
+                cache = Path.home() / ".cache" / "huggingface" / "hub"
+            folder = cache / ("models--" + f"Systran/faster-whisper-{model}".replace("/", "--"))
+            while not stop.wait(0.8):
+                try:
+                    if folder.exists():
+                        size = sum(
+                            f.stat().st_size for f in folder.rglob("*") if f.is_file()
+                        )
+                        pct = min(0.78, size / (expected_mb * 1024 * 1024))
+                        _push({"stage": "downloading", "pct": max(0.04, pct)})
+                except Exception:
+                    pass
+
+        def _do():
+            try:
+                model = settings.get_transcription_model()
+                expected_mb = _MODEL_SIZES_MB.get(model, 480)
+                from helpmeet import diagnostics as _diag
+
+                already = _diag.whisper_model_status(model).get("downloaded", False)
+                if not already:
+                    _push({"stage": "downloading", "pct": 0.02, "model": model,
+                           "size_label": f"~{expected_mb} MB"})
+                    stop = threading.Event()
+                    poll_t = threading.Thread(
+                        target=_poll, args=(model, expected_mb, stop), daemon=True
+                    )
+                    poll_t.start()
+                    try:
+                        from huggingface_hub import snapshot_download
+                        snapshot_download(repo_id=f"Systran/faster-whisper-{model}")
+                    except Exception as exc:
+                        _log.warning(
+                            "No se pudo predescargar el modelo '%s'. Se intentará "
+                            "cargar con fallback automático. Detalle: %s",
+                            model, exc,
+                        )
+                    finally:
+                        stop.set()
+                        poll_t.join(timeout=2)
+
+                _push({"stage": "loading", "pct": 0.82, "model": model})
+                engine = self._get_engine()          # pre-carga en memoria
+                loaded = getattr(engine, "model_name", model)
+                if loaded != model:
+                    _push({"stage": "fallback", "pct": 0.9, "model": loaded})
+                settings.set_setup_done(True)
+                _push({"stage": "done", "pct": 1.0})
+            except Exception as exc:
+                _push({"stage": "error", "pct": 0.0, "error": str(exc)})
+            finally:
+                self._setup_running = False
+
+        threading.Thread(target=_do, daemon=True).start()
+        return {"ok": True}
 
     def get_recording_preflight(self, kind, monitor_index=1):
         """Diagnóstico específico que se recalcula antes de cada grabación."""
@@ -1527,6 +1999,50 @@ class Api:
         return {"ok": True, "queued": True, "meeting_id": meeting.id,
                 "filename": filename}
 
+    def _pick_files(self):
+        """Abre el diálogo nativo para elegir MÚLTIPLES archivos de video/audio."""
+        types = (
+            "Video o audio (*.mp4;*.mkv;*.mov;*.avi;*.webm;*.mp3;*.m4a;*.wav;*.ogg)",
+            "Todos los archivos (*.*)",
+        )
+        result = self._window.create_file_dialog(
+            webview.OPEN_DIALOG, allow_multiple=True, file_types=types
+        )
+        return list(result) if result else []
+
+    def import_media_multiple(self, initiative_id):
+        """Abre selector múltiple y encola todos los archivos en segundo plano."""
+        files = self._pick_files()
+        if not files:
+            return {"ok": False, "cancelled": True, "count": 0}
+        imported = []
+        for src in files:
+            filename = Path(src).name
+            title = Path(src).stem or "Vídeo importado"
+            meeting = repo.start_meeting(self._session, int(initiative_id), title)
+            self._enqueue_import_job(meeting.id, title, int(initiative_id), src)
+            imported.append({"filename": filename, "meeting_id": meeting.id})
+        _log.info("Importando %d archivo(s) a iniciativa %s", len(imported), initiative_id)
+        return {"ok": True, "count": len(imported), "files": imported}
+
+    def import_video_for_meeting(self, meeting_id):
+        """Asocia un video externo a una reunión existente y encola su transcripción.
+
+        Útil cuando la reunión ya tiene capturas con timestamps y el video se grabó
+        por separado (p.ej. con OBS). La transcripción quedará alineada con las capturas."""
+        m = repo.get_meeting(self._session, int(meeting_id))
+        if m is None:
+            return {"ok": False, "error": "La reunión no existe."}
+        src = self._pick_file()
+        if not src:
+            return {"ok": False, "cancelled": True}
+        force = bool(m.utterances)  # si ya tenía frases, forzar retranscripción
+        m.audio_path = src
+        self._session.commit()
+        self._enqueue_video_job(m.id, m.title, m.initiative_id, force)
+        return {"ok": True, "queued": True, "meeting_id": m.id,
+                "filename": Path(src).name}
+
     def _enqueue_import_job(self, meeting_id, title, initiative_id, src):
         """Encola la transcripción de un archivo importado en segundo plano."""
         on_status = lambda text, _mid=meeting_id: self._job_event(_mid, stage=text)
@@ -1581,6 +2097,7 @@ class Api:
                 meeting.ended_at = meeting.started_at + timedelta(seconds=int(audio_seconds))
                 session.commit()
         except Exception:
+            _log.error("_transcribe_import falló (src=%s):\n%s", src, traceback.format_exc())
             # Reunión vacía: se borra para no dejar una reunión sin contenido.
             try:
                 session.delete(meeting)
@@ -1757,6 +2274,30 @@ class Api:
 
 
 def run():
+    import platform
+    _log.info("=" * 60)
+    _log.info("Helpmeet %s — iniciando", __version__)
+    _log.info("Python %s | %s", sys.version.split()[0], platform.platform())
+    _log.info("DATA_DIR: %s", config.DATA_DIR)
+    _log.info("EXE: %s", sys.executable)
+    # Verificar si el modelo Whisper está disponible en caché
+    try:
+        from helpmeet.transcription.engine import _model_cache_dir
+        from helpmeet import settings as _s
+        _model_name = _s.get_transcription_settings().get("model", config.WHISPER_MODEL)
+        _model_dir = _model_cache_dir(_model_name)
+        if _model_dir and _model_dir.exists():
+            _bin = list(_model_dir.rglob("model.bin")) + list(_model_dir.rglob("model.safetensors"))
+            if _bin:
+                _log.info("Modelo '%s' encontrado en caché: %s", _model_name, _bin[0])
+            else:
+                _log.warning("Modelo '%s': carpeta existe pero model.bin/safetensors NO encontrado — "
+                             "se necesitará internet al transcribir", _model_name)
+        else:
+            _log.warning("Modelo '%s' NO está en caché — "
+                         "se descargará la primera vez que se transcriba", _model_name)
+    except Exception:
+        _log.debug("No se pudo verificar el modelo en caché", exc_info=True)
     _set_windows_app_identity()
     api = Api()
     web_dir = Path(__file__).parent / "web"

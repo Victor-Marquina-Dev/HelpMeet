@@ -124,13 +124,78 @@ def apply_env() -> None:
 # ---------- Instrucciones para la IA (cabecera del contexto) ----------
 # Texto que se antepone al `contexto.md` para orientar a la IA externa
 # (Claude Code) desde la primera línea. Es plantilla por defecto y editable.
-DEFAULT_AI_INSTRUCTIONS = (
-    "Eres un asistente que me ayuda con este proyecto. A continuación tienes las "
-    "transcripciones de mis reuniones, con sus capturas y notas. Úsalas como "
-    "contexto para responderme con precisión. Cuando te apoyes en algo dicho en "
-    "una reunión, indica de cuál y en qué momento. Si algo no aparece en el "
-    "contexto, dímelo en lugar de inventarlo."
-)
+DEFAULT_AI_INSTRUCTIONS = """Actúa como un senior fullstack engineer + analista funcional con experiencia en proyectos enterprise y comunicación profesional.
+
+Tu objetivo es ayudarme a:
+- Resumir información (reuniones, textos, transcripciones)
+- Redactar documentos profesionales
+- Validar contenido antes de enviarlo a cliente
+- Escribir correos claros y efectivos
+- Organizar ideas de forma estructurada
+- Detectar errores, redundancias o inconsistencias
+
+CONTEXTO DE TRABAJO
+Trabajo en proyectos tecnológicos (integraciones, APIs, sistemas como SAP, CRM, etc.).
+Necesito respuestas prácticas, claras y listas para usar en contexto real (empresa/cliente).
+
+REGLAS CRÍTICAS
+- NO inventes información
+- Usa SOLO lo que te proporciono
+- Si algo no está claro o no se menciona, dilo explícitamente
+- Diferencia entre:
+  - lo que está confirmado
+  - lo que es interpretación
+- Evita contenido genérico o “relleno”
+
+FORMA DE RESPONDER
+Responde siempre:
+- Claro y directo
+- Estructurado (listas, secciones)
+- Enfocado en ejecución (que pueda usarlo inmediatamente)
+- Con lenguaje profesional pero natural (que no suene a IA)
+
+TIPOS DE TAREAS
+
+1. Resúmenes
+- Resume por:
+  - puntos clave
+  - tareas pendientes
+  - decisiones
+- No agregues información adicional
+
+2. Documentos
+- Estructura clara (objetivo, contexto, contenido)
+- Sin redundancias
+- Nivel profesional (cliente/empresa)
+- No incluir soluciones si no se piden
+
+3. Correos
+- Asunto claro
+- Contexto breve
+- Mensaje directo
+- Acción esperada
+- Cierre profesional
+
+4. Validación
+Cuando te pase contenido:
+- Indica qué está correcto
+- Qué falta
+- Qué sobra o está repetido
+- Qué no está alineado con la fuente
+
+EXTRA IMPORTANTE
+Si te pregunto:
+“¿esto está bien?”
+→ responde con criterio profesional real (no solo “sí”)
+
+Si te pregunto:
+“¿esto parece hecho por IA?”
+→ evalúa tono, claridad y naturalidad
+
+Si te pido mejorar algo:
+→ hazlo sin cambiar el significado ni agregar información nueva
+
+Responde siempre como si el resultado fuera a enviarse a un cliente o usarse en un entorno profesional real."""
 
 
 def get_ai_instructions() -> str:
@@ -173,6 +238,12 @@ WHISPER_MODELS_BY_LANG = {
 
 DEFAULT_TIER = "balanced"
 _TIER_IDS = {t["tier"] for t in WHISPER_TIERS}
+_TIER_ALIASES = {
+    # Compatibilidad con ajustes escritos manualmente o versiones anteriores.
+    "standard": "balanced",
+    "normal": "balanced",
+    "small": "balanced",
+}
 
 
 def get_transcription_language() -> str:
@@ -183,7 +254,8 @@ def get_transcription_language() -> str:
 
 def get_transcription_tier() -> str:
     """Nivel de calidad elegido (fast/balanced/accurate/max). Por defecto balanced."""
-    value = _load().get("transcription_tier")
+    value = str(_load().get("transcription_tier", "")).lower()
+    value = _TIER_ALIASES.get(value, value)
     return value if value in _TIER_IDS else DEFAULT_TIER
 
 
@@ -233,6 +305,7 @@ def get_transcription_settings() -> dict:
         # sin volver a llamar a Python.
         "models": _models_for(language),
         "models_by_lang": {lang: _models_for(lang) for lang in WHISPER_LANGUAGES},
+        "export_dir": str(get_export_dir()),
     }
 
 
@@ -245,6 +318,17 @@ def set_consent_seen(seen: bool = True) -> None:
     current = _load()
     current["recording_consent_seen"] = bool(seen)
     _save(current)
+
+
+def get_setup_done() -> bool:
+    """Si el usuario completó el asistente de primera ejecución."""
+    return bool(_load().get("setup_done", False))
+
+
+def set_setup_done(done: bool = True) -> None:
+    data = _load()
+    data["setup_done"] = bool(done)
+    _save(data)
 
 
 def set_transcription_settings(values: dict) -> dict:
@@ -264,7 +348,8 @@ def set_transcription_settings(values: dict) -> dict:
             raise ValueError("Idioma de transcripción no válido.")
         current["transcription_language"] = language
     if "tier" in values:
-        tier = str(values["tier"])
+        tier = str(values["tier"]).lower()
+        tier = _TIER_ALIASES.get(tier, tier)
         if tier not in _TIER_IDS:
             raise ValueError("Nivel de transcripción no válido.")
         current["transcription_tier"] = tier
@@ -275,3 +360,156 @@ def set_transcription_settings(values: dict) -> dict:
         current["video_profile"] = profile
     _save(current)
     return get_transcription_settings()
+
+
+# ---------- Token de licencia ----------
+_LIC_CRED_TARGET = "MimoTech.Helpmeet.LicenseToken"
+_ADVAPI32 = "Advapi32.dll"
+
+
+def _wincred_read(target: str) -> str:
+    """Lee una credencial genérica de Windows Credential Manager por nombre."""
+    import sys, ctypes, ctypes.wintypes as _wt
+    if not sys.platform.startswith("win"):
+        return ""
+    try:
+        _TYPE_GENERIC = 1
+
+        class _FILETIME(ctypes.Structure):
+            _fields_ = [("dwLowDateTime", _wt.DWORD), ("dwHighDateTime", _wt.DWORD)]
+
+        class _CRED(ctypes.Structure):
+            _fields_ = [
+                ("Flags", _wt.DWORD), ("Type", _wt.DWORD),
+                ("TargetName", _wt.LPWSTR), ("Comment", _wt.LPWSTR),
+                ("LastWritten", _FILETIME), ("CredentialBlobSize", _wt.DWORD),
+                ("CredentialBlob", ctypes.POINTER(ctypes.c_ubyte)),
+                ("Persist", _wt.DWORD), ("AttributeCount", _wt.DWORD),
+                ("Attributes", ctypes.c_void_p), ("TargetAlias", _wt.LPWSTR),
+                ("UserName", _wt.LPWSTR),
+            ]
+
+        api = ctypes.WinDLL(_ADVAPI32, use_last_error=True)
+        api.CredReadW.argtypes = [_wt.LPCWSTR, _wt.DWORD, _wt.DWORD,
+                                  ctypes.POINTER(ctypes.POINTER(_CRED))]
+        api.CredReadW.restype = _wt.BOOL
+        api.CredFree.argtypes = [ctypes.c_void_p]
+        ptr = ctypes.POINTER(_CRED)()
+        if not api.CredReadW(target, _TYPE_GENERIC, 0, ctypes.byref(ptr)):
+            return ""
+        try:
+            cred = ptr.contents
+            if not cred.CredentialBlob or not cred.CredentialBlobSize:
+                return ""
+            raw = ctypes.string_at(cred.CredentialBlob, cred.CredentialBlobSize)
+            return raw.decode("utf-16-le")
+        finally:
+            api.CredFree(ptr)
+    except Exception:
+        return ""
+
+
+def _wincred_write(target: str, value: str) -> bool:
+    """Escribe una credencial genérica en Windows Credential Manager. Devuelve True si OK."""
+    import sys, os, ctypes, ctypes.wintypes as _wt
+    if not sys.platform.startswith("win"):
+        return False
+    try:
+        _TYPE_GENERIC = 1
+        _PERSIST_LOCAL_MACHINE = 2
+
+        class _FILETIME(ctypes.Structure):
+            _fields_ = [("dwLowDateTime", _wt.DWORD), ("dwHighDateTime", _wt.DWORD)]
+
+        class _CRED(ctypes.Structure):
+            _fields_ = [
+                ("Flags", _wt.DWORD), ("Type", _wt.DWORD),
+                ("TargetName", _wt.LPWSTR), ("Comment", _wt.LPWSTR),
+                ("LastWritten", _FILETIME), ("CredentialBlobSize", _wt.DWORD),
+                ("CredentialBlob", ctypes.POINTER(ctypes.c_ubyte)),
+                ("Persist", _wt.DWORD), ("AttributeCount", _wt.DWORD),
+                ("Attributes", ctypes.c_void_p), ("TargetAlias", _wt.LPWSTR),
+                ("UserName", _wt.LPWSTR),
+            ]
+
+        value = (value or "").strip()
+        if not value:
+            _wincred_delete(target)
+            return True
+        raw = value.encode("utf-16-le")
+        if len(raw) > 5120:
+            return False
+        api = ctypes.WinDLL(_ADVAPI32, use_last_error=True)
+        api.CredWriteW.argtypes = [ctypes.POINTER(_CRED), _wt.DWORD]
+        api.CredWriteW.restype = _wt.BOOL
+        blob = (ctypes.c_ubyte * len(raw)).from_buffer_copy(raw)
+        cred = _CRED()
+        cred.Type = _TYPE_GENERIC
+        cred.TargetName = target
+        cred.Comment = "Token de licencia Helpmeet"
+        cred.CredentialBlobSize = len(raw)
+        cred.CredentialBlob = ctypes.cast(blob, ctypes.POINTER(ctypes.c_ubyte))
+        cred.Persist = _PERSIST_LOCAL_MACHINE
+        cred.UserName = os.environ.get("USERNAME", "Helpmeet")
+        return bool(api.CredWriteW(ctypes.byref(cred), 0))
+    except Exception:
+        return False
+
+
+def _wincred_delete(target: str) -> None:
+    """Elimina una credencial de Windows Credential Manager si existe."""
+    import sys, ctypes, ctypes.wintypes as _wt
+    if not sys.platform.startswith("win"):
+        return
+    try:
+        api = ctypes.WinDLL(_ADVAPI32, use_last_error=True)
+        api.CredDeleteW.argtypes = [_wt.LPCWSTR, _wt.DWORD, _wt.DWORD]
+        api.CredDeleteW.restype = _wt.BOOL
+        api.CredDeleteW(target, 1, 0)  # 1 = CRED_TYPE_GENERIC; ignora ERROR_NOT_FOUND
+    except Exception:
+        pass
+
+
+def get_license_token() -> str | None:
+    # Primero intenta leer del almacén seguro (Windows Credential Manager)
+    val = _wincred_read(_LIC_CRED_TARGET)
+    if val:
+        return val
+    # Fallback: JSON antiguo (instalaciones previas); migra automáticamente
+    val = _load().get("license_token") or None
+    if val and _wincred_write(_LIC_CRED_TARGET, val):
+        # Migración exitosa: elimina del JSON
+        data = _load()
+        data.pop("license_token", None)
+        _save(data)
+    return val or None
+
+
+def set_license_token(token: str) -> None:
+    token = (token or "").strip()
+    ok = _wincred_write(_LIC_CRED_TARGET, token)
+    if not ok:
+        # Fallback: guardar en settings.json si Windows rechazó la operación
+        data = _load()
+        if token:
+            data["license_token"] = token
+        else:
+            data.pop("license_token", None)
+        _save(data)
+        return
+    # Éxito en almacén seguro: limpiar cualquier valor residual del JSON
+    data = _load()
+    if "license_token" in data:
+        data.pop("license_token", None)
+        _save(data)
+
+
+# ---------- Marca de tiempo del último check de licencia ----------
+def get_last_license_check() -> str | None:
+    return _load().get("last_license_check") or None
+
+
+def set_last_license_check(iso_ts: str) -> None:
+    data = _load()
+    data["last_license_check"] = iso_ts
+    _save(data)
