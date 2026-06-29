@@ -6,6 +6,7 @@ data/
 *.env
 .claude/
 .superpowers/
+.codex/
 assets/models/
 *.sqlite
 *.sqlite3
