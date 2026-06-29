@@ -40,6 +40,8 @@ Compression=lzma2
 SolidCompression=yes
 ArchitecturesAllowed=x64compatible
 ArchitecturesInstallIn64BitMode=x64compatible
+CloseApplications=yes
+RestartApplications=yes
 
 [Languages]
 Name: "spanish"; MessagesFile: "compiler:Languages\Spanish.isl"
@@ -50,6 +52,8 @@ Name: "desktopicon"; Description: "Crear un acceso directo en el escritorio"; Gr
 [Files]
 ; Carpeta generada por PyInstaller (onedir): dist\Helpmeet\
 Source: "..\dist\Helpmeet\*"; DestDir: "{app}"; Flags: recursesubdirs createallsubdirs ignoreversion
+; Licencias de terceros
+Source: "..\licenses\THIRD_PARTY_LICENSES.md"; DestDir: "{app}\licenses"; Flags: ignoreversion
 
 [Icons]
 ; Los accesos llevan el AppUserModelID para que Windows agrupe la app y muestre

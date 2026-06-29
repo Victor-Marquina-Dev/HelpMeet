@@ -31,6 +31,13 @@ datas += collect_data_files(
 
 hiddenimports += collect_submodules("faster_whisper")
 hiddenimports += collect_submodules("tokenizers")
+hiddenimports += collect_submodules("ctranslate2")
+hiddenimports += collect_submodules("httpx")
+hiddenimports += collect_submodules("huggingface_hub")
+hiddenimports += [
+    "onnxruntime.capi._pydll",
+    "onnxruntime.capi.onnxruntime_validation",
+]
 
 # Imports dinámicos usados por pywebview/pythonnet en Windows.
 hiddenimports += [
@@ -50,8 +57,8 @@ def _is_noise(entry):
     )
     if any(part in haystack for part in noise_parts):
         return True
-    # Transcripción en nube deshabilitada: no empaquetar clientes HTTP extra.
-    if any(part in haystack for part in ("/replicate/", "/dotenv/", "/httpx/", "/hf_xet/")):
+    # Paquetes de nube/dev que no se usan en runtime.
+    if any(part in haystack for part in ("/replicate/", "/dotenv/", "/hf_xet/")):
         return True
     return False
 
@@ -63,10 +70,9 @@ hiddenimports = sorted({
         name.startswith("huggingface_hub.commands")
         or name.startswith("huggingface_hub.cli")
         or name.startswith("huggingface_hub.inference._mcp")
-        or name.startswith("ctranslate2.converters")
+        or name.startswith("onnxruntime.tools")
         or name.startswith("replicate")
         or name.startswith("dotenv")
-        or name.startswith("httpx")
         or name.startswith("hf_xet")
     )
 })
@@ -81,12 +87,11 @@ a = Analysis(
     runtime_hooks=[],
     excludes=[
         "pytest", "unittest", "doctest", "pdb",
-        "replicate", "dotenv", "httpx",
+        "replicate", "dotenv",
         "hf_xet",
         "matplotlib", "PIL", "pandas", "scipy",
         "torch", "tensorflow",
         "onnxruntime.tools", "huggingface_hub.commands",
-        "ctranslate2.converters",
     ],
     noarchive=False,
 )
@@ -101,9 +106,10 @@ exe = EXE(
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
-    upx=True,
+    upx=True,   # upx=False si PyInstaller + UPX genera falsos positivos de antivirus
     console=False,
     icon=str(root / "helpmeet" / "ui" / "web" / "assets" / "helpmeet.ico"),
+    version_file=str(root / "installer" / "version_info.txt"),
 )
 
 coll = COLLECT(
