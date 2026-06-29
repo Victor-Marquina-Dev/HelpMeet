@@ -7,21 +7,22 @@ Durante la grabación la miniatura sale del propio pipeline de vídeo (P-08); es
 clase cubre el momento PREVIO, capturando con mss a pocos fps (ligero).
 """
 import base64
+import io
 import threading
 import time
+from fractions import Fraction
 
+import av
 import numpy as np
 import mss
 
-from helpmeet.video.recorder import _jpeg_from_rgb
-
-PREVIEW_WIDTH = 480
+PREVIEW_WIDTH = 1280   # resolución alta para preview nítido
 
 
 class ScreenPreview:
     """Manda miniaturas JPEG de un monitor a la UI, sin grabar nada."""
 
-    def __init__(self, monitor, on_preview, fps=4):
+    def __init__(self, monitor, on_preview, fps=10):
         self.monitor = dict(monitor)
         self.on_preview = on_preview
         self.fps = max(1, int(fps))
@@ -48,21 +49,54 @@ class ScreenPreview:
         try:
             with mss.mss() as sct:
                 while self._running:
+                    t0 = time.monotonic()
                     with self._lock:
                         mon = dict(self.monitor)
                     region = {"left": mon["left"], "top": mon["top"],
                               "width": mon["width"], "height": mon["height"]}
                     img = sct.grab(region)
-                    arr = np.frombuffer(img.rgb, dtype=np.uint8).reshape(
-                        img.height, img.width, 3)
-                    step = max(1, img.width // PREVIEW_WIDTH)
-                    small = arr[::step, ::step]
-                    h = small.shape[0] - small.shape[0] % 2
-                    w = small.shape[1] - small.shape[1] % 2
-                    rgb = np.ascontiguousarray(small[:h, :w])
-                    jpeg = _jpeg_from_rgb(rgb, w, h)
+                    sw, sh = img.width, img.height
+                    # Calcula tamaño destino manteniendo proporción exacta
+                    if sw > PREVIEW_WIDTH:
+                        tw = PREVIEW_WIDTH
+                        th = int(sh * PREVIEW_WIDTH / sw)
+                    else:
+                        tw, th = sw, sh
+                    tw -= tw % 2
+                    th -= th % 2
+                    # Escala con libswscale (Lanczos) via PyAV → calidad OBS
+                    arr = np.frombuffer(img.rgb, dtype=np.uint8).reshape(sh, sw, 3)
+                    frame = av.VideoFrame.from_ndarray(arr, format="rgb24")
+                    scaled = frame.reformat(width=tw, height=th,
+                                            format="yuvj420p",
+                                            interpolation="LANCZOS")
+                    jpeg = _encode_jpeg(scaled, tw, th)
                     if jpeg and self.on_preview:
                         self.on_preview(base64.b64encode(jpeg).decode())
-                    time.sleep(interval)
+                    elapsed = time.monotonic() - t0
+                    sleep = max(0.0, interval - elapsed)
+                    if sleep:
+                        time.sleep(sleep)
         except Exception:
             pass  # la vista previa nunca debe romper nada
+
+
+def _encode_jpeg(frame, width, height) -> bytes:
+    """Codifica un VideoFrame YUV a JPEG de alta calidad con PyAV."""
+    frame.pts = 0
+    frame.time_base = Fraction(1, 1)
+    buf = io.BytesIO()
+    out = av.open(buf, mode="w", format="mjpeg")
+    try:
+        stream = out.add_stream("mjpeg", rate=1)
+        stream.width, stream.height = width, height
+        stream.pix_fmt = "yuvj420p"
+        stream.time_base = Fraction(1, 1)
+        stream.options = {"q:v": "2"}   # calidad máxima (1=mejor, 31=peor)
+        for pkt in stream.encode(frame):
+            out.mux(pkt)
+        for pkt in stream.encode():
+            out.mux(pkt)
+    finally:
+        out.close()
+    return buf.getvalue()

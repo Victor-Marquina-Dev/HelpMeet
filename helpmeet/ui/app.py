@@ -1646,11 +1646,15 @@ class Api:
         return hashlib.sha256(raw.encode()).hexdigest()[:32]
 
     def _license_socket(self, path: str, body: dict) -> dict:
-        import urllib.request, json as _j
+        import urllib.parse, urllib.request, json as _j
         try:
+            base_url = self._LICENSE_SERVER.rstrip("/")
+            parsed = urllib.parse.urlparse(base_url)
+            if parsed.scheme != "https" and parsed.hostname not in {"localhost", "127.0.0.1", "::1"}:
+                return {"_error": "license_server_requires_https"}
             b = _j.dumps(body).encode()
             req = urllib.request.Request(
-                self._LICENSE_SERVER.rstrip("/") + path,
+                base_url + path,
                 data=b,
                 headers={"Content-Type": "application/json"},
                 method="POST",

@@ -158,7 +158,10 @@ def _map_captures(meeting: Meeting, captures_dir: Path) -> dict:
 
 
 def _map_notes(meeting: Meeting, sorted_utts: list) -> dict:
-    """Mapea las notas a la frase de su momento: utterance_id -> [(texto, momento)]."""
+    """Mapea todas las notas a la frase de su momento.
+
+    Las notas del tab «Notas» también son contexto útil para la IA; si ocurren
+    después de la última frase, se anclan a esa última frase disponible."""
     by_utt: dict[int | None, list[tuple[str, float]]] = {}
     for note in meeting.notes:
         offset = _offset(note.created_at, meeting.started_at)

@@ -185,6 +185,13 @@ class MeetingRecorder:
             for label, fname in _CHANNELS
             if (self._tmp / fname).exists() and self._has_audio(self._tmp / fname)
         ]
+        if not tracks:
+            if self.on_status:
+                self.on_status("No se detectó audio grabado")
+            raise RuntimeError(
+                "No se detectó audio en la grabación. "
+                "Comprueba que el micrófono esté activo y sin silenciar."
+            )
         from helpmeet.transcription.progress import WeightedProgress
         weighted = WeightedProgress([wav for _, wav in tracks])
         failures = []

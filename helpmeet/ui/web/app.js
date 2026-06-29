@@ -1,4 +1,4 @@
-/* ============================================================
+﻿/* ============================================================
    Helpmeet — app.js
    Lógica de interfaz para pywebview.
    ------------------------------------------------------------
@@ -68,6 +68,7 @@ const ICONS = {
   calendar: '<rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/>',
   filter: '<path d="M22 3H2l8 9.46V19l4 2v-8.54L22 3z"/>',
   clock: '<circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/>',
+  arrowUp: '<path d="M12 19V5M5 12l7-7 7 7"/>',
 };
 function svg(name, size) {
   size = size || 15;
@@ -107,10 +108,15 @@ const api = {
   renameMeeting: (id, title) => call('rename_meeting', id, title),
   setMeetingContext: (id, text) => call('set_meeting_context', id, text),
   addMeetingNote: (id, text) => call('add_meeting_note', id, text),
+  addNotePost: (mid, text) => call('add_note_post', mid, text),
   moveMeeting: (mid, iid) => call('move_meeting', mid, iid),
   getGlossary: (iid) => call('get_glossary', iid),
   listMeetings: (iid) => call('list_meetings', iid),
   getBootstrapState: () => call('get_bootstrap_state'),
+  checkLicense: () => call('check_license'),
+  activateLicense: (key) => call('activate_license', key),
+  getLicenseInfo: () => call('get_license_info'),
+  deactivateLicense: () => call('deactivate_license'),
   search: (q) => call('search', q),
   getTranscript: (mid) => call('get_transcript', mid),
   startRecording: (iid, title) => call('start_recording', iid, title),
@@ -120,6 +126,8 @@ const api = {
   addNote: (text) => call('add_note', text),
   toggleMeetingMicMute: (muted) => call('toggle_meeting_mic_mute', muted),
   importMedia: (iid) => call('import_media', iid),
+  importMediaMultiple: (iid) => call('import_media_multiple', iid),
+  importVideoForMeeting: (mid) => call('import_video_for_meeting', mid),
   exportMeetingById: (mid) => call('export_meeting_by_id', mid),
   exportTranscriptTxt: (mid) => call('export_transcript_txt', mid),
   exportTranscriptPackage: (mid) => call('export_transcript_package', mid),
@@ -198,6 +206,8 @@ const api = {
     deleteParticipant: (id) => call('delete_participant', id),
     setMeParticipant: (iid, pid) => call('set_me_participant', iid, pid),
     assignUtteranceParticipant: (uid, pid) => call('assign_utterance_participant', uid, pid),
+    cancelMeetingJob: (mid) => call('cancel_meeting_job', mid),
+    runSetup: () => call('run_setup'),                               // @pending-python
   },
   // Controles de ventana frameless
   winMinimize: () => call('win_minimize'),
@@ -295,7 +305,24 @@ const MOCK = (() => {
       if (transcripts[id]) { transcripts[id].utterances = transcripts[id].utterances || []; transcripts[id].utterances.unshift(note); }
       return wait({ ok: true, note });
     },
+    add_note_post: (id, text) => {
+      const note = { id: 'n' + (++mctr), kind: 'note', text, time: '00:00' };
+      if (transcripts[id]) { transcripts[id].assets = transcripts[id].assets || {}; transcripts[id].assets.notes = transcripts[id].assets.notes || []; transcripts[id].assets.notes.push(note); }
+      return wait({ ok: true, note });
+    },
     move_meeting: () => wait({ ok: true }),
+    run_setup: () => {
+      // Simulación de progreso para pruebas en el navegador
+      const steps = [
+        { stage: 'downloading', pct: 0.15, model: 'small', size_label: '~480 MB' },
+        { stage: 'downloading', pct: 0.45, model: 'small' },
+        { stage: 'downloading', pct: 0.78, model: 'small' },
+        { stage: 'loading',     pct: 0.82, model: 'small' },
+        { stage: 'done',        pct: 1.0 },
+      ];
+      steps.forEach((s, i) => setTimeout(() => window.onSetupProgress && window.onSetupProgress(s), 800 * (i + 1)));
+      return wait({ ok: true });
+    },
     get_glossary: (iid) => wait(glossary[iid] || []),
     list_meetings: (iid) => wait((meetings[iid] || []).slice()),
     get_bootstrap_state: () => {
@@ -306,6 +333,7 @@ const MOCK = (() => {
         initiatives: inits.slice(), meetings_by_initiative: mbi,
         monitors: [{ index: 0, width: 2560, height: 1440 }, { index: 1, width: 1920, height: 1080 }],
         library_counts: { archive: 2, trash: 1 }, background_jobs: [],
+        setup_done: true,
       });
     },
     search: () => wait([]),
@@ -327,6 +355,7 @@ const MOCK = (() => {
     take_capture: () => wait({ ok: true }),
     add_note: () => wait({ ok: true }),
     import_media: (iid) => wait({ id: 'm' + (++mctr), title: 'Vídeo importado', initiative_id: iid, utterances: 30 }, 600),
+    import_video_for_meeting: (mid) => wait({ ok: true, queued: true, meeting_id: mid, filename: 'grabacion.mp4' }, 400),
     export_meeting_by_id: () => wait({ path: 'C:\\Helpmeet\\export' }, 500),
     export_transcript_txt: () => wait({ ok: true, path: 'C:\\Helpmeet\\transcripcion.txt' }, 500),
     export_transcript_package: () => wait({ ok: true, path: 'C:\\Helpmeet\\transcripcion.zip', captures: 2, files: 1 }, 500),
@@ -368,7 +397,7 @@ const STATE = {
   appState: 'idle',     // idle | recording | recording-local | recording-cloud | screen-recording | processing
   screen: 'welcome',    // welcome | initiative | meeting | search | glossary | archive | trash | meetings
   sidebarOpen: load('hm.sidebar', '1') === '1',
-  cal: { y: null, m: null, view: 'month', filter: 'all', weekStart: null },  // estado del calendario de Reuniones
+  cal: { y: null, m: null, view: 'week', filter: 'all', weekStart: null },  // estado del calendario de Reuniones
   initiatives: [],
   meetingsByInit: {},    // cache
   openInits: {},         // id -> bool expandido
@@ -417,6 +446,34 @@ function setAppState(s) {
    ============================================================ */
 const $ = (sel) => document.querySelector(sel);
 const el = (tag, cls, html) => { const e = document.createElement(tag); if (cls) e.className = cls; if (html != null) e.innerHTML = html; return e; };
+function btnEl({ label = '', icon, variant = '', size = '', disabled = false, onClick } = {}) {
+  const cls = ['btn', variant ? `btn-${variant}` : '', size ? `btn-${size}` : ''].filter(Boolean).join(' ');
+  const b = el('button', cls);
+  if (icon) b.appendChild(elFromHTML(`<span class="ico">${svg(icon, 14)}</span>`));
+  b.appendChild(document.createTextNode(label));
+  if (disabled) b.disabled = true;
+  if (onClick) b.onclick = onClick;
+  return b;
+}
+function emptyState({ icon = 'info', title = '', text = '', action } = {}) {
+  const w = el('div', 'empty');
+  let inner = `
+    <div class="empty-watermark" aria-hidden="true">
+      <span class="wm-square"></span><span class="wm-diamond"></span>
+    </div>
+    <div class="empty-inner">
+      <div class="empty-logo">${svg(icon, 24)}</div>
+      <h2 class="empty-title">${esc(title)}</h2>
+      ${text ? `<p>${esc(text)}</p>` : ''}
+    </div>`;
+  w.innerHTML = inner;
+  if (action) {
+    const btn = btnEl({ label: action.label, variant: 'primary', onClick: action.onClick });
+    btn.classList.add('btn-welcome');
+    w.querySelector('.empty-inner').appendChild(btn);
+  }
+  return w;
+}
 function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
 
 function renderTopStatus() {
@@ -473,12 +530,16 @@ function renderMain() {
   const main = $('#main');
   document.body.setAttribute('data-screen', STATE.screen);
   // Estado activo del nav lateral (Reuniones vs. Iniciativas)
-  const onMeetings = STATE.screen === 'meetings';
+  const onMeetings  = STATE.screen === 'meetings';
+  const onFavorites = STATE.screen === 'favorites';
   $('#navMeetings')?.classList.toggle('active', onMeetings);
-  $('#navInitiatives')?.classList.toggle('active', !onMeetings);
+  $('#navFavorites')?.classList.toggle('active', onFavorites);
+  $('#navInitiatives')?.classList.toggle('active', !onMeetings && !onFavorites);
   switch (STATE.screen) {
     case 'welcome': return main.replaceChildren(viewWelcome());
     case 'meetings': return main.replaceChildren(viewMeetings());
+    case 'favorites': return main.replaceChildren(viewFavorites());
+    case 'initiatives-list': return main.replaceChildren(viewAllInitiatives());
     case 'initiative': return main.replaceChildren(viewInitiative());
     case 'meeting': return main.replaceChildren(viewMeeting());
     case 'search': return main.replaceChildren(viewSearch());
@@ -595,6 +656,92 @@ function _calEvent(m, it) {
   ev.innerHTML = `<span class="cal-ev-dot" style="${dotStyle}"></span>${time ? `<span class="cal-ev-time">${esc(time)}</span>` : ''}<span class="cal-ev-title">${esc(m.title)}</span>`;
   ev.onclick = (e) => { e.stopPropagation(); _calOpenMeeting(m, it); };
   return ev;
+}
+
+function viewFavorites() {
+  const wrap = el('div'); wrap.style.cssText = 'display:flex;flex-direction:column;flex:1;min-height:0;overflow:hidden';
+  // Contar favoritas para mostrar en el header
+  const favIds = _getMeetingFavs();
+  const favList = [];
+  for (const [iid, ms] of Object.entries(STATE.meetingsByInit || {})) {
+    for (const m of (ms || [])) {
+      if (favIds.has(m.id)) {
+        const it = (STATE.initiatives || []).find(x => x.id === Number(iid));
+        favList.push({ m, it });
+      }
+    }
+  }
+
+  const head = el('div', 'mhead');
+  head.style.cssText = 'border-bottom:none;background:transparent';
+  head.innerHTML = `<div class="mhead-row"><h1 class="mtitle-h">Favoritas</h1></div>`;
+  const content = el('div', 'content');
+
+  if (!favList.length) {
+    content.appendChild(emptyState({
+      icon: 'star',
+      title: 'Sin favoritas aún',
+      text: 'Usa el botón ☆ en cada reunión o el menú ⋯ para marcarla como favorita.',
+    }));
+  } else {
+    const list = el('div', 'fav-list');
+    // Agrupar por iniciativa
+    const byInit = new Map();
+    favList.forEach(({ m, it }) => {
+      const key = it ? it.id : 'none';
+      if (!byInit.has(key)) byInit.set(key, { it, meetings: [] });
+      byInit.get(key).meetings.push(m);
+    });
+    // Solo inicializar una vez (no reiniciar en cada re-render)
+    if (!STATE._favOpen) {
+      STATE._favOpen = new Set();
+      if (byInit.size > 0) STATE._favOpen.add(byInit.keys().next().value);
+    }
+
+    byInit.forEach(({ it, meetings }, key) => {
+      const mColor = it ? _initColor(it) : 'var(--text-muted)';
+      const initName = it ? it.name : 'Sin iniciativa';
+      const isOpen = STATE._favOpen.has(key);
+      // Cabecera de iniciativa (colapsable)
+      const ihdr = el('div', 'fav-init-hdr' + (isOpen ? ' open' : ''));
+      ihdr.innerHTML = `<span class="fav-chev">${svg('chevron', 10)}</span><span class="fav-init-dot" style="background:${mColor}"></span><span class="fav-init-name">${esc(initName)}</span><span class="fav-init-cnt">${meetings.length}</span>`;
+      ihdr.onclick = () => {
+        STATE._favOpen.has(key) ? STATE._favOpen.delete(key) : STATE._favOpen.add(key);
+        renderMain();
+      };
+      list.appendChild(ihdr);
+      if (!isOpen) return; // colapsado: no renderizar cards
+      // Cards de reunión
+      meetings.forEach(m => {
+        const { day, mon } = parseMeetingDate(m.date || m.started_at);
+        const c = el('div', 'row-card done fav-card');
+        c.innerHTML = `
+          <div class="rc-date"><span class="rc-mon">${mon}</span><span class="rc-day">${day}</span></div>
+          <div class="rc-body">
+            <div class="rc-title">${esc(m.title)}</div>
+            <div class="rc-meta">${m.dur ? esc(m.dur) : ''}${m.time ? '<span class="rc-size">' + esc(m.time) + '</span>' : ''}</div>
+          </div>
+          <div class="rc-right">
+            <div class="rc-actions">
+              <button class="icon-btn sm rc-act-btn fav-on" data-act="unfav" title="Quitar de favoritas">${svg('star',13)}</button>
+            </div>
+            <span class="pill pill-done"><span class="pd"></span>Finalizada</span>
+          </div>`;
+        c.onclick = () => { if (it) STATE.selInit = it.id; openMeeting(m.id); };
+        c.oncontextmenu = (e) => { e.preventDefault(); openMeetingMenu(e, m.id); };
+        c.querySelector('[data-act="unfav"]').onclick = (e) => {
+          e.stopPropagation();
+          _toggleMeetingFav(m.id);
+          c.remove();
+          if (!list.querySelector('.fav-card')) renderMain();
+        };
+        list.appendChild(c);
+      });
+    });
+    content.appendChild(list);
+  }
+  wrap.replaceChildren(head, content);
+  return wrap;
 }
 
 function viewMeetings() {
@@ -926,6 +1073,9 @@ function viewInitiative() {
     placeholder="Contexto de la iniciativa"></textarea>`;
   const ta = objBox.querySelector('#initObjetivo');
   ta.value = (it && it.description) || '';
+  const _resizeObj = () => { ta.style.height = 'auto'; ta.style.height = Math.min(120, ta.scrollHeight) + 'px'; };
+  ta.addEventListener('input', _resizeObj);
+  setTimeout(_resizeObj, 0);
   ta.onblur = async () => {
     const val = ta.value.trim();
     if (it && val === ((it.description) || '')) return;
@@ -946,7 +1096,9 @@ function viewInitiative() {
     listWrapper.appendChild(p);
   } else {
     row = el('div', 'list');
-    ms.forEach(m => {
+
+    // Función que crea y añade una card de reunión al contenedor dado
+    const _appendCard = (m, container) => {
       const c = el('div', 'row-card' + (m.status === 'pending' ? ' warn' : m.status === 'done' ? ' done' : ''));
       const { day, mon } = parseMeetingDate(m.date || m.started_at);
       const pill = m.status === 'done'
@@ -956,14 +1108,15 @@ function viewInitiative() {
         : m.status === 'error'
         ? '<span class="pill pill-error"><span class="pd"></span>Error</span>'
         : '<span class="pill pill-pending"><span class="pd"></span>Pendiente</span>';
+      const isFav = _isMeetingFav(m.id);
       c.innerHTML = `
         <div class="rc-sel"><span class="rc-cb"></span></div>
         <div class="rc-date"><span class="rc-mon">${mon}</span><span class="rc-day">${day}</span></div>
         <div class="rc-body"><div class="rc-title">${esc(m.title)}</div><div class="rc-meta">${m.dur ? esc(m.dur) : ''}${m.size ? '<span class="rc-size">' + esc(m.size) + '</span>' : ''}</div></div>
         <div class="rc-right">
           <div class="rc-actions">
+            <button class="icon-btn sm rc-act-btn${isFav ? ' fav-on' : ''}" data-act="fav" title="${isFav ? 'Quitar de favoritas' : 'Marcar como favorita'}">${svg('star', 13)}</button>
             <button class="icon-btn sm rc-act-btn" data-act="rename" title="Renombrar">${svg('edit', 13)}</button>
-            <button class="icon-btn sm rc-act-btn" data-act="archive" title="Archivar">${svg('archive', 13)}</button>
             <button class="icon-btn sm rc-act-btn rc-act-danger" data-act="trash" title="Enviar a la papelera">${svg('trash', 13)}</button>
           </div>
           ${pill}
@@ -981,12 +1134,8 @@ function viewInitiative() {
           if (btn.dataset.act === 'rename') {
             const titleEl = c.querySelector('.rc-title');
             const input = document.createElement('input');
-            input.type = 'text';
-            input.value = m.title;
-            input.className = 'rc-title-input';
-            titleEl.replaceWith(input);
-            input.focus();
-            input.select();
+            input.type = 'text'; input.value = m.title; input.className = 'rc-title-input';
+            titleEl.replaceWith(input); input.focus(); input.select();
             input.addEventListener('click', ev => ev.stopPropagation());
             let done = false;
             const commit = async (save) => {
@@ -1007,11 +1156,60 @@ function viewInitiative() {
             });
             input.addEventListener('blur', () => commit(true));
           } else if (btn.dataset.act === 'archive') archiveMeeting(m.id);
-          else if (btn.dataset.act === 'trash') deleteMeeting(m.id);
+          else if (btn.dataset.act === 'fav') {
+            _toggleMeetingFav(m.id);
+            const nowFav = _isMeetingFav(m.id);
+            btn.classList.toggle('fav-on', nowFav);
+            btn.title = nowFav ? 'Quitar de favoritas' : 'Marcar como favorita';
+            renderSidebar();
+          } else if (btn.dataset.act === 'trash') deleteMeeting(m.id);
         });
       });
-      row.appendChild(c);
+      container.appendChild(c);
+    };
+
+    // Agrupar por mes → semana y renderizar con headers colapsables
+    const _IV_MS  = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
+    const _IV_MES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+    const _ivWeekOf = (iso) => {
+      if (!iso) return null;
+      const d = new Date(iso); if (isNaN(d)) return null;
+      const day = d.getDay();
+      const mon2 = new Date(d); mon2.setDate(d.getDate() - (day === 0 ? 6 : day - 1));
+      const sun2 = new Date(mon2); sun2.setDate(mon2.getDate() + 6);
+      const fmt = dt => `${dt.getDate()} ${_IV_MS[dt.getMonth()]}`;
+      return { mKey:`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`, wKey:mon2.toISOString().slice(0,10), wLabel:`${fmt(mon2)} – ${fmt(sun2)}`, mLabel:`${_IV_MES[d.getMonth()]} ${d.getFullYear()}` };
+    };
+    const _ivMOrder=[], _ivMMap=new Map(), _ivWMap=new Map();
+    ms.forEach(m => {
+      const g = _ivWeekOf(m.started_at) || {mKey:'none',wKey:'none',wLabel:'—',mLabel:'Sin fecha'};
+      if (!_ivMMap.has(g.mKey)) { _ivMMap.set(g.mKey,{mLabel:g.mLabel,wkKeys:[]}); _ivMOrder.push(g.mKey); }
+      const mk=`${g.mKey}|${g.wKey}`;
+      if (!_ivWMap.has(mk)) { _ivWMap.set(mk,{wLabel:g.wLabel,items:[]}); _ivMMap.get(g.mKey).wkKeys.push(mk); }
+      _ivWMap.get(mk).items.push(m);
     });
+    if (!STATE._ivWeeks) STATE._ivWeeks = {};
+    if (!STATE._ivWeeks[STATE.selInit]) {
+      const fw = _ivMOrder.length ? _ivMMap.get(_ivMOrder[0]).wkKeys[0] : null;
+      STATE._ivWeeks[STATE.selInit] = new Set(fw ? [fw] : []);
+    }
+    const _ivOpen = STATE._ivWeeks[STATE.selInit];
+
+    _ivMOrder.forEach(mKey => {
+      const {mLabel, wkKeys} = _ivMMap.get(mKey);
+      const mhdr = el('div', 'list-month-hdr', esc(mLabel));
+      row.appendChild(mhdr);
+      wkKeys.forEach(mk => {
+        const {wLabel, items} = _ivWMap.get(mk);
+        const isOpen = _ivOpen.has(mk);
+        const whdr = el('div', 'list-week-hdr' + (isOpen ? ' open' : ''));
+        whdr.innerHTML = `<span class="tw-chev">${svg('chevron',10)}</span><span class="lw-label">${esc(wLabel)}</span><span class="lw-cnt">${items.length}</span>`;
+        whdr.onclick = () => { _ivOpen.has(mk) ? _ivOpen.delete(mk) : _ivOpen.add(mk); renderMain(); };
+        row.appendChild(whdr);
+        if (isOpen) items.forEach(m => _appendCard(m, row));
+      });
+    });
+
     listWrapper.appendChild(row);
   }
   recents.appendChild(listWrapper);
@@ -1335,10 +1533,11 @@ function meetingIsRecording(mid) {
 function meetingJobMarkup(job) {
   if (!job) return '';
   const pct = Math.max(0, Math.min(100, Math.round((job.progress || 0) * 100)));
-  const stage = job.state === 'queued' ? (job.stage || 'En cola') : (job.stage || 'Transcribiendo…');
-  return `<div class="meeting-title-job" data-meeting-job>
-      <span class="meeting-title-stage"><span class="meeting-title-label">${esc(stage)}</span><span class="meeting-title-pct">${pct}%</span></span>
+  const canCancel = job.state === 'running' || job.state === 'queued';
+  return `<div class="meeting-title-job" data-meeting-job data-job-mid="${job.meeting_id}">
+      <span class="meeting-title-pct">${pct}%</span>
       <span class="meeting-title-track"><i style="width:${pct}%"></i></span>
+      ${canCancel ? `<button class="mtj-cancel" data-cancel-job title="Cancelar transcripción" aria-label="Cancelar transcripción">${svg('x', 11)}</button>` : ''}
     </div>`;
 }
 
@@ -1362,8 +1561,21 @@ function refreshMeetingTitleJob() {
     const tmp = el('div');
     tmp.innerHTML = meetingJobMarkup(job);
     const fresh = tmp.firstElementChild;
+    _wireJobCancel(fresh);
     if (old) old.replaceWith(fresh); else copy.appendChild(fresh);
   } else if (old) old.remove();
+}
+
+function _wireJobCancel(el) {
+  const btn = el && el.querySelector('[data-cancel-job]');
+  if (!btn) return;
+  const mid = el.dataset.jobMid;
+  btn.onclick = async (e) => {
+    e.stopPropagation();
+    btn.disabled = true;
+    await api.v2.cancelMeetingJob(mid).catch(() => {});
+    toast('info', 'Cancelando transcripción…');
+  };
 }
 
 function viewMeeting() {
@@ -1414,13 +1626,16 @@ function viewMeeting() {
       </div>
     </div>
     <div class="tabs" role="tablist">
-      ${['transcript', 'archivos'].map(tab => {
-        const label = { transcript: 'Transcripción', archivos: 'Archivos' }[tab];
+      ${['transcript', 'notas', 'archivos'].map(tab => {
+        const label = { transcript: 'Transcripción', notas: 'Notas', archivos: 'Archivos' }[tab];
         return `<button class="tab ${STATE.activeTab === tab ? 'active' : ''}" data-tab="${tab}" role="tab">${label}</button>`;
       }).join('')}
     </div>`;
   const content = el('div', 'content');
+  if (STATE.activeTab === 'notas') content.classList.add('notes-mode');
   content.appendChild(renderTab(STATE.activeTab, t));
+  // Wire botón cancelar si hay trabajo activo al renderizar la vista
+  _wireJobCancel(head.querySelector('[data-meeting-job]'));
   // eventos
   head.querySelector('#mCopy').onclick = (e) => copyMeetingContext(STATE.selMeeting, e.currentTarget);
   head.querySelector('#mOpen').onclick = (e) => doOpenFolder(e.currentTarget);
@@ -1473,19 +1688,47 @@ function viewMeeting() {
 
 function renderTab(tab, t) {
   if (tab === 'archivos') return renderFiles();
+  if (tab === 'notas') return renderNotes();
   return renderTranscript(t);  // por defecto, la transcripción
 }
 
 function renderTranscript(t) {
   const r = el('div', 'reading');
-  // Grabación de pantalla: reproductor del .mp4 + opción de transcribir.
-  if (t && t.video_path) r.appendChild(videoPanel(t));
+  // Grabación de pantalla: agrupa panel + input de contexto en un bloque visual.
+  const videoSection = (t && t.video_path) ? el('div', 'video-section') : null;
+  if (videoSection) { videoSection.appendChild(videoPanel(t)); r.appendChild(videoSection); }
   const us = (t && t.utterances) || [];
+  const fraseCount = us.filter(u => !u.kind || u.kind === 'utterance').length;
+  const transcribed = fraseCount > 0;
 
-  // Buscador DENTRO de esta transcripción: filtra las frases/notas/capturas
-  // que contienen el texto y muestra cuántas coinciden. Sólo en reposo.
   const recording = STATE.appState === 'recording' || STATE.appState === 'recording-local' || STATE.appState === 'recording-cloud';
   const items = [];
+
+  // ── Selección múltiple ──────────────────────────────────────
+  let txMode = false;
+  let txCount = 0;
+
+  const exitTxSelect = () => {
+    txMode = false; txCount = 0;
+    r.classList.remove('selecting');
+    r.querySelectorAll('.utterance.sel').forEach(n => n.classList.remove('sel'));
+    bulkBar.classList.remove('active');
+  };
+
+  const _updateBar = () => {
+    bulkBar.classList.toggle('active', txCount > 0);
+    bulkBar.querySelector('.tx-bulk-count').textContent =
+      `${txCount} seleccionada${txCount !== 1 ? 's' : ''}`;
+  };
+
+  const toggleTxSelect = (node) => {
+    const isSel = node.classList.contains('sel');
+    node.classList.toggle('sel', !isSel);
+    txCount += isSel ? -1 : 1;
+    if (txCount <= 0) { exitTxSelect(); return; }
+    if (!txMode) { txMode = true; r.classList.add('selecting'); }
+    _updateBar();
+  };
 
   // Construye el nodo (frase/captura/nota) y su texto en minúsculas para buscar.
   const buildItem = (u) => {
@@ -1493,9 +1736,69 @@ function renderTranscript(t) {
     if (u.kind === 'capture') { node = captureEvent(u); text = (u.code || '') + ' ' + (u.note || ''); }
     else if (u.kind === 'context') { node = contextEvent(u); text = u.text || ''; }
     else if (u.kind === 'note') { node = noteEvent(u); text = u.text || ''; }
-    else { node = utterance(u); text = u.text || ''; }
+    else {
+      node = utterance(u); text = u.text || '';
+      // Un único handler en el nodo: el checkbox activa select, el cuerpo también en txMode
+      node.addEventListener('click', (e) => {
+        const onCheck = e.target.closest('.u-check');
+        if (!onCheck && !txMode) return;      // fuera de modo selección y no es checkbox → ignorar
+        if (e.target.closest('.u-act')) return; // acciones individuales → no seleccionar
+        e.stopPropagation();
+        toggleTxSelect(node);
+      });
+    }
     return { node, text: String(text).toLowerCase() };
   };
+
+  // Barra flotante de acciones en lote (visible solo con clase .active)
+  const bulkBar = el('div', 'tx-bulk-bar');
+  bulkBar.innerHTML = `
+    <span class="tx-bulk-count">0 seleccionadas</span>
+    <div class="tx-bulk-acts">
+      <button class="btn sm tx-bulk-btn" id="txBulkStar">${svg('star', 13)}<span>Favorito</span></button>
+      <button class="btn sm tx-bulk-btn" id="txBulkPart">${svg('users', 13)}<span>Participante</span></button>
+    </div>
+    <button class="icon-btn sm" id="txBulkClose" title="Cancelar selección">${svg('x', 13)}</button>`;
+
+  bulkBar.querySelector('#txBulkClose').onclick = exitTxSelect;
+
+  bulkBar.querySelector('#txBulkStar').onclick = () => {
+    // DOM como fuente de verdad: captura los nodos seleccionados ANTES de limpiar
+    const selNodes = [...r.querySelectorAll('.utterance.sel')];
+    // 1. Aplica highlight inmediatamente (mientras .sel todavía está presente)
+    selNodes.forEach(node => {
+      node.classList.add('highlighted');
+      const btn = node.querySelector('[data-act="star"]');
+      if (btn) btn.classList.add('on');
+    });
+    // 2. Limpia la selección (quita .sel pero highlighted permanece)
+    exitTxSelect();
+    // 3. Llama API en background
+    selNodes.forEach(node => {
+      if (node.dataset.id) api.v2.toggleUtteranceHighlight(node.dataset.id).catch(() => null);
+    });
+    toast('ok', `${selNodes.length} frase${selNodes.length !== 1 ? 's' : ''} marcadas como favorito`);
+  };
+
+  bulkBar.querySelector('#txBulkPart').onclick = (e) => {
+    const parts = (STATE.transcript && STATE.transcript.participants) || [];
+    if (!parts.length) { toast('info', 'No hay participantes — añádelos en la pestaña de Participantes'); return; }
+    const selNodes = [...r.querySelectorAll('.utterance.sel')];
+    openMenu(e, parts.map(p => ({
+      label: p.name,
+      icon: 'users',
+      onClick: () => {
+        selNodes.forEach(node => {
+          const who = node.querySelector('.u-who');
+          if (who) who.textContent = p.name;
+          if (node.dataset.id) api.v2.assignUtteranceParticipant(node.dataset.id, p.id).catch(() => null);
+        });
+        exitTxSelect();
+        toast('ok', `«${p.name}» asignado a ${selNodes.length} frase${selNodes.length !== 1 ? 's' : ''}`);
+      },
+    })));
+  };
+  // ────────────────────────────────────────────────────────────
 
   // P-10: en reposo se paginan las frases para no crear miles de nodos de golpe
   // al abrir una reunión muy larga. Se muestran PAGE y "Mostrar más" carga el resto.
@@ -1516,11 +1819,10 @@ function renderTranscript(t) {
   };
   const drawAll = () => { if (drawn < us.length) drawBatch(us.length - drawn); };
 
-  if (!recording && t) {
+  if (!recording && t && transcribed) {
     const tools = el('div', 'meeting-tools');
     const context = el('div', 'meeting-context');
-    context.innerHTML = `<span class="meeting-context-icon" title="Añadir a la transcripción">${svg('edit', 15)}</span>
-      <textarea id="meetingContext" rows="1" maxlength="2000" placeholder="Añadir contexto" aria-label="Añadir contexto"></textarea>
+    context.innerHTML = `<textarea id="meetingContext" rows="1" maxlength="2000" placeholder="Añadir contexto" aria-label="Añadir contexto"></textarea>
       <span class="meeting-context-state" id="meetingContextState"></span>`;
     const contextInput = context.querySelector('#meetingContext');
     const contextState = context.querySelector('#meetingContextState');
@@ -1575,8 +1877,9 @@ function renderTranscript(t) {
     } else {
       STATE._txApply = null;
     }
-    r.appendChild(tools);
+    (videoSection || r).appendChild(tools);
   }
+
 
   if (!us.length && !(t && t.video_path)) {
     r.appendChild(el('p', null, '<span style="color:var(--text-muted)">Sin transcripción todavía.</span>'));
@@ -1587,6 +1890,7 @@ function renderTranscript(t) {
     // En grabación las frases llegan en vivo (window.addUtterance): se pintan todas.
     us.forEach(u => { const it = buildItem(u); items.push(it); r.appendChild(it.node); });
   } else {
+    r.appendChild(bulkBar);   // sticky arriba, antes de las frases
     r.appendChild(moreBtn);
     moreBtn.onclick = () => drawBatch(PAGE);
     drawBatch(PAGE);
@@ -1601,16 +1905,19 @@ function videoPanel(t) {
   const wrap = el('div', 'video-panel');
   const name = String(t.video_path || '').split(/[\\/]/).pop() || 'grabacion.mp4';
   wrap.innerHTML = `<div class="video-file">
-    <span class="video-file-icon">${svg('play', 15)}</span>
+    <button class="video-file-icon" title="Reproducir vídeo">${svg('play', 15)}</button>
     <div class="video-file-copy"><b>Grabación de pantalla</b><small>${esc(name)}</small></div>
     <div class="rec-actions"></div>
   </div>`;
+  wrap.querySelector('.video-file-icon').onclick = () => api.openPath(t.video_path);
   const actions = el('div', 'rec-actions');
-  const open = el('button', 'btn');
-  open.innerHTML = svg('play', 14) + ' Abrir vídeo';
-  open.onclick = () => api.openPath(t.video_path);
+  const folderPath = String(t.video_path).replace(/[/\\][^/\\]*$/, '');
+  const open = el('button', 'icon-btn');
+  open.innerHTML = svg('folder', 14);
+  open.title = 'Abrir carpeta';
+  open.onclick = () => api.openPath(folderPath);
   actions.appendChild(open);
-  const bt = el('button', hasTx ? 'btn' : 'btn btn-primary', hasTx ? 'Retranscribir' : 'Transcribir este vídeo');
+  const bt = el('button', hasTx ? 'btn' : 'btn btn-primary', hasTx ? 'Retranscribir' : 'Transcribir');
   if (hasTx) bt.title = 'Volver a transcribir este vídeo';
   bt.onclick = () => {
     if (hasTx) {
@@ -1643,6 +1950,7 @@ function utterance(u) {
   d.dataset.id = u.id;
   const who = esc(u.display_name || (u.speaker === 'me' ? 'Yo' : 'Los demás'));
   d.innerHTML = `
+    <div class="u-check" aria-hidden="true"><span class="u-cb"></span></div>
     <div class="u-side">
       <span class="u-who">${who}</span>
       <span class="u-time mono">${esc(u.time)}</span>
@@ -1653,7 +1961,6 @@ function utterance(u) {
     <div class="u-actions">
       <button class="u-act${u.highlighted ? ' on' : ''}" data-act="star" title="Marcar como importante" aria-label="Marcar como importante">${svg('star', 14)}</button>
       <button class="u-act" data-act="edit" title="Editar" aria-label="Editar">${svg('edit', 14)}</button>
-      <button class="u-act" data-act="speaker" title="Cambiar hablante" aria-label="Cambiar hablante">${svg('users', 14)}</button>
       <button class="u-act danger" data-act="del" title="Eliminar" aria-label="Eliminar">${svg('trash', 14)}</button>
     </div>`;
   d.querySelectorAll('.u-act').forEach(b => b.onclick = () => utteranceAction(b.dataset.act, u, d));
@@ -1829,40 +2136,147 @@ function renderFiles() {
   const assets = (STATE.transcript && STATE.transcript.assets) || {};
   const caps = assets.captures || [];
   const notes = assets.notes || [];
-  d.innerHTML = '<div class="section-label" style="margin:0 0 12px">CAPTURAS</div>';
+
+  d.appendChild(el('div', 'section-label', 'Capturas'));
   const grid = el('div', 'grid3');
   caps.forEach(c => {
     const x = el('div', 'cap-card');
     const ph = el('div', 'ph');
-    // WebView2 no carga file:// como sub-recurso → pedimos la imagen en base64.
     loadCaptureThumb(ph, c.id);
     x.appendChild(ph);
     x.appendChild(el('div', 'cap-meta', `${c.code ? '<span class="cap-code">' + esc(c.code) + '</span> ' : ''}<span class="mono">${esc(c.time)}</span>${c.note ? ' · ' + esc(c.note) : ''}`));
     grid.appendChild(x);
   });
-  if (!caps.length) grid.appendChild(el('p', null, '<span style="color:var(--text-muted);font-size:13px">No hay capturas en esta reunión.</span>'));
+  if (!caps.length) grid.appendChild(el('p', 'files-empty', 'No hay capturas en esta reunión.'));
   d.appendChild(grid);
-  d.appendChild(el('div', 'section-label', 'NOTAS')).style.margin = '18px 0 8px';
-  if (notes.length) notes.forEach(n => {
-    const row = el('div', 'row-card'); row.style.cursor = 'default';
-    row.innerHTML = `<div class="mono" style="color:var(--warning);font-size:12px">${esc(n.time)}</div><div class="rc-body"><div class="rc-title" style="font-size:13px">${esc(n.text)}</div></div>`;
-    d.appendChild(row);
-  });
-  else d.appendChild(el('p', null, '<span style="color:var(--text-muted);font-size:13px">No hay notas en esta reunión.</span>'));
+
+  const notasOnly = notes.filter(n => n.kind === 'note');
+  const notasHead = el('div', 'section-label-row');
+  notasHead.innerHTML = `<span class="section-label" style="margin:0;border:0;padding:0">Notas</span>`;
+  const notasCopyBtn = el('button', 'icon-btn');
+  notasCopyBtn.innerHTML = svg('copy', 13);
+  notasCopyBtn.title = 'Copiar notas al portapapeles';
+  notasCopyBtn.onclick = () => {
+    if (!notasOnly.length) { toast('info', 'No hay notas que copiar'); return; }
+    const txt = notasOnly.map(n => n.text).join('\n\n');
+    navigator.clipboard.writeText(txt).then(
+      () => toast('ok', 'Notas copiadas'),
+      () => toast('err', 'No se pudo copiar')
+    );
+  };
+  notasHead.appendChild(notasCopyBtn);
+  d.appendChild(notasHead);
+  const notasList = el('div', 'files-notes-list');
+  if (notasOnly.length) {
+    notasOnly.forEach(n => {
+      const row = el('div', 'files-note-row');
+      row.innerHTML = `<p class="files-note-text">${esc(n.text)}</p>`;
+      notasList.appendChild(row);
+    });
+  } else {
+    notasList.appendChild(el('p', 'files-empty', 'No hay notas en esta reunión.'));
+  }
+  d.appendChild(notasList);
+
   if (assets.audio) {
-    d.appendChild(el('div', 'section-label', 'AUDIO')).style.margin = '18px 0 8px';
+    d.appendChild(el('div', 'section-label', 'Audio'));
     const dur = (STATE.transcript && STATE.transcript.audio_duration) || '';
-    const aa = el('div', 'row-card'); aa.style.cursor = 'default';
-    aa.innerHTML = `<span style="width:30px;height:30px;border-radius:7px;border:1px solid var(--border-strong);display:flex;align-items:center;justify-content:center">${svg('mic', 13)}</span><div class="rc-body"><div class="rc-title" style="font-size:13px">${esc(String(assets.audio).split(/[\\/]/).pop())}</div><div class="rc-meta">Grabación de audio${dur ? ' · ' + dur : ''}</div></div>`;
+    const aa = el('div', 'row-card');
+    aa.innerHTML = `<span class="file-ico">${svg('mic', 14)}</span><div class="rc-body"><div class="rc-title">${esc(String(assets.audio).split(/[\\/]/).pop())}</div><div class="rc-meta">Grabación de audio${dur ? ' · ' + dur : ''}</div></div>`;
     aa.onclick = () => api.openPath(assets.audio); d.appendChild(aa);
   }
   if (assets.video) {
-    d.appendChild(el('div', 'section-label', 'VIDEO')).style.margin = '18px 0 8px';
-    const a = el('div', 'row-card'); a.style.cursor = 'default';
-    a.innerHTML = `<span style="width:30px;height:30px;border-radius:7px;border:1px solid var(--border-strong);display:flex;align-items:center;justify-content:center">${svg('play', 13)}</span><div class="rc-body"><div class="rc-title" style="font-size:13px">${esc(String(assets.video).split(/[\\/]/).pop())}</div><div class="rc-meta">Grabación de pantalla asociada</div></div>`;
+    d.appendChild(el('div', 'section-label', 'Video'));
+    const a = el('div', 'row-card');
+    a.innerHTML = `<span class="file-ico">${svg('play', 14)}</span><div class="rc-body"><div class="rc-title">${esc(String(assets.video).split(/[\\/]/).pop())}</div><div class="rc-meta">Grabación de pantalla</div></div>`;
     a.onclick = () => api.openPath(assets.video); d.appendChild(a);
   }
   return d;
+}
+
+function renderNotes() {
+  const wrap = el('div', 'notes-tab');
+  const assets = (STATE.transcript && STATE.transcript.assets) || {};
+  const existing = (assets.notes || []).filter(n => n.kind === 'note');
+
+  /* ── Área de escritura (arriba de la lista) ── */
+  const compose = el('div', 'notes-compose');
+  compose.innerHTML = `
+    <textarea class="notes-ta" id="notesInput" rows="1" maxlength="4000"
+      placeholder="Pega aquí tu resumen"
+      aria-label="Pega aquí tu resumen"></textarea>
+    <button class="icon-btn notes-copy-all" title="Copiar todas las notas">${svg('copy', 14)}</button>`;
+  compose.querySelector('.notes-copy-all').onclick = () => {
+    const all = (((STATE.transcript && STATE.transcript.assets) || {}).notes || [])
+      .filter(n => n.kind === 'note');
+    if (!all.length) { toast('info', 'No hay notas que copiar'); return; }
+    const txt = all.map(n => n.time ? `[${n.time}]  ${n.text}` : n.text).join('\n\n');
+    navigator.clipboard.writeText(txt).then(
+      () => toast('ok', 'Notas copiadas al portapapeles'),
+      () => toast('err', 'No se pudo copiar')
+    );
+  };
+  wrap.appendChild(compose);
+
+  /* ── Lista de notas ── */
+  const list = el('div', 'notes-list');
+
+  function _appendNoteItem(n) {
+    const item = el('div', 'note-item');
+    const displayTime = n.wall_time || n.time;
+    item.innerHTML = `
+      <div class="note-item-body">
+        <p class="note-item-text">${esc(n.text)}</p>
+        ${displayTime ? `<span class="note-item-time">${esc(displayTime)}</span>` : ''}
+      </div>`;
+    list.appendChild(item);
+    return item;
+  }
+
+  if (!existing.length) {
+    list.innerHTML = `<div class="notes-empty">${svg('note', 20)}<p>Aún no hay notas.</p></div>`;
+  } else {
+    existing.forEach(_appendNoteItem);
+    setTimeout(() => { list.scrollTop = list.scrollHeight; }, 0);
+  }
+  wrap.appendChild(list);
+
+  const ta = compose.querySelector('#notesInput');
+
+  const resize = () => {
+    ta.style.height = 'auto';
+    ta.style.height = Math.min(200, ta.scrollHeight) + 'px';
+  };
+
+  const addNote = async () => {
+    const text = ta.value.trim();
+    if (!text) return;
+    ta.disabled = true;
+    const r = await api.addNotePost(STATE.selMeeting, text).catch(() => null);
+    ta.disabled = false;
+    ta.focus();
+    if (r && r.ok && r.note) {
+      ta.value = ''; resize();
+      if (STATE.transcript && STATE.transcript.assets) {
+        STATE.transcript.assets.notes = STATE.transcript.assets.notes || [];
+        STATE.transcript.assets.notes.push(r.note);
+      }
+      const emptyEl = list.querySelector('.notes-empty');
+      if (emptyEl) emptyEl.remove();
+      const item = _appendNoteItem(r.note);
+      item.classList.add('note-item--new');
+      list.scrollTop = list.scrollHeight;
+    } else {
+      toast('err', 'No se pudo añadir la nota');
+    }
+  };
+
+  ta.addEventListener('input', resize);
+  ta.addEventListener('keydown', e => {
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); addNote(); }
+  });
+  resize();
+  return wrap;
 }
 
 /* P-09: la tarjeta usa una MINIATURA ligera; el original (pesado) solo se pide
@@ -1935,7 +2349,15 @@ function viewArchiveTrash(which) {
   const isTrash = which === 'trash';
   const wrap = el('div'); wrap.style.cssText = 'display:flex;flex-direction:column;flex:1;min-height:0';
   const head = el('div', 'mhead');
-  head.innerHTML = `<div class="mhead-row"><h1 class="mtitle-h">${isTrash ? 'Papelera' : 'Archivo'}</h1></div><div style="height:16px"></div>`;
+  head.style.cssText = 'border-bottom:none;background:transparent';
+  head.innerHTML = `<div class="mhead-row"><h1 class="mtitle-h">${isTrash ? 'Papelera' : 'Archivo'}</h1></div>`;
+  if (isTrash) {
+    const emptyBtn = el('button', 'btn btn-danger sm');
+    emptyBtn.id = 'emptyTrash';
+    emptyBtn.style.marginLeft = 'auto';
+    emptyBtn.innerHTML = svg('trash', 13) + ' Vaciar papelera';
+    head.querySelector('.mhead-row').appendChild(emptyBtn);
+  }
   const content = el('div', 'content');
   const list = el('div'); list.style.maxWidth = '640px';
   content.appendChild(list);
@@ -2002,8 +2424,8 @@ function renderActionBar() {
         <button class="dock-btn ${dis}" id="abUpload"><span class="dock-ico">${svg('upload', 18)}</span>Importar video</button>
       </div>`;
     bar.querySelector('#btnMic').onclick = toggleMic;
-    bar.querySelector('#abRecord').onclick = () => canRecord && withRecordingConsent(() => openRecordingPreflight('meeting', startMeetingRecording));
-    bar.querySelector('#abScreen').onclick = () => canRecord && withRecordingConsent(() => openRecordingPreflight('screen', openScreenPanel));
+    bar.querySelector('#abRecord').onclick = () => canRecord && withRecordingConsent(() => startMeetingRecording());
+    bar.querySelector('#abScreen').onclick = () => canRecord && withRecordingConsent(() => openScreenPanel());
     bar.querySelector('#abUpload').onclick = () => canRecord && doImport(bar.querySelector('#abUpload'));
   } else if (s === 'recording' || s === 'recording-local' || s === 'recording-cloud') {
     bar.innerHTML = `
@@ -2050,49 +2472,499 @@ function monitorSelectEl() {
 }
 
 /* ============================================================
+   4b. VISTA: TODAS LAS INICIATIVAS
+   ============================================================ */
+function viewAllInitiatives() {
+  let _filter = 'all'; // all | pinned | active | paused | closed
+  let _search = '';
+  let _sortBy = 'activity'; // activity | name | meetings
+  let _selId = null;
+  const _expandedInits = new Set();
+
+  const wrap = el('div', 'init-hub-wrap');
+
+  // ── Toolbar ───────────────────────────────────────────────
+  const toolbar = el('div', 'init-hub-toolbar');
+
+  // Fila 1: título + botón nuevo
+  const topRow = el('div', 'init-hub-top-row');
+  topRow.innerHTML = `<h1 class="title-lg">Iniciativas</h1>`;
+  const newBtn = el('button', 'btn btn-primary');
+  newBtn.innerHTML = `${svg('plus', 13)} Nueva iniciativa`;
+  newBtn.onclick = promptNewInitiative;
+  topRow.appendChild(newBtn);
+  toolbar.appendChild(topRow);
+
+  // Fila 2: chips simplificados
+  const filtersRow = el('div', 'init-hub-filters-row');
+  const chips = el('div', 'init-hub-chips');
+  const chipDefs = [
+    { key: 'all', label: 'Todas' },
+    { key: 'pinned', label: 'Fijadas' },
+  ];
+  const renderChips = () => {
+    chips.replaceChildren();
+    chipDefs.forEach(c => {
+      const chip = el('button', 'init-hub-chip' + (_filter === c.key ? ' is-active' : ''), c.label);
+      chip.onclick = () => { _filter = c.key; renderChips(); redrawList(); };
+      chips.appendChild(chip);
+    });
+  };
+  renderChips();
+  filtersRow.appendChild(chips);
+  toolbar.appendChild(filtersRow);
+  wrap.appendChild(toolbar);
+
+  // ── Cuerpo: tabla + panel ─────────────────────────────────
+  const body = el('div', 'init-hub-body');
+
+  // Anchos de columna redimensionables (px). fixed=true = no se pueden cambiar.
+  const _cols = [
+    { fixed: true,  w: 20,  min: 20  },  // chevron
+    { fixed: true,  w: 22,  min: 22  },  // pin
+    { fixed: false, w: 220, min: 110 },  // nombre
+    { fixed: false, w: 80,  min: 60  },  // estado
+    { fixed: false, w: 130, min: 80  },  // actividad
+    { fixed: false, w: 70,  min: 50  },  // reuniones
+    { fixed: false, w: 130, min: 80  },  // pendientes
+    { fixed: true,  w: 34,  min: 34  },  // menú
+  ];
+  const _gridTpl = () => _cols.map(c => c.w + 'px').join(' ');
+  const _applyWidths = () => {
+    const tpl = _gridTpl();
+    thead.style.gridTemplateColumns = tpl;
+    tbody.querySelectorAll('.init-hub-row, .init-hub-meeting-row')
+         .forEach(r => { r.style.gridTemplateColumns = tpl; });
+  };
+
+  const tableWrap = el('div', 'init-hub-table');
+  const thead = el('div', 'init-hub-thead');
+
+  const colLabels = ['', '', 'Iniciativa', 'Estado', 'Última actividad', 'Reuniones', 'Pendientes', ''];
+  _cols.forEach((col, i) => {
+    const cell = el('div', 'iht');
+    cell.textContent = colLabels[i];
+    if (i === 2) { // solo columna "Iniciativa" es redimensionable
+      const handle = el('span', 'col-resizer');
+      handle.addEventListener('mousedown', (e) => {
+        e.preventDefault(); e.stopPropagation();
+        handle.classList.add('is-dragging');
+        const startX = e.clientX, startW = col.w;
+        const onMove = (e) => {
+          col.w = Math.max(col.min, startW + e.clientX - startX);
+          _applyWidths();
+        };
+        const onUp = () => {
+          handle.classList.remove('is-dragging');
+          document.removeEventListener('mousemove', onMove);
+          document.removeEventListener('mouseup', onUp);
+        };
+        document.addEventListener('mousemove', onMove);
+        document.addEventListener('mouseup', onUp);
+      });
+      cell.appendChild(handle);
+    }
+    thead.appendChild(cell);
+  });
+  tableWrap.appendChild(thead);
+
+  const tbody = el('div', 'init-hub-tbody');
+  tableWrap.appendChild(tbody);
+  body.appendChild(tableWrap);
+
+  const panel = el('div', 'init-hub-panel');
+  panel.hidden = true;
+  body.appendChild(panel);
+  wrap.appendChild(body);
+
+  // ── Helpers ───────────────────────────────────────────────
+  function _fmtActivity(it) {
+    const ms = STATE.meetingsByInit[it.id];
+    if (!ms) return '…';
+    if (!ms.length) return '—';
+    const m = ms[0];
+    if (!m.started_at) return m.time || m.month_label || '—';
+    const d = new Date(m.started_at), now = new Date();
+    const t = d.toLocaleTimeString('es', { hour: '2-digit', minute: '2-digit' });
+    if (d.toDateString() === now.toDateString()) return `Hoy · ${t}`;
+    if (d.toDateString() === new Date(now - 86400000).toDateString()) return `Ayer · ${t}`;
+    return `${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}/${String(d.getFullYear()).slice(-2)}`;
+  }
+
+  function _pendingCount(it) {
+    const ms = STATE.meetingsByInit[it.id];
+    return ms ? ms.filter(m => m.status === 'pending' || m.status === 'processing').length : null;
+  }
+
+  function _getFiltered() {
+    let list = [...STATE.initiatives];
+    if (_search) list = list.filter(it =>
+      it.name.toLowerCase().includes(_search) ||
+      (it.description || '').toLowerCase().includes(_search));
+    if (_filter === 'pinned') list = list.filter(it => it.pinned);
+    if (_filter === 'fav') list = list.filter(it => it.pinned);
+    if (_sortBy === 'name') list.sort((a, b) => a.name.localeCompare(b.name, 'es'));
+    else if (_sortBy === 'meetings') {
+      list.sort((a, b) => (STATE.meetingsByInit[b.id] || []).length - (STATE.meetingsByInit[a.id] || []).length);
+    } else { // activity: pinned first, then newest
+      list.sort((a, b) => {
+        if (a.pinned !== b.pinned) return b.pinned ? 1 : -1;
+        const aD = STATE.meetingsByInit[a.id]?.[0]?.started_at;
+        const bD = STATE.meetingsByInit[b.id]?.[0]?.started_at;
+        return (bD ? new Date(bD) : 0) - (aD ? new Date(aD) : 0);
+      });
+    }
+    return list;
+  }
+
+  function redrawList() {
+    tbody.replaceChildren();
+    const list = _getFiltered();
+    if (!list.length) {
+      tbody.appendChild(el('p', 'files-empty', _search ? 'Sin iniciativas que coincidan.' : 'Aún no hay iniciativas.'));
+    } else {
+      list.forEach(it => tbody.appendChild(renderRow(it)));
+    }
+    _applyWidths();
+  }
+
+  function renderRow(it) {
+    const isExpanded = _expandedInits.has(it.id);
+    const ms = STATE.meetingsByInit[it.id];
+    const pending = _pendingCount(it);
+    const wrapper = el('div', 'init-hub-item');
+
+    const row = el('div', 'init-hub-row' + (_selId === it.id ? ' is-selected' : '') + (isExpanded ? ' is-expanded' : ''));
+    row.innerHTML = `
+      <span class="ihr-chev">${svg('chevron', 10)}</span>
+      <span class="ihr-pin${it.pinned ? ' is-pinned' : ''}" title="${it.pinned ? 'Desfijar' : 'Fijar'}">${svg('pin', 11)}</span>
+      <div class="ihr-name-cell">
+        <span class="ihr-dot" style="background:${_initColor(it)}"></span>
+        <div class="ihr-info">
+          <span class="ihr-name">${esc(it.name)}</span>
+          ${it.description ? `<span class="ihr-desc">${esc(it.description.slice(0,55))}${it.description.length > 55 ? '…' : ''}</span>` : ''}
+        </div>
+      </div>
+      <span class="ihr-status"><span class="init-status-chip active">Activa</span></span>
+      <span class="ihr-activity">${_fmtActivity(it)}</span>
+      <span class="ihr-meetings">${ms === undefined ? '…' : ms.length}</span>
+      <span class="ihr-pending${pending > 0 ? ' has-pending' : ''}">${pending === null ? '…' : pending > 0 ? `${pending} por transcribir` : ''}</span>`;
+    const menuBtn = el('button', 'icon-btn ihr-menu-btn');
+    menuBtn.innerHTML = svg('dots', 14);
+    menuBtn.onclick = (e) => { e.stopPropagation(); openInitiativeMenu(e, it.id); };
+    row.appendChild(menuBtn);
+    row.oncontextmenu = (e) => { e.preventDefault(); openInitiativeMenu(e, it.id); };
+
+    row.onclick = (e) => {
+      if (e.target.closest('.ihr-menu-btn') || e.target.closest('.ihr-pin')) return;
+      const alreadyOpen = _selId === it.id && _expandedInits.has(it.id);
+      if (alreadyOpen) {
+        // 2.º click: cierra panel y colapsa
+        _selId = null;
+        _expandedInits.delete(it.id);
+      } else {
+        // 1.er click: abre panel y despliega reuniones
+        _selId = it.id;
+        _expandedInits.add(it.id);
+        if (!STATE.meetingsByInit[it.id]) {
+          api.listMeetings(it.id).then(r => { STATE.meetingsByInit[it.id] = r || []; redrawList(); });
+        }
+      }
+      redrawList();
+      redrawPanel();
+    };
+
+    row.querySelector('.ihr-pin').onclick = async (e) => {
+      e.stopPropagation();
+      await api.toggleInitiativePin(it.id).catch(() => {});
+      it.pinned = !it.pinned;
+      redrawList();
+    };
+    wrapper.appendChild(row);
+
+    if (isExpanded) {
+      const sub = el('div', 'init-hub-sub');
+      const msList = ms || [];
+      if (!msList.length) {
+        sub.appendChild(el('p', 'files-empty', STATE.meetingsByInit[it.id] ? 'Sin reuniones aún.' : 'Cargando…'));
+      } else {
+        const MS2 = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
+        const MES  = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+        // Calcula lunes de la semana a partir de una fecha ISO (fuente de verdad = started_at)
+        const _weekOf = (iso) => {
+          if (!iso) return { mKey: 'none', wKey: 'none', wLabel: '—', mLabel: 'Sin fecha' };
+          const d = new Date(iso); if (isNaN(d)) return { mKey: 'none', wKey: 'none', wLabel: '—', mLabel: 'Sin fecha' };
+          const day = d.getDay();
+          const mon = new Date(d); mon.setDate(d.getDate() - (day === 0 ? 6 : day - 1));
+          const sun = new Date(mon); sun.setDate(mon.getDate() + 6);
+          const fmt = dt => `${dt.getDate()} ${MS2[dt.getMonth()]}`;
+          return {
+            mKey:   `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`,
+            wKey:   mon.toISOString().slice(0,10),
+            wLabel: `${fmt(mon)} – ${fmt(sun)}`,
+            mLabel: `${MES[d.getMonth()]} ${d.getFullYear()}`,
+          };
+        };
+
+        // Pre-agrupar por mes → semana usando started_at como única fuente de verdad
+        const monthOrder = []; // mantiene orden de inserción
+        const monthMap2  = new Map(); // mKey → { mLabel, wkKeys[] }
+        const weekMap2   = new Map(); // mKey|wKey → { wLabel, ms[] }
+        msList.forEach(m => {
+          const { mKey, wKey, wLabel, mLabel } = _weekOf(m.started_at);
+          if (!monthMap2.has(mKey)) { monthMap2.set(mKey, { mLabel, wkKeys: [] }); monthOrder.push(mKey); }
+          const mapKey = `${mKey}|${wKey}`;
+          if (!weekMap2.has(mapKey)) { weekMap2.set(mapKey, { wLabel, ms: [] }); monthMap2.get(mKey).wkKeys.push(mapKey); }
+          weekMap2.get(mapKey).ms.push(m);
+        });
+
+        // Estado de semanas abiertas (solo la primera por defecto)
+        if (!STATE._hubWeeks) STATE._hubWeeks = {};
+        if (!STATE._hubWeeks[it.id]) {
+          const firstWk = monthOrder.length ? monthMap2.get(monthOrder[0]).wkKeys[0] : null;
+          STATE._hubWeeks[it.id] = new Set(firstWk ? [firstWk] : []);
+        }
+        const openHubWeeks = STATE._hubWeeks[it.id];
+        const mc = _initColor(it);
+
+        monthOrder.forEach(mKey => {
+          const { mLabel, wkKeys } = monthMap2.get(mKey);
+          // Mes
+          const mhdr = el('div', 'ihm-month-hdr');
+          mhdr.innerHTML = `<span></span><span class="ihm-month-label">${esc(mLabel)}</span>`;
+          sub.appendChild(mhdr);
+          // Semanas
+          wkKeys.forEach(mapKey => {
+            const { wLabel, ms: wms } = weekMap2.get(mapKey);
+            const isOpen = openHubWeeks.has(mapKey);
+            const whdr = el('div', 'ihm-week-hdr' + (isOpen ? ' open' : ''));
+            whdr.innerHTML = `<span class="tw-chev">${svg('chevron', 9)}</span><span class="ihm-week-label">${esc(wLabel)}</span><span class="ihm-week-cnt">${wms.length}</span>`;
+            whdr.onclick = (e) => { e.stopPropagation(); openHubWeeks.has(mapKey) ? openHubWeeks.delete(mapKey) : openHubWeeks.add(mapKey); redrawList(); };
+            sub.appendChild(whdr);
+            if (isOpen) {
+              wms.forEach(m => {
+                const mr = el('div', 'init-hub-meeting-row');
+                const st = m.status || 'done';
+                const ds = st === 'pending' ? `border:1.5px solid ${mc};background:transparent` : `background:${mc}`;
+                mr.innerHTML = `<div class="ihm-info"><span class="stat ${st}" style="${ds}"></span><span class="ihm-title">${esc(m.title)}</span></div><span class="ihm-date">${m.time || ''}</span>`;
+                mr.onclick = (e) => { e.stopPropagation(); STATE.selInit = it.id; openMeeting(m.id); };
+                mr.oncontextmenu = (e) => { e.preventDefault(); e.stopPropagation(); openMeetingMenu(e, m.id); };
+                sub.appendChild(mr);
+              });
+            }
+          });
+        });
+      }
+      wrapper.appendChild(sub);
+    }
+    return wrapper;
+  }
+
+  function redrawPanel() {
+    if (!_selId) { panel.classList.remove('is-visible'); return; }
+    const it = STATE.initiatives.find(x => x.id === _selId);
+    if (!it) { panel.classList.add('is-visible'); panel.innerHTML = ''; return; }
+    panel.classList.add('is-visible');
+    const ms = STATE.meetingsByInit[it.id] || [];
+    const pending = ms.filter(m => m.status === 'pending' || m.status === 'processing').length;
+
+    panel.innerHTML = `
+      <div class="ihp-head">
+        <span class="ihp-dot" style="background:${_initColor(it)}"></span>
+        <span class="ihp-name">${esc(it.name)}</span>
+        <button class="icon-btn ihp-pin${it.pinned ? ' is-pinned' : ''}" title="${it.pinned ? 'Desfijar' : 'Fijar'}">${svg('pin', 13)}</button>
+        <button class="icon-btn ihp-more" title="Más acciones">${svg('dots', 14)}</button>
+        <button class="icon-btn ihp-close" title="Cerrar">${svg('x', 14)}</button>
+      </div>
+      ${it.description ? `<p class="ihp-desc">${esc(it.description)}</p>` : ''}
+      <div class="ihp-stats">
+        <div class="ihp-stat">${svg('calendar', 12)}<span>${ms.length} reuniones</span></div>
+        ${pending > 0 ? `<div class="ihp-stat is-pending">${svg('warn', 12)}<span>${pending} pendientes por transcribir</span></div>` : ''}
+        <div class="ihp-stat">${svg('clock', 12)}<span>Última actividad: ${_fmtActivity(it)}</span></div>
+        ${it.created_at ? `<div class="ihp-stat">${svg('info', 12)}<span>Creada el ${new Date(it.created_at).toLocaleDateString('es')}</span></div>` : ''}
+      </div>
+      <div class="ihp-actions-title">Acciones rápidas</div>
+      <div class="ihp-actions">
+        <button class="ihp-act ihp-open">${svg('folder', 13)}<span>Abrir iniciativa</span></button>
+        <button class="ihp-act ihp-pin-act">${svg('pin', 13)}<span>${it.pinned ? 'Desfijar' : 'Fijar'}</span></button>
+        <button class="ihp-act ihp-edit">${svg('edit', 13)}<span>Editar</span></button>
+        <button class="ihp-act ihp-export">${svg('download', 13)}<span>Exportar contexto</span></button>
+        <button class="ihp-act ihp-archive is-danger">${svg('archive', 13)}<span>Archivar</span></button>
+      </div>`;
+
+    const closePanel = () => { _selId = null; panel.classList.remove('is-visible'); redrawList(); };
+    panel.querySelector('.ihp-close').onclick = closePanel;
+    panel.querySelector('.ihp-open').onclick = () => selectInitiative(it.id);
+    panel.querySelector('.ihp-pin').onclick = () => panel.querySelector('.ihp-pin-act').click();
+    panel.querySelector('.ihp-pin-act').onclick = async () => {
+      await api.toggleInitiativePin(it.id).catch(() => {});
+      it.pinned = !it.pinned;
+      redrawList(); redrawPanel();
+    };
+    panel.querySelector('.ihp-more').onclick = (e) => openInitiativeMenu(e, it.id);
+    panel.querySelector('.ihp-edit').onclick = (e) => openInitiativeMenu(e, it.id);
+    panel.querySelector('.ihp-export').onclick = () => exportInitiativeTo(it.id);
+    panel.querySelector('.ihp-archive').onclick = (e) => openInitiativeMenu(e, it.id);
+  }
+
+  // Cerrar panel al hacer click fuera de filas y del panel
+  body.addEventListener('click', (e) => {
+    if (_selId && !e.target.closest('.init-hub-row') && !e.target.closest('.init-hub-meeting-row') && !e.target.closest('.init-hub-panel')) {
+      _selId = null; panel.classList.remove('is-visible'); redrawList();
+    }
+  });
+
+  // Render inicial + carga de reuniones en 2.º plano
+  redrawList();
+  STATE.initiatives.forEach(async it => {
+    if (!STATE.meetingsByInit[it.id]) {
+      STATE.meetingsByInit[it.id] = await api.listMeetings(it.id) || [];
+      redrawList();
+      if (_selId === it.id) redrawPanel();
+    }
+  });
+
+  return wrap;
+}
+
+/* ============================================================
    5. SIDEBAR
    ============================================================ */
+let _sidebarSearch = '';
+
+function _renderInitRow(tree, it) {
+  const open = !!STATE.openInits[it.id];
+  const ms = STATE.meetingsByInit[it.id] || [];
+  const isSelected = STATE.selInit === it.id && STATE.screen === 'initiative';
+  const row = el('div', 'tree-initiative' + (open ? ' open' : '') + (isSelected ? ' selected' : ''));
+  row.dataset.iid = it.id;
+  row.title = it.name || '';
+  row.innerHTML = `<span class="chev">${svg('chevron', 12)}</span><span class="init-dot" style="background:${_initColor(it)}"></span><span class="name">${esc(it.name)}</span>${it.pinned ? '<span class="pin-ind">' + svg('pin', 10) + '</span>' : ''}<span class="count">${ms.length || ''}</span>`;
+  row.onclick = () => selectInitiative(it.id);
+  row.oncontextmenu = (e) => { e.preventDefault(); openInitiativeMenu(e, it.id); };
+  tree.appendChild(row);
+  if (open) {
+    const sub = el('div', 'tree-meetings');
+    const MS = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
+
+    const _monKey = (iso) => {
+      const d = new Date(iso); if (isNaN(d)) return null;
+      const day = d.getDay();
+      const mon = new Date(d); mon.setDate(d.getDate() - (day === 0 ? 6 : day - 1));
+      const sun = new Date(mon); sun.setDate(mon.getDate() + 6);
+      const fmt = dt => `${dt.getDate()} ${MS[dt.getMonth()]}`;
+      return { key: mon.toISOString().slice(0,10), label: `${fmt(mon)} – ${fmt(sun)}` };
+    };
+
+    // Pre-agrupar: mes → semana → reuniones (sin duplicados)
+    const monthMap = new Map();   // month_label → [{weekKey,weekLabel,ms:[]}]
+    const weekMap  = new Map();   // month|weekKey → weekGroup
+    ms.forEach(m => {
+      const month = m.month_label || 'Sin fecha';
+      const wk = m.started_at ? _monKey(m.started_at) : null;
+      const wkKey = wk ? wk.key : 'none';
+      const wkLabel = wk ? wk.label : '—';
+      if (!monthMap.has(month)) monthMap.set(month, []);
+      const mapKey = `${month}|${wkKey}`;
+      if (!weekMap.has(mapKey)) {
+        const g = { weekKey: wkKey, weekLabel: wkLabel, ms: [] };
+        weekMap.set(mapKey, g);
+        monthMap.get(month).push(g);
+      }
+      weekMap.get(mapKey).ms.push(m);
+    });
+
+    // Estado de semanas abiertas persistido en STATE (solo la más reciente por defecto)
+    if (!STATE._openWeeks) STATE._openWeeks = {};
+    if (!STATE._openWeeks[it.id]) {
+      // Abrir la primera semana (más reciente) por defecto
+      const firstMonth = monthMap.keys().next().value;
+      const firstWeek = firstMonth && monthMap.get(firstMonth)[0];
+      STATE._openWeeks[it.id] = new Set(firstWeek ? [`${firstMonth}|${firstWeek.weekKey}`] : []);
+    }
+    const openWeeks = STATE._openWeeks[it.id];
+
+    const mColor = _initColor(it);
+    monthMap.forEach((weeks, month) => {
+      sub.appendChild(el('div', 'tree-month', esc(month)));
+      weeks.forEach(({ weekKey, weekLabel, ms: wms }) => {
+        const wkId = `${month}|${weekKey}`;
+        const isWkOpen = openWeeks.has(wkId);
+
+        // Encabezado de semana colapsable
+        const wkHdr = el('div', 'tree-week' + (isWkOpen ? ' open' : ''));
+        wkHdr.innerHTML = `<span class="tw-chev">${svg('chevron', 9)}</span><span class="tw-label">${esc(weekLabel)}</span><span class="tw-cnt">${wms.length}</span>`;
+        wkHdr.onclick = (e) => {
+          e.stopPropagation();
+          openWeeks.has(wkId) ? openWeeks.delete(wkId) : openWeeks.add(wkId);
+          renderSidebar();
+        };
+        sub.appendChild(wkHdr);
+
+        if (isWkOpen) {
+          wms.forEach(m => {
+            const st = m.status || 'done';
+            const recording = meetingIsRecording(m.id);
+            const transcribing = !recording && (st === 'processing' || meetingIsTranscribing(m.id));
+            const mr = el('div', 'tree-meeting' + (STATE.selMeeting === m.id ? ' selected' : '') + (recording ? ' recording' : '') + (transcribing ? ' transcribing' : ''));
+            mr.dataset.mid = m.id;
+            mr.title = m.title || '';
+            const dotStyle = st === 'pending' ? ` style="border:1.5px solid ${mColor};background:transparent"` : st === 'done' ? ` style="background:${mColor}"` : '';
+            mr.innerHTML = `<span class="stat ${st}"${dotStyle}></span><span class="mtitle">${esc(m.title)}</span>${m.time ? '<span class="mtime">' + esc(m.time) + '</span>' : ''}`;
+            mr.onclick = (e) => { e.stopPropagation(); openMeeting(m.id); };
+            mr.oncontextmenu = (e) => { e.preventDefault(); e.stopPropagation(); openMeetingMenu(e, m.id); };
+            sub.appendChild(mr);
+          });
+        }
+      });
+    });
+    if (!ms.length) sub.appendChild(el('div', 'tree-meeting', '<span style="color:var(--text-faint);font-size:12px">Sin reuniones</span>'));
+    tree.appendChild(sub);
+  }
+}
+
 function renderSidebar() {
   const tree = $('#sidebarTree');
   tree.replaceChildren();
-  STATE.initiatives.forEach(it => {
-    const open = !!STATE.openInits[it.id];
-    const ms = STATE.meetingsByInit[it.id] || [];
-    const row = el('div', 'tree-initiative' + (open ? ' open' : '') + (STATE.selInit === it.id && STATE.screen === 'initiative' ? ' selected' : ''));
-    row.dataset.iid = it.id;
-    row.title = it.name || '';
-    row.innerHTML = `<span class="chev">${svg('chevron', 12)}</span><span class="init-dot" style="background:${_initColor(it)}"></span><span class="name">${esc(it.name)}</span>${it.pinned ? '<span class="pin-ind" title="Anclada">' + svg('pin', 11) + '</span>' : ''}<span class="count">${ms.length || ''}</span>`;
-    row.onclick = () => selectInitiative(it.id);
-    row.oncontextmenu = (e) => { e.preventDefault(); openInitiativeMenu(e, it.id); };
-    tree.appendChild(row);
-    if (open) {
-      const sub = el('div', 'tree-meetings');
-      let currentMonth = null;
-      ms.forEach(m => {
-        const month = m.month_label || 'Sin fecha';
-        if (month !== currentMonth) {
-          currentMonth = month;
-          sub.appendChild(el('div', 'tree-month', esc(month)));
-        }
-        const st = m.status || 'done';
-        const recording = meetingIsRecording(m.id);
-        const transcribing = !recording && (st === 'processing' || meetingIsTranscribing(m.id));
-        const mr = el('div', 'tree-meeting' + (STATE.selMeeting === m.id ? ' selected' : '') + (recording ? ' recording' : '') + (transcribing ? ' transcribing' : ''));
-        mr.dataset.mid = m.id;
-        mr.title = m.title || '';
-        // El punto toma el color de la iniciativa (hueco si está pendiente). Errores conservan su color.
-        const mColor = _initColor(it);
-        const dotStyle = st === 'pending' ? ` style="border:1.5px solid ${mColor};background:transparent"`
-          : st === 'done' ? ` style="background:${mColor}"` : '';
-        mr.innerHTML = `<span class="stat ${st}"${dotStyle}></span><span class="mtitle">${esc(m.title)}</span>${m.time ? '<span class="mtime">' + esc(m.time) + '</span>' : ''}`;
-        mr.onclick = (e) => { e.stopPropagation(); openMeeting(m.id); };
-        mr.oncontextmenu = (e) => { e.preventDefault(); e.stopPropagation(); openMeetingMenu(e, m.id); };
-        sub.appendChild(mr);
-      });
-      if (!ms.length) sub.appendChild(el('div', 'tree-meeting', '<span style="color:var(--text-faint);font-size:12px">Sin reuniones</span>'));
-      tree.appendChild(sub);
+
+  const all = STATE.initiatives;
+  const pinned = all.filter(it => it.pinned);
+  const rest = all.filter(it => !it.pinned);
+  const MAX = 5;
+
+  // ── Fijadas ───────────────────────────────────────────────
+  if (pinned.length) {
+    const grpLabel = el('div', 'sidebar-group-label');
+    grpLabel.innerHTML = `<span>${svg('pin', 10)} Fijadas</span><span class="sgr-count">${pinned.length}</span>`;
+    tree.appendChild(grpLabel);
+    pinned.slice(0, MAX).forEach(it => _renderInitRow(tree, it));
+    if (pinned.length > MAX) {
+      const more = el('button', 'sidebar-see-more', `Ver más (${pinned.length - MAX})`);
+      more.onclick = () => { MAX === 5 ? pinned.forEach(it => _renderInitRow(tree, it)) : null; /* simple toggle */ };
+      tree.appendChild(more);
     }
-  });
+  }
+
+  // ── Activas (no fijadas) ──────────────────────────────────
+  if (rest.length) {
+    const grpLabel2 = el('div', 'sidebar-group-label');
+    grpLabel2.innerHTML = `<span>Activas</span><span class="sgr-count">${rest.length}</span>`;
+    tree.appendChild(grpLabel2);
+    rest.slice(0, MAX).forEach(it => _renderInitRow(tree, it));
+    if (rest.length > MAX) {
+      const more2 = el('button', 'sidebar-see-more', `Ver más (${rest.length - MAX})`);
+      let expanded = false;
+      more2.onclick = () => {
+        if (!expanded) {
+          expanded = true; more2.remove();
+          rest.slice(MAX).forEach(it => _renderInitRow(tree, it));
+        }
+      };
+      tree.appendChild(more2);
+    }
+  }
+
+  if (!all.length) tree.appendChild(el('div', 'tree-meeting', `<span style="color:var(--text-faint);font-size:11px">${q ? 'Sin resultados' : 'Sin iniciativas'}</span>`));
 }
 
 async function selectInitiative(id) {
@@ -2109,8 +2981,14 @@ async function openMeeting(mid, keepTab) {
   STATE.selMeeting = mid;
   STATE.screen = 'meeting';
   if (!keepTab) STATE.activeTab = 'transcript';
-  STATE.transcript = await api.getTranscript(mid);
-  renderSidebar(); renderMain(); renderTopStatus();
+  try {
+    STATE.transcript = await api.getTranscript(mid);
+    renderSidebar(); renderMain(); renderTopStatus();
+  } catch (err) {
+    STATE.screen = STATE.selInit ? 'initiative' : 'welcome';
+    toast('err', 'Error al abrir la reunión: ' + (err && err.message ? err.message : String(err)));
+    renderSidebar(); renderMain();
+  }
 }
 
 function backToTree() { STATE.screen = STATE.selMeeting ? 'meeting' : (STATE.selInit ? 'initiative' : 'welcome'); renderMain(); renderTopStatus(); }
@@ -2240,7 +3118,7 @@ function formModal(title, fieldLabel, value, okLabel, onOk, opts) {
       <div><label>${esc(fieldLabel)}</label>${opts.textarea ? `<textarea class="field" style="height:auto;min-height:70px;padding:9px"></textarea>` : `<input class="field" type="text" value="${esc(value || '')}">`}
       <div class="field-error"></div></div>
     </div>
-    <div class="modal-foot"><button class="btn" data-c>Cancelar (Esc)</button><button class="btn btn-primary" data-ok>${esc(okLabel)} (⏎)</button></div>`;
+    <div class="modal-foot"><button class="btn" data-c>Cancelar<kbd>Esc</kbd></button><button class="btn btn-primary" data-ok>${esc(okLabel)}<kbd>⏎</kbd></button></div>`;
   const input = m.querySelector('.field'); const err = m.querySelector('.field-error');
   const submit = async () => {
     const v = input.value.trim();
@@ -2267,12 +3145,20 @@ function confirmModal(title, body, okLabel, onOk, danger) {
   openModal(m);
 }
 
-function toast(kind, msg, action) {
+function toast(kind, msg, action, onAction) {
   const t = el('div', 'toast ' + (kind || 'info'));
-  const i = kind === 'err' ? svg('x', 12) : kind === 'info' ? svg('check', 12) : svg('check', 12);
-  t.innerHTML = `<span class="ti">${i}</span><span class="tmsg">${esc(msg)}</span>${action ? `<span class="taction">${esc(action)}</span>` : ''}`;
+  const i = kind === 'err' ? svg('x', 12) : svg('check', 12);
+  t.innerHTML = `<span class="ti">${i}</span><span class="tmsg">${esc(msg)}</span>${action ? `<button class="taction">${esc(action)}</button>` : ''}`;
+  if (action && onAction) {
+    t.querySelector('.taction').onclick = (e) => { e.stopPropagation(); t.remove(); onAction(); };
+  }
   $('#toasts').appendChild(t);
-  setTimeout(() => { t.style.opacity = '0'; t.style.transition = 'opacity .3s'; setTimeout(() => t.remove(), 320); }, 3600);
+  const ms = kind === 'err' ? 4500 : kind === 'info' ? 3000 : 2500;
+  setTimeout(() => {
+    t.style.opacity = '0';
+    t.style.transition = `opacity .3s`;
+    setTimeout(() => t.remove(), 320);
+  }, ms);
 }
 
 let _ctxOpen = null;
@@ -2351,18 +3237,65 @@ function openCustomSelectPanel(anchor, items, curVal, minWidth, onPick) {
   setTimeout(() => document.addEventListener('click', closeMenu, { once: true }), 0);
 }
 
+// ── Carpetas de iniciativa (almacenadas localmente) ──────────
+function _getFolders(iid) { try { return JSON.parse(localStorage.getItem('hm.folders.' + iid) || '[]'); } catch { return []; } }
+function _saveFolders(iid, folders) { localStorage.setItem('hm.folders.' + iid, JSON.stringify(folders)); }
+function promptCreateFolder(iid) {
+  formModal('Nueva carpeta', 'Nombre de la carpeta', '', 'Crear', (name) => {
+    if (!name.trim()) return;
+    const folders = _getFolders(iid);
+    folders.push({ id: Date.now(), name: name.trim() });
+    _saveFolders(iid, folders);
+    toast('ok', `Carpeta «${name.trim()}» creada`);
+    if (STATE.screen === 'initiative' && STATE.selInit === iid) renderMain();
+  });
+}
+
+async function _importVideosToInit(iid) {
+  const it = STATE.initiatives.find(x => x.id === iid);
+  const name = it ? it.name : 'la iniciativa';
+  const r = await api.importMediaMultiple(iid).catch(() => null);
+  if (!r || r.cancelled) return;
+  if (r.error) { toast('err', r.error); return; }
+  if (r.ok) {
+    await refreshMeetings(iid);
+    toast('ok', `${r.count} video${r.count !== 1 ? 's' : ''} importado${r.count !== 1 ? 's' : ''} en «${name}» · transcribiendo en 2.º plano`);
+  }
+}
+
+function _initAllFav(iid) {
+  const ms = STATE.meetingsByInit[iid] || [];
+  const favs = _getMeetingFavs();
+  const allFav = ms.length > 0 && ms.every(m => favs.has(m.id));
+  if (allFav) {
+    ms.forEach(m => favs.delete(m.id));
+    localStorage.setItem('hm.favMeetings', JSON.stringify([...favs]));
+    toast('ok', `${ms.length} reuniones quitadas de favoritas`);
+  } else {
+    ms.forEach(m => favs.add(m.id));
+    localStorage.setItem('hm.favMeetings', JSON.stringify([...favs]));
+    toast('ok', `${ms.length} reuniones añadidas a favoritas`);
+  }
+  renderSidebar(); if (STATE.screen === 'favorites') renderMain();
+}
+
 function openInitiativeMenu(e, iid) {
   const it = STATE.initiatives.find(x => x.id === iid);
   const pinned = !!(it && it.pinned);
+  const ms = STATE.meetingsByInit[iid] || [];
+  const favs = _getMeetingFavs();
+  const allFav = ms.length > 0 && ms.every(m => favs.has(m.id));
   openMenu(e, [
     { label: pinned ? 'Desanclar iniciativa' : 'Anclar iniciativa', icon: 'pin', onClick: () => toggleInitiativePin(iid) },
+    { label: allFav ? 'Quitar de favoritas' : 'Añadir todas a favoritas', icon: 'star', onClick: () => _initAllFav(iid) },
     { label: 'Ver glosario', icon: 'search', onClick: () => openGlossary(iid) },
     { label: 'Renombrar iniciativa', icon: 'edit', onClick: () => promptRenameInitiative(iid) },
     { label: 'Cambiar color', icon: 'palette', onClick: () => pickInitiativeColor(iid) },
-    { label: 'Exportar', icon: 'download', onClick: () => exportInitiativeNow(iid) },
+    { sep: true },
+    { label: 'Importar videos', icon: 'upload', onClick: () => _importVideosToInit(iid) },
+    { sep: true },
     { label: 'Exportar a otra carpeta', icon: 'download', onClick: () => exportInitiativeTo(iid) },
     { sep: true },
-    { label: 'Archivar iniciativa', icon: 'archive', onClick: () => archiveInitiative(iid) },
     { label: 'Enviar a la papelera', icon: 'trash', danger: true, onClick: () => deleteInitiative(iid) },
   ]);
 }
@@ -2393,18 +3326,35 @@ function pickInitiativeColor(iid) {
   m.querySelector('[data-x]').onclick = closeModal;
   openModal(m);
 }
+function _getMeetingFavs() { try { return new Set(JSON.parse(localStorage.getItem('hm.favMeetings') || '[]')); } catch { return new Set(); } }
+function _toggleMeetingFav(mid) { const s = _getMeetingFavs(); s.has(mid) ? s.delete(mid) : s.add(mid); localStorage.setItem('hm.favMeetings', JSON.stringify([...s])); }
+function _isMeetingFav(mid) { return _getMeetingFavs().has(mid); }
+
 function openMeetingMenu(e, mid) {
+  const isFav = _isMeetingFav(mid);
   openMenu(e, [
-    { label: 'Exportar', icon: 'download', onClick: () => doExportMeeting() },
+    { label: isFav ? 'Quitar de favoritos' : 'Marcar como favorita', icon: 'star', onClick: () => { _toggleMeetingFav(mid); renderSidebar(); renderMain(); } },
+    { sep: true },
     { label: 'Participantes', icon: 'users', onClick: () => { if (STATE.transcript) participantsModal(STATE.transcript); } },
+    { label: 'Importar video y transcribir…', icon: 'upload', onClick: () => doImportVideoForMeeting(mid) },
     { sep: true },
     { label: 'Renombrar reunión', icon: 'edit', onClick: () => promptRenameMeeting(mid) },
     { label: 'Mover a otra iniciativa', icon: 'folder', onClick: () => promptMoveMeeting(mid) },
-    { label: 'Exportar a otra carpeta', icon: 'download', onClick: () => exportMeetingTo(mid) },
     { sep: true },
-    { label: 'Archivar reunión', icon: 'archive', onClick: () => archiveMeeting(mid) },
     { label: 'Enviar a la papelera', icon: 'trash', danger: true, onClick: () => deleteMeeting(mid) },
   ]);
+}
+
+async function doImportVideoForMeeting(mid) {
+  const r = await api.importVideoForMeeting(mid);
+  if (!r || r.cancelled) return;
+  if (r.error) { toast('err', 'No se pudo importar: ' + r.error); return; }
+  if (r.ok) {
+    toast('ok', `«${r.filename || 'video'}» importado · transcribiendo en segundo plano`);
+    try { renderBgJobs(await api.getBackgroundJobs()); } catch (e) {}
+    await refreshMeetings(STATE.selInit);
+    renderMain();
+  }
 }
 
 /* ============================================================
@@ -2455,7 +3405,14 @@ function promptRenameInitiative(iid) {
   });
 }
 function promptRenameMeeting(mid) {
-  formModal('Renombrar reunión', 'Nuevo título', '', 'Guardar', async (title) => {
+  const current = (() => {
+    for (const k in STATE.meetingsByInit) {
+      const m = STATE.meetingsByInit[k].find(x => x.id === mid);
+      if (m) return m.title;
+    }
+    return STATE.transcript && STATE.transcript.title ? STATE.transcript.title : '';
+  })();
+  formModal('Renombrar reunión', 'Título', current, 'Guardar', async (title) => {
     await api.renameMeeting(mid, title);
     for (const k in STATE.meetingsByInit) { const m = STATE.meetingsByInit[k].find(x => x.id === mid); if (m) m.title = title; }
     if (STATE.transcript) STATE.transcript.title = title;
@@ -2513,22 +3470,89 @@ async function doOpenFolder(btn) {
 async function exportMeetingTo(mid) { const r = await api.exportMeetingTo(mid); if (r && r.ok) toast('ok', 'Exportado a ' + r.path); }
 async function exportInitiativeTo(iid) { const r = await api.exportInitiativeTo(iid); if (r && r.ok) toast('ok', 'Exportado a ' + r.path); }
 
+function _pickInitiativeForImport() {
+  return new Promise((resolve) => {
+    const m = el('div', 'modal');
+    m.setAttribute('role', 'dialog');
+    m.innerHTML = `
+      <div class="modal-card iap-modal">
+        <div class="modal-head">
+          <span class="modal-title">¿A qué iniciativa importar?</span>
+          <button class="icon-btn" id="iapClose">${svg('x', 14)}</button>
+        </div>
+        <div class="modal-body iap-body">
+          <p class="iap-hint">Selecciona una iniciativa o crea una nueva.</p>
+          <div class="iap-list" id="iapList"></div>
+          <button class="btn iap-new-btn" id="iapNew">${svg('plus', 13)} Nueva iniciativa</button>
+        </div>
+      </div>`;
+    const list = m.querySelector('#iapList');
+    STATE.initiatives.forEach(it => {
+      const row = el('button', 'iap-item');
+      row.innerHTML = `<span class="iap-dot" style="background:${_initColor(it)}"></span><span class="iap-name">${esc(it.name)}</span>`;
+      row.onclick = () => { closeModal(); resolve(it.id); };
+      list.appendChild(row);
+    });
+    m.querySelector('#iapClose').onclick = () => { closeModal(); resolve(null); };
+    m.querySelector('#iapNew').onclick = () => {
+      closeModal();
+      _promptNewInitiativeReturn(resolve);
+    };
+    openModal(m);
+  });
+}
+
+function _promptNewInitiativeReturn(onCreated) {
+  let color = INIT_COLORS[0];
+  const m = el('div', 'modal');
+  m.setAttribute('role', 'dialog');
+  m.innerHTML = `
+    <div class="modal-head"><h3>Nueva iniciativa</h3><button class="icon-btn sm" data-x>${svg('x', 14)}</button></div>
+    <div class="modal-body" style="gap:12px">
+      <input class="field" id="niName2" placeholder="Nombre de la iniciativa" maxlength="120" autocomplete="off">
+    </div>
+    <div class="modal-foot">
+      <button class="btn" data-x>Cancelar</button>
+      <button class="btn btn-primary" id="niOk2">Crear</button>
+    </div>`;
+  const inp = m.querySelector('#niName2');
+  const ok = async () => {
+    const name = inp.value.trim();
+    if (!name) { inp.focus(); return; }
+    closeModal();
+    const r = await api.createInitiative(name, color).catch(() => null);
+    if (r && r.id) {
+      STATE.initiatives.unshift(r);
+      renderSidebar();
+      onCreated(r.id);
+    } else { toast('err', 'No se pudo crear la iniciativa'); onCreated(null); }
+  };
+  m.querySelector('#niOk2').onclick = ok;
+  inp.onkeydown = (e) => { if (e.key === 'Enter') ok(); };
+  m.querySelectorAll('[data-x]').forEach(b => b.onclick = () => { closeModal(); onCreated(null); });
+  openModal(m);
+  setTimeout(() => inp.focus(), 50);
+}
+
 async function doImport(btn) {
-  // NO se arranca el cronómetro aquí: primero se elige el archivo (no debe contar
-  // el rato de selección). La transcripción va en segundo plano.
   btn.classList.add('is-loading');
   try {
-    const r = await api.importMedia(STATE.selInit);
-    if (r && r.error) { toast('err', 'No se pudo importar: ' + r.error); }
-    else if (r && r.cancelled) { /* el usuario cerró el diálogo */ }
-    else if (r && r.ok) {
-      // El archivo ya se está procesando por detrás; se ve en el indicador de
-      // trabajos y la reunión aparece como "procesando".
-      await refreshMeetings(STATE.selInit);
-      try { renderBgJobs(await api.getBackgroundJobs()); } catch (e) { /* sin jobs */ }
-      toast('ok', `Subiendo «${r.filename || 'archivo'}» · se transcribe en segundo plano`);
+    let initId = STATE.selInit || (STATE.transcript && STATE.transcript.initiative_id) || null;
+    if (!initId) {
+      btn.classList.remove('is-loading');
+      initId = await _pickInitiativeForImport();
+      if (!initId) return;
+      btn.classList.add('is-loading');
     }
-  } catch (e) { toast('err', 'Error al importar el archivo'); }
+    const r = await api.importMediaMultiple(initId);
+    if (r && r.error) { toast('err', 'No se pudo importar: ' + r.error); }
+    else if (r && r.cancelled) { /* usuario cerró el diálogo */ }
+    else if (r && r.ok) {
+      await refreshMeetings(initId);
+      try { renderBgJobs(await api.getBackgroundJobs()); } catch { /* sin jobs */ }
+      toast('ok', `${r.count} video${r.count !== 1 ? 's' : ''} importado${r.count !== 1 ? 's' : ''} · transcribiendo en 2.º plano`);
+    }
+  } catch { toast('err', 'Error al importar'); }
   btn.classList.remove('is-loading');
 }
 
@@ -2552,10 +3576,14 @@ function withRecordingConsent(proceed) {
   else api.getSettings().then(s => { STATE.settings = s || {}; run(!!(s && s.consent_seen)); });
 }
 
+function _nowDateShort() {
+  const d = new Date();
+  return `${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}/${String(d.getFullYear()).slice(-2)}`;
+}
 function startMeetingRecording() {
   if (STATE.appState !== 'idle') return;
   if (!STATE.selInit) { toast('err', 'Selecciona una iniciativa antes de grabar'); return; }
-  formModal('Nueva reunión', 'Título de la reunión', 'Reunión', 'Empezar a grabar', beginMeetingRecording);
+  formModal('Nueva reunión', 'Título de la reunión', _nowDateShort(), 'Empezar a grabar', beginMeetingRecording);
 }
 async function beginMeetingRecording(title) {
   if (!STATE.selInit) { toast('err', 'Selecciona una iniciativa antes de grabar'); return; }
@@ -2584,13 +3612,32 @@ async function stopMeetingRecording() {
   stopTimer();
   try {
     const r = await api.stopRecording();
-    // La transcripción va en segundo plano: volvemos a 'idle' al instante para
-    // poder empezar otra grabación sin esperar.
+    const stoppedId = r && r.meeting_id;
     STATE.screen = STATE.selInit ? 'initiative' : 'welcome';
     setAppState('idle');
     await refreshMeetings(STATE.selInit);
-    if (r && r.ok) toast('ok', 'Grabación detenida · se transcribe en segundo plano');
-    else toast('err', (r && r.error) || 'No se pudo finalizar la reunión');
+    if (r && r.ok) {
+      toast('ok', 'Grabación detenida · se transcribe en segundo plano');
+      // Modal opcional para renombrar la reunión
+      if (stoppedId) {
+        const ts = _nowDateShort();
+        const mtg = (STATE.meetingsByInit[STATE.selInit] || []).find(m => m.id === stoppedId);
+        const curTitle = (mtg && mtg.title) || ts;
+        formModal('Nombrar la reunión', 'Título (opcional)', curTitle, 'Guardar nombre', async (title) => {
+          title = (title || '').trim();
+          if (!title || title === curTitle) return;
+          await api.renameMeeting(stoppedId, title);
+          for (const k in STATE.meetingsByInit) {
+            const m = STATE.meetingsByInit[k].find(x => x.id === stoppedId);
+            if (m) m.title = title;
+          }
+          renderSidebar(); renderMain();
+          toast('ok', 'Reunión renombrada');
+        });
+      }
+    } else {
+      toast('err', (r && r.error) || 'No se pudo finalizar la reunión');
+    }
   } catch (e) {
     setAppState('idle');
     toast('err', 'No se pudo finalizar la reunión');
@@ -2612,6 +3659,14 @@ async function openScreenPanel() {
   STATE.screenTransform = { x: 0, y: 0, w: 1, h: 1 };
   const r = await api.startScreenPreview(STATE.monitorIdx);
   if (!r || r.ok === false) { toast('err', (r && r.error) || 'No se pudo abrir la vista previa'); return; }
+  if (r.recording) {
+    // El backend tiene una grabación activa que el JS no conocía: restaurar estado
+    STATE.screenMeetingId = r.meeting_id || null;
+    STATE.screenRecording = true;
+    setAppState('screen-recording');
+    startTimer();
+    return;
+  }
   showScreenPanel();
 }
 
@@ -2654,12 +3709,9 @@ function showScreenPanel() {
        <button class="btn btn-ghost" id="scCancel">Cancelar</button>`;
 
   m.innerHTML = `
-    <div class="modal-head">
-      ${head}
-      <span id="scMonMount" style="margin-left:auto"></span>
-      ${recording ? '<button class="icon-btn sc-collapse-btn" id="scCollapse" aria-label="Minimizar panel" title="Minimizar panel (−)">−</button>' : ''}
-    </div>
+    ${head ? `<div class="modal-head">${head}${recording ? '<button class="icon-btn sc-collapse-btn" id="scCollapse" aria-label="Minimizar panel" title="Minimizar panel (−)" style="margin-left:auto">−</button>' : ''}</div>` : ''}
     <div class="screen-setup">
+      <span id="scMonMount"></span>
       <input id="scName" class="field" placeholder="Nombre de la reunión" autocomplete="off" value="${esc(STATE.screenPanelName || '')}">
     </div>
     ${canvas}
@@ -2703,7 +3755,11 @@ function showScreenPanel() {
     wireObsCanvas(m.querySelector('#obsCanvas'));
   }
   const root = $('#overlayRoot'); root.replaceChildren(m); root.hidden = false;
-  root.onclick = recording ? (e) => { if (e.target === root) { STATE.screenPanelCollapsed = true; root.hidden = true; renderActionBar(); } } : null;
+  root.onclick = (e) => {
+    if (e.target !== root) return;
+    if (recording) { STATE.screenPanelCollapsed = true; root.hidden = true; renderActionBar(); }
+    else { api.stopScreenPreview(); STATE.screenPanelOpen = false; root.hidden = true; root.replaceChildren(); }
+  };
 }
 
 function applyObsSource() {
@@ -2811,8 +3867,18 @@ window.onScreenVideoSaved = async function (meetingId, initiativeId, ok, audio) 
   } else if (STATE.selInit) {
     await refreshMeetings(STATE.selInit);
   }
-  if (ok) toast(audio === false ? 'info' : 'ok', audio === false ? 'Vídeo guardado (sin sonido)' : 'Vídeo guardado');
-  else toast('err', 'No se pudo guardar el vídeo');
+  if (ok) {
+    const msg = audio === false ? 'Vídeo guardado (sin sonido)' : 'Vídeo añadido a Archivos';
+    toast(audio === false ? 'info' : 'ok', msg, 'Ver archivo', () => {
+      if (meetingId) {
+        openMeeting(meetingId);
+        STATE.activeTab = 'archivos';
+        renderMain();
+      }
+    });
+  } else {
+    toast('err', 'No se pudo guardar el vídeo');
+  }
 };
 
 /* ============================================================
@@ -3034,20 +4100,14 @@ function applyScreenPreviewFit(p) {
 window.setScreenPreview = function (b64) {
   if (!b64) return;
   const url = 'url(data:image/jpeg;base64,' + b64 + ')';
-  const source = document.getElementById('obsSource');
-  if (source && !STATE.screenRecording) {
-    // En espera: la pantalla cruda llena la CAJA (estirada a su tamaño = como se grabará).
-    source.style.backgroundImage = url;
-    source.style.backgroundSize = '100% 100%';
-    source.style.backgroundPosition = 'center';
-    return;
-  }
-  // Grabando: la vista previa ya viene compuesta (lienzo negro + pantalla colocada).
+  // Siempre pintamos sobre el canvas completo (como OBS: fondo negro + pantalla encima).
+  // El obsSource es solo el marco/handles de posicionamiento (transparente).
   const canvas = document.getElementById('obsCanvas');
   if (canvas) {
     canvas.style.backgroundImage = url;
-    canvas.style.backgroundSize = '100% 100%';
+    canvas.style.backgroundSize = 'contain';      // mantiene proporción EXACTA, sin distorsión
     canvas.style.backgroundPosition = 'center';
+    canvas.style.backgroundRepeat = 'no-repeat';
   }
 };
 // Tu backend (grabación de pantalla) llama setPreview(); es el mismo destino.
@@ -3069,7 +4129,23 @@ function showRecoveryBanner(rec) {
       <button class="btn btn-primary btn-lg" data-rec style="justify-content:center">Recuperar y transcribir</button>
       <div style="display:flex;gap:8px"><button class="btn" data-keep style="flex:1;justify-content:center">Conservar para después</button><button class="btn btn-danger" data-disc style="flex:1;justify-content:center">Descartar…</button></div>
     </div>`;
-  m.querySelector('[data-rec]').onclick = async () => { closeModal(); if (v2Available('recover_recording')) await api.v2.recoverRecording(rec.id); runProcessing('Recuperando y transcribiendo', () => toast('ok', 'Grabación recuperada')); };
+  m.querySelector('[data-rec]').onclick = async () => {
+    closeModal();
+    if (!v2Available('recover_recording')) { toast('err', 'Recuperación no disponible'); return; }
+    const r = await api.v2.recoverRecording(rec.id);
+    if (!r || !r.ok) { toast('err', r && r.error ? r.error : 'No se pudo recuperar la grabación'); return; }
+    try { renderBgJobs(await api.getBackgroundJobs()); } catch (e) {}
+    if (r.meeting_id) {
+      // Reunión conocida: navegar directo a ella (ya tiene video_path)
+      if (r.initiative_id) STATE.selInit = r.initiative_id;
+      await refreshMeetings(r.initiative_id || STATE.selInit);
+      await openMeeting(r.meeting_id, false);
+      toast('ok', 'Vídeo recuperado — usa "Transcribir este vídeo" para obtener el texto');
+    } else {
+      // Sin reunión vinculada (crash antiguo): el vídeo quedó en carpeta «Recuperados»
+      toast('info', 'Vídeo guardado en carpeta «Recuperados». Ábrela con el ícono de carpeta, luego usa «Importar vídeo y transcribir» en la reunión que quieras.');
+    }
+  };
   m.querySelector('[data-keep]').onclick = closeModal;
   m.querySelector('[data-disc]').onclick = () => confirmModal('Descartar grabación', 'Se eliminará el audio recuperado. Esta acción no se puede deshacer.', 'Descartar', async () => { if (v2Available('discard_recoverable_recording')) await api.v2.discardRecoverable(rec.id); toast('info', 'Grabación descartada'); });
   openModal(m);
@@ -3215,7 +4291,8 @@ function openSettings() { STATE.screen = 'settings'; renderMain(); renderTopStat
 function viewSettings() {
   const wrap = el('div'); wrap.style.cssText = 'display:flex;flex-direction:column;flex:1;min-height:0';
   const head = el('div', 'mhead');
-  head.innerHTML = `<div class="mhead-row"><h1 class="mtitle-h">Ajustes</h1></div><div style="height:16px"></div>`;
+  head.style.cssText = 'border-bottom:none;background:transparent';
+  head.innerHTML = `<div class="mhead-row"><h1 class="mtitle-h">Ajustes</h1></div>`;
   const content = el('div', 'content');
   const inner = el('div', 'sv-page');
   inner.style.maxWidth = '640px';
@@ -3248,7 +4325,7 @@ function viewSettings() {
 
       <div class="sv-section">
         <div class="sv-sec-title">${svg('edit', 14)} Instrucciones para la IA</div>
-        <textarea id="svAiInstr" class="obj-text sv-textarea" rows="5"
+        <textarea id="svAiInstr" class="obj-text sv-textarea" rows="8"
           placeholder="Instrucciones al inicio de cada exportación a Claude…">${esc(s.ai_instructions || '')}</textarea>
         <div class="sv-row-end">
           <button class="btn" id="svAiReset">Restablecer</button>
@@ -3264,9 +4341,27 @@ function viewSettings() {
         </div>
       </div>
 
+      <div class="sv-section" id="svLicSection">
+        <div class="sv-sec-title">${svg('checkSquare', 14)} Licencia</div>
+        <div class="sv-lic-rows">
+          <div class="sv-row">
+            <span class="sv-lbl">Estado</span>
+            <span id="svLicStatus" style="color:var(--text-secondary)">Cargando…</span>
+          </div>
+          <div class="sv-row">
+            <span class="sv-lbl">Plan</span>
+            <span id="svLicPlan" style="color:var(--text-primary)">—</span>
+          </div>
+        </div>
+        <div class="sv-row-end" style="margin-top:12px">
+          <button class="sv-act sv-lic-deactivate" id="svLicDeactivate" style="display:none">
+            ${svg('x', 11)} Desactivar en este dispositivo
+          </button>
+        </div>
+      </div>
+
       <div class="sv-section sv-section--actions">
         <button class="sv-act" id="svDiag">${svg('check', 13)} Diagnóstico</button>
-        <button class="sv-act" id="svBackup">${svg('download', 13)} Copia de seguridad</button>
         <button class="sv-act sv-act--danger" id="svWipe">${svg('trash', 13)} Borrar datos</button>
       </div>`;
 
@@ -3311,14 +4406,34 @@ function viewSettings() {
     inner.querySelector('#svAiReset').onclick = async () => { const r = await api.setAiInstructions(''); inner.querySelector('#svAiInstr').value = (r && r.text) || ''; toast('ok', 'Restablecido'); };
     inner.querySelector('#svDir').onclick = async () => { const r = await api.chooseExportDir(); if (r && r.ok) { toast('ok', 'Carpeta actualizada'); openSettings(); } };
     inner.querySelector('#svDiag').onclick = () => openDiagnostics();
-    inner.querySelector('#svBackup').onclick = async (e) => {
-      e.currentTarget.classList.add('is-loading');
-      try {
-        const r = await api.backupDatabase();
-        if (r && r.ok) toast('ok', 'Copia de seguridad guardada');
-        else if (!r?.cancelled) toast('err', 'No se pudo crear la copia');
-      } finally { e.currentTarget.classList.remove('is-loading'); }
-    };
+    // Sección licencia
+    if (HAS_PYWEBVIEW()) {
+      api.getLicenseInfo().then(info => {
+        const stEl = inner.querySelector('#svLicStatus');
+        const planEl = inner.querySelector('#svLicPlan');
+        const btn = inner.querySelector('#svLicDeactivate');
+        if (!stEl) return;
+        if (info && info.active) {
+          stEl.textContent = 'Activa';
+          stEl.style.color = 'var(--accent)';
+          planEl.textContent = info.plan || 'personal';
+          btn.style.display = '';
+          btn.onclick = () => confirmModal(
+            'Desactivar licencia',
+            'Se borrará la activación de este dispositivo. Necesitarás tu product key para volver a activar.',
+            'Desactivar', async () => {
+              await api.deactivateLicense();
+              toast('ok', 'Licencia desactivada');
+              showLicenseGate();
+            }
+          );
+        } else {
+          stEl.textContent = 'Sin licencia';
+          planEl.textContent = '—';
+        }
+      });
+    }
+
     inner.querySelector('#svWipe').onclick = () => {
       confirmModal('Borrar todos los datos',
         'Se borrarán TODOS tus datos locales: iniciativas, reuniones, transcripciones, notas, capturas y ajustes. Tu carpeta de exportación NO se toca. Esta acción no se puede deshacer.',
@@ -3378,8 +4493,15 @@ function applyBootstrap(b) {
   STATE.archiveCount = lc.archive || 0; STATE.trashCount = lc.trash || 0;
   const ac = $('#archiveCount'), tc = $('#trashCount');
   if (ac) ac.textContent = STATE.archiveCount; if (tc) tc.textContent = STATE.trashCount;
-  if (b.version) { STATE.version = b.version; const ve = $('#sidebarVersion'); if (ve) ve.textContent = 'Helpmeet v' + b.version; }
+  if (b.version) { STATE.version = b.version; const ve = $('#headerVersion'); if (ve) ve.textContent = 'v' + b.version; }
   if (b.default_mic_muted != null) { STATE.micMuted = !!b.default_mic_muted; updateMicChip(); }
+  // Restaurar estado de grabación de pantalla si el backend la tenía activa
+  if (b.screen_recording) {
+    STATE.screenMeetingId = b.screen_meeting_id || null;
+    STATE.screenRecording = true;
+    setAppState('screen-recording');
+    startTimer();
+  }
 }
 
 async function refreshAll() {
@@ -3409,10 +4531,10 @@ const WC_SVG = {
 function wireTopbar() {
   $('#btnNewInitiative').innerHTML = svg('plus', 14);
   $('#btnNewInitiativeRail').innerHTML = svg('plus', 16);
-  $('#btnArchive').querySelector('.ico-archive')?.replaceWith(elFromHTML('<span class="ico">' + svg('archive', 14) + '</span>'));
+  $('#btnArchive')?.querySelector('.ico-archive')?.replaceWith(elFromHTML('<span class="ico">' + svg('archive', 14) + '</span>'));
   $('#btnTrash').querySelector('.ico-trash')?.replaceWith(elFromHTML('<span class="ico">' + svg('trash', 14) + '</span>'));
   $('#navInitiatives').querySelector('.ico-rocket')?.replaceWith(elFromHTML('<span class="ico">' + svg('rocket', 15) + '</span>'));
-  $('#navInitiatives .nav-chev').innerHTML = svg('chevron', 14);
+  $('#navInitiatives .nav-chev').innerHTML = svg('chevron', 17);
   $('#navMeetings').querySelector('.ico-meetings')?.replaceWith(elFromHTML('<span class="ico">' + svg('calendar', 15) + '</span>'));
   $('#btnSettingsSide').querySelector('.ico-settings')?.replaceWith(elFromHTML('<span class="ico">' + svg('settings', 14) + '</span>'));
   // Rail
@@ -3425,7 +4547,7 @@ function wireTopbar() {
 
   $('#btnNewInitiative').onclick = promptNewInitiative;
   $('#btnNewInitiativeRail').onclick = promptNewInitiative;
-  $('#btnArchive').onclick = () => { STATE.screen = 'archive'; renderMain(); };
+  if ($('#btnArchive')) $('#btnArchive').onclick = () => { STATE.screen = 'archive'; renderMain(); };
   $('#btnTrash').onclick = () => { STATE.screen = 'trash'; renderMain(); };
   $('#btnSettingsSide').onclick = () => { STATE.screen = 'settings'; renderMain(); renderTopStatus(); };
   $('#railMeetings')?.addEventListener('click', () => { STATE.sidebarOpen = true; applySidebar(); openMeetingsView(); });
@@ -3434,12 +4556,22 @@ function wireTopbar() {
   $('#railTrash')?.addEventListener('click', () => { STATE.sidebarOpen = true; applySidebar(); STATE.screen = 'trash'; renderMain(); });
   $('#railSettings')?.addEventListener('click', () => { STATE.sidebarOpen = true; applySidebar(); STATE.screen = 'settings'; renderMain(); renderTopStatus(); });
   $('#navInitiativesToggle').onclick = () => {
+    STATE.openInits = {};   // colapsa todo lo abierto en el árbol
+    STATE.selInit = null; STATE.selMeeting = null;
+    STATE.screen = 'initiatives-list';
+    renderSidebar(); renderMain(); renderTopStatus();
+  };
+  // El chevron colapsa/expande el árbol sin navegar
+  $('#navInitiatives .nav-chev').onclick = (e) => {
+    e.stopPropagation();
     const tree = $('#sidebarTree');
     const collapsed = tree.classList.toggle('is-collapsed');
     $('#navInitiatives').classList.toggle('collapsed', collapsed);
     $('#navInitiativesToggle').setAttribute('aria-expanded', String(!collapsed));
   };
   $('#navMeetings').onclick = openMeetingsView;
+  $('#navFavorites')?.querySelector('.ico-star')?.replaceWith(elFromHTML('<span class="ico">' + svg('star', 15) + '</span>'));
+  if ($('#navFavorites')) $('#navFavorites').onclick = () => { STATE.screen = 'favorites'; renderMain(); renderTopStatus(); };
 
   // Controles de ventana frameless — iconos SVG estilo Win11
   const wcMin = $('#wcMin'), wcMax = $('#wcMax'), wcClose = $('#wcClose');
@@ -3475,10 +4607,223 @@ function wireTopbar() {
 }
 function elFromHTML(h) { const t = el('div'); t.innerHTML = h; return t.firstChild; }
 
-async function init() {
-  applySidebar();
-  wireTopbar();
-  setAppState('idle');
+/* ============================================================
+   ASISTENTE DE PRIMERA EJECUCIÓN (SETUP)
+   ============================================================ */
+function showSetupOverlay(cfg) {
+  // cfg: objeto get_transcription_settings (puede ser null si aún no cargó)
+  const ov = el('div', 'setup-overlay');
+  ov.innerHTML = `
+    <div class="setup-box">
+      <div class="setup-hero">
+        <img class="setup-logo-img" src="assets/helpmeet-symbol.svg" alt="">
+        <h1 class="setup-h1">Bienvenido a Helpmeet</h1>
+        <p class="setup-sub">Vamos a preparar el motor de transcripción antes de tu primera grabación.<br>Solo se hace una vez y tardará unos minutos.</p>
+      </div>
+
+      <div class="setup-section" id="setupCfgWrap">
+        <div class="setup-section-title">Idioma y calidad</div>
+        <div class="pre-cfg">
+          <div class="pre-cfg-row"><span class="pre-cfg-lbl">Idioma</span><div class="cfg-chips" id="setupLangChips"></div></div>
+          <div class="pre-cfg-row"><span class="pre-cfg-lbl">Calidad</span><div class="cfg-chips" id="setupModelChips"></div></div>
+        </div>
+      </div>
+
+      <div class="setup-section">
+        <div class="setup-section-title">Carpeta de grabaciones</div>
+        <div class="setup-folder-row">
+          <span class="setup-folder-path" id="setupFolderPath">…</span>
+          <button class="btn setup-folder-btn" id="setupFolderBtn">Cambiar</button>
+        </div>
+      </div>
+
+      <div class="setup-section">
+        <div class="setup-section-title">Estado del sistema</div>
+        <div class="setup-checks" id="setupChecks"><span class="setup-check-placeholder">Comprobando…</span></div>
+      </div>
+
+      <div class="setup-progress-wrap" id="setupProgressWrap" hidden>
+        <div class="setup-progress-bar-outer"><div class="setup-progress-bar-fill" id="setupFill" style="width:3%"></div></div>
+        <div class="setup-progress-label" id="setupLabel">Preparando…</div>
+      </div>
+
+      <div class="setup-error-msg" id="setupErrorMsg" hidden></div>
+
+      <div class="setup-foot">
+        <button class="btn btn-primary setup-btn-start" id="setupBtnStart">Descargar e instalar modelo</button>
+        <button class="btn setup-btn-skip" id="setupBtnSkip" hidden>Continuar sin configurar</button>
+      </div>
+    </div>`;
+
+  document.body.appendChild(ov);
+
+  let _cfg = cfg || {};
+  let _started = false;
+
+  async function _loadChips() {
+    try { _cfg = await api.v2.getTranscriptionSettings() || _cfg; } catch (e) { /* usa lo que hay */ }
+    const byLang = _cfg.models_by_lang || {};
+    const langEl = ov.querySelector('#setupLangChips');
+    const modelEl = ov.querySelector('#setupModelChips');
+    langEl.innerHTML = (_cfg.languages || []).map(lg =>
+      `<button class="cfg-chip${lg.id === _cfg.language ? ' on' : ''}" data-lang="${esc(lg.id)}">${esc(lg.label)}</button>`
+    ).join('');
+    modelEl.innerHTML = (byLang[_cfg.language] || _cfg.models || []).map(mo =>
+      `<button class="cfg-chip${mo.tier === _cfg.tier ? ' on' : ''}" data-tier="${esc(mo.tier)}" title="${esc(mo.label)} · ${esc(mo.download)}">${esc(mo.id)}<span class="cfg-chip-sub">${esc(mo.download)}</span></button>`
+    ).join('');
+    langEl.querySelectorAll('[data-lang]').forEach(b => b.onclick = async () => {
+      try { _cfg = await api.v2.setTranscriptionSettings({ language: b.dataset.lang }) || _cfg; } catch (e) { /* */ }
+      _loadChips();
+    });
+    modelEl.querySelectorAll('[data-tier]').forEach(b => b.onclick = async () => {
+      try { _cfg = await api.v2.setTranscriptionSettings({ tier: b.dataset.tier }) || _cfg; } catch (e) { /* */ }
+      _loadChips();
+    });
+    // Carpeta de destino
+    const folderEl = ov.querySelector('#setupFolderPath');
+    if (folderEl && _cfg.export_dir) folderEl.textContent = _cfg.export_dir;
+  }
+  _loadChips();
+
+  ov.querySelector('#setupFolderBtn').onclick = async () => {
+    try {
+      await api.chooseExportDir();
+      _loadChips();  // actualiza la ruta mostrada
+    } catch (e) { /* cancelado */ }
+  };
+
+  async function _loadChecks() {
+    try {
+      const r = await api.getRecordingPreflight('meeting', 0);
+      const checksEl = ov.querySelector('#setupChecks');
+      if (!r || !r.checks) { checksEl.innerHTML = ''; return; }
+      checksEl.innerHTML = r.checks.map(c => {
+        const ico = c.status === 'ok' ? svg('check', 13) : c.status === 'error' ? svg('x', 13) : svg('info', 13);
+        return `<span class="setup-check ${c.status}">${ico}<span>${esc(c.title)}</span></span>`;
+      }).join('');
+    } catch (e) { ov.querySelector('#setupChecks').innerHTML = ''; }
+  }
+  _loadChecks();
+
+  function _enterApp() {
+    window.onSetupProgress = null;
+    ov.classList.add('setup-fade-out');
+    setTimeout(() => {
+      ov.style.display = 'none';
+      ov.style.pointerEvents = 'none';
+      if (ov.parentNode) ov.remove();
+    }, 450);
+  }
+
+  window.onSetupProgress = (e) => {
+    const fill = ov.querySelector('#setupFill');
+    const label = ov.querySelector('#setupLabel');
+    const errEl = ov.querySelector('#setupErrorMsg');
+    const btn = ov.querySelector('#setupBtnStart');
+    const skip = ov.querySelector('#setupBtnSkip');
+    const pct = Math.round((e.pct || 0) * 100);
+    if (fill) fill.style.width = Math.max(3, pct) + '%';
+    if (e.stage === 'downloading') {
+      const sz = e.size_label ? ` (${e.size_label})` : '';
+      if (label) label.textContent = `Descargando modelo «${e.model || ''}»${sz}… ${pct}%`;
+    } else if (e.stage === 'loading') {
+      if (label) label.textContent = `Cargando en memoria… ${pct}%`;
+    } else if (e.stage === 'done') {
+      if (fill) fill.style.width = '100%';
+      if (label) label.textContent = '¡Listo! El motor ya está caliente.';
+      btn.textContent = 'Comenzar →';
+      btn.disabled = false;
+      btn.onclick = _enterApp;
+    } else if (e.stage === 'error') {
+      if (errEl) { errEl.hidden = false; errEl.textContent = e.error || 'Error durante la instalación.'; }
+      if (label) label.textContent = 'Se produjo un error.';
+      btn.textContent = 'Reintentar';
+      btn.disabled = false;
+      _started = false;
+      skip.hidden = false;
+    }
+  };
+
+  ov.querySelector('#setupBtnStart').onclick = async () => {
+    if (_started) return;
+    _started = true;
+    const btn = ov.querySelector('#setupBtnStart');
+    btn.disabled = true;
+    btn.textContent = 'Instalando…';
+    ov.querySelector('#setupProgressWrap').hidden = false;
+    ov.querySelector('#setupErrorMsg').hidden = true;
+    try { await api.v2.runSetup(); } catch (e) { /* la respuesta llega por onSetupProgress */ }
+  };
+  ov.querySelector('#setupBtnSkip').onclick = _enterApp;
+}
+
+window.doLicenseActivate = async function() {
+  const input = document.getElementById('licenseKeyInput');
+  const btn   = document.querySelector('.license-btn');
+  const errEl = document.getElementById('licenseError');
+  if (!input || !btn || btn.disabled) return;
+  const key = input.value.trim().toUpperCase();
+  if (!key || key.length < 22) { input.focus(); input.classList.add('lic-shake'); setTimeout(() => input.classList.remove('lic-shake'), 500); return; }
+  btn.disabled = true;
+  btn.innerHTML = '<span class="lic-spinner"></span>Activando...';
+  if (errEl) errEl.hidden = true;
+  try {
+    const result = await api.activateLicense(key);
+    if (result && result.ok) {
+      btn.innerHTML = '<span class="lic-check"></span>Activado';
+      btn.classList.add('lic-success');
+      const gate = document.getElementById('licenseGate');
+      gate.classList.add('lic-fade-out');
+      await new Promise(r => setTimeout(r, 400));
+      gate.hidden = true;
+      gate.classList.remove('lic-fade-out');
+      await _finishInit();
+    } else {
+      if (errEl) {
+        errEl.textContent = (result && result.error) || 'Key invalida. Intentalo de nuevo.';
+        errEl.hidden = false;
+      }
+      input.classList.add('lic-shake');
+      setTimeout(() => input.classList.remove('lic-shake'), 500);
+      btn.disabled = false;
+      btn.innerHTML = 'Activar';
+    }
+  } catch (e) {
+    if (errEl) { errEl.textContent = 'Error inesperado. Intentalo de nuevo.'; errEl.hidden = false; }
+    btn.disabled = false;
+    btn.innerHTML = 'Activar';
+  }
+};
+
+function showLicenseGate() {
+  const gate = document.getElementById('licenseGate');
+  gate.hidden = false;
+  gate.classList.add('lic-fade-in');
+  setTimeout(() => gate.classList.remove('lic-fade-in'), 400);
+  const input = document.getElementById('licenseKeyInput');
+  if (!input) return;
+  setTimeout(() => input.focus(), 120);
+  // Auto-formato HM-XXXX-XXXX-XXXX-XXXX mientras escribe
+  input.addEventListener('input', () => {
+    const sel = input.selectionStart;
+    const raw = input.value.replace(/[^A-Z0-9]/gi, '').toUpperCase().slice(0, 18);
+    let fmt = '';
+    if (raw.length >= 2) {
+      fmt = raw.slice(0, 2) + '-';
+      const rest = raw.slice(2);
+      for (let i = 0; i < rest.length; i++) {
+        if (i > 0 && i % 4 === 0) fmt += '-';
+        fmt += rest[i];
+      }
+    } else {
+      fmt = raw;
+    }
+    input.value = fmt;
+    input.classList.toggle('valid', fmt.length === 22);
+  });
+}
+
+async function _finishInit() {
   let booted = false;
   try {
     if (bootstrapAvailable()) {
@@ -3488,13 +4833,16 @@ async function init() {
         applyBootstrap(b);
         booted = true;
         try { renderBgJobs(b.background_jobs || []); } catch (e) { /* sin jobs */ }
+        if (!b.setup_done) {
+          showSetupOverlay(null);
+        }
       }
     }
     if (!booted) {
       // Backend antiguo: camino anterior (una llamada por iniciativa).
       STATE.initiatives = await api.listInitiatives() || [];
       STATE.monitors = await api.listMonitors() || [];
-      if (STATE.monitors.length) STATE.monitorIdx = STATE.monitors[0].index;  // índice real (1 = principal)
+      if (STATE.monitors.length) STATE.monitorIdx = STATE.monitors[0].index;
       for (const it of STATE.initiatives) STATE.meetingsByInit[it.id] = await api.listMeetings(it.id) || [];
     }
   } catch (e) { console.warn('init', e); }
@@ -3503,12 +4851,27 @@ async function init() {
     updateLibraryCounts();
     try { renderBgJobs(await api.getBackgroundJobs()); } catch (e) { /* sin jobs */ }
   }
-
   // Recuperación al arrancar (V2). Si no hay backend, no molesta.
   if (v2Available('list_recoverable_recordings')) {
     const recs = await api.v2.listRecoverable();
     if (recs && recs.length) showRecoveryBanner(recs[0]);
   }
+}
+
+async function init() {
+  applySidebar();
+  wireTopbar();
+  setAppState('idle');
+
+  // Verificar licencia
+  if (HAS_PYWEBVIEW()) {
+    try {
+      const lic = await api.checkLicense();
+      if (!lic || !lic.ok) { showLicenseGate(); return; }
+    } catch (e) { console.warn('license_check', e); }
+  }
+
+  await _finishInit();
 }
 
 // pywebview expone la API de forma ASÍNCRONA: el objeto window.pywebview.api

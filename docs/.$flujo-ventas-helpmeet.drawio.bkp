@@ -1,0 +1,306 @@
+<mxGraphModel dx="1422" dy="762" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1700" pageHeight="2200" math="0" shadow="0">
+  <root>
+    <mxCell id="0" />
+    <mxCell id="1" parent="0" />
+
+    <!-- TÍTULO -->
+    <mxCell id="title" value="Flujo de Ventas — Helpmeet" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=24;fontStyle=1;fontColor=#2d3436;" vertex="1" parent="1">
+      <mxGeometry x="40" y="10" width="1620" height="44" as="geometry" />
+    </mxCell>
+
+    <!-- ═══════════════════════════════════════════════════════ -->
+    <!-- SWIM LANES (verticales, todo el alto) -->
+    <!-- ═══════════════════════════════════════════════════════ -->
+
+    <mxCell id="lane-cliente" value="🧑 CLIENTE" style="swimlane;startSize=34;horizontal=0;fillColor=#dae8fc;strokeColor=#6c8ebf;fontStyle=1;fontSize=13;verticalAlign=middle;" vertex="1" parent="1">
+      <mxGeometry x="40" y="70" width="180" height="2080" as="geometry" />
+    </mxCell>
+
+    <mxCell id="lane-gumroad" value="🛒 GUMROAD" style="swimlane;startSize=34;horizontal=0;fillColor=#fff2cc;strokeColor=#d6b656;fontStyle=1;fontSize=13;verticalAlign=middle;" vertex="1" parent="1">
+      <mxGeometry x="220" y="70" width="220" height="2080" as="geometry" />
+    </mxCell>
+
+    <mxCell id="lane-backend" value="⚙️ RAILWAY BACKEND (FastAPI)" style="swimlane;startSize=34;horizontal=0;fillColor=#d5e8d4;strokeColor=#82b366;fontStyle=1;fontSize=13;verticalAlign=middle;" vertex="1" parent="1">
+      <mxGeometry x="440" y="70" width="340" height="2080" as="geometry" />
+    </mxCell>
+
+    <mxCell id="lane-db" value="🗄️ POSTGRESQL" style="swimlane;startSize=34;horizontal=0;fillColor=#e1d5e7;strokeColor=#9673a6;fontStyle=1;fontSize=13;verticalAlign=middle;" vertex="1" parent="1">
+      <mxGeometry x="780" y="70" width="240" height="2080" as="geometry" />
+    </mxCell>
+
+    <mxCell id="lane-admin" value="👨‍💼 VICTOR (ADMIN)" style="swimlane;startSize=34;horizontal=0;fillColor=#ffe6cc;strokeColor=#d79b00;fontStyle=1;fontSize=13;verticalAlign=middle;" vertex="1" parent="1">
+      <mxGeometry x="1020" y="70" width="240" height="2080" as="geometry" />
+    </mxCell>
+
+    <mxCell id="lane-app" value="💻 HELPMEET APP (PC del cliente)" style="swimlane;startSize=34;horizontal=0;fillColor=#f8cecc;strokeColor=#b85450;fontStyle=1;fontSize=13;verticalAlign=middle;" vertex="1" parent="1">
+      <mxGeometry x="1260" y="70" width="260" height="2080" as="geometry" />
+    </mxCell>
+
+    <!-- ═══════════════════════════════════════════════════════ -->
+    <!-- FASE 1 — COMPRA  (y: 120-480) -->
+    <!-- ═══════════════════════════════════════════════════════ -->
+
+    <mxCell id="fase1-band" value="" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=none;opacity=25;" vertex="1" parent="1">
+      <mxGeometry x="40" y="120" width="1700" height="360" as="geometry" />
+    </mxCell>
+    <mxCell id="fase1-label" value="FASE 1 — COMPRA EN GUMROAD" style="text;html=1;strokeColor=none;fillColor=#6c8ebf;align=center;verticalAlign=middle;rounded=1;fontSize=12;fontStyle=1;fontColor=#ffffff;" vertex="1" parent="1">
+      <mxGeometry x="60" y="130" width="1660" height="26" as="geometry" />
+    </mxCell>
+
+    <mxCell id="c1" value="Ve el producto en Gumroad&#xa;marquinavictor.gumroad.com/l/helpmeet" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=11;" vertex="1" parent="1">
+      <mxGeometry x="70" y="180" width="150" height="55" as="geometry" />
+    </mxCell>
+
+    <mxCell id="c2" value="Introduce datos de pago&#xa;(tarjeta / PayPal)&#xa;Precio: $X" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=11;" vertex="1" parent="1">
+      <mxGeometry x="70" y="270" width="150" height="65" as="geometry" />
+    </mxCell>
+
+    <mxCell id="g1" value="Procesa el pago" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=11;fontStyle=1;" vertex="1" parent="1">
+      <mxGeometry x="260" y="180" width="180" height="45" as="geometry" />
+    </mxCell>
+
+    <mxCell id="g2" value="✉ Envía email de confirmación&#xa;al comprador (recibo Gumroad)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=11;" vertex="1" parent="1">
+      <mxGeometry x="260" y="250" width="180" height="55" as="geometry" />
+    </mxCell>
+
+    <mxCell id="g3" value="🔔 Dispara webhook (ping)&#xa;POST /api/gumroad/webhook&#xa;?token=ADMIN_API_KEY&#xa;Solo si precio &gt; $0" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=11;fontStyle=1;" vertex="1" parent="1">
+      <mxGeometry x="260" y="335" width="180" height="80" as="geometry" />
+    </mxCell>
+
+    <!-- ═══════════════════════════════════════════════════════ -->
+    <!-- FASE 2 — GENERACIÓN DE LICENCIA  (y: 480-1080) -->
+    <!-- ═══════════════════════════════════════════════════════ -->
+
+    <mxCell id="fase2-band" value="" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=none;opacity=25;" vertex="1" parent="1">
+      <mxGeometry x="40" y="480" width="1700" height="600" as="geometry" />
+    </mxCell>
+    <mxCell id="fase2-label" value="FASE 2 — EL BACKEND GENERA LA LICENCIA" style="text;html=1;strokeColor=none;fillColor=#82b366;align=center;verticalAlign=middle;rounded=1;fontSize=12;fontStyle=1;fontColor=#ffffff;" vertex="1" parent="1">
+      <mxGeometry x="60" y="490" width="1660" height="26" as="geometry" />
+    </mxCell>
+
+    <mxCell id="b1" value="Recibe el webhook&#xa;Verifica token con HMAC&#xa;compare_digest()&#xa;✅ Autenticado" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=11;" vertex="1" parent="1">
+      <mxGeometry x="460" y="540" width="220" height="65" as="geometry" />
+    </mxCell>
+
+    <mxCell id="b2" value="¿Ya se procesó&#xa;este sale_id antes?&#xa;(idempotencia)" style="rhombus;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=10;" vertex="1" parent="1">
+      <mxGeometry x="500" y="630" width="140" height="65" as="geometry" />
+    </mxCell>
+
+    <mxCell id="b3" value="Busca o crea Customer&#xa;en la base de datos&#xa;por email" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=11;" vertex="1" parent="1">
+      <mxGeometry x="460" y="725" width="220" height="55" as="geometry" />
+    </mxCell>
+
+    <mxCell id="b4" value="🔑  GENERA LA PRODUCT KEY  🔑&#xa;&#xa;generate_license_key()&#xa;secrets.choice(A-Z0-9) × 16&#xa;Formato: HM-XXXX-XXXX-XXXX-XXXX&#xa;&#xa;Criptográficamente segura&#xa;(módulo 'secrets', no random)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#00b86b;strokeColor=#00703f;fontSize=12;fontStyle=1;fontColor=#ffffff;" vertex="1" parent="1">
+      <mxGeometry x="460" y="800" width="220" height="115" as="geometry" />
+    </mxCell>
+
+    <mxCell id="b5" value="🔒 Hashea la key&#xa;SHA-256(key) → key_hash&#xa;La key en texto plano&#xa;NUNCA se guarda en BD" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=11;" vertex="1" parent="1">
+      <mxGeometry x="460" y="935" width="220" height="65" as="geometry" />
+    </mxCell>
+
+    <mxCell id="b6" value="📧 Notifica a Victor (admin)&#xa;via Resend (HTTPS)&#xa;Email + key completa" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=11;" vertex="1" parent="1">
+      <mxGeometry x="460" y="1015" width="220" height="55" as="geometry" />
+    </mxCell>
+
+    <!-- DB inserts en fase 2 -->
+    <mxCell id="db1" value="INSERT License&#xa;─────────────────&#xa;customer_id&#xa;key_hash (SHA-256)&#xa;key_last4 (XXXX)&#xa;plan = personal&#xa;status = active&#xa;max_devices = 1&#xa;created_at = NOW()" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=10;align=left;spacingLeft=8;" vertex="1" parent="1">
+      <mxGeometry x="800" y="800" width="200" height="135" as="geometry" />
+    </mxCell>
+
+    <mxCell id="db2" value="INSERT LicenseEvent&#xa;─────────────────&#xa;event_type:&#xa; gumroad_purchase&#xa;metadata: {sale_id, email,&#xa; product_id}" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=10;align=left;spacingLeft=8;" vertex="1" parent="1">
+      <mxGeometry x="800" y="950" width="200" height="100" as="geometry" />
+    </mxCell>
+
+    <!-- Admin recibe notificación -->
+    <mxCell id="a1" value="📨 Recibe email en Gmail:&#xa;'Nueva venta'&#xa;+ email del comprador&#xa;+ key completa generada" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;fontSize=11;" vertex="1" parent="1">
+      <mxGeometry x="1040" y="1015" width="200" height="70" as="geometry" />
+    </mxCell>
+
+    <!-- ═══════════════════════════════════════════════════════ -->
+    <!-- FASE 3 — ENTREGA DE LA KEY  (y: 1080-1430) -->
+    <!-- ═══════════════════════════════════════════════════════ -->
+
+    <mxCell id="fase3-band" value="" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=none;opacity=25;" vertex="1" parent="1">
+      <mxGeometry x="40" y="1080" width="1700" height="350" as="geometry" />
+    </mxCell>
+    <mxCell id="fase3-label" value="FASE 3 — VICTOR ENTREGA LA KEY AL CLIENTE" style="text;html=1;strokeColor=none;fillColor=#d79b00;align=center;verticalAlign=middle;rounded=1;fontSize=12;fontStyle=1;fontColor=#ffffff;" vertex="1" parent="1">
+      <mxGeometry x="60" y="1090" width="1660" height="26" as="geometry" />
+    </mxCell>
+
+    <mxCell id="a2" value="Abre admin-panel.html&#xa;Ve la licencia nueva&#xa;(badge 'NUEVO' resaltado)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;fontSize=11;" vertex="1" parent="1">
+      <mxGeometry x="1040" y="1140" width="200" height="60" as="geometry" />
+    </mxCell>
+
+    <mxCell id="a3" value="Click en '✉ Enviar key'" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;fontSize=11;fontStyle=1;" vertex="1" parent="1">
+      <mxGeometry x="1040" y="1220" width="200" height="40" as="geometry" />
+    </mxCell>
+
+    <mxCell id="b7" value="POST /generate-key&#xa;Genera NUEVA key&#xa;(reemplaza key_hash)&#xa;Registra evento&#xa;'key_generated'&#xa;Notifica a Victor (Resend)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=11;" vertex="1" parent="1">
+      <mxGeometry x="460" y="1140" width="220" height="100" as="geometry" />
+    </mxCell>
+
+    <mxCell id="a4" value="📨 Recibe 2do email&#xa;'Clave lista para enviar'&#xa;con la key + plantilla&#xa;de texto para reenviar" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;fontSize=11;" vertex="1" parent="1">
+      <mxGeometry x="1040" y="1280" width="200" height="65" as="geometry" />
+    </mxCell>
+
+    <mxCell id="a5" value="📤 Reenvía el email&#xa;al cliente (1 clic en Gmail)&#xa;o copia la key manualmente" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;fontSize=11;fontStyle=1;" vertex="1" parent="1">
+      <mxGeometry x="1040" y="1365" width="200" height="55" as="geometry" />
+    </mxCell>
+
+    <mxCell id="c3" value="📨 Recibe email&#xa;con su Product Key&#xa;HM-XXXX-XXXX-XXXX-XXXX" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=11;" vertex="1" parent="1">
+      <mxGeometry x="70" y="1280" width="150" height="65" as="geometry" />
+    </mxCell>
+
+    <!-- ═══════════════════════════════════════════════════════ -->
+    <!-- FASE 4 — ACTIVACIÓN EN LA APP  (y: 1430-1880) -->
+    <!-- ═══════════════════════════════════════════════════════ -->
+
+    <mxCell id="fase4-band" value="" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=none;opacity=25;" vertex="1" parent="1">
+      <mxGeometry x="40" y="1430" width="1700" height="450" as="geometry" />
+    </mxCell>
+    <mxCell id="fase4-label" value="FASE 4 — ACTIVACIÓN EN LA APP" style="text;html=1;strokeColor=none;fillColor=#b85450;align=center;verticalAlign=middle;rounded=1;fontSize=12;fontStyle=1;fontColor=#ffffff;" vertex="1" parent="1">
+      <mxGeometry x="60" y="1440" width="1660" height="26" as="geometry" />
+    </mxCell>
+
+    <mxCell id="c4" value="Abre Helpmeet&#xa;Introduce la key&#xa;Click 'Activar'" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=11;" vertex="1" parent="1">
+      <mxGeometry x="70" y="1490" width="150" height="60" as="geometry" />
+    </mxCell>
+
+    <mxCell id="app1" value="Pantalla 'Activa tu licencia'&#xa;Auto-formato HM-XXXX-...&#xa;mientras escribe" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=11;" vertex="1" parent="1">
+      <mxGeometry x="1280" y="1490" width="220" height="60" as="geometry" />
+    </mxCell>
+
+    <mxCell id="app2" value="POST /api/license/activate&#xa;{license_key, device_id,&#xa; device_name, os, app_version}" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=11;fontStyle=1;" vertex="1" parent="1">
+      <mxGeometry x="1280" y="1575" width="220" height="65" as="geometry" />
+    </mxCell>
+
+    <mxCell id="b8" value="SHA-256(key_recibida)&#xa;Busca License por hash&#xa;Verifica status = active&#xa;Verifica límite max_devices" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=11;" vertex="1" parent="1">
+      <mxGeometry x="460" y="1490" width="220" height="70" as="geometry" />
+    </mxCell>
+
+    <mxCell id="b9" value="🎫 Genera JWT Token&#xa;Algoritmo HS256, 365 días&#xa;Payload: {license_id,&#xa; device_id_hash, plan, exp}" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=11;fontStyle=1;" vertex="1" parent="1">
+      <mxGeometry x="460" y="1580" width="220" height="70" as="geometry" />
+    </mxCell>
+
+    <mxCell id="db3" value="INSERT Activation&#xa;─────────────────&#xa;license_id&#xa;device_id_hash (SHA-256)&#xa;device_name, os&#xa;status = active&#xa;first_activated_at" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=10;align=left;spacingLeft=8;" vertex="1" parent="1">
+      <mxGeometry x="800" y="1490" width="200" height="120" as="geometry" />
+    </mxCell>
+
+    <mxCell id="app3" value="✅ Guarda el JWT en&#xa;Windows Credential Manager&#xa;(cifrado, nunca texto plano)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=11;" vertex="1" parent="1">
+      <mxGeometry x="1280" y="1665" width="220" height="60" as="geometry" />
+    </mxCell>
+
+    <mxCell id="app4" value="🎉  Helpmeet se abre  🎉&#xa;Licencia activa&#xa;Plan Personal · 1 dispositivo" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#00b86b;strokeColor=#00703f;fontSize=12;fontStyle=1;fontColor=#ffffff;" vertex="1" parent="1">
+      <mxGeometry x="1280" y="1745" width="220" height="60" as="geometry" />
+    </mxCell>
+
+    <!-- ═══════════════════════════════════════════════════════ -->
+    <!-- FASE 5 — USO POSTERIOR  (y: 1880-2150) -->
+    <!-- ═══════════════════════════════════════════════════════ -->
+
+    <mxCell id="fase5-band" value="" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=none;opacity=25;" vertex="1" parent="1">
+      <mxGeometry x="40" y="1880" width="1700" height="260" as="geometry" />
+    </mxCell>
+    <mxCell id="fase5-label" value="FASE 5 — CADA VEZ QUE ABRE LA APP (VALIDACIÓN)" style="text;html=1;strokeColor=none;fillColor=#9673a6;align=center;verticalAlign=middle;rounded=1;fontSize=12;fontStyle=1;fontColor=#ffffff;" vertex="1" parent="1">
+      <mxGeometry x="60" y="1890" width="1660" height="26" as="geometry" />
+    </mxCell>
+
+    <mxCell id="app5" value="POST /api/license/validate&#xa;{token, device_id}" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=11;" vertex="1" parent="1">
+      <mxGeometry x="1280" y="1940" width="220" height="55" as="geometry" />
+    </mxCell>
+
+    <mxCell id="b10" value="Verifica firma JWT&#xa;Compara device_id_hash&#xa;Actualiza last_seen_at" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=11;" vertex="1" parent="1">
+      <mxGeometry x="460" y="1940" width="220" height="60" as="geometry" />
+    </mxCell>
+
+    <mxCell id="offline" value="⚠️ Servidor no disponible&#xa;→ MODO OFFLINE&#xa;Grace period: 7 días&#xa;(usa el token guardado)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=11;" vertex="1" parent="1">
+      <mxGeometry x="1280" y="2015" width="220" height="70" as="geometry" />
+    </mxCell>
+
+    <!-- ═══════════════════════════════════════════════════════ -->
+    <!-- FLECHAS -->
+    <!-- ═══════════════════════════════════════════════════════ -->
+
+    <mxCell id="arr1" edge="1" source="c1" target="g1" parent="1"><mxGeometry relative="1" as="geometry"/></mxCell>
+    <mxCell id="arr2" edge="1" source="c2" target="g1" parent="1"><mxGeometry relative="1" as="geometry"/></mxCell>
+    <mxCell id="arr3" edge="1" source="g1" target="g2" parent="1"><mxGeometry relative="1" as="geometry"/></mxCell>
+    <mxCell id="arr4" edge="1" source="g2" target="g3" parent="1"><mxGeometry relative="1" as="geometry"/></mxCell>
+
+    <mxCell id="arr5" value="HTTPS POST&#xa;form-urlencoded" style="fontStyle=2;fontSize=10;strokeColor=#d6b656;" edge="1" source="g3" target="b1" parent="1"><mxGeometry relative="1" as="geometry"/></mxCell>
+
+    <mxCell id="arr6" edge="1" source="b1" target="b2" parent="1"><mxGeometry relative="1" as="geometry"/></mxCell>
+    <mxCell id="arr7" value="NO (compra nueva)" style="fontSize=10;" edge="1" source="b2" target="b3" parent="1"><mxGeometry relative="1" as="geometry"/></mxCell>
+    <mxCell id="arr7b" value="SÍ → ignora (idempotente)" style="fontSize=10;strokeColor=#ff0000;dashed=1;" edge="1" source="b2" target="b6" parent="1">
+      <mxGeometry relative="1" as="geometry">
+        <Array as="points"><mxPoint x="380" y="660"/></Array>
+      </mxGeometry>
+    </mxCell>
+    <mxCell id="arr8" edge="1" source="b3" target="b4" parent="1"><mxGeometry relative="1" as="geometry"/></mxCell>
+    <mxCell id="arr9" edge="1" source="b4" target="b5" parent="1"><mxGeometry relative="1" as="geometry"/></mxCell>
+    <mxCell id="arr10" edge="1" source="b5" target="b6" parent="1"><mxGeometry relative="1" as="geometry"/></mxCell>
+
+    <mxCell id="arr11" value="INSERT" style="fontSize=10;strokeColor=#9673a6;" edge="1" source="b5" target="db1" parent="1"><mxGeometry relative="1" as="geometry"/></mxCell>
+    <mxCell id="arr12" value="INSERT" style="fontSize=10;strokeColor=#9673a6;" edge="1" source="b5" target="db2" parent="1"><mxGeometry relative="1" as="geometry"/></mxCell>
+
+    <mxCell id="arr13" value="Resend API&#xa;(HTTPS)" style="fontStyle=2;fontSize=10;strokeColor=#d79b00;" edge="1" source="b6" target="a1" parent="1"><mxGeometry relative="1" as="geometry"/></mxCell>
+
+    <mxCell id="arr14" edge="1" source="a1" target="a2" parent="1"><mxGeometry relative="1" as="geometry"/></mxCell>
+    <mxCell id="arr15" edge="1" source="a2" target="a3" parent="1"><mxGeometry relative="1" as="geometry"/></mxCell>
+    <mxCell id="arr16" value="API call" style="fontStyle=2;fontSize=10;strokeColor=#d79b00;" edge="1" source="a3" target="b7" parent="1"><mxGeometry relative="1" as="geometry"/></mxCell>
+    <mxCell id="arr17" value="Resend API" style="fontStyle=2;fontSize=10;strokeColor=#82b366;" edge="1" source="b7" target="a4" parent="1"><mxGeometry relative="1" as="geometry"/></mxCell>
+    <mxCell id="arr18" edge="1" source="a4" target="a5" parent="1"><mxGeometry relative="1" as="geometry"/></mxCell>
+
+    <mxCell id="arr19" value="Email con la key" style="fontStyle=2;fontSize=10;strokeColor=#6c8ebf;" edge="1" source="a5" target="c3" parent="1">
+      <mxGeometry relative="1" as="geometry">
+        <Array as="points"><mxPoint x="980" y="1395"/></Array>
+      </mxGeometry>
+    </mxCell>
+
+    <mxCell id="arr20" edge="1" source="c3" target="c4" parent="1"><mxGeometry relative="1" as="geometry"/></mxCell>
+    <mxCell id="arr21" edge="1" source="c4" target="b8" parent="1">
+      <mxGeometry relative="1" as="geometry">
+        <Array as="points"><mxPoint x="240" y="1520"/></Array>
+      </mxGeometry>
+    </mxCell>
+
+    <mxCell id="arr22" edge="1" source="b8" target="b9" parent="1"><mxGeometry relative="1" as="geometry"/></mxCell>
+    <mxCell id="arr23" value="INSERT" style="fontSize=10;strokeColor=#9673a6;" edge="1" source="b8" target="db3" parent="1"><mxGeometry relative="1" as="geometry"/></mxCell>
+
+    <mxCell id="arr24" value="JWT Token" style="fontStyle=2;fontSize=10;strokeColor=#b85450;" edge="1" source="b9" target="app3" parent="1">
+      <mxGeometry relative="1" as="geometry">
+        <Array as="points"><mxPoint x="1140" y="1695"/></Array>
+      </mxGeometry>
+    </mxCell>
+    <mxCell id="arr25" edge="1" source="app3" target="app4" parent="1"><mxGeometry relative="1" as="geometry"/></mxCell>
+
+    <mxCell id="arr26" edge="1" source="app4" target="app5" parent="1"><mxGeometry relative="1" as="geometry"/></mxCell>
+    <mxCell id="arr27" value="HTTPS POST" style="fontStyle=2;fontSize=10;strokeColor=#b85450;" edge="1" source="app5" target="b10" parent="1"><mxGeometry relative="1" as="geometry"/></mxCell>
+    <mxCell id="arr28" value="ok = True" style="fontStyle=2;fontSize=10;strokeColor=#00703f;" edge="1" source="b10" target="app4" parent="1">
+      <mxGeometry relative="1" as="geometry">
+        <Array as="points"><mxPoint x="1140" y="1800"/></Array>
+      </mxGeometry>
+    </mxCell>
+    <mxCell id="arr29" value="error / timeout" style="fontStyle=2;fontSize=10;strokeColor=#d79b00;dashed=1;" edge="1" source="app5" target="offline" parent="1"><mxGeometry relative="1" as="geometry"/></mxCell>
+
+    <!-- ═══════════════════════════════════════════════════════ -->
+    <!-- NOTAS LATERALES -->
+    <!-- ═══════════════════════════════════════════════════════ -->
+
+    <mxCell id="note1" value="🔑 Generación de la clave&#xa;─────────────────&#xa;Módulo: secrets (Python)&#xa;Función: generate_license_key()&#xa;Formato: HM-XXXX-XXXX-XXXX-XXXX&#xa;Alfabeto: A-Z, 0-9&#xa;Solo se muestra UNA VEZ" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#00b86b;strokeColor=#00703f;fontSize=11;fontColor=#ffffff;align=left;spacingLeft=10;" vertex="1" parent="1">
+      <mxGeometry x="1560" y="800" width="180" height="115" as="geometry" />
+    </mxCell>
+
+    <mxCell id="note2" value="🔒 Seguridad&#xa;─────────────────&#xa;• Key nunca se guarda en BD&#xa;• Se guarda SHA-256(key)&#xa;• JWT en Credential Manager&#xa;• Admin key con HMAC compare&#xa;• device_id también hasheado" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=11;align=left;spacingLeft=10;" vertex="1" parent="1">
+      <mxGeometry x="1560" y="940" width="180" height="115" as="geometry" />
+    </mxCell>
+
+    <mxCell id="note3" value="📧 Sin dominio verificado&#xa;─────────────────&#xa;Resend → solo a tu Gmail&#xa;Tú reenvías al cliente&#xa;&#xa;Con dominio (~$10/año):&#xa;Resend → directo al cliente" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;fontSize=11;align=left;spacingLeft=10;" vertex="1" parent="1">
+      <mxGeometry x="1560" y="1140" width="180" height="115" as="geometry" />
+    </mxCell>
+
+    <mxCell id="note4" value="⚙️ Idempotencia&#xa;─────────────────&#xa;Cada sale_id de Gumroad&#xa;se guarda como evento.&#xa;Si Gumroad reenvía el&#xa;mismo webhook 2 veces,&#xa;NO se duplica la licencia." style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=11;align=left;spacingLeft=10;" vertex="1" parent="1">
+      <mxGeometry x="1560" y="630" width="180" height="115" as="geometry" />
+    </mxCell>
+
+  </root>
+</mxGraphModel>

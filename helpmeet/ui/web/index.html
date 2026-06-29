@@ -6,7 +6,7 @@
   <title>Helpmeet</title>
   <link rel="icon" type="image/svg+xml" href="assets/helpmeet-app-icon.svg?v=20260625-78">
   <link rel="alternate icon" type="image/x-icon" href="assets/helpmeet.ico?v=20260625-78">
-  <link rel="stylesheet" href="style.css?v=20260625-78">
+  <link rel="stylesheet" href="style.css?v=20260629-03">
 </head>
 <body data-app-state="idle" data-screen="welcome">
 
@@ -18,8 +18,9 @@
     <div class="brand no-drag">
       <span class="brand-mark" aria-hidden="true"><img src="assets/helpmeet-symbol.svg?v=20260625-78" alt=""></span>
       <span class="brand-name">Helpmeet</span>
+      <span class="topbar-sep" aria-hidden="true"></span>
+      <span class="brand-version" id="headerVersion">v1.2.7</span>
     </div>
-    <div class="topbar-sep" aria-hidden="true"></div>
 
     <!-- Centro: contexto activo (iniciativa › reunión) en reposo · estado de grabación/proceso cuando hay actividad -->
     <div class="topbar-status" id="topbarStatus" aria-live="polite"></div>
@@ -38,6 +39,7 @@
     <aside class="sidebar" id="sidebar" aria-label="Iniciativas y reuniones">
       <nav class="sidebar-nav" aria-label="Secciones">
         <button class="nav-item" id="navMeetings"><span class="ico ico-meetings"></span>Reuniones</button>
+        <button class="nav-item" id="navFavorites"><span class="ico ico-star"></span>Favoritas</button>
         <div class="nav-item active" id="navInitiatives">
           <button class="nav-toggle" id="navInitiativesToggle" aria-expanded="true" aria-controls="sidebarTree">
             <span class="ico ico-rocket"></span>
@@ -51,11 +53,9 @@
         <!-- inyectado por app.js -->
       </nav>
       <div class="sidebar-foot">
-        <button class="side-link" id="btnArchive"><span class="ico ico-archive"></span>Archivo<span class="count" id="archiveCount">0</span></button>
         <button class="side-link" id="btnTrash"><span class="ico ico-trash"></span>Papelera<span class="count" id="trashCount">0</span></button>
         <button class="side-link" id="btnSettingsSide"><span class="ico ico-settings"></span>Configuración</button>
       </div>
-      <div class="sidebar-version" id="sidebarVersion">Helpmeet v1.1.0</div>
     </aside>
 
     <!-- Handle para redimensionar el sidebar -->
@@ -67,7 +67,6 @@
       <button class="rail-btn rail-btn--active" id="railInitiatives" aria-label="Iniciativas" title="Iniciativas"><span class="ico ico-rocket"></span></button>
       <button class="rail-btn" id="btnNewInitiativeRail" aria-label="Nueva iniciativa" title="Nueva iniciativa (Ctrl+N)"></button>
       <div class="rail-sep"></div>
-      <button class="rail-btn" id="railArchive" aria-label="Archivo" title="Archivo"><span class="ico ico-archive"></span></button>
       <button class="rail-btn" id="railTrash" aria-label="Papelera" title="Papelera"><span class="ico ico-trash"></span></button>
       <button class="rail-btn rail-btn--foot" id="railSettings" aria-label="Configuración" title="Configuración"><span class="ico ico-settings"></span></button>
       <div class="rail-resize-handle no-drag" id="railResizeHandle" title="Arrastrar para expandir"></div>
@@ -94,11 +93,30 @@
   <div class="wr wr-se" data-dir="se"></div>
   <div class="wr wr-sw" data-dir="sw"></div>
 
+  <!-- ============ PANTALLA DE LICENCIA ============ -->
+  <div class="license-gate" id="licenseGate" hidden>
+    <div class="license-card">
+      <div class="license-brand">
+        <img src="assets/helpmeet-symbol.svg?v=20260625-78" alt="" class="license-symbol">
+        <span class="license-brand-name">Helpmeet</span>
+      </div>
+      <h2 class="license-title">Activa tu licencia</h2>
+      <p class="license-subtitle">Introduce la product key que recibiste al comprar Helpmeet.</p>
+      <label for="licenseKeyInput" class="visually-hidden">Product key</label>
+      <input id="licenseKeyInput" class="license-input" type="text"
+             placeholder="HM-XXXX-XXXX-XXXX-XXXX"
+             autocomplete="off" spellcheck="false" maxlength="22"
+             onkeydown="if(event.key==='Enter') window.doLicenseActivate()">
+      <button class="license-btn" onclick="window.doLicenseActivate()">Activar</button>
+      <p class="license-error" id="licenseError" hidden></p>
+    </div>
+  </div>
+
   <!-- ============ OVERLAYS ============ -->
   <div class="overlay" id="overlayRoot" hidden></div>
   <div class="toasts" id="toasts" aria-live="polite" aria-atomic="false"></div>
 
   <!-- Plantillas SVG de iconos. Inyectadas por app.js -->
-  <script src="app.js?v=20260625-78"></script>
+  <script src="app.js?v=20260629-13"></script>
 </body>
 </html>

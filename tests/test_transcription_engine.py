@@ -1,5 +1,6 @@
 from types import SimpleNamespace
 
+from helpmeet.transcription import engine as engine_mod
 from helpmeet.transcription.engine import TranscriptionEngine
 
 
@@ -39,3 +40,21 @@ def test_fast_quality_keeps_low_latency_options():
 
     assert engine._model.options["beam_size"] == 1
     assert engine._model.options["condition_on_previous_text"] is False
+
+
+def test_load_model_falls_back_to_lighter_model(monkeypatch):
+    calls = []
+
+    def fake_load(name):
+        calls.append(name)
+        if name == "large-v3":
+            raise RuntimeError("Unable to open file 'model.bin'")
+        return f"model:{name}"
+
+    monkeypatch.setattr(engine_mod, "_load_single_model", fake_load)
+
+    model, loaded_name = engine_mod._load_model("large-v3")
+
+    assert model == "model:medium"
+    assert loaded_name == "medium"
+    assert calls == ["large-v3", "medium"]

@@ -30,7 +30,7 @@ def test_whisper_model_status_downloaded(tmp_path, monkeypatch):
     fake_cache = tmp_path / "hub"
     snap = fake_cache / "models--Systran--faster-whisper-small" / "snapshots" / "abc"
     snap.mkdir(parents=True)
-    (snap / "model.bin").write_bytes(b"x")
+    (snap / "model.bin").write_bytes(b"x" * 2048)
     monkeypatch.setattr("huggingface_hub.constants.HF_HUB_CACHE", str(fake_cache))
     res = diagnostics.whisper_model_status("small")
     assert res["downloaded"] is True

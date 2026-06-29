@@ -13,15 +13,17 @@ SYS_WAV = "others.wav"    # pista del audio del sistema
 MIXED_WAV = "mixed.wav"   # mezcla de ambas para el audio del mp4
 TEMP_VIDEO = "video_temp.mp4"
 
-PREVIEW_WIDTH = 480       # ancho de la miniatura de vista previa
+PREVIEW_WIDTH = 1280      # ancho de la miniatura de vista previa (HD)
 
 
 def _jpeg_from_rgb(rgb, width, height) -> bytes:
-    """Codifica un ndarray RGB (rgb24) a JPEG en memoria con PyAV (sin Pillow)."""
+    """Codifica un ndarray RGB (rgb24) a JPEG de alta calidad con PyAV/libswscale."""
     frame = av.VideoFrame.from_ndarray(rgb, format="rgb24")
-    small = frame.reformat(format="yuvj420p")
-    small.pts = 0
-    small.time_base = Fraction(1, 1)
+    # Reformat con Lanczos si hay que escalar (ya viene al tamaño correcto normalmente)
+    yuv = frame.reformat(width=width, height=height,
+                         format="yuvj420p", interpolation="LANCZOS")
+    yuv.pts = 0
+    yuv.time_base = Fraction(1, 1)
     buffer = io.BytesIO()
     out = av.open(buffer, mode="w", format="mjpeg")
     try:
@@ -29,7 +31,8 @@ def _jpeg_from_rgb(rgb, width, height) -> bytes:
         stream.width, stream.height = width, height
         stream.pix_fmt = "yuvj420p"
         stream.time_base = Fraction(1, 1)
-        for packet in stream.encode(small):
+        stream.options = {"q:v": "2"}   # calidad casi máxima (1-31, 1=mejor)
+        for packet in stream.encode(yuv):
             out.mux(packet)
         for packet in stream.encode():
             out.mux(packet)
@@ -69,7 +72,7 @@ class ScreenVideoRecorder:
         self._preview_lock = threading.Lock()
         self._preview_event = threading.Event()
         self._preview_slot = None
-        self._preview_every = max(1, int((fps or config.VIDEO_FPS) // 2))  # ~2 fps
+        self._preview_every = max(1, int((fps or config.VIDEO_FPS) // 8))  # ~8 fps
         # Tamaño de salida fijo = el del primer monitor (pares para yuv420p),
         # acotado por la resolución máxima del perfil. Si luego se cambia a un
         # monitor de otra resolución, se escala a este tamaño.

@@ -56,7 +56,10 @@ def whisper_model_status(model_name: str) -> dict:
             for snap in snapshots:
                 model_bin = snap / "model.bin"
                 try:
-                    if model_bin.exists() and model_bin.stat().st_size > 0:
+                    # En Windows/HuggingFace puede ser enlace al blob real. `resolve`
+                    # evita marcar como 0 KB un enlace válido; si está roto, cae a warn.
+                    real_file = model_bin.resolve(strict=True)
+                    if real_file.is_file() and real_file.stat().st_size > 1024:
                         complete = True
                         break
                 except OSError:
