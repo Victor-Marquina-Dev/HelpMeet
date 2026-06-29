@@ -1,0 +1,430 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Helpmeet Admin</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: system-ui, -apple-system, sans-serif; background: #0f1110; color: #e3e2e0; min-height: 100vh; }
+
+  /* LOGIN */
+  #login { display: flex; align-items: center; justify-content: center; min-height: 100vh; }
+  .login-card { background: #1a1c1b; border: 1px solid #2a2c2b; border-radius: 16px; padding: 40px; width: 360px; text-align: center; }
+  .login-card h1 { font-size: 22px; margin-bottom: 8px; color: #aacfbf; }
+  .login-card p { color: #8b928e; font-size: 13px; margin-bottom: 24px; }
+  .login-card input { width: 100%; padding: 11px 14px; background: #0d0f0e; border: 1px solid #2a2c2b; border-radius: 8px; color: #e3e2e0; font-size: 13px; font-family: monospace; outline: none; margin-bottom: 14px; }
+  .login-card input:focus { border-color: #aacfbf; }
+  .btn-green { width: 100%; padding: 11px; background: #aacfbf; border: none; border-radius: 8px; color: #0d1a14; font-weight: 700; font-size: 14px; cursor: pointer; }
+  .btn-green:hover { background: #c5ebda; }
+  .err { color: #f28b82; font-size: 12px; margin-top: 8px; display: none; }
+
+  /* APP */
+  #app { display: none; }
+  .topbar { background: #1a1c1b; border-bottom: 1px solid #2a2c2b; padding: 0 24px; height: 56px; display: flex; align-items: center; justify-content: space-between; }
+  .topbar .brand { font-weight: 700; color: #aacfbf; font-size: 16px; }
+  .topbar .logout { font-size: 12px; color: #8b928e; cursor: pointer; background: none; border: none; color: #8b928e; }
+  .topbar .logout:hover { color: #e3e2e0; }
+
+  .main { max-width: 1100px; margin: 0 auto; padding: 28px 20px; }
+
+  /* STATS */
+  .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 14px; margin-bottom: 28px; }
+  .stat { background: #1a1c1b; border: 1px solid #2a2c2b; border-radius: 12px; padding: 20px; }
+  .stat .n { font-size: 32px; font-weight: 700; color: #aacfbf; }
+  .stat .l { font-size: 12px; color: #8b928e; margin-top: 4px; }
+
+  /* TABLE */
+  .section-title { font-size: 15px; font-weight: 600; margin-bottom: 14px; color: #c1c8c3; }
+  .table-wrap { background: #1a1c1b; border: 1px solid #2a2c2b; border-radius: 12px; overflow: hidden; margin-bottom: 28px; }
+  table { width: 100%; border-collapse: collapse; }
+  th { background: #1e201f; padding: 11px 16px; text-align: left; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .06em; color: #8b928e; border-bottom: 1px solid #2a2c2b; }
+  td { padding: 12px 16px; font-size: 13px; border-bottom: 1px solid #1e201f; vertical-align: middle; }
+  tr:last-child td { border-bottom: none; }
+  tr:hover td { background: #1e201f; }
+
+  .badge { display: inline-block; padding: 2px 8px; border-radius: 20px; font-size: 11px; font-weight: 600; }
+  .badge-active { background: rgba(170,207,191,.15); color: #aacfbf; }
+  .badge-revoked { background: rgba(242,139,130,.12); color: #f28b82; }
+  .badge-refunded { background: rgba(255,186,0,.1); color: #ffc046; }
+
+  .mono { font-family: monospace; font-size: 12px; letter-spacing: .04em; color: #c1c8c3; }
+
+  /* ACTIONS */
+  .actions { display: flex; gap: 6px; flex-wrap: wrap; }
+  .btn-sm { padding: 5px 10px; font-size: 11px; font-weight: 600; border: none; border-radius: 6px; cursor: pointer; }
+  .btn-revoke { background: rgba(242,139,130,.15); color: #f28b82; }
+  .btn-revoke:hover { background: rgba(242,139,130,.25); }
+  .btn-reset { background: rgba(170,207,191,.12); color: #aacfbf; }
+  .btn-reset:hover { background: rgba(170,207,191,.2); }
+  .btn-mail { background: rgba(100,149,237,.12); color: #6495ed; }
+  .btn-mail:hover { background: rgba(100,149,237,.2); }
+
+  .loading { text-align: center; padding: 40px; color: #8b928e; }
+  .toast { position: fixed; bottom: 24px; right: 24px; background: #1e201f; border: 1px solid #2a2c2b; border-radius: 10px; padding: 12px 18px; font-size: 13px; display: none; z-index: 999; }
+  .toast.show { display: block; }
+
+  /* MODAL */
+  .modal-bg { display: none; position: fixed; inset: 0; background: rgba(0,0,0,.7); z-index: 100; align-items: center; justify-content: center; }
+  .modal-bg.open { display: flex; }
+  .modal { background: #1a1c1b; border: 1px solid #2a2c2b; border-radius: 14px; padding: 28px; width: 400px; }
+  .modal h3 { margin-bottom: 12px; }
+  .modal p { color: #8b928e; font-size: 13px; margin-bottom: 20px; }
+  .modal-btns { display: flex; gap: 10px; justify-content: flex-end; }
+  .btn-cancel { padding: 8px 16px; background: #2a2c2b; border: none; border-radius: 8px; color: #c1c8c3; cursor: pointer; font-size: 13px; }
+  .btn-confirm-red { padding: 8px 16px; background: #f28b82; border: none; border-radius: 8px; color: #1a0000; font-weight: 700; cursor: pointer; font-size: 13px; }
+</style>
+</head>
+<body>
+
+<!-- LOGIN -->
+<div id="login">
+  <div class="login-card">
+    <h1>⚡ Helpmeet Admin</h1>
+    <p>Introduce tu clave de administrador</p>
+    <input type="password" id="keyInput" placeholder="Admin Key" autocomplete="off">
+    <button class="btn-green" onclick="doLogin()">Entrar</button>
+    <div class="err" id="loginErr">Clave incorrecta</div>
+  </div>
+</div>
+
+<!-- APP -->
+<div id="app">
+  <div class="topbar">
+    <span class="brand">⚡ Helpmeet Admin</span>
+    <div style="display:flex;align-items:center;gap:16px">
+      <span style="font-size:12px;color:#8b928e" id="lastUpdated"></span>
+      <button onclick="loadData()" style="background:#2a2c2b;border:none;border-radius:6px;padding:6px 12px;color:#c1c8c3;cursor:pointer;font-size:12px">↻ Actualizar</button>
+      <button class="logout" onclick="doLogout()">Cerrar sesión</button>
+    </div>
+  </div>
+
+  <div class="main">
+    <div class="stats" id="stats">
+      <div class="stat"><div class="n" id="sTotal">—</div><div class="l">Licencias totales</div></div>
+      <div class="stat"><div class="n" id="sActive">—</div><div class="l">Activas</div></div>
+      <div class="stat"><div class="n" id="sRevoked">—</div><div class="l">Revocadas / Reembolsadas</div></div>
+      <div class="stat"><div class="n" id="sCustomers">—</div><div class="l">Clientes</div></div>
+    </div>
+
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
+      <div class="section-title" style="margin:0">Licencias</div>
+      <button class="btn-green" style="width:auto;padding:8px 18px;font-size:13px" onclick="openCreateModal()">+ Nueva licencia</button>
+    </div>
+    <div class="table-wrap">
+      <div class="loading" id="tableLoading">Cargando…</div>
+      <table id="licTable" style="display:none">
+        <thead>
+          <tr>
+            <th>ID</th>
+            <th>Cliente</th>
+            <th>Key (últimos 4)</th>
+            <th>Plan</th>
+            <th>Estado</th>
+            <th>Creada</th>
+            <th>Acciones</th>
+          </tr>
+        </thead>
+        <tbody id="licBody"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL CREAR LICENCIA -->
+<div class="modal-bg" id="createModalBg">
+  <div class="modal" style="width:460px">
+    <h3 style="margin-bottom:18px">Nueva licencia</h3>
+    <div style="display:flex;flex-direction:column;gap:12px">
+      <div>
+        <div style="font-size:12px;color:#8b928e;margin-bottom:6px">Email del cliente *</div>
+        <input id="createEmail" type="email" placeholder="cliente@email.com"
+          style="width:100%;padding:10px 14px;background:#0d0f0e;border:1px solid #2a2c2b;border-radius:8px;color:#e3e2e0;font-size:13px;outline:none">
+      </div>
+      <div>
+        <div style="font-size:12px;color:#8b928e;margin-bottom:6px">Nombre (opcional)</div>
+        <input id="createName" type="text" placeholder="Nombre del cliente"
+          style="width:100%;padding:10px 14px;background:#0d0f0e;border:1px solid #2a2c2b;border-radius:8px;color:#e3e2e0;font-size:13px;outline:none">
+      </div>
+      <div>
+        <div style="font-size:12px;color:#8b928e;margin-bottom:6px">Plan</div>
+        <select id="createPlan" style="width:100%;padding:10px 14px;background:#0d0f0e;border:1px solid #2a2c2b;border-radius:8px;color:#e3e2e0;font-size:13px;outline:none">
+          <option value="personal">Personal</option>
+          <option value="pro">Pro</option>
+          <option value="team">Team</option>
+        </select>
+      </div>
+      <label style="display:flex;align-items:center;gap:10px;cursor:pointer;font-size:13px">
+        <input type="checkbox" id="createSendEmail" checked>
+        <span>Enviar key por email al cliente</span>
+      </label>
+    </div>
+
+    <!-- KEY RESULT -->
+    <div id="keyResult" style="display:none;margin-top:16px;background:#0d0f0e;border:1px solid #aacfbf44;border-radius:8px;padding:16px;text-align:center">
+      <div style="font-size:11px;color:#8b928e;margin-bottom:8px">KEY GENERADA — cópiala ahora</div>
+      <div id="keyValue" style="font-family:monospace;font-size:18px;color:#aacfbf;letter-spacing:2px;font-weight:bold"></div>
+      <button onclick="copyKey()" style="margin-top:10px;background:#2a2c2b;border:none;border-radius:6px;padding:6px 14px;color:#c1c8c3;cursor:pointer;font-size:12px">Copiar</button>
+    </div>
+
+    <div id="createErr" style="color:#f28b82;font-size:12px;margin-top:10px;display:none"></div>
+
+    <div class="modal-btns" style="margin-top:20px">
+      <button class="btn-cancel" onclick="closeCreateModal()">Cerrar</button>
+      <button class="btn-green" id="createBtn" style="width:auto;padding:9px 20px;font-size:13px" onclick="createLicense()">Crear licencia</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL CONFIRMAR -->
+<div class="modal-bg" id="modalBg">
+  <div class="modal">
+    <h3 id="modalTitle"></h3>
+    <p id="modalDesc"></p>
+    <div class="modal-btns">
+      <button class="btn-cancel" onclick="closeModal()">Cancelar</button>
+      <button class="btn-confirm-red" id="modalConfirm">Confirmar</button>
+    </div>
+  </div>
+</div>
+
+<!-- TOAST -->
+<div class="toast" id="toast"></div>
+
+<script>
+const API = 'https://web-production-93435.up.railway.app';
+let ADMIN_KEY = '';
+
+function doLogin() {
+  const k = document.getElementById('keyInput').value.trim();
+  if (!k) return;
+  ADMIN_KEY = k;
+  fetch(`${API}/api/admin/licenses`, { headers: { 'X-Admin-Key': k } })
+    .then(r => {
+      if (r.ok) {
+        localStorage.setItem('hm_admin_key', k);
+        document.getElementById('login').style.display = 'none';
+        document.getElementById('app').style.display = 'block';
+        loadData();
+      } else {
+        document.getElementById('loginErr').style.display = 'block';
+        ADMIN_KEY = '';
+      }
+    })
+    .catch(() => { document.getElementById('loginErr').style.display = 'block'; ADMIN_KEY = ''; });
+}
+
+document.getElementById('keyInput').addEventListener('keydown', e => { if (e.key === 'Enter') doLogin(); });
+
+function doLogout() {
+  localStorage.removeItem('hm_admin_key');
+  location.reload();
+}
+
+async function loadData() {
+  try {
+    const [lics, customers] = await Promise.all([
+      fetch(`${API}/api/admin/licenses`, { headers: { 'X-Admin-Key': ADMIN_KEY } }).then(r => r.json()),
+      fetch(`${API}/api/admin/customers`, { headers: { 'X-Admin-Key': ADMIN_KEY } }).then(r => r.json()),
+    ]);
+
+    const active = lics.filter(l => l.status === 'active').length;
+    const revoked = lics.filter(l => ['revoked','refunded'].includes(l.status)).length;
+    document.getElementById('sTotal').textContent = lics.length;
+    document.getElementById('sActive').textContent = active;
+    document.getElementById('sRevoked').textContent = revoked;
+    document.getElementById('sCustomers').textContent = customers.length;
+    document.getElementById('lastUpdated').textContent = 'Actualizado: ' + new Date().toLocaleTimeString('es');
+
+    const body = document.getElementById('licBody');
+    body.innerHTML = '';
+    lics.slice().reverse().forEach(lic => {
+      const createdAt = new Date(lic.created_at);
+      const isNew = (Date.now() - createdAt.getTime()) < 86400000; // últimas 24h
+      const date = createdAt.toLocaleDateString('es', { day:'2-digit', month:'short', year:'numeric' });
+      const email = lic.customer?.email || '—';
+      const badge = lic.status === 'active'
+        ? `<span class="badge badge-active">Activa</span>`
+        : lic.status === 'refunded'
+          ? `<span class="badge badge-refunded">Reembolsada</span>`
+          : `<span class="badge badge-revoked">Revocada</span>`;
+
+      const actions = lic.status === 'active'
+        ? `<div class="actions">
+            <button class="btn-sm btn-mail" onclick="sendKeyEmail(${lic.id}, '${email}')">✉ Enviar key</button>
+            <button class="btn-sm btn-reset" onclick="confirmReset(${lic.id})">↺ Reset PC</button>
+            <button class="btn-sm btn-revoke" onclick="confirmRevoke(${lic.id})">✕ Revocar</button>
+           </div>`
+        : `<span style="color:#8b928e;font-size:12px">${lic.status}</span>`;
+
+      const newTag = isNew ? '<span style="background:#aacfbf22;color:#aacfbf;font-size:10px;font-weight:700;padding:2px 6px;border-radius:10px;margin-left:6px">NUEVO</span>' : '';
+      body.innerHTML += `<tr style="${isNew ? 'background:#1a2420' : ''}">
+        <td style="color:#8b928e">#${lic.id}</td>
+        <td><div>${email}${newTag}</div></td>
+        <td><span class="mono">...${lic.key_last4}</span></td>
+        <td style="text-transform:capitalize">${lic.plan}</td>
+        <td>${badge}</td>
+        <td style="color:#8b928e;font-size:12px">${date}</td>
+        <td>${actions}</td>
+      </tr>`;
+    });
+
+    document.getElementById('tableLoading').style.display = 'none';
+    document.getElementById('licTable').style.display = 'table';
+  } catch(e) {
+    document.getElementById('tableLoading').textContent = 'Error al cargar datos.';
+  }
+}
+
+let modalAction = null;
+function openModal(title, desc, onConfirm) {
+  document.getElementById('modalTitle').textContent = title;
+  document.getElementById('modalDesc').textContent = desc;
+  document.getElementById('modalConfirm').onclick = () => { closeModal(); onConfirm(); };
+  document.getElementById('modalBg').classList.add('open');
+}
+function closeModal() { document.getElementById('modalBg').classList.remove('open'); }
+
+function confirmRevoke(id) {
+  openModal('Revocar licencia', `¿Revocar la licencia #${id}? El usuario no podrá usarla.`, () => revokeLicense(id));
+}
+function confirmReset(id) {
+  openModal('Resetear dispositivos', `¿Resetear los dispositivos de la licencia #${id}? El usuario podrá activar en un PC nuevo.`, () => resetDevices(id));
+}
+
+async function revokeLicense(id) {
+  const r = await fetch(`${API}/api/admin/licenses/${id}/revoke`, {
+    method: 'POST', headers: { 'X-Admin-Key': ADMIN_KEY }
+  });
+  if ((await r.json()).ok) { showToast('Licencia revocada'); loadData(); }
+}
+
+async function resetDevices(id) {
+  const r = await fetch(`${API}/api/admin/licenses/${id}/reset-devices`, {
+    method: 'POST', headers: { 'X-Admin-Key': ADMIN_KEY }
+  });
+  if ((await r.json()).ok) { showToast('Dispositivos reseteados — el cliente puede activar en un PC nuevo'); loadData(); }
+}
+
+async function sendKeyEmail(id, email) {
+  const btn = event.target;
+  btn.disabled = true;
+  btn.textContent = 'Enviando...';
+  try {
+    const r = await fetch(`${API}/api/admin/licenses/${id}/send-key`, {
+      method: 'POST', headers: { 'X-Admin-Key': ADMIN_KEY }
+    });
+    const data = await r.json();
+    if (data.ok) {
+      showToast(`Email enviado a ${email}`);
+      loadData();
+    } else {
+      showToast('Error: ' + (data.error || 'fallo al enviar'));
+      btn.disabled = false;
+      btn.textContent = '✉ Enviar key';
+    }
+  } catch(e) {
+    showToast('Error de conexión');
+    btn.disabled = false;
+    btn.textContent = '✉ Enviar key';
+  }
+}
+
+function openCreateModal() {
+  document.getElementById('createModalBg').classList.add('open');
+  document.getElementById('keyResult').style.display = 'none';
+  document.getElementById('createErr').style.display = 'none';
+  document.getElementById('createEmail').value = '';
+  document.getElementById('createName').value = '';
+  document.getElementById('createBtn').style.display = '';
+  document.getElementById('createEmail').focus();
+}
+function closeCreateModal() {
+  document.getElementById('createModalBg').classList.remove('open');
+  loadData();
+}
+
+let _createdKey = '';
+async function createLicense() {
+  const email = document.getElementById('createEmail').value.trim();
+  const name = document.getElementById('createName').value.trim();
+  const plan = document.getElementById('createPlan').value;
+  const sendEmail = document.getElementById('createSendEmail').checked;
+  const errEl = document.getElementById('createErr');
+  const btn = document.getElementById('createBtn');
+
+  if (!email) { errEl.textContent = 'El email es obligatorio'; errEl.style.display = 'block'; return; }
+  errEl.style.display = 'none';
+  btn.disabled = true; btn.textContent = 'Creando...';
+
+  try {
+    // 1. Crear o reusar cliente
+    let customerId;
+    const rCust = await fetch(`${API}/api/admin/customers`, {
+      method: 'POST',
+      headers: { 'X-Admin-Key': ADMIN_KEY, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, name: name || null })
+    });
+    if (rCust.ok) {
+      customerId = (await rCust.json()).id;
+    } else {
+      // Ya existe — buscar en la lista
+      const all = await fetch(`${API}/api/admin/customers`, { headers: { 'X-Admin-Key': ADMIN_KEY } }).then(r => r.json());
+      const found = all.find(c => c.email === email);
+      if (found) customerId = found.id;
+      else { errEl.textContent = 'No se pudo crear el cliente'; errEl.style.display = 'block'; btn.disabled = false; btn.textContent = 'Crear licencia'; return; }
+    }
+
+    // 2. Crear licencia
+    const rLic = await fetch(`${API}/api/admin/licenses`, {
+      method: 'POST',
+      headers: { 'X-Admin-Key': ADMIN_KEY, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ customer_id: customerId, plan })
+    });
+    const lic = await rLic.json();
+    _createdKey = lic.license_key;
+
+    // Mostrar key
+    document.getElementById('keyValue').textContent = _createdKey;
+    document.getElementById('keyResult').style.display = 'block';
+    btn.style.display = 'none';
+
+    // 3. Enviar email si se marcó
+    if (sendEmail) {
+      await fetch(`${API}/api/admin/licenses/${lic.id}/send-key`, {
+        method: 'POST', headers: { 'X-Admin-Key': ADMIN_KEY }
+      });
+      showToast(`Licencia creada y email enviado a ${email}`);
+    } else {
+      showToast('Licencia creada — recuerda enviar la key al cliente');
+    }
+  } catch(e) {
+    errEl.textContent = 'Error de conexión'; errEl.style.display = 'block';
+    btn.disabled = false; btn.textContent = 'Crear licencia';
+  }
+}
+
+function copyKey() {
+  navigator.clipboard.writeText(_createdKey);
+  showToast('Key copiada al portapapeles');
+}
+
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 3000);
+}
+
+// Auto-login si hay key guardada
+const saved = localStorage.getItem('hm_admin_key');
+if (saved) {
+  document.getElementById('keyInput').value = saved;
+  doLogin();
+}
+
+// Auto-refresh cada 60 segundos
+setInterval(() => { if (ADMIN_KEY) loadData(); }, 60000);
+</script>
+</body>
+</html>
