@@ -316,29 +316,17 @@ async function sendKeyEmail(id, email) {
     });
     const data = await r.json();
     if (data.ok && data.key) {
-      // Abrir Gmail con el email pre-rellenado
-      const subject = encodeURIComponent('Tu Product Key de Helpmeet');
-      const body = encodeURIComponent(
-`Hola,
-
-Aquí está tu Product Key de Helpmeet:
-
-  ${data.key}
-
-Pasos para activar:
-1. Descarga e instala Helpmeet
-2. Abre la aplicación
-3. Introduce la key cuando se solicite
-4. ¡Listo!
-
-Plan: ${data.plan} · 1 dispositivo
-¿Cambiaste de PC? Responde este email y lo resolvemos.
-
-¡Gracias por tu compra!
-— Victor, MimoTech`
-      );
-      window.open(`mailto:${data.email}?subject=${subject}&body=${body}`, '_blank');
-      showToast(`Gmail abierto para ${data.email}`);
+      if (data.email_sent) {
+        showToast(`Email enviado a ${data.email} desde tu Gmail`);
+      } else if (data.email_error) {
+        // Gmail no configurado o error — abrir mailto como fallback
+        const subject = encodeURIComponent('Tu Product Key de Helpmeet');
+        const body = encodeURIComponent(`Hola,\n\nTu Product Key de Helpmeet:\n\n  ${data.key}\n\nComo activar:\n1. Instala Helpmeet\n2. Abre la app\n3. Introduce la key\n\nSoporte: victor.marquina30@gmail.com`);
+        window.open(`mailto:${data.email}?subject=${subject}&body=${body}`, '_blank');
+        showToast(`Gmail abierto (configura GMAIL_APP_PASSWORD para envío automático)`);
+      } else {
+        showToast(`Key generada para ${data.email}`);
+      }
       loadData();
     } else {
       showToast('Error: ' + (data.error || 'no se pudo generar la key'));
