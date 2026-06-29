@@ -1643,32 +1643,18 @@ class Api:
         return hashlib.sha256(raw.encode()).hexdigest()[:32]
 
     def _license_socket(self, path: str, body: dict) -> dict:
-        import socket as _s, json as _j
+        import urllib.request, json as _j
         try:
-            server = self._LICENSE_SERVER.rstrip("/")
-            # Parse host and port from the server URL (supports http:// and https://)
-            host_part = server.split("://", 1)[-1]  # strip scheme
-            if ":" in host_part:
-                _host, _port_str = host_part.rsplit(":", 1)
-                _port = int(_port_str)
-            else:
-                _host = host_part
-                _port = 443 if server.startswith("https") else 80
             b = _j.dumps(body).encode()
-            req = (f"POST {path} HTTP/1.0\r\nHost: {host_part}\r\n"
-                   f"Content-Type: application/json\r\nContent-Length: {len(b)}\r\n\r\n").encode() + b
-            with _s.socket(_s.AF_INET, _s.SOCK_STREAM) as s:
-                s.settimeout(8)
-                s.connect((_host, _port))
-                s.sendall(req)
-                data = b""
-                while True:
-                    chunk = s.recv(8192)
-                    if not chunk:
-                        break
-                    data += chunk
-            sep = data.find(b"\r\n\r\n")
-            return _j.loads(data[sep + 4:] if sep >= 0 else data)
+            req = urllib.request.Request(
+                self._LICENSE_SERVER.rstrip("/") + path,
+                data=b,
+                headers={"Content-Type": "application/json"},
+                method="POST",
+            )
+            opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
+            with opener.open(req, timeout=8) as resp:
+                return _j.loads(resp.read())
         except Exception as exc:
             return {"_error": str(exc)}
 
@@ -1688,7 +1674,9 @@ class Api:
         last_check = settings.get_last_license_check()
         if last_check:
             try:
-                last_dt = datetime.fromisoformat(last_check)
+                # Compatible with Python 3.7+: strip timezone suffix if present
+                ts = last_check.replace("+00:00", "").replace("Z", "")
+                last_dt = datetime.fromisoformat(ts).replace(tzinfo=timezone.utc)
                 if (datetime.now(timezone.utc) - last_dt) < timedelta(days=7):
                     return {"ok": True, "plan": "offline", "offline": True}
             except Exception:
