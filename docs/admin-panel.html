@@ -309,22 +309,43 @@ async function resetDevices(id) {
 async function sendKeyEmail(id, email) {
   const btn = event.target;
   btn.disabled = true;
-  btn.textContent = 'Enviando...';
+  btn.textContent = 'Generando...';
   try {
-    const r = await fetch(`${API}/api/admin/licenses/${id}/send-key`, {
+    const r = await fetch(`${API}/api/admin/licenses/${id}/generate-key`, {
       method: 'POST', headers: { 'X-Admin-Key': ADMIN_KEY }
     });
     const data = await r.json();
-    if (data.ok) {
-      showToast(`Email enviado a ${email}`);
+    if (data.ok && data.key) {
+      // Abrir Gmail con el email pre-rellenado
+      const subject = encodeURIComponent('Tu Product Key de Helpmeet');
+      const body = encodeURIComponent(
+`Hola,
+
+Aquí está tu Product Key de Helpmeet:
+
+  ${data.key}
+
+Pasos para activar:
+1. Descarga e instala Helpmeet
+2. Abre la aplicación
+3. Introduce la key cuando se solicite
+4. ¡Listo!
+
+Plan: ${data.plan} · 1 dispositivo
+¿Cambiaste de PC? Responde este email y lo resolvemos.
+
+¡Gracias por tu compra!
+— Victor, MimoTech`
+      );
+      window.open(`mailto:${data.email}?subject=${subject}&body=${body}`, '_blank');
+      showToast(`Gmail abierto para ${data.email}`);
       loadData();
     } else {
-      showToast('Error: ' + (data.error || 'fallo al enviar'));
-      btn.disabled = false;
-      btn.textContent = '✉ Enviar key';
+      showToast('Error: ' + (data.error || 'no se pudo generar la key'));
     }
   } catch(e) {
     showToast('Error de conexión');
+  } finally {
     btn.disabled = false;
     btn.textContent = '✉ Enviar key';
   }
