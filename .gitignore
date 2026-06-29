@@ -17,3 +17,24 @@ dist/
 Helpmeet — Rediseño de interfaz/
 Helpmeet — Rediseño de interfaz.zip
 node_modules/
+
+# Archivos temporales de pruebas y debug
+*.db
+*.log
+*_debug.txt
+*_error.txt
+*_output.txt
+test_typer4_output.txt
+inspect_output.txt
+cli_debug.txt
+cli_error.txt
+cli_minimal_output.txt
+
+# Archivos temporales de licencias
+helpmeet-licenses/test.db
+helpmeet-licenses/*.txt
+
+# Logs de la app
+helpmeet.log
+lic2.txt
+lic_debug.txt
