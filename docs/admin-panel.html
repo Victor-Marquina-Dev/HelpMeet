@@ -5,131 +5,175 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Helpmeet Admin</title>
 <style>
-  * { box-sizing: border-box; margin: 0; padding: 0; }
-  body { font-family: system-ui, -apple-system, sans-serif; background: #0f1110; color: #e3e2e0; min-height: 100vh; }
+* { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  --bg: #0b0d0c; --card: #141615; --card2: #1a1c1b;
+  --border: #252726; --border2: #2e3130;
+  --green: #4ade80; --green-dim: rgba(74,222,128,.12);
+  --red: #f87171; --red-dim: rgba(248,113,113,.1);
+  --yellow: #fbbf24; --yellow-dim: rgba(251,191,36,.1);
+  --accent: #aacfbf; --accent-dim: rgba(170,207,191,.1);
+  --text: #e2e8e4; --muted: #9ca89f; --faint: #5c6660;
+  --on-accent: #0a1a12;
+}
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; font-size: 14px; }
 
-  /* LOGIN */
-  #login { display: flex; align-items: center; justify-content: center; min-height: 100vh; }
-  .login-card { background: #1a1c1b; border: 1px solid #2a2c2b; border-radius: 16px; padding: 40px; width: 360px; text-align: center; }
-  .login-card h1 { font-size: 22px; margin-bottom: 8px; color: #aacfbf; }
-  .login-card p { color: #8b928e; font-size: 13px; margin-bottom: 24px; }
-  .login-card input { width: 100%; padding: 11px 14px; background: #0d0f0e; border: 1px solid #2a2c2b; border-radius: 8px; color: #e3e2e0; font-size: 13px; font-family: monospace; outline: none; margin-bottom: 14px; }
-  .login-card input:focus { border-color: #aacfbf; }
-  .btn-green { width: 100%; padding: 11px; background: #aacfbf; border: none; border-radius: 8px; color: #0d1a14; font-weight: 700; font-size: 14px; cursor: pointer; }
-  .btn-green:hover { background: #c5ebda; }
-  .err { color: #f28b82; font-size: 12px; margin-top: 8px; display: none; }
+/* ─── LOGIN ─── */
+#login { display:flex; align-items:center; justify-content:center; min-height:100vh; }
+.lcard { background:var(--card); border:1px solid var(--border); border-radius:20px; padding:44px; width:360px; text-align:center; }
+.lcard .logo { font-size:28px; font-weight:800; color:var(--accent); letter-spacing:-.5px; margin-bottom:6px; }
+.lcard p { color:var(--muted); font-size:13px; margin-bottom:28px; }
+.inp { width:100%; padding:11px 14px; background:#0d0f0e; border:1px solid var(--border2); border-radius:10px; color:var(--text); font-size:13px; font-family:monospace; outline:none; margin-bottom:12px; }
+.inp:focus { border-color:var(--accent); }
+.btn-primary { width:100%; padding:12px; background:var(--accent); border:none; border-radius:10px; color:var(--on-accent); font-weight:700; font-size:14px; cursor:pointer; transition:.15s; }
+.btn-primary:hover { background:#c5ebda; }
+.err { color:var(--red); font-size:12px; margin-top:8px; display:none; }
 
-  /* APP */
-  #app { display: none; }
-  .topbar { background: #1a1c1b; border-bottom: 1px solid #2a2c2b; padding: 0 24px; height: 56px; display: flex; align-items: center; justify-content: space-between; }
-  .topbar .brand { font-weight: 700; color: #aacfbf; font-size: 16px; }
-  .topbar .logout { font-size: 12px; color: #8b928e; cursor: pointer; background: none; border: none; color: #8b928e; }
-  .topbar .logout:hover { color: #e3e2e0; }
+/* ─── APP ─── */
+#app { display:none; }
+.topbar { height:58px; background:var(--card); border-bottom:1px solid var(--border); display:flex; align-items:center; justify-content:space-between; padding:0 28px; position:sticky; top:0; z-index:50; }
+.topbar .brand { font-weight:800; font-size:16px; color:var(--accent); letter-spacing:-.3px; }
+.topbar .right { display:flex; align-items:center; gap:14px; }
+.topbar .ts { font-size:11px; color:var(--faint); }
+.btn-sm { padding:7px 14px; font-size:12px; font-weight:600; border:1px solid var(--border2); background:var(--card2); color:var(--muted); border-radius:8px; cursor:pointer; transition:.15s; }
+.btn-sm:hover { color:var(--text); border-color:var(--accent); }
 
-  .main { max-width: 1100px; margin: 0 auto; padding: 28px 20px; }
+.main { max-width:1160px; margin:0 auto; padding:28px 20px; }
 
-  /* STATS */
-  .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 14px; margin-bottom: 28px; }
-  .stat { background: #1a1c1b; border: 1px solid #2a2c2b; border-radius: 12px; padding: 20px; }
-  .stat .n { font-size: 32px; font-weight: 700; color: #aacfbf; }
-  .stat .l { font-size: 12px; color: #8b928e; margin-top: 4px; }
+/* ─── STATS ─── */
+.stats { display:grid; grid-template-columns:repeat(4,1fr); gap:14px; margin-bottom:28px; }
+.stat { background:var(--card); border:1px solid var(--border); border-radius:14px; padding:22px 20px; }
+.stat .n { font-size:34px; font-weight:800; color:var(--accent); line-height:1; }
+.stat .l { font-size:12px; color:var(--muted); margin-top:6px; }
 
-  /* TABLE */
-  .section-title { font-size: 15px; font-weight: 600; margin-bottom: 14px; color: #c1c8c3; }
-  .table-wrap { background: #1a1c1b; border: 1px solid #2a2c2b; border-radius: 12px; overflow: hidden; margin-bottom: 28px; }
-  table { width: 100%; border-collapse: collapse; }
-  th { background: #1e201f; padding: 11px 16px; text-align: left; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .06em; color: #8b928e; border-bottom: 1px solid #2a2c2b; }
-  td { padding: 12px 16px; font-size: 13px; border-bottom: 1px solid #1e201f; vertical-align: middle; }
-  tr:last-child td { border-bottom: none; }
-  tr:hover td { background: #1e201f; }
+/* ─── LOG ─── */
+.section-hd { display:flex; align-items:center; justify-content:space-between; margin-bottom:12px; }
+.section-title { font-size:13px; font-weight:700; color:var(--muted); text-transform:uppercase; letter-spacing:.06em; }
+.log-box { background:#080a09; border:1px solid var(--border); border-radius:12px; padding:16px; font-family:monospace; font-size:12px; max-height:140px; overflow-y:auto; line-height:2; }
+.log-ok  { color:var(--green); }
+.log-err { color:var(--red); }
+.log-ts  { color:var(--faint); margin-right:8px; }
+#logSection { display:none; margin-bottom:24px; }
 
-  .badge { display: inline-block; padding: 2px 8px; border-radius: 20px; font-size: 11px; font-weight: 600; }
-  .badge-active { background: rgba(170,207,191,.15); color: #aacfbf; }
-  .badge-revoked { background: rgba(242,139,130,.12); color: #f28b82; }
-  .badge-refunded { background: rgba(255,186,0,.1); color: #ffc046; }
+/* ─── TABLE ─── */
+.tbar { display:flex; align-items:center; justify-content:space-between; margin-bottom:12px; }
+.table-wrap { background:var(--card); border:1px solid var(--border); border-radius:14px; overflow:hidden; }
+table { width:100%; border-collapse:collapse; }
+th { background:var(--card2); padding:11px 16px; text-align:left; font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.06em; color:var(--faint); border-bottom:1px solid var(--border); }
+td { padding:13px 16px; border-bottom:1px solid var(--border); vertical-align:middle; }
+tr:last-child td { border-bottom:none; }
+tr:hover td { background:rgba(255,255,255,.018); }
 
-  .mono { font-family: monospace; font-size: 12px; letter-spacing: .04em; color: #c1c8c3; }
+.badge { display:inline-flex; align-items:center; gap:5px; padding:3px 9px; border-radius:20px; font-size:11px; font-weight:700; }
+.badge-active   { background:var(--green-dim); color:var(--green); }
+.badge-revoked  { background:var(--red-dim); color:var(--red); }
+.badge-refunded { background:var(--yellow-dim); color:var(--yellow); }
+.badge-new { background:var(--accent-dim); color:var(--accent); margin-left:5px; font-size:10px; }
 
-  /* ACTIONS */
-  .actions { display: flex; gap: 6px; flex-wrap: wrap; }
-  .btn-sm { padding: 5px 10px; font-size: 11px; font-weight: 600; border: none; border-radius: 6px; cursor: pointer; }
-  .btn-revoke { background: rgba(242,139,130,.15); color: #f28b82; }
-  .btn-revoke:hover { background: rgba(242,139,130,.25); }
-  .btn-reset { background: rgba(170,207,191,.12); color: #aacfbf; }
-  .btn-reset:hover { background: rgba(170,207,191,.2); }
-  .btn-mail { background: rgba(100,149,237,.12); color: #6495ed; }
-  .btn-mail:hover { background: rgba(100,149,237,.2); }
+.mono { font-family:monospace; font-size:12px; letter-spacing:.05em; color:var(--accent); }
+.email-cell { max-width:220px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 
-  .loading { text-align: center; padding: 40px; color: #8b928e; }
-  .toast { position: fixed; bottom: 24px; right: 24px; background: #1e201f; border: 1px solid #2a2c2b; border-radius: 10px; padding: 12px 18px; font-size: 13px; display: none; z-index: 999; }
-  .toast.show { display: block; }
+/* email status */
+.mail-ok  { display:inline-flex; align-items:center; gap:4px; color:var(--green); font-size:11px; font-weight:600; }
+.mail-no  { color:var(--faint); font-size:11px; }
+.mail-pending { color:var(--yellow); font-size:11px; }
 
-  /* MODAL */
-  .modal-bg { display: none; position: fixed; inset: 0; background: rgba(0,0,0,.7); z-index: 100; align-items: center; justify-content: center; }
-  .modal-bg.open { display: flex; }
-  .modal { background: #1a1c1b; border: 1px solid #2a2c2b; border-radius: 14px; padding: 28px; width: 400px; }
-  .modal h3 { margin-bottom: 12px; }
-  .modal p { color: #8b928e; font-size: 13px; margin-bottom: 20px; }
-  .modal-btns { display: flex; gap: 10px; justify-content: flex-end; }
-  .btn-cancel { padding: 8px 16px; background: #2a2c2b; border: none; border-radius: 8px; color: #c1c8c3; cursor: pointer; font-size: 13px; }
-  .btn-confirm-red { padding: 8px 16px; background: #f28b82; border: none; border-radius: 8px; color: #1a0000; font-weight: 700; cursor: pointer; font-size: 13px; }
+/* action buttons */
+.actions { display:flex; gap:6px; flex-wrap:wrap; }
+.abtn { padding:6px 11px; font-size:11px; font-weight:600; border:none; border-radius:7px; cursor:pointer; transition:.12s; white-space:nowrap; }
+.abtn:disabled { opacity:.45; cursor:default; }
+.abtn-send  { background:rgba(74,222,128,.12); color:var(--green); }
+.abtn-send:hover:not(:disabled)  { background:rgba(74,222,128,.2); }
+.abtn-reset { background:rgba(170,207,191,.1); color:var(--accent); }
+.abtn-reset:hover { background:rgba(170,207,191,.18); }
+.abtn-rev   { background:var(--red-dim); color:var(--red); }
+.abtn-rev:hover { background:rgba(248,113,113,.18); }
+
+.btn-green { padding:9px 18px; background:var(--accent); border:none; border-radius:10px; color:var(--on-accent); font-weight:700; font-size:13px; cursor:pointer; }
+.btn-green:hover { background:#c5ebda; }
+
+/* ─── MODAL ─── */
+.modal-bg { display:none; position:fixed; inset:0; background:rgba(0,0,0,.7); z-index:100; align-items:center; justify-content:center; backdrop-filter:blur(2px); }
+.modal-bg.open { display:flex; }
+.modal { background:var(--card); border:1px solid var(--border2); border-radius:18px; padding:32px; width:460px; max-width:95vw; }
+.modal h3 { font-size:17px; font-weight:700; margin-bottom:18px; }
+.modal-field { margin-bottom:14px; }
+.modal-field label { display:block; font-size:11px; font-weight:600; color:var(--muted); text-transform:uppercase; letter-spacing:.05em; margin-bottom:6px; }
+.modal-field input, .modal-field select { width:100%; padding:10px 14px; background:#0d0f0e; border:1px solid var(--border2); border-radius:9px; color:var(--text); font-size:13px; outline:none; }
+.modal-field input:focus, .modal-field select:focus { border-color:var(--accent); }
+.modal-btns { display:flex; gap:10px; justify-content:flex-end; margin-top:22px; }
+.btn-cancel { padding:9px 18px; background:var(--card2); border:none; border-radius:9px; color:var(--muted); cursor:pointer; font-size:13px; }
+.btn-cancel:hover { color:var(--text); }
+.key-result { display:none; margin-top:18px; background:#080a09; border:1px solid rgba(74,222,128,.2); border-radius:12px; padding:20px; text-align:center; }
+.key-result .lbl { font-size:11px; color:var(--muted); margin-bottom:10px; font-weight:600; text-transform:uppercase; letter-spacing:.06em; }
+.key-result code { font-size:20px; letter-spacing:3px; color:var(--green); font-weight:700; font-family:monospace; }
+.key-result .copy-btn { margin-top:12px; background:var(--card2); border:none; border-radius:7px; padding:6px 14px; color:var(--muted); cursor:pointer; font-size:12px; }
+
+/* confirm modal */
+.confirm-desc { color:var(--muted); font-size:13px; line-height:1.6; margin-bottom:4px; }
+.btn-danger { padding:9px 18px; background:var(--red); border:none; border-radius:9px; color:#fff; font-weight:700; cursor:pointer; font-size:13px; }
+
+/* toast */
+.toast { position:fixed; bottom:24px; right:24px; background:var(--card2); border:1px solid var(--border2); border-radius:12px; padding:13px 20px; font-size:13px; display:none; z-index:999; box-shadow:0 8px 32px rgba(0,0,0,.4); }
+.toast.show { display:block; }
 </style>
 </head>
 <body>
 
-<!-- LOGIN -->
 <div id="login">
-  <div class="login-card">
-    <h1>⚡ Helpmeet Admin</h1>
-    <p>Introduce tu clave de administrador</p>
-    <input type="password" id="keyInput" placeholder="Admin Key" autocomplete="off">
-    <button class="btn-green" onclick="doLogin()">Entrar</button>
+  <div class="lcard">
+    <div class="logo">⚡ Helpmeet</div>
+    <p>Panel de administración</p>
+    <input class="inp" type="password" id="keyInput" placeholder="Admin Key" autocomplete="off">
+    <button class="btn-primary" onclick="doLogin()">Entrar</button>
     <div class="err" id="loginErr">Clave incorrecta</div>
   </div>
 </div>
 
-<!-- APP -->
 <div id="app">
   <div class="topbar">
     <span class="brand">⚡ Helpmeet Admin</span>
-    <div style="display:flex;align-items:center;gap:16px">
-      <span style="font-size:12px;color:#8b928e" id="lastUpdated"></span>
-      <button onclick="loadData()" style="background:#2a2c2b;border:none;border-radius:6px;padding:6px 12px;color:#c1c8c3;cursor:pointer;font-size:12px">↻ Actualizar</button>
-      <button class="logout" onclick="doLogout()">Cerrar sesión</button>
+    <div class="right">
+      <span class="ts" id="lastUpdated"></span>
+      <button class="btn-sm" onclick="loadData()">↻ Actualizar</button>
+      <button class="btn-sm" onclick="doLogout()">Salir</button>
     </div>
   </div>
 
   <div class="main">
-    <div class="stats" id="stats">
+    <!-- STATS -->
+    <div class="stats">
       <div class="stat"><div class="n" id="sTotal">—</div><div class="l">Licencias totales</div></div>
-      <div class="stat"><div class="n" id="sActive">—</div><div class="l">Activas</div></div>
-      <div class="stat"><div class="n" id="sRevoked">—</div><div class="l">Revocadas / Reembolsadas</div></div>
+      <div class="stat"><div class="n" id="sActive" style="color:var(--green)">—</div><div class="l">Activas</div></div>
+      <div class="stat"><div class="n" id="sRevoked" style="color:var(--red)">—</div><div class="l">Revocadas</div></div>
       <div class="stat"><div class="n" id="sCustomers">—</div><div class="l">Clientes</div></div>
     </div>
 
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
-      <div class="section-title" style="margin:0">Licencias</div>
-      <button class="btn-green" style="width:auto;padding:8px 18px;font-size:13px" onclick="openCreateModal()">+ Nueva licencia</button>
-    </div>
-    <!-- LOG DE ACTIVIDAD -->
-    <div id="logSection" style="display:none;margin-bottom:24px">
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
-        <div class="section-title" style="margin:0">Actividad reciente</div>
-        <button onclick="clearLogs()" style="background:none;border:none;color:#8b928e;cursor:pointer;font-size:12px">Limpiar</button>
+    <!-- LOG -->
+    <div id="logSection">
+      <div class="section-hd">
+        <div class="section-title">Actividad reciente</div>
+        <button class="btn-sm" onclick="clearLogs()">Limpiar</button>
       </div>
-      <div id="logBox" style="background:#0d0f0e;border:1px solid #2a2c2b;border-radius:8px;padding:14px;font-family:monospace;font-size:12px;color:#c1c8c3;max-height:160px;overflow-y:auto;line-height:1.8"></div>
+      <div class="log-box" id="logBox"></div>
     </div>
 
+    <!-- TABLE -->
+    <div class="tbar">
+      <div class="section-title">Licencias</div>
+      <button class="btn-green" onclick="openCreateModal()">+ Nueva licencia</button>
+    </div>
     <div class="table-wrap">
-      <div class="loading" id="tableLoading">Cargando…</div>
+      <div id="tableLoading" style="padding:40px;text-align:center;color:var(--muted)">Cargando…</div>
       <table id="licTable" style="display:none">
         <thead>
           <tr>
-            <th>ID</th>
+            <th>#</th>
             <th>Cliente</th>
-            <th>Key (últimos 4)</th>
+            <th>Key</th>
             <th>Plan</th>
             <th>Estado</th>
+            <th>Email</th>
             <th>Creada</th>
             <th>Acciones</th>
           </tr>
@@ -140,69 +184,55 @@
   </div>
 </div>
 
-<!-- MODAL CREAR LICENCIA -->
+<!-- MODAL CREAR -->
 <div class="modal-bg" id="createModalBg">
-  <div class="modal" style="width:460px">
-    <h3 style="margin-bottom:18px">Nueva licencia</h3>
-    <div style="display:flex;flex-direction:column;gap:12px">
-      <div>
-        <div style="font-size:12px;color:#8b928e;margin-bottom:6px">Email del cliente *</div>
-        <input id="createEmail" type="email" placeholder="cliente@email.com"
-          style="width:100%;padding:10px 14px;background:#0d0f0e;border:1px solid #2a2c2b;border-radius:8px;color:#e3e2e0;font-size:13px;outline:none">
-      </div>
-      <div>
-        <div style="font-size:12px;color:#8b928e;margin-bottom:6px">Nombre (opcional)</div>
-        <input id="createName" type="text" placeholder="Nombre del cliente"
-          style="width:100%;padding:10px 14px;background:#0d0f0e;border:1px solid #2a2c2b;border-radius:8px;color:#e3e2e0;font-size:13px;outline:none">
-      </div>
-      <div>
-        <div style="font-size:12px;color:#8b928e;margin-bottom:6px">Plan</div>
-        <select id="createPlan" style="width:100%;padding:10px 14px;background:#0d0f0e;border:1px solid #2a2c2b;border-radius:8px;color:#e3e2e0;font-size:13px;outline:none">
-          <option value="personal">Personal</option>
-          <option value="pro">Pro</option>
-          <option value="team">Team</option>
-        </select>
-      </div>
-      <label style="display:flex;align-items:center;gap:10px;cursor:pointer;font-size:13px">
-        <input type="checkbox" id="createSendEmail" checked>
-        <span>Enviar key por email al cliente</span>
-      </label>
+  <div class="modal">
+    <h3>Nueva licencia</h3>
+    <div class="modal-field"><label>Email del cliente *</label><input id="createEmail" type="email" placeholder="cliente@email.com"></div>
+    <div class="modal-field"><label>Nombre (opcional)</label><input id="createName" type="text" placeholder="Nombre"></div>
+    <div class="modal-field"><label>Plan</label>
+      <select id="createPlan">
+        <option value="personal">Personal</option>
+        <option value="pro">Pro</option>
+        <option value="team">Team</option>
+      </select>
     </div>
-
-    <!-- KEY RESULT -->
-    <div id="keyResult" style="display:none;margin-top:16px;background:#0d0f0e;border:1px solid #aacfbf44;border-radius:8px;padding:16px;text-align:center">
-      <div style="font-size:11px;color:#8b928e;margin-bottom:8px">KEY GENERADA — cópiala ahora</div>
-      <div id="keyValue" style="font-family:monospace;font-size:18px;color:#aacfbf;letter-spacing:2px;font-weight:bold"></div>
-      <button onclick="copyKey()" style="margin-top:10px;background:#2a2c2b;border:none;border-radius:6px;padding:6px 14px;color:#c1c8c3;cursor:pointer;font-size:12px">Copiar</button>
+    <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;color:var(--muted)">
+      <input type="checkbox" id="createSendEmail" checked> Notificarme por email al crear
+    </label>
+    <div class="key-result" id="keyResult">
+      <div class="lbl">Key generada — cópiala ahora</div>
+      <code id="keyValue"></code>
+      <button class="copy-btn" onclick="copyKey()">Copiar</button>
     </div>
-
-    <div id="createErr" style="color:#f28b82;font-size:12px;margin-top:10px;display:none"></div>
-
-    <div class="modal-btns" style="margin-top:20px">
+    <div style="color:var(--red);font-size:12px;margin-top:8px;display:none" id="createErr"></div>
+    <div class="modal-btns">
       <button class="btn-cancel" onclick="closeCreateModal()">Cerrar</button>
-      <button class="btn-green" id="createBtn" style="width:auto;padding:9px 20px;font-size:13px" onclick="createLicense()">Crear licencia</button>
+      <button class="btn-green" id="createBtn" onclick="createLicense()">Crear licencia</button>
     </div>
   </div>
 </div>
 
 <!-- MODAL CONFIRMAR -->
-<div class="modal-bg" id="modalBg">
-  <div class="modal">
-    <h3 id="modalTitle"></h3>
-    <p id="modalDesc"></p>
+<div class="modal-bg" id="confirmBg">
+  <div class="modal" style="width:400px">
+    <h3 id="confirmTitle"></h3>
+    <p class="confirm-desc" id="confirmDesc"></p>
     <div class="modal-btns">
-      <button class="btn-cancel" onclick="closeModal()">Cancelar</button>
-      <button class="btn-confirm-red" id="modalConfirm">Confirmar</button>
+      <button class="btn-cancel" onclick="closeConfirm()">Cancelar</button>
+      <button class="btn-danger" id="confirmBtn">Confirmar</button>
     </div>
   </div>
 </div>
 
-<!-- TOAST -->
 <div class="toast" id="toast"></div>
 
 <script>
 const API = 'https://web-production-93435.up.railway.app';
 let ADMIN_KEY = '';
+// Track email sent per license: { licId: 'ok'|'fail'|'pending' }
+const emailStatus = JSON.parse(localStorage.getItem('hm_email_status') || '{}');
+function saveEmailStatus() { localStorage.setItem('hm_email_status', JSON.stringify(emailStatus)); }
 
 function doLogin() {
   const k = document.getElementById('keyInput').value.trim();
@@ -215,65 +245,62 @@ function doLogin() {
         document.getElementById('login').style.display = 'none';
         document.getElementById('app').style.display = 'block';
         loadData();
-      } else {
-        document.getElementById('loginErr').style.display = 'block';
-        ADMIN_KEY = '';
-      }
-    })
-    .catch(() => { document.getElementById('loginErr').style.display = 'block'; ADMIN_KEY = ''; });
+      } else { document.getElementById('loginErr').style.display = 'block'; ADMIN_KEY = ''; }
+    }).catch(() => { document.getElementById('loginErr').style.display = 'block'; ADMIN_KEY = ''; });
 }
-
 document.getElementById('keyInput').addEventListener('keydown', e => { if (e.key === 'Enter') doLogin(); });
-
-function doLogout() {
-  localStorage.removeItem('hm_admin_key');
-  location.reload();
-}
+function doLogout() { localStorage.removeItem('hm_admin_key'); location.reload(); }
 
 async function loadData() {
   try {
-    const [lics, customers] = await Promise.all([
+    const [lics, custs] = await Promise.all([
       fetch(`${API}/api/admin/licenses`, { headers: { 'X-Admin-Key': ADMIN_KEY } }).then(r => r.json()),
       fetch(`${API}/api/admin/customers`, { headers: { 'X-Admin-Key': ADMIN_KEY } }).then(r => r.json()),
     ]);
-
-    const active = lics.filter(l => l.status === 'active').length;
-    const revoked = lics.filter(l => ['revoked','refunded'].includes(l.status)).length;
     document.getElementById('sTotal').textContent = lics.length;
-    document.getElementById('sActive').textContent = active;
-    document.getElementById('sRevoked').textContent = revoked;
-    document.getElementById('sCustomers').textContent = customers.length;
-    document.getElementById('lastUpdated').textContent = 'Actualizado: ' + new Date().toLocaleTimeString('es');
+    document.getElementById('sActive').textContent = lics.filter(l => l.status === 'active').length;
+    document.getElementById('sRevoked').textContent = lics.filter(l => ['revoked','refunded'].includes(l.status)).length;
+    document.getElementById('sCustomers').textContent = custs.length;
+    document.getElementById('lastUpdated').textContent = new Date().toLocaleTimeString('es');
 
     const body = document.getElementById('licBody');
     body.innerHTML = '';
     lics.slice().reverse().forEach(lic => {
-      const createdAt = new Date(lic.created_at);
-      const isNew = (Date.now() - createdAt.getTime()) < 86400000; // últimas 24h
-      const date = createdAt.toLocaleDateString('es', { day:'2-digit', month:'short', year:'numeric' });
+      const isNew = (Date.now() - new Date(lic.created_at).getTime()) < 86400000;
+      const date = new Date(lic.created_at).toLocaleDateString('es', { day:'2-digit', month:'short' });
       const email = lic.customer?.email || '—';
+      const newTag = isNew ? `<span class="badge badge-new">NUEVO</span>` : '';
       const badge = lic.status === 'active'
-        ? `<span class="badge badge-active">Activa</span>`
+        ? `<span class="badge badge-active">● Activa</span>`
         : lic.status === 'refunded'
-          ? `<span class="badge badge-refunded">Reembolsada</span>`
-          : `<span class="badge badge-revoked">Revocada</span>`;
+          ? `<span class="badge badge-refunded">↩ Reembolsada</span>`
+          : `<span class="badge badge-revoked">✕ Revocada</span>`;
+
+      const es = emailStatus[lic.id];
+      const emailCol = es === 'ok'
+        ? `<span class="mail-ok">✓ Enviado</span>`
+        : es === 'fail'
+          ? `<span class="mail-no">✗ Error</span>`
+          : es === 'pending'
+            ? `<span class="mail-pending">⟳ Enviando</span>`
+            : `<span class="mail-no">— Sin enviar</span>`;
 
       const actions = lic.status === 'active'
         ? `<div class="actions">
-            <button class="btn-sm btn-mail" onclick="sendKeyEmail(${lic.id}, '${email}')">✉ Enviar key</button>
-            <button class="btn-sm btn-reset" onclick="confirmReset(${lic.id})">↺ Reset PC</button>
-            <button class="btn-sm btn-revoke" onclick="confirmRevoke(${lic.id})">✕ Revocar</button>
+            <button class="abtn abtn-send" onclick="sendKey(${lic.id},'${email}',this)">✉ Enviar key</button>
+            <button class="abtn abtn-reset" onclick="confirmAction('reset',${lic.id})">↺ Reset PC</button>
+            <button class="abtn abtn-rev" onclick="confirmAction('revoke',${lic.id})">✕ Revocar</button>
            </div>`
-        : `<span style="color:#8b928e;font-size:12px">${lic.status}</span>`;
+        : `<span style="color:var(--faint);font-size:11px">${lic.status}</span>`;
 
-      const newTag = isNew ? '<span style="background:#aacfbf22;color:#aacfbf;font-size:10px;font-weight:700;padding:2px 6px;border-radius:10px;margin-left:6px">NUEVO</span>' : '';
-      body.innerHTML += `<tr style="${isNew ? 'background:#1a2420' : ''}">
-        <td style="color:#8b928e">#${lic.id}</td>
-        <td><div>${email}${newTag}</div></td>
+      body.innerHTML += `<tr id="row-${lic.id}">
+        <td style="color:var(--faint)">#${lic.id}</td>
+        <td class="email-cell">${email}${newTag}</td>
         <td><span class="mono">...${lic.key_last4}</span></td>
-        <td style="text-transform:capitalize">${lic.plan}</td>
+        <td style="text-transform:capitalize;color:var(--muted)">${lic.plan}</td>
         <td>${badge}</td>
-        <td style="color:#8b928e;font-size:12px">${date}</td>
+        <td id="email-status-${lic.id}">${emailCol}</td>
+        <td style="color:var(--faint);font-size:12px">${date}</td>
         <td>${actions}</td>
       </tr>`;
     });
@@ -285,173 +312,134 @@ async function loadData() {
   }
 }
 
-let modalAction = null;
-function openModal(title, desc, onConfirm) {
-  document.getElementById('modalTitle').textContent = title;
-  document.getElementById('modalDesc').textContent = desc;
-  document.getElementById('modalConfirm').onclick = () => { closeModal(); onConfirm(); };
-  document.getElementById('modalBg').classList.add('open');
-}
-function closeModal() { document.getElementById('modalBg').classList.remove('open'); }
-
-function confirmRevoke(id) {
-  openModal('Revocar licencia', `¿Revocar la licencia #${id}? El usuario no podrá usarla.`, () => revokeLicense(id));
-}
-function confirmReset(id) {
-  openModal('Resetear dispositivos', `¿Resetear los dispositivos de la licencia #${id}? El usuario podrá activar en un PC nuevo.`, () => resetDevices(id));
-}
-
-async function revokeLicense(id) {
-  const r = await fetch(`${API}/api/admin/licenses/${id}/revoke`, {
-    method: 'POST', headers: { 'X-Admin-Key': ADMIN_KEY }
-  });
-  if ((await r.json()).ok) { showToast('Licencia revocada'); loadData(); }
-}
-
-async function resetDevices(id) {
-  const r = await fetch(`${API}/api/admin/licenses/${id}/reset-devices`, {
-    method: 'POST', headers: { 'X-Admin-Key': ADMIN_KEY }
-  });
-  if ((await r.json()).ok) { showToast('Dispositivos reseteados — el cliente puede activar en un PC nuevo'); loadData(); }
-}
-
-async function sendKeyEmail(id, email) {
-  const btn = event.target;
+async function sendKey(id, email, btn) {
   btn.disabled = true;
-  btn.textContent = 'Generando...';
+  btn.textContent = '⟳ Enviando...';
+  emailStatus[id] = 'pending';
+  const el = document.getElementById(`email-status-${id}`);
+  if (el) el.innerHTML = `<span class="mail-pending">⟳ Enviando</span>`;
+
   try {
     const r = await fetch(`${API}/api/admin/licenses/${id}/generate-key`, {
       method: 'POST', headers: { 'X-Admin-Key': ADMIN_KEY }
     });
     const data = await r.json();
-    if (data.ok && data.key) {
-      if (data.email_sent) {
-        showToast(`Email enviado a ${data.email}`);
-        addLog(`OK — Email enviado a ${data.email} | Key: ...${data.key.slice(-4)}`);
-      } else {
-        const err = data.email_error || 'Gmail no configurado';
-        showToast(`Key generada pero email falló: ${err}`);
-        addLog(`ERROR email — ${err} | Key: ${data.key} | Para: ${data.email}`);
-      }
-      loadData();
+    if (data.ok) {
+      emailStatus[id] = data.email_sent ? 'ok' : 'fail';
+      saveEmailStatus();
+      if (el) el.innerHTML = data.email_sent
+        ? `<span class="mail-ok">✓ Enviado</span>`
+        : `<span class="mail-no">✗ Sin email</span>`;
+      const msg = data.email_sent ? `Email enviado · Key: ...${data.key.slice(-4)}` : `Key generada (sin email): ${data.key}`;
+      addLog(data.email_sent ? 'ok' : 'err', `${email} | ${msg}`);
+      showToast(data.email_sent ? `Email enviado a tu Gmail` : `Key generada — revisa el log`);
     } else {
-      showToast('Error: ' + (data.error || 'no se pudo generar la key'));
+      emailStatus[id] = 'fail'; saveEmailStatus();
+      if (el) el.innerHTML = `<span class="mail-no">✗ Error</span>`;
+      addLog('err', `Error: ${data.error || 'desconocido'}`);
     }
   } catch(e) {
-    showToast('Error de conexión');
-  } finally {
-    btn.disabled = false;
-    btn.textContent = '✉ Enviar key';
+    emailStatus[id] = 'fail'; saveEmailStatus();
+    if (el) el.innerHTML = `<span class="mail-no">✗ Error</span>`;
+    addLog('err', `Error de conexión`);
   }
+  btn.disabled = false;
+  btn.textContent = '✉ Enviar key';
 }
 
+// ─── CONFIRM MODAL ───
+let _confirmFn = null;
+function confirmAction(type, id) {
+  const titles = { revoke: 'Revocar licencia', reset: 'Resetear dispositivos' };
+  const descs  = { revoke: `Licencia #${id} quedará revocada y el usuario no podrá usarla.`, reset: `Se desactivarán todos los dispositivos de la licencia #${id}. El cliente podrá activar en un PC nuevo.` };
+  document.getElementById('confirmTitle').textContent = titles[type];
+  document.getElementById('confirmDesc').textContent  = descs[type];
+  _confirmFn = type === 'revoke' ? () => revokeLicense(id) : () => resetDevices(id);
+  document.getElementById('confirmBtn').onclick = () => { closeConfirm(); _confirmFn(); };
+  document.getElementById('confirmBg').classList.add('open');
+}
+function closeConfirm() { document.getElementById('confirmBg').classList.remove('open'); }
+
+async function revokeLicense(id) {
+  const r = await fetch(`${API}/api/admin/licenses/${id}/revoke`, { method:'POST', headers:{'X-Admin-Key':ADMIN_KEY} });
+  if ((await r.json()).ok) { addLog('ok', `Licencia #${id} revocada`); showToast('Licencia revocada'); loadData(); }
+}
+async function resetDevices(id) {
+  const r = await fetch(`${API}/api/admin/licenses/${id}/reset-devices`, { method:'POST', headers:{'X-Admin-Key':ADMIN_KEY} });
+  if ((await r.json()).ok) { addLog('ok', `Dispositivos de #${id} reseteados`); showToast('Dispositivos reseteados'); loadData(); }
+}
+
+// ─── CREAR LICENCIA ───
+let _createdKey = '';
 function openCreateModal() {
   document.getElementById('createModalBg').classList.add('open');
   document.getElementById('keyResult').style.display = 'none';
   document.getElementById('createErr').style.display = 'none';
+  document.getElementById('createBtn').style.display = '';
   document.getElementById('createEmail').value = '';
   document.getElementById('createName').value = '';
-  document.getElementById('createBtn').style.display = '';
-  document.getElementById('createEmail').focus();
+  setTimeout(() => document.getElementById('createEmail').focus(), 100);
 }
-function closeCreateModal() {
-  document.getElementById('createModalBg').classList.remove('open');
-  loadData();
-}
+function closeCreateModal() { document.getElementById('createModalBg').classList.remove('open'); loadData(); }
 
-let _createdKey = '';
 async function createLicense() {
   const email = document.getElementById('createEmail').value.trim();
-  const name = document.getElementById('createName').value.trim();
-  const plan = document.getElementById('createPlan').value;
-  const sendEmail = document.getElementById('createSendEmail').checked;
+  const name  = document.getElementById('createName').value.trim();
+  const plan  = document.getElementById('createPlan').value;
+  const send  = document.getElementById('createSendEmail').checked;
   const errEl = document.getElementById('createErr');
-  const btn = document.getElementById('createBtn');
-
+  const btn   = document.getElementById('createBtn');
   if (!email) { errEl.textContent = 'El email es obligatorio'; errEl.style.display = 'block'; return; }
   errEl.style.display = 'none';
   btn.disabled = true; btn.textContent = 'Creando...';
-
   try {
-    // 1. Crear o reusar cliente
-    let customerId;
-    const rCust = await fetch(`${API}/api/admin/customers`, {
-      method: 'POST',
-      headers: { 'X-Admin-Key': ADMIN_KEY, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email, name: name || null })
-    });
-    if (rCust.ok) {
-      customerId = (await rCust.json()).id;
-    } else {
-      // Ya existe — buscar en la lista
-      const all = await fetch(`${API}/api/admin/customers`, { headers: { 'X-Admin-Key': ADMIN_KEY } }).then(r => r.json());
-      const found = all.find(c => c.email === email);
-      if (found) customerId = found.id;
-      else { errEl.textContent = 'No se pudo crear el cliente'; errEl.style.display = 'block'; btn.disabled = false; btn.textContent = 'Crear licencia'; return; }
-    }
+    let cid;
+    const rc = await fetch(`${API}/api/admin/customers`, { method:'POST', headers:{'X-Admin-Key':ADMIN_KEY,'Content-Type':'application/json'}, body:JSON.stringify({email,name:name||null}) });
+    if (rc.ok) { cid = (await rc.json()).id; }
+    else { const all = await fetch(`${API}/api/admin/customers`,{headers:{'X-Admin-Key':ADMIN_KEY}}).then(r=>r.json()); cid = all.find(c=>c.email===email)?.id; }
+    if (!cid) { errEl.textContent = 'Error creando cliente'; errEl.style.display = 'block'; btn.disabled=false; btn.textContent='Crear licencia'; return; }
 
-    // 2. Crear licencia
-    const rLic = await fetch(`${API}/api/admin/licenses`, {
-      method: 'POST',
-      headers: { 'X-Admin-Key': ADMIN_KEY, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ customer_id: customerId, plan })
-    });
-    const lic = await rLic.json();
+    const rl = await fetch(`${API}/api/admin/licenses`, { method:'POST', headers:{'X-Admin-Key':ADMIN_KEY,'Content-Type':'application/json'}, body:JSON.stringify({customer_id:cid,plan}) });
+    const lic = await rl.json();
     _createdKey = lic.license_key;
-
-    // Mostrar key
     document.getElementById('keyValue').textContent = _createdKey;
     document.getElementById('keyResult').style.display = 'block';
     btn.style.display = 'none';
-
-    // 3. Enviar email si se marcó
-    if (sendEmail) {
-      await fetch(`${API}/api/admin/licenses/${lic.id}/send-key`, {
-        method: 'POST', headers: { 'X-Admin-Key': ADMIN_KEY }
-      });
-      showToast(`Licencia creada y email enviado a ${email}`);
+    addLog('ok', `Licencia #${lic.id} creada para ${email}`);
+    if (send) {
+      await fetch(`${API}/api/admin/licenses/${lic.id}/generate-key`, { method:'POST', headers:{'X-Admin-Key':ADMIN_KEY} });
+      emailStatus[lic.id] = 'ok'; saveEmailStatus();
+      addLog('ok', `Notificación enviada a tu Gmail`);
+      showToast('Licencia creada y email enviado');
     } else {
-      showToast('Licencia creada — recuerda enviar la key al cliente');
+      showToast('Licencia creada');
     }
-  } catch(e) {
-    errEl.textContent = 'Error de conexión'; errEl.style.display = 'block';
-    btn.disabled = false; btn.textContent = 'Crear licencia';
-  }
+  } catch(e) { errEl.textContent = 'Error de conexión'; errEl.style.display = 'block'; btn.disabled=false; btn.textContent='Crear licencia'; }
 }
+function copyKey() { navigator.clipboard.writeText(_createdKey); showToast('Key copiada'); }
 
-function copyKey() {
-  navigator.clipboard.writeText(_createdKey);
-  showToast('Key copiada al portapapeles');
-}
-
-function addLog(msg) {
+// ─── LOG ───
+function addLog(type, msg) {
   const box = document.getElementById('logBox');
   const sec = document.getElementById('logSection');
   if (!box) return;
   sec.style.display = 'block';
-  const time = new Date().toLocaleTimeString('es');
-  box.innerHTML = `<div style="color:#8b928e">[${time}]</div> ${msg}<br>` + box.innerHTML;
+  const t = new Date().toLocaleTimeString('es');
+  const cls = type === 'ok' ? 'log-ok' : 'log-err';
+  const icon = type === 'ok' ? '✓' : '✗';
+  box.innerHTML = `<div><span class="log-ts">[${t}]</span><span class="${cls}">${icon} ${msg}</span></div>` + box.innerHTML;
 }
-function clearLogs() {
-  document.getElementById('logBox').innerHTML = '';
-  document.getElementById('logSection').style.display = 'none';
-}
+function clearLogs() { document.getElementById('logBox').innerHTML=''; document.getElementById('logSection').style.display='none'; }
 
 function showToast(msg) {
   const t = document.getElementById('toast');
-  t.textContent = msg;
-  t.classList.add('show');
+  t.textContent = msg; t.classList.add('show');
   setTimeout(() => t.classList.remove('show'), 3000);
 }
 
-// Auto-login si hay key guardada
+// ─── BOOT ───
 const saved = localStorage.getItem('hm_admin_key');
-if (saved) {
-  document.getElementById('keyInput').value = saved;
-  doLogin();
-}
-
-// Auto-refresh cada 60 segundos
+if (saved) { document.getElementById('keyInput').value = saved; doLogin(); }
 setInterval(() => { if (ADMIN_KEY) loadData(); }, 60000);
 </script>
 </body>
