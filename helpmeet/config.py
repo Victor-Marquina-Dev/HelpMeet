@@ -48,16 +48,19 @@ SCREENSHOT_HOTKEY = "<ctrl>+<shift>+s"
 VIDEO_FPS = 30
 VIDEO_CODEC = "libx264"
 VIDEO_PRESET = "veryfast"   # rápido para no soltar fotogramas al grabar
-VIDEO_CRF = "18"            # calidad alta (menor = mejor; 18 ≈ sin pérdida visible)
+VIDEO_CRF = "28"            # equilibrio tipo OBS para reuniones (menor = más calidad/peso)
 VIDEO_AUDIO_RATE = 48000
+VIDEO_AUDIO_BITRATE = 128_000  # AAC 128 kbps: suficiente para voz/reuniones
 
 # Perfiles de calidad de grabación de pantalla (P-12). Permiten grabaciones más
 # ligeras (menos CPU y espacio) o de máxima nitidez. `max_w/max_h = 0` = sin
 # límite de resolución (la nativa del monitor). `crf` menor = más calidad/peso.
 VIDEO_PROFILES = {
-    "light":    {"label": "Ligero · 720p · 15 fps",       "max_w": 1280, "max_h": 720,  "fps": 15, "crf": "26"},
-    "balanced": {"label": "Equilibrado · 1080p · 30 fps",  "max_w": 1920, "max_h": 1080, "fps": 30, "crf": "23"},
-    "native":   {"label": "Nativo · máxima nitidez",       "max_w": 0,    "max_h": 0,    "fps": 30, "crf": "18"},
+    # Reuniones y demos: prioriza texto legible + peso razonable.
+    "light":    {"label": "Ligero · 720p · 12 fps · menor peso",       "max_w": 1280, "max_h": 720,  "fps": 12, "crf": "31", "preset": "veryfast"},
+    "balanced": {"label": "Optimizado · 1080p · 20 fps · recomendado", "max_w": 1920, "max_h": 1080, "fps": 20, "crf": "28", "preset": "veryfast"},
+    # Solo para casos donde importe cada pixel; puede generar archivos grandes.
+    "native":   {"label": "Nativo · alta nitidez · más peso",          "max_w": 0,    "max_h": 0,    "fps": 30, "crf": "23", "preset": "veryfast"},
 }
 DEFAULT_VIDEO_PROFILE = "balanced"
 

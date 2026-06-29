@@ -25,6 +25,7 @@ from helpmeet.export.exporter import (
 )
 from helpmeet import config
 from helpmeet import settings
+from helpmeet.version import __version__
 
 
 _MONTHS_ES = (
@@ -48,23 +49,66 @@ def _set_windows_app_identity() -> None:
         pass
 
 
+def _apply_dark_titlebar(hwnd: int) -> None:
+    """Pinta la barra de título oscura y con el color de la app (Win11 DWM API)."""
+    try:
+        import ctypes
+        import ctypes.wintypes
+        dwmapi = ctypes.WinDLL("dwmapi")
+
+        def _dwm_set(attr: int, value: ctypes.c_uint | ctypes.c_int) -> None:
+            dwmapi.DwmSetWindowAttribute(
+                ctypes.wintypes.HWND(hwnd), ctypes.wintypes.DWORD(attr),
+                ctypes.byref(value), ctypes.sizeof(value),
+            )
+
+        # Modo oscuro: texto blanco, botones oscuros (Win10 20H1+)
+        _dwm_set(20, ctypes.c_int(1))   # DWMWA_USE_IMMERSIVE_DARK_MODE
+
+        # Fondo de la barra: #121413 → BGR = 0x131412
+        _dwm_set(35, ctypes.c_uint(0x131412))  # DWMWA_CAPTION_COLOR
+
+        # Texto: casi blanco
+        _dwm_set(36, ctypes.c_uint(0xD8E0DC))  # DWMWA_TEXT_COLOR
+
+        # Borde: oscuro neutro
+        _dwm_set(34, ctypes.c_uint(0x1E201F))  # DWMWA_BORDER_COLOR
+    except Exception:
+        pass
+
+
 def _apply_native_window_icon(window, icon_path: Path) -> None:
-    """Aplica el .ico a WinForms después de que pywebview cree la ventana."""
+    """Aplica el .ico y el tema oscuro a WinForms después de que pywebview cree la ventana."""
     if not sys.platform.startswith("win") or not window.events.shown.wait(15):
         return
     try:
-        from System import Action
+        import ctypes
+        from System import Action, IntPtr
         from System.Drawing import Icon
         from webview.platforms.winforms import BrowserView
 
         form = BrowserView.instances.get(window.uid)
         if form is None:
             return
-        icon = Icon(str(icon_path), 256, 256)
-        _NATIVE_ICON_REFS.append(icon)  # conservar el handle durante toda la app
+        icon = Icon(str(icon_path))          # sin restricción de tamaño: carga el mejor frame
+        icon_big = Icon(str(icon_path), 32, 32)
+        _NATIVE_ICON_REFS.extend([icon, icon_big])
 
         def assign():
             form.Icon = icon
+            try:
+                hwnd = form.Handle.ToInt64()
+                # Forzar WM_SETICON en la ventana para que la barra de tareas lo recoja
+                WM_SETICON = 0x0080
+                hicon_big = icon.Handle.ToInt64()
+                hicon_sm  = icon_big.Handle.ToInt64()
+                ctypes.windll.user32.SendMessageW(hwnd, WM_SETICON, 1, hicon_big)  # ICON_BIG
+                ctypes.windll.user32.SendMessageW(hwnd, WM_SETICON, 0, hicon_sm)   # ICON_SMALL
+                # Notificar al shell para que refresque la caché de iconos
+                ctypes.windll.shell32.SHChangeNotify(0x08000000, 0x0000, None, None)
+                _apply_dark_titlebar(hwnd)
+            except Exception:
+                pass
 
         if form.InvokeRequired:
             form.Invoke(Action(assign))
@@ -86,6 +130,37 @@ def _spanish_month(value) -> str:
 def _fmt_12h(value) -> str:
     """Hora en formato 12h con AM/PM y sin cero inicial (ej. `7:08 PM`)."""
     return value.strftime("%I:%M %p").lstrip("0")
+
+
+def _human_size(path) -> str:
+    """Tamaño legible del archivo (KB/MB/GB). Cadena vacía si no existe."""
+    try:
+        if not path:
+            return ""
+        n = os.path.getsize(path)
+    except OSError:
+        return ""
+    units = ("B", "KB", "MB", "GB", "TB")
+    size = float(n)
+    i = 0
+    while size >= 1024 and i < len(units) - 1:
+        size /= 1024
+        i += 1
+    if i == 0:
+        return f"{int(size)} {units[i]}"
+    return f"{size:.1f} {units[i]}"
+
+
+def _initiative_payload(i) -> dict:
+    """Dict de una iniciativa para la UI (incluye color y fecha de creación)."""
+    return {
+        "id": i.id,
+        "name": i.name,
+        "description": i.description or "",
+        "color": i.color or "",
+        "created_at": i.created_at.isoformat() if i.created_at else "",
+        "pinned": i.pinned_at is not None,
+    }
 
 
 def _friendly_model_error(exc: Exception) -> str:
@@ -174,9 +249,7 @@ class Api:
         self._window = window
 
     def list_initiatives(self):
-        return [{"id": i.id, "name": i.name, "description": i.description or "",
-                 "pinned": i.pinned_at is not None}
-                for i in repo.list_initiatives(self._session)]
+        return [_initiative_payload(i) for i in repo.list_initiatives(self._session)]
 
     def toggle_initiative_pin(self, initiative_id):
         """Ancla/desancla una iniciativa (las ancladas salen arriba en la lista)."""
@@ -240,12 +313,16 @@ class Api:
                        for mid in meeting_ids)
         return False
 
-    def create_initiative(self, name):
-        i = repo.create_initiative(self._session, name)
-        return {"id": i.id, "name": i.name}
+    def create_initiative(self, name, color=None):
+        i = repo.create_initiative(self._session, name, color=color)
+        return _initiative_payload(i)
 
     def rename_initiative(self, initiative_id, name):
         repo.rename_initiative(self._session, int(initiative_id), name)
+        return {"ok": True}
+
+    def set_initiative_color(self, initiative_id, color):
+        repo.set_initiative_color(self._session, int(initiative_id), color)
         return {"ok": True}
 
     def rename_meeting(self, meeting_id, title):
@@ -307,12 +384,14 @@ class Api:
             "id": m.id,
             "title": m.title,
             "date": m.started_at.strftime("%d/%m/%Y %H:%M"),
+            "started_at": m.started_at.strftime("%Y-%m-%dT%H:%M:%S"),
             "time": _fmt_12h(m.started_at),
             "month_key": m.started_at.strftime("%Y-%m"),
             "month_label": _spanish_month(m.started_at),
             "status": status,
             "frases": frase_count,
             "dur": f"{mm:02d}:{ss:02d}" if m.ended_at else "—",
+            "size": _human_size(m.audio_path),
             "has_video": is_video,
         }
 
@@ -334,8 +413,7 @@ class Api:
         todo de una vez, con las reuniones agrupadas en UNA consulta y los conteos
         de frases agregados."""
         self._session.expire_all()
-        initiatives = [{"id": i.id, "name": i.name, "description": i.description or "",
-                        "pinned": i.pinned_at is not None}
+        initiatives = [_initiative_payload(i)
                        for i in repo.list_initiatives(self._session)]
         grouped = repo.list_meetings_by_initiative(self._session)
         all_ids = [m.id for ms in grouped.values() for m in ms]
@@ -356,6 +434,7 @@ class Api:
         with self._jobs_lock:
             jobs = list(self._jobs_info.values())
         return {
+            "version": __version__,
             "initiatives": initiatives,
             "meetings_by_initiative": meetings_by_initiative,
             "monitors": monitors,
@@ -364,6 +443,7 @@ class Api:
                 "trash": len(repo.list_trash(self._session)),
             },
             "background_jobs": jobs,
+            "default_mic_muted": bool(settings.get_transcription_settings().get("default_mic_muted", False)),
         }
 
     def search(self, query):
@@ -386,11 +466,14 @@ class Api:
         m = repo.get_meeting(self._session, int(meeting_id))
         if m is None:
             return {"title": "", "context": "", "started_at": "", "utterances": [],
-                    "assets": {"captures": [], "notes": [], "video": None},
+                    "assets": {"captures": [], "notes": [], "video": None, "audio": None},
                     "video_path": None}
         video = m.audio_path if (m.audio_path and str(m.audio_path).lower().endswith(".mp4")
                                  and os.path.exists(m.audio_path)) else None
+        audio = m.audio_path if (m.audio_path and not str(m.audio_path).lower().endswith(".mp4")
+                                 and os.path.exists(m.audio_path)) else None
         video_duration = ""
+        audio_duration = ""
         if video:
             from helpmeet.media import media_duration
             secs = int(media_duration(video))
@@ -398,6 +481,16 @@ class Api:
                 hours, rem = divmod(secs, 3600)
                 mins, sec = divmod(rem, 60)
                 video_duration = f"{hours}:{mins:02d}:{sec:02d}" if hours else f"{mins}:{sec:02d}"
+        elif m.audio_path and os.path.exists(m.audio_path):
+            try:
+                from helpmeet.media import media_duration
+                secs = int(media_duration(m.audio_path))
+                if secs > 0:
+                    hours, rem = divmod(secs, 3600)
+                    mins, sec = divmod(rem, 60)
+                    audio_duration = f"{hours}:{mins:02d}:{sec:02d}" if hours else f"{mins}:{sec:02d}"
+            except Exception:
+                pass
 
         def stamp(seconds):
             minutes, secs = divmod(max(0, int(seconds or 0)), 60)
@@ -456,9 +549,11 @@ class Api:
             "participants": [{"id": p.id, "name": p.name, "is_me": bool(p.is_me)}
                              for p in participants],
             "utterances": timeline,
-            "assets": {"captures": captures, "notes": notes, "video": video},
+            "assets": {"captures": captures, "notes": notes, "video": video, "audio": audio},
             "video_path": video,
             "video_duration": video_duration,
+            "audio_duration": audio_duration,
+            "duration": audio_duration,
         }
 
     def update_utterance(self, utterance_id, changes):
@@ -702,6 +797,8 @@ class Api:
         return self._local_engine
 
     def start_recording(self, initiative_id, title):
+        if not initiative_id:
+            return {"ok": False, "error": "Selecciona una iniciativa antes de grabar."}
         if self._recorder is not None:
             return {"ok": False, "error": "Ya hay una grabación de reunión en curso."}
         if self._screen_rec is not None:
@@ -1522,6 +1619,142 @@ class Api:
         _open_in_explorer(out)
         return {"ok": True, "path": str(out)}
 
+    # ---- Controles de ventana (frameless) ----
+    def win_minimize(self):
+        if self._window:
+            self._window.minimize()
+        return {"ok": True}
+
+    def win_maximize(self):
+        """Alterna maximizado ↔ restaurado respetando la barra de tareas."""
+        if not self._window:
+            return {"ok": True}
+        if not sys.platform.startswith("win"):
+            self._window.toggle_fullscreen()
+            return {"ok": True}
+        try:
+            from System import Action
+            from System.Windows.Forms import Screen
+            from webview.platforms.winforms import BrowserView
+            form = BrowserView.instances.get(self._window.uid)
+            if form is None:
+                return {"ok": True}
+            def toggle():
+                wa = Screen.GetWorkingArea(form)
+                is_max = (form.Left == wa.X and form.Top == wa.Y
+                          and form.Width == wa.Width and form.Height == wa.Height)
+                if is_max:
+                    b = getattr(self, '_pre_max_bounds', None)
+                    if b:
+                        form.SetBounds(b[0], b[1], b[2], b[3])
+                    else:
+                        form.SetBounds(wa.X + 60, wa.Y + 60, 1100, 720)
+                else:
+                    self._pre_max_bounds = (form.Left, form.Top, form.Width, form.Height)
+                    form.SetBounds(wa.X, wa.Y, wa.Width, wa.Height)
+            if form.InvokeRequired:
+                form.Invoke(Action(toggle))
+            else:
+                toggle()
+        except Exception:
+            pass
+        return {"ok": True}
+
+    def win_close(self):
+        if self._window:
+            self._window.destroy()
+        return {"ok": True}
+
+    def win_is_maximized(self):
+        if not sys.platform.startswith("win"):
+            return {"maximized": False}
+        try:
+            from System.Windows.Forms import Screen
+            from webview.platforms.winforms import BrowserView
+            form = BrowserView.instances.get(self._window.uid)
+            if form:
+                wa = Screen.GetWorkingArea(form)
+                return {"maximized": (form.Left == wa.X and form.Top == wa.Y
+                                      and form.Width == wa.Width and form.Height == wa.Height)}
+        except Exception:
+            pass
+        return {"maximized": False}
+
+    def win_start_move(self):
+        """Mueve la ventana siguiendo el ratón mientras el botón izquierdo esté pulsado."""
+        import threading, time as _time
+        if not sys.platform.startswith("win"):
+            return {"ok": True}
+        def _loop():
+            try:
+                import ctypes, ctypes.wintypes
+                from System import Action
+                from webview.platforms.winforms import BrowserView
+                form = BrowserView.instances.get(self._window.uid)
+                if form is None:
+                    return
+                p0 = ctypes.wintypes.POINT()
+                ctypes.windll.user32.GetCursorPos(ctypes.byref(p0))
+                sx, sy = p0.x, p0.y
+                ox, oy = form.Left, form.Top
+                pt = ctypes.wintypes.POINT()
+                while ctypes.windll.user32.GetAsyncKeyState(0x01) & 0x8000:
+                    ctypes.windll.user32.GetCursorPos(ctypes.byref(pt))
+                    dx = pt.x - sx; dy = pt.y - sy
+                    def _mv(x=ox + dx, y=oy + dy):
+                        form.SetBounds(x, y, form.Width, form.Height)
+                    if form.InvokeRequired:
+                        form.Invoke(Action(_mv))
+                    else:
+                        _mv()
+                    _time.sleep(0.012)
+            except Exception:
+                pass
+        threading.Thread(target=_loop, daemon=True).start()
+        return {"ok": True}
+
+    def win_start_resize(self, direction):
+        """Trackea el ratón y redimensiona la ventana mientras el botón esté pulsado."""
+        import threading, time as _time
+        if not sys.platform.startswith("win"):
+            return {"ok": True}
+        def _loop():
+            try:
+                import ctypes, ctypes.wintypes
+                from System import Action
+                from webview.platforms.winforms import BrowserView
+                form = BrowserView.instances.get(self._window.uid)
+                if form is None:
+                    return
+                # Posición inicial del ratón
+                p0 = ctypes.wintypes.POINT()
+                ctypes.windll.user32.GetCursorPos(ctypes.byref(p0))
+                sx, sy = p0.x, p0.y
+                # Bounds iniciales de la ventana
+                ox = form.Left; oy = form.Top; ow = form.Width; oh = form.Height
+                MIN_W, MIN_H = 500, 380
+                pt = ctypes.wintypes.POINT()
+                d = direction.lower()
+                while ctypes.windll.user32.GetAsyncKeyState(0x01) & 0x8000:
+                    ctypes.windll.user32.GetCursorPos(ctypes.byref(pt))
+                    dx = pt.x - sx; dy = pt.y - sy
+                    nx, ny, nw, nh = ox, oy, ow, oh
+                    if 'e' in d: nw = max(MIN_W, ow + dx)
+                    if 's' in d: nh = max(MIN_H, oh + dy)
+                    if 'w' in d: nw = max(MIN_W, ow - dx); nx = ox + (ow - nw)
+                    if 'n' in d: nh = max(MIN_H, oh - dy); ny = oy + (oh - nh)
+                    def _set(x=nx, y=ny, w=nw, h=nh):
+                        form.SetBounds(x, y, w, h)
+                    if form.InvokeRequired:
+                        form.Invoke(Action(_set))
+                    else:
+                        _set()
+                    _time.sleep(0.012)
+            except Exception:
+                pass
+        threading.Thread(target=_loop, daemon=True).start()
+        return {"ok": True}
+
 
 def run():
     _set_windows_app_identity()
@@ -1531,6 +1764,7 @@ def run():
     window = webview.create_window(
         "Helpmeet", str(web_dir / "index.html"),
         js_api=api, width=1100, height=720,
+        frameless=True, easy_drag=False,
     )
     api.set_window(window)
     webview.start(_apply_native_window_icon, args=(window, icon_path))

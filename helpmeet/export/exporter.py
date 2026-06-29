@@ -276,11 +276,35 @@ def _move_video_to_meeting(meeting: Meeting, meeting_dir: Path) -> None:
     meeting.audio_path = str(destination)
 
 
+def _move_audio_to_meeting(meeting: Meeting, meeting_dir: Path) -> None:
+    """Mueve el WAV de grabación de audio a la carpeta de exportación."""
+    if not meeting.audio_path or str(meeting.audio_path).lower().endswith(".mp4"):
+        return
+    source = Path(meeting.audio_path)
+    if not source.exists():
+        return
+    meeting_dir.mkdir(parents=True, exist_ok=True)
+    destination = meeting_dir / "grabacion.wav"
+    if source.resolve() == destination.resolve():
+        meeting.audio_path = str(destination)
+        return
+    if destination.exists() and destination.stat().st_size == source.stat().st_size:
+        source.unlink(missing_ok=True)
+    elif not destination.exists():
+        shutil.move(str(source), str(destination))
+    else:
+        destination = meeting_dir / "grabacion-recuperada.wav"
+        if not destination.exists():
+            shutil.move(str(source), str(destination))
+    meeting.audio_path = str(destination)
+
+
 def _organize_meeting(meeting: Meeting, base_dir: Path) -> Path:
     """Genera la carpeta visible de una reunión sin exponer pistas técnicas."""
     folder = meeting_export_dir(meeting, base_dir)
     folder.mkdir(parents=True, exist_ok=True)
     _move_video_to_meeting(meeting, folder)
+    _move_audio_to_meeting(meeting, folder)
     captures_dir = folder / "capturas"
     captures_dir.mkdir(parents=True, exist_ok=True)
     lines = _render_meeting(

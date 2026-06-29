@@ -4,9 +4,9 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Helpmeet</title>
-  <link rel="icon" type="image/svg+xml" href="assets/helpmeet-app-icon.svg">
-  <link rel="alternate icon" type="image/x-icon" href="assets/helpmeet.ico">
-  <link rel="stylesheet" href="style.css?v=20260624-8">
+  <link rel="icon" type="image/svg+xml" href="assets/helpmeet-app-icon.svg?v=20260625-78">
+  <link rel="alternate icon" type="image/x-icon" href="assets/helpmeet.ico?v=20260625-78">
+  <link rel="stylesheet" href="style.css?v=20260625-78">
 </head>
 <body data-app-state="idle" data-screen="welcome">
 
@@ -15,9 +15,8 @@
 
   <!-- ============ BARRA SUPERIOR GLOBAL ============ -->
   <header class="topbar">
-    <button class="icon-btn" id="btnToggleSidebar" aria-label="Mostrar u ocultar panel" title="Mostrar/ocultar panel (Ctrl+B)"></button>
-    <div class="brand">
-      <span class="brand-mark" aria-hidden="true"><img src="assets/helpmeet-app-icon.svg" alt=""></span>
+    <div class="brand no-drag">
+      <span class="brand-mark" aria-hidden="true"><img src="assets/helpmeet-symbol.svg?v=20260625-78" alt=""></span>
       <span class="brand-name">Helpmeet</span>
     </div>
     <div class="topbar-sep" aria-hidden="true"></div>
@@ -25,41 +24,53 @@
     <!-- Centro: contexto activo (iniciativa › reunión) en reposo · estado de grabación/proceso cuando hay actividad -->
     <div class="topbar-status" id="topbarStatus" aria-live="polite"></div>
 
-    <!-- Cluster derecho: silenciar micro · buscar · ajustes -->
-    <div class="topbar-right">
-      <button class="audio-chip" id="btnMic" aria-pressed="false" aria-label="Silenciar micrófono" title="Silenciar micrófono">
-        <span class="mic-ico" aria-hidden="true"></span>
-        <span class="eq mini" aria-hidden="true"><i></i><i></i><i></i></span>
-      </button>
-      <div class="search" id="search" role="search">
-        <span class="search-ico" aria-hidden="true"></span>
-        <input id="searchInput" type="search" placeholder="Buscar en todas las reuniones…" aria-label="Buscar frases y notas" autocomplete="off">
-        <kbd id="searchKbd">Ctrl K</kbd>
-      </div>
-      <button class="icon-btn" id="btnSettings" aria-label="Ajustes" title="Ajustes"></button>
+    <!-- Controles de ventana frameless -->
+    <div class="win-controls no-drag" id="winControls">
+      <button class="wc-btn wc-min" id="wcMin" title="Minimizar" aria-label="Minimizar"></button>
+      <button class="wc-btn wc-max" id="wcMax" title="Maximizar" aria-label="Maximizar"></button>
+      <button class="wc-btn wc-close" id="wcClose" title="Cerrar" aria-label="Cerrar"></button>
     </div>
   </header>
 
   <!-- ============ CUERPO ============ -->
-  <div class="body">
+  <div class="body no-drag">
     <!-- Sidebar de iniciativas/reuniones -->
     <aside class="sidebar" id="sidebar" aria-label="Iniciativas y reuniones">
-      <div class="sidebar-head">
-        <span class="sidebar-title">INICIATIVAS</span>
-        <button class="icon-btn sm" id="btnNewInitiative" aria-label="Nueva iniciativa" title="Nueva iniciativa (Ctrl+N)"></button>
-      </div>
+      <nav class="sidebar-nav" aria-label="Secciones">
+        <button class="nav-item" id="navMeetings"><span class="ico ico-meetings"></span>Reuniones</button>
+        <div class="nav-item active" id="navInitiatives">
+          <button class="nav-toggle" id="navInitiativesToggle" aria-expanded="true" aria-controls="sidebarTree">
+            <span class="ico ico-rocket"></span>
+            <span class="nav-label">Iniciativas</span>
+            <span class="nav-chev" aria-hidden="true"></span>
+          </button>
+          <button class="icon-btn sm" id="btnNewInitiative" aria-label="Nueva iniciativa" title="Nueva iniciativa (Ctrl+N)"></button>
+        </div>
+      </nav>
       <nav class="sidebar-tree" id="sidebarTree" aria-label="Lista de iniciativas">
         <!-- inyectado por app.js -->
       </nav>
       <div class="sidebar-foot">
         <button class="side-link" id="btnArchive"><span class="ico ico-archive"></span>Archivo<span class="count" id="archiveCount">0</span></button>
         <button class="side-link" id="btnTrash"><span class="ico ico-trash"></span>Papelera<span class="count" id="trashCount">0</span></button>
+        <button class="side-link" id="btnSettingsSide"><span class="ico ico-settings"></span>Configuración</button>
       </div>
+      <div class="sidebar-version" id="sidebarVersion">Helpmeet v1.1.0</div>
     </aside>
+
+    <!-- Handle para redimensionar el sidebar -->
+    <div class="sidebar-resize-handle no-drag" id="sidebarResizeHandle" title="Arrastrar para redimensionar"></div>
 
     <!-- Rail colapsado -->
     <aside class="sidebar-rail" id="sidebarRail" aria-label="Panel colapsado" hidden>
-      <button class="icon-btn" id="btnNewInitiativeRail" aria-label="Nueva iniciativa"></button>
+      <button class="rail-btn" id="railMeetings" aria-label="Reuniones" title="Reuniones"><span class="ico ico-meetings"></span></button>
+      <button class="rail-btn rail-btn--active" id="railInitiatives" aria-label="Iniciativas" title="Iniciativas"><span class="ico ico-rocket"></span></button>
+      <button class="rail-btn" id="btnNewInitiativeRail" aria-label="Nueva iniciativa" title="Nueva iniciativa (Ctrl+N)"></button>
+      <div class="rail-sep"></div>
+      <button class="rail-btn" id="railArchive" aria-label="Archivo" title="Archivo"><span class="ico ico-archive"></span></button>
+      <button class="rail-btn" id="railTrash" aria-label="Papelera" title="Papelera"><span class="ico ico-trash"></span></button>
+      <button class="rail-btn rail-btn--foot" id="railSettings" aria-label="Configuración" title="Configuración"><span class="ico ico-settings"></span></button>
+      <div class="rail-resize-handle no-drag" id="railResizeHandle" title="Arrastrar para expandir"></div>
     </aside>
 
     <!-- Área principal -->
@@ -73,11 +84,21 @@
     <!-- inyectado por app.js según el estado global -->
   </footer>
 
+  <!-- Handles de resize de ventana (frameless) -->
+  <div class="wr wr-n"  data-dir="n"></div>
+  <div class="wr wr-s"  data-dir="s"></div>
+  <div class="wr wr-e"  data-dir="e"></div>
+  <div class="wr wr-w"  data-dir="w"></div>
+  <div class="wr wr-ne" data-dir="ne"></div>
+  <div class="wr wr-nw" data-dir="nw"></div>
+  <div class="wr wr-se" data-dir="se"></div>
+  <div class="wr wr-sw" data-dir="sw"></div>
+
   <!-- ============ OVERLAYS ============ -->
   <div class="overlay" id="overlayRoot" hidden></div>
   <div class="toasts" id="toasts" aria-live="polite" aria-atomic="false"></div>
 
-  <!-- Plantillas SVG de iconos (Lucide). Inyectadas por app.js -->
-  <script src="app.js?v=20260624-8"></script>
+  <!-- Plantillas SVG de iconos. Inyectadas por app.js -->
+  <script src="app.js?v=20260625-78"></script>
 </body>
 </html>

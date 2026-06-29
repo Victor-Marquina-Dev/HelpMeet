@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-labelledby="title">
   <title id="title">Símbolo monocromático de Helpmeet</title>
-  <rect x="11" y="15" width="42" height="11" rx="5.5" fill="currentColor"/>
-  <rect x="11" y="29" width="42" height="11" rx="5.5" fill="currentColor"/>
-  <rect x="11" y="43" width="29" height="11" rx="5.5" fill="currentColor"/>
+  <rect x="11" y="11" width="42" height="14" rx="7" fill="currentColor"/>
+  <rect x="11" y="28" width="42" height="14" rx="7" fill="currentColor"/>
+  <circle cx="22" cy="50" r="8" fill="currentColor"/>
 </svg>

@@ -265,6 +265,25 @@ class MeetingRecorder:
             self.engine = self.engine()
         return self.engine
 
+    def _persist_audio(self):
+        """Mezcla me.wav + others.wav y guarda grabacion.wav en el directorio
+        de medios interno. La ruta queda registrada en meeting.audio_path para
+        que el exportador la mueva después a la carpeta del usuario."""
+        from helpmeet.media_storage import meeting_media_dir
+        from helpmeet.audio.mixing import mix_wavs
+        me_wav = self._tmp / "me.wav"
+        others_wav = self._tmp / "others.wav"
+        media_dir = meeting_media_dir(self.meeting.id)
+        media_dir.mkdir(parents=True, exist_ok=True)
+        out = media_dir / "grabacion.wav"
+        try:
+            ok = mix_wavs(me_wav, others_wav, out)
+            if ok and out.exists() and out.stat().st_size > 0:
+                self.meeting.audio_path = str(out)
+                self._session.commit()
+        except Exception:
+            pass
+
     def transcribe(self):
         """Transcribe el audio ya grabado y enlaza las capturas por tiempo.
 
@@ -276,6 +295,7 @@ class MeetingRecorder:
                 self.on_status("Preparando la transcripción…")
             self._transcribe_channels()
         self._link_captures_by_time()
+        self._persist_audio()
         # Solo se elimina al completar todo. Si Python/Windows se cierra o el
         # motor falla, el manifiesto y los WAV quedan disponibles al reiniciar.
         self._cleanup_tmp()

@@ -53,6 +53,7 @@ class ScreenVideoRecorder:
         prof = config.video_profile(profile) if profile else None
         self.fps = fps or (prof["fps"] if prof else config.VIDEO_FPS)
         self._crf = prof["crf"] if prof else config.VIDEO_CRF
+        self._preset = prof.get("preset", config.VIDEO_PRESET) if prof else config.VIDEO_PRESET
         self._max_w = prof["max_w"] if prof else 0
         self._max_h = prof["max_h"] if prof else 0
         self.on_status = on_status
@@ -199,7 +200,7 @@ class ScreenVideoRecorder:
         stream.pix_fmt = "yuv420p"
         # bf=0: sin B-frames -> DTS no negativo -> el remux (mux final) no falla
         # con "Cannot rebase to zero time". No afecta a la nitidez.
-        stream.options = {"preset": config.VIDEO_PRESET, "crf": self._crf, "bf": "0"}
+        stream.options = {"preset": self._preset, "crf": self._crf, "bf": "0"}
         stream.codec_context.time_base = Fraction(1, self.fps)
         idx = 0
         try:
@@ -353,6 +354,8 @@ class ScreenVideoRecorder:
             # mp4 se escribe en el primer mux y ya no admite pistas nuevas).
             out_v = out.add_stream(template=in_v)  # copia el video sin recodificar
             out_a = out.add_stream("aac", rate=config.VIDEO_AUDIO_RATE) if ain else None
+            if out_a is not None:
+                out_a.bit_rate = config.VIDEO_AUDIO_BITRATE
 
             for pkt in vin.demux(in_v):   # video: copia directa
                 if pkt.dts is None:

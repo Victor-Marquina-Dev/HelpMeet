@@ -6,8 +6,9 @@ from helpmeet.db.models import Initiative, Meeting, Utterance, Capture, Note, Pa
 SPEAKER_LABEL = {"me": "Yo", "others": "Los demás"}
 
 
-def create_initiative(session: Session, name: str, description: str | None = None) -> Initiative:
-    ini = Initiative(name=name, description=description)
+def create_initiative(session: Session, name: str, description: str | None = None,
+                      color: str | None = None) -> Initiative:
+    ini = Initiative(name=name, description=description, color=color)
     session.add(ini)
     session.commit()
     return ini
@@ -161,6 +162,14 @@ def rename_initiative(session: Session, initiative_id: int, name: str) -> Initia
     ini = session.get(Initiative, initiative_id)
     if ini and name and name.strip():
         ini.name = name.strip()
+        session.commit()
+    return ini
+
+
+def set_initiative_color(session: Session, initiative_id: int, color: str) -> Initiative:
+    ini = session.get(Initiative, initiative_id)
+    if ini and color:
+        ini.color = color.strip()
         session.commit()
     return ini
 

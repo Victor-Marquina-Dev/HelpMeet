@@ -140,6 +140,16 @@ def _migrate_initiative_pin(engine) -> None:
             )
 
 
+def _migrate_initiative_color(engine) -> None:
+    """Añade la columna `color` (color de la iniciativa) a bases anteriores."""
+    with engine.begin() as connection:
+        existing = {column["name"] for column in inspect(connection).get_columns("initiatives")}
+        if "color" not in existing:
+            connection.exec_driver_sql(
+                "ALTER TABLE initiatives ADD COLUMN color VARCHAR(20)"
+            )
+
+
 def _migrate_meeting_context(engine) -> None:
     """Añade el contexto/objetivo editable de cada reunión."""
     with engine.begin() as connection:
@@ -177,6 +187,7 @@ def init_db():
     _migrate_utterance_highlight(_engine)
     _migrate_utterance_participant(_engine)
     _migrate_initiative_pin(_engine)
+    _migrate_initiative_color(_engine)
     _migrate_meeting_context(_engine)
     _migrate_note_is_context(_engine)
     _ensure_indexes(_engine)

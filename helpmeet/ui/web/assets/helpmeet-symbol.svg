@@ -1,12 +1,12 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-labelledby="title">
   <title id="title">Símbolo de Helpmeet</title>
   <defs>
-    <linearGradient id="helpmeet-gradient" x1="10" y1="10" x2="54" y2="58" gradientUnits="userSpaceOnUse">
-      <stop stop-color="#6D8CFF"/>
-      <stop offset="1" stop-color="#8A6DFF"/>
+    <linearGradient id="hm-sym-g" x1="10" y1="10" x2="54" y2="56" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#6FE3B5"/>
+      <stop offset="1" stop-color="#34C78A"/>
     </linearGradient>
   </defs>
-  <rect x="11" y="15" width="42" height="11" rx="5.5" fill="url(#helpmeet-gradient)"/>
-  <rect x="11" y="29" width="42" height="11" rx="5.5" fill="url(#helpmeet-gradient)"/>
-  <rect x="11" y="43" width="29" height="11" rx="5.5" fill="url(#helpmeet-gradient)"/>
+  <rect x="11" y="11" width="42" height="14" rx="7" fill="url(#hm-sym-g)"/>
+  <rect x="11" y="28" width="42" height="14" rx="7" fill="url(#hm-sym-g)"/>
+  <circle cx="22" cy="50" r="8" fill="url(#hm-sym-g)"/>
 </svg>

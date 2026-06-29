@@ -19,16 +19,16 @@ def test_video_profile_caps_resolution_and_sets_quality():
     mon = {"left": 0, "top": 0, "width": 2560, "height": 1440}
 
     light = ScreenVideoRecorder("x.mp4", mon, profile="light")
-    assert light.fps == 15 and light._crf == "26"
+    assert light.fps == 12 and light._crf == "31"
     assert light._out_w <= 1280 and light._out_h <= 720
     assert abs(light._out_w / light._out_h - 16 / 9) < 0.05  # conserva proporción
 
     native = ScreenVideoRecorder("x.mp4", mon, profile="native")
-    assert native._out_w == 2560 and native._out_h == 1440 and native._crf == "18"
+    assert native._out_w == 2560 and native._out_h == 1440 and native._crf == "23"
 
-    # Perfil inválido cae al de por defecto (equilibrado).
+    # Perfil inválido cae al de por defecto (optimizado).
     fallback = ScreenVideoRecorder("x.mp4", mon, profile="inexistente")
-    assert fallback.fps == 30 and fallback._out_w <= 1920
+    assert fallback.fps == 20 and fallback._out_w <= 1920
 
 
 def test_jpeg_from_rgb_produces_valid_jpeg():
