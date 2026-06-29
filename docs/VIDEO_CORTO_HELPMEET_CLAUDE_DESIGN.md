@@ -70,7 +70,7 @@ Texto corto:
 
 ### 5. Exportación
 
-- Copiar transcripción `.md`.
+- Copiar transcripción `.md`.![alt text](image.png)
 - Exportar `.txt`.
 - Exportar ZIP si hay imágenes o archivos.
 - Abrir carpeta de la reunión.
