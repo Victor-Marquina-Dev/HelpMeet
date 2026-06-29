@@ -264,7 +264,10 @@ def _reveal_in_explorer(path: str) -> None:
 
 class Api:
     import os as _os
-    _LICENSE_SERVER = _os.environ.get("HELPMEET_LICENSE_SERVER", "http://127.0.0.1:8765")
+    _LICENSE_SERVER = _os.environ.get(
+        "HELPMEET_LICENSE_SERVER",
+        "https://web-production-93435.up.railway.app",
+    )
 
     def __init__(self):
         _log.info("Inicializando base de datos")
