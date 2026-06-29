@@ -111,6 +111,15 @@
       <div class="section-title" style="margin:0">Licencias</div>
       <button class="btn-green" style="width:auto;padding:8px 18px;font-size:13px" onclick="openCreateModal()">+ Nueva licencia</button>
     </div>
+    <!-- LOG DE ACTIVIDAD -->
+    <div id="logSection" style="display:none;margin-bottom:24px">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+        <div class="section-title" style="margin:0">Actividad reciente</div>
+        <button onclick="clearLogs()" style="background:none;border:none;color:#8b928e;cursor:pointer;font-size:12px">Limpiar</button>
+      </div>
+      <div id="logBox" style="background:#0d0f0e;border:1px solid #2a2c2b;border-radius:8px;padding:14px;font-family:monospace;font-size:12px;color:#c1c8c3;max-height:160px;overflow-y:auto;line-height:1.8"></div>
+    </div>
+
     <div class="table-wrap">
       <div class="loading" id="tableLoading">Cargando…</div>
       <table id="licTable" style="display:none">
@@ -317,15 +326,12 @@ async function sendKeyEmail(id, email) {
     const data = await r.json();
     if (data.ok && data.key) {
       if (data.email_sent) {
-        showToast(`Email enviado a ${data.email} desde tu Gmail`);
-      } else if (data.email_error) {
-        // Gmail no configurado o error — abrir mailto como fallback
-        const subject = encodeURIComponent('Tu Product Key de Helpmeet');
-        const body = encodeURIComponent(`Hola,\n\nTu Product Key de Helpmeet:\n\n  ${data.key}\n\nComo activar:\n1. Instala Helpmeet\n2. Abre la app\n3. Introduce la key\n\nSoporte: victor.marquina30@gmail.com`);
-        window.open(`mailto:${data.email}?subject=${subject}&body=${body}`, '_blank');
-        showToast(`Gmail abierto (configura GMAIL_APP_PASSWORD para envío automático)`);
+        showToast(`Email enviado a ${data.email}`);
+        addLog(`OK — Email enviado a ${data.email} | Key: ...${data.key.slice(-4)}`);
       } else {
-        showToast(`Key generada para ${data.email}`);
+        const err = data.email_error || 'Gmail no configurado';
+        showToast(`Key generada pero email falló: ${err}`);
+        addLog(`ERROR email — ${err} | Key: ${data.key} | Para: ${data.email}`);
       }
       loadData();
     } else {
@@ -416,6 +422,19 @@ async function createLicense() {
 function copyKey() {
   navigator.clipboard.writeText(_createdKey);
   showToast('Key copiada al portapapeles');
+}
+
+function addLog(msg) {
+  const box = document.getElementById('logBox');
+  const sec = document.getElementById('logSection');
+  if (!box) return;
+  sec.style.display = 'block';
+  const time = new Date().toLocaleTimeString('es');
+  box.innerHTML = `<div style="color:#8b928e">[${time}]</div> ${msg}<br>` + box.innerHTML;
+}
+function clearLogs() {
+  document.getElementById('logBox').innerHTML = '';
+  document.getElementById('logSection').style.display = 'none';
 }
 
 function showToast(msg) {
