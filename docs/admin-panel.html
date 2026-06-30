@@ -19,103 +19,114 @@
 body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; font-size: 14px; }
 
 /* ─── LOGIN ─── */
-#login { display:flex; align-items:center; justify-content:center; min-height:100vh; }
-.lcard { background:var(--card); border:1px solid var(--border); border-radius:20px; padding:44px; width:360px; text-align:center; }
-.lcard .logo { font-size:28px; font-weight:800; color:var(--accent); letter-spacing:-.5px; margin-bottom:6px; }
-.lcard p { color:var(--muted); font-size:13px; margin-bottom:28px; }
-.inp { width:100%; padding:11px 14px; background:#0d0f0e; border:1px solid var(--border2); border-radius:10px; color:var(--text); font-size:13px; font-family:monospace; outline:none; margin-bottom:12px; }
-.inp:focus { border-color:var(--accent); }
-.btn-primary { width:100%; padding:12px; background:var(--accent); border:none; border-radius:10px; color:var(--on-accent); font-weight:700; font-size:14px; cursor:pointer; transition:.15s; }
-.btn-primary:hover { background:#c5ebda; }
-.err { color:var(--red); font-size:12px; margin-top:8px; display:none; }
+#login { display: flex; align-items: center; justify-content: center; min-height: 100vh; }
+.lcard { background: var(--card); border: 1px solid var(--border); border-radius: 20px; padding: 44px; width: 360px; text-align: center; }
+.lcard .logo { font-size: 28px; font-weight: 800; color: var(--accent); letter-spacing: -.5px; margin-bottom: 6px; }
+.lcard p { color: var(--muted); font-size: 13px; margin-bottom: 28px; }
+.inp { width: 100%; padding: 11px 14px; background: #0d0f0e; border: 1px solid var(--border2); border-radius: 10px; color: var(--text); font-size: 13px; font-family: monospace; outline: none; margin-bottom: 12px; }
+.inp:focus { border-color: var(--accent); }
+.btn-primary { width: 100%; padding: 12px; background: var(--accent); border: none; border-radius: 10px; color: var(--on-accent); font-weight: 700; font-size: 14px; cursor: pointer; transition: .15s; }
+.btn-primary:hover { background: #c5ebda; }
+.err { color: var(--red); font-size: 12px; margin-top: 8px; display: none; }
 
 /* ─── APP ─── */
-#app { display:none; }
-.topbar { height:58px; background:var(--card); border-bottom:1px solid var(--border); display:flex; align-items:center; justify-content:space-between; padding:0 28px; position:sticky; top:0; z-index:50; }
-.topbar .brand { font-weight:800; font-size:16px; color:var(--accent); letter-spacing:-.3px; }
-.topbar .right { display:flex; align-items:center; gap:14px; }
-.topbar .ts { font-size:11px; color:var(--faint); }
-.btn-sm { padding:7px 14px; font-size:12px; font-weight:600; border:1px solid var(--border2); background:var(--card2); color:var(--muted); border-radius:8px; cursor:pointer; transition:.15s; }
-.btn-sm:hover { color:var(--text); border-color:var(--accent); }
+#app { display: none; }
+.topbar { height: 58px; background: var(--card); border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; padding: 0 28px; position: sticky; top: 0; z-index: 50; }
+.topbar .brand { font-weight: 800; font-size: 16px; color: var(--accent); letter-spacing: -.3px; }
+.topbar .right { display: flex; align-items: center; gap: 14px; }
+.topbar .ts { font-size: 11px; color: var(--faint); }
+.btn-sm { padding: 7px 14px; font-size: 12px; font-weight: 600; border: 1px solid var(--border2); background: var(--card2); color: var(--muted); border-radius: 8px; cursor: pointer; transition: .15s; }
+.btn-sm:hover { color: var(--text); border-color: var(--accent); }
 
-.main { max-width:1160px; margin:0 auto; padding:28px 20px; }
+.main { max-width: 1160px; margin: 0 auto; padding: 28px 20px; }
 
 /* ─── STATS ─── */
-.stats { display:grid; grid-template-columns:repeat(4,1fr); gap:14px; margin-bottom:28px; }
-.stat { background:var(--card); border:1px solid var(--border); border-radius:14px; padding:22px 20px; }
-.stat .n { font-size:34px; font-weight:800; color:var(--accent); line-height:1; }
-.stat .l { font-size:12px; color:var(--muted); margin-top:6px; }
+.stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin-bottom: 28px; }
+.stat { background: var(--card); border: 1px solid var(--border); border-radius: 14px; padding: 22px 20px; }
+.stat .n { font-size: 34px; font-weight: 800; color: var(--accent); line-height: 1; }
+.stat .n--green { color: var(--green); }
+.stat .n--red { color: var(--red); }
+.stat .l { font-size: 12px; color: var(--muted); margin-top: 6px; }
 
 /* ─── LOG ─── */
-.section-hd { display:flex; align-items:center; justify-content:space-between; margin-bottom:12px; }
-.section-title { font-size:13px; font-weight:700; color:var(--muted); text-transform:uppercase; letter-spacing:.06em; }
-.log-box { background:#080a09; border:1px solid var(--border); border-radius:12px; padding:16px; font-family:monospace; font-size:12px; max-height:140px; overflow-y:auto; line-height:2; }
-.log-ok  { color:var(--green); }
-.log-err { color:var(--red); }
-.log-ts  { color:var(--faint); margin-right:8px; }
-#logSection { display:none; margin-bottom:24px; }
+.section-hd { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+.section-title { font-size: 13px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; }
+.log-box { background: #080a09; border: 1px solid var(--border); border-radius: 12px; padding: 16px; font-family: monospace; font-size: 12px; max-height: 140px; overflow-y: auto; line-height: 2; }
+.log-ok  { color: var(--green); }
+.log-err { color: var(--red); }
+.log-ts  { color: var(--faint); margin-right: 8px; }
+#logSection { display: none; margin-bottom: 24px; }
 
 /* ─── TABLE ─── */
-.tbar { display:flex; align-items:center; justify-content:space-between; margin-bottom:12px; }
-.table-wrap { background:var(--card); border:1px solid var(--border); border-radius:14px; overflow:hidden; }
-table { width:100%; border-collapse:collapse; }
-th { background:var(--card2); padding:11px 16px; text-align:left; font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.06em; color:var(--faint); border-bottom:1px solid var(--border); }
-td { padding:13px 16px; border-bottom:1px solid var(--border); vertical-align:middle; }
-tr:last-child td { border-bottom:none; }
-tr:hover td { background:rgba(255,255,255,.018); }
+.tbar { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+.table-wrap { background: var(--card); border: 1px solid var(--border); border-radius: 14px; overflow: hidden; }
+.table-loading { padding: 40px; text-align: center; color: var(--muted); }
+table { width: 100%; border-collapse: collapse; }
+th { background: var(--card2); padding: 11px 16px; text-align: left; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: var(--faint); border-bottom: 1px solid var(--border); }
+td { padding: 13px 16px; border-bottom: 1px solid var(--border); vertical-align: middle; }
+tr:last-child td { border-bottom: none; }
+tr:hover td { background: rgba(255,255,255,.018); }
 
-.badge { display:inline-flex; align-items:center; gap:5px; padding:3px 9px; border-radius:20px; font-size:11px; font-weight:700; }
-.badge-active   { background:var(--green-dim); color:var(--green); }
-.badge-revoked  { background:var(--red-dim); color:var(--red); }
-.badge-refunded { background:var(--yellow-dim); color:var(--yellow); }
-.badge-new { background:var(--accent-dim); color:var(--accent); margin-left:5px; font-size:10px; }
+.badge { display: inline-flex; align-items: center; gap: 5px; padding: 3px 9px; border-radius: 20px; font-size: 11px; font-weight: 700; }
+.badge-active   { background: var(--green-dim); color: var(--green); }
+.badge-revoked  { background: var(--red-dim); color: var(--red); }
+.badge-refunded { background: var(--yellow-dim); color: var(--yellow); }
+.badge-new { background: var(--accent-dim); color: var(--accent); margin-left: 5px; font-size: 10px; }
 
-.mono { font-family:monospace; font-size:12px; letter-spacing:.05em; color:var(--accent); }
-.email-cell { max-width:220px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.td-id    { color: var(--faint); }
+.td-plan  { text-transform: capitalize; color: var(--muted); }
+.td-date  { color: var(--faint); font-size: 12px; }
+.td-inactive { color: var(--faint); font-size: 11px; }
+
+.mono { font-family: monospace; font-size: 12px; letter-spacing: .05em; color: var(--accent); }
+.email-cell { max-width: 220px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 /* email status */
-.mail-ok  { display:inline-flex; align-items:center; gap:4px; color:var(--green); font-size:11px; font-weight:600; }
-.mail-no  { color:var(--faint); font-size:11px; }
-.mail-pending { color:var(--yellow); font-size:11px; }
+.mail-ok      { display: inline-flex; align-items: center; gap: 4px; color: var(--green); font-size: 11px; font-weight: 600; }
+.mail-no      { color: var(--faint); font-size: 11px; }
+.mail-pending { color: var(--yellow); font-size: 11px; }
 
 /* action buttons */
-.actions { display:flex; gap:6px; flex-wrap:wrap; }
-.abtn { padding:6px 11px; font-size:11px; font-weight:600; border:none; border-radius:7px; cursor:pointer; transition:.12s; white-space:nowrap; }
-.abtn:disabled { opacity:.45; cursor:default; }
-.abtn-send  { background:rgba(74,222,128,.12); color:var(--green); }
-.abtn-send:hover:not(:disabled)  { background:rgba(74,222,128,.2); }
-.abtn-reset { background:rgba(170,207,191,.1); color:var(--accent); }
-.abtn-reset:hover { background:rgba(170,207,191,.18); }
-.abtn-rev   { background:var(--red-dim); color:var(--red); }
-.abtn-rev:hover { background:rgba(248,113,113,.18); }
+.actions { display: flex; gap: 6px; flex-wrap: wrap; }
+.abtn { padding: 6px 11px; font-size: 11px; font-weight: 600; border: none; border-radius: 7px; cursor: pointer; transition: .12s; white-space: nowrap; }
+.abtn:disabled { opacity: .45; cursor: default; }
+.abtn-send  { background: rgba(74,222,128,.12); color: var(--green); }
+.abtn-send:hover:not(:disabled) { background: rgba(74,222,128,.2); }
+.abtn-reset { background: rgba(170,207,191,.1); color: var(--accent); }
+.abtn-reset:hover { background: rgba(170,207,191,.18); }
+.abtn-rev   { background: var(--red-dim); color: var(--red); }
+.abtn-rev:hover { background: rgba(248,113,113,.18); }
 
-.btn-green { padding:9px 18px; background:var(--accent); border:none; border-radius:10px; color:var(--on-accent); font-weight:700; font-size:13px; cursor:pointer; }
-.btn-green:hover { background:#c5ebda; }
+.btn-green { padding: 9px 18px; background: var(--accent); border: none; border-radius: 10px; color: var(--on-accent); font-weight: 700; font-size: 13px; cursor: pointer; }
+.btn-green:hover { background: #c5ebda; }
 
 /* ─── MODAL ─── */
-.modal-bg { display:none; position:fixed; inset:0; background:rgba(0,0,0,.7); z-index:100; align-items:center; justify-content:center; backdrop-filter:blur(2px); }
-.modal-bg.open { display:flex; }
-.modal { background:var(--card); border:1px solid var(--border2); border-radius:18px; padding:32px; width:460px; max-width:95vw; }
-.modal h3 { font-size:17px; font-weight:700; margin-bottom:18px; }
-.modal-field { margin-bottom:14px; }
-.modal-field label { display:block; font-size:11px; font-weight:600; color:var(--muted); text-transform:uppercase; letter-spacing:.05em; margin-bottom:6px; }
-.modal-field input, .modal-field select { width:100%; padding:10px 14px; background:#0d0f0e; border:1px solid var(--border2); border-radius:9px; color:var(--text); font-size:13px; outline:none; }
-.modal-field input:focus, .modal-field select:focus { border-color:var(--accent); }
-.modal-btns { display:flex; gap:10px; justify-content:flex-end; margin-top:22px; }
-.btn-cancel { padding:9px 18px; background:var(--card2); border:none; border-radius:9px; color:var(--muted); cursor:pointer; font-size:13px; }
-.btn-cancel:hover { color:var(--text); }
-.key-result { display:none; margin-top:18px; background:#080a09; border:1px solid rgba(74,222,128,.2); border-radius:12px; padding:20px; text-align:center; }
-.key-result .lbl { font-size:11px; color:var(--muted); margin-bottom:10px; font-weight:600; text-transform:uppercase; letter-spacing:.06em; }
-.key-result code { font-size:20px; letter-spacing:3px; color:var(--green); font-weight:700; font-family:monospace; }
-.key-result .copy-btn { margin-top:12px; background:var(--card2); border:none; border-radius:7px; padding:6px 14px; color:var(--muted); cursor:pointer; font-size:12px; }
+dialog { background: var(--card); border: 1px solid var(--border2); border-radius: 18px; padding: 32px; width: 460px; max-width: 95vw; color: var(--text); position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); margin: 0; }
+dialog::backdrop { background: rgba(0,0,0,.7); backdrop-filter: blur(2px); }
+dialog h3 { font-size: 17px; font-weight: 700; margin-bottom: 18px; }
+dialog.modal--sm { width: 400px; }
+.check-label { display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 13px; color: var(--muted); }
+.modal-field { margin-bottom: 14px; }
+.modal-field label { display: block; font-size: 11px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: .05em; margin-bottom: 6px; }
+.modal-field input,
+.modal-field select { width: 100%; padding: 10px 14px; background: #0d0f0e; border: 1px solid var(--border2); border-radius: 9px; color: var(--text); font-size: 13px; outline: none; }
+.modal-field input:focus,
+.modal-field select:focus { border-color: var(--accent); }
+.modal-btns { display: flex; gap: 10px; justify-content: flex-end; margin-top: 22px; }
+.btn-cancel { padding: 9px 18px; background: var(--card2); border: none; border-radius: 9px; color: var(--muted); cursor: pointer; font-size: 13px; }
+.btn-cancel:hover { color: var(--text); }
+.key-result { display: none; margin-top: 18px; background: #080a09; border: 1px solid rgba(74,222,128,.2); border-radius: 12px; padding: 20px; text-align: center; }
+.key-result .lbl { font-size: 11px; color: var(--muted); margin-bottom: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: .06em; }
+.key-result code { font-size: 20px; letter-spacing: 3px; color: var(--green); font-weight: 700; font-family: monospace; }
+.key-result .copy-btn { margin-top: 12px; background: var(--card2); border: none; border-radius: 7px; padding: 6px 14px; color: var(--muted); cursor: pointer; font-size: 12px; }
 
 /* confirm modal */
-.confirm-desc { color:var(--muted); font-size:13px; line-height:1.6; margin-bottom:4px; }
-.btn-danger { padding:9px 18px; background:var(--red); border:none; border-radius:9px; color:#fff; font-weight:700; cursor:pointer; font-size:13px; }
+.confirm-desc { color: var(--muted); font-size: 13px; line-height: 1.6; margin-bottom: 4px; }
+.btn-danger { padding: 9px 18px; background: var(--red); border: none; border-radius: 9px; color: #fff; font-weight: 700; cursor: pointer; font-size: 13px; }
 
 /* toast */
-.toast { position:fixed; bottom:24px; right:24px; background:var(--card2); border:1px solid var(--border2); border-radius:12px; padding:13px 20px; font-size:13px; display:none; z-index:999; box-shadow:0 8px 32px rgba(0,0,0,.4); }
-.toast.show { display:block; }
+.toast { position: fixed; bottom: 24px; right: 24px; background: var(--card2); border: 1px solid var(--border2); border-radius: 12px; padding: 13px 20px; font-size: 13px; display: none; z-index: 999; box-shadow: 0 8px 32px rgba(0,0,0,.4); }
+.toast.show { display: block; }
 </style>
 </head>
 <body>
@@ -124,8 +135,8 @@ tr:hover td { background:rgba(255,255,255,.018); }
   <div class="lcard">
     <div class="logo">⚡ Helpmeet</div>
     <p>Panel de administración</p>
-    <input class="inp" type="password" id="keyInput" placeholder="Admin Key" autocomplete="off">
-    <button class="btn-primary" onclick="doLogin()">Entrar</button>
+    <input class="inp" type="password" id="keyInput" placeholder="Admin Key" autocomplete="off" aria-label="Admin Key">
+    <button class="btn-primary" id="loginBtn">Entrar</button>
     <div class="err" id="loginErr">Clave incorrecta</div>
   </div>
 </div>
@@ -135,8 +146,8 @@ tr:hover td { background:rgba(255,255,255,.018); }
     <span class="brand">⚡ Helpmeet Admin</span>
     <div class="right">
       <span class="ts" id="lastUpdated"></span>
-      <button class="btn-sm" onclick="loadData()">↻ Actualizar</button>
-      <button class="btn-sm" onclick="doLogout()">Salir</button>
+      <button class="btn-sm" id="refreshBtn">↻ Actualizar</button>
+      <button class="btn-sm" id="logoutBtn">Salir</button>
     </div>
   </div>
 
@@ -144,8 +155,8 @@ tr:hover td { background:rgba(255,255,255,.018); }
     <!-- STATS -->
     <div class="stats">
       <div class="stat"><div class="n" id="sTotal">—</div><div class="l">Licencias totales</div></div>
-      <div class="stat"><div class="n" id="sActive" style="color:var(--green)">—</div><div class="l">Activas</div></div>
-      <div class="stat"><div class="n" id="sRevoked" style="color:var(--red)">—</div><div class="l">Revocadas</div></div>
+      <div class="stat"><div class="n n--green" id="sActive">—</div><div class="l">Activas</div></div>
+      <div class="stat"><div class="n n--red" id="sRevoked">—</div><div class="l">Revocadas</div></div>
       <div class="stat"><div class="n" id="sCustomers">—</div><div class="l">Clientes</div></div>
     </div>
 
@@ -153,7 +164,7 @@ tr:hover td { background:rgba(255,255,255,.018); }
     <div id="logSection">
       <div class="section-hd">
         <div class="section-title">Actividad reciente</div>
-        <button class="btn-sm" onclick="clearLogs()">Limpiar</button>
+        <button class="btn-sm" id="clearLogBtn">Limpiar</button>
       </div>
       <div class="log-box" id="logBox"></div>
     </div>
@@ -161,21 +172,15 @@ tr:hover td { background:rgba(255,255,255,.018); }
     <!-- TABLE -->
     <div class="tbar">
       <div class="section-title">Licencias</div>
-      <button class="btn-green" onclick="openCreateModal()">+ Nueva licencia</button>
+      <button class="btn-green" id="newLicBtn">+ Nueva licencia</button>
     </div>
     <div class="table-wrap">
-      <div id="tableLoading" style="padding:40px;text-align:center;color:var(--muted)">Cargando…</div>
-      <table id="licTable" style="display:none">
+      <div class="table-loading" id="tableLoading">Cargando…</div>
+      <table id="licTable" hidden>
         <thead>
           <tr>
-            <th>#</th>
-            <th>Cliente</th>
-            <th>Key</th>
-            <th>Plan</th>
-            <th>Estado</th>
-            <th>Email</th>
-            <th>Creada</th>
-            <th>Acciones</th>
+            <th>#</th><th>Cliente</th><th>Key</th><th>Plan</th>
+            <th>Estado</th><th>Email</th><th>Creada</th><th>Acciones</th>
           </tr>
         </thead>
         <tbody id="licBody"></tbody>
@@ -185,262 +190,385 @@ tr:hover td { background:rgba(255,255,255,.018); }
 </div>
 
 <!-- MODAL CREAR -->
-<div class="modal-bg" id="createModalBg">
-  <div class="modal">
-    <h3>Nueva licencia</h3>
-    <div class="modal-field"><label>Email del cliente *</label><input id="createEmail" type="email" placeholder="cliente@email.com"></div>
-    <div class="modal-field"><label>Nombre (opcional)</label><input id="createName" type="text" placeholder="Nombre"></div>
-    <div class="modal-field"><label>Plan</label>
-      <select id="createPlan">
-        <option value="personal">Personal</option>
-        <option value="pro">Pro</option>
-        <option value="team">Team</option>
-      </select>
-    </div>
-    <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;color:var(--muted)">
-      <input type="checkbox" id="createSendEmail" checked> Notificarme por email al crear
-    </label>
-    <div class="key-result" id="keyResult">
-      <div class="lbl">Key generada — cópiala ahora</div>
-      <code id="keyValue"></code>
-      <button class="copy-btn" onclick="copyKey()">Copiar</button>
-    </div>
-    <div style="color:var(--red);font-size:12px;margin-top:8px;display:none" id="createErr"></div>
-    <div class="modal-btns">
-      <button class="btn-cancel" onclick="closeCreateModal()">Cerrar</button>
-      <button class="btn-green" id="createBtn" onclick="createLicense()">Crear licencia</button>
-    </div>
+<dialog id="createDialog" aria-labelledby="createModalTitle">
+  <h3 id="createModalTitle">Nueva licencia</h3>
+  <div class="modal-field">
+    <label for="createEmail">Email del cliente *</label>
+    <input id="createEmail" type="email" placeholder="cliente@email.com">
   </div>
-</div>
+  <div class="modal-field">
+    <label for="createName">Nombre (opcional)</label>
+    <input id="createName" type="text" placeholder="Nombre">
+  </div>
+  <div class="modal-field">
+    <label for="createPlan">Plan</label>
+    <select id="createPlan">
+      <option value="personal">Personal</option>
+      <option value="pro">Pro</option>
+      <option value="team">Team</option>
+    </select>
+  </div>
+  <label class="check-label" for="createSendEmail">
+    <input type="checkbox" id="createSendEmail" checked> Notificarme por email al crear
+  </label>
+  <div class="key-result" id="keyResult">
+    <div class="lbl">Key generada — cópiala ahora</div>
+    <code id="keyValue"></code>
+    <button class="copy-btn" id="copyKeyBtn">Copiar</button>
+  </div>
+  <div class="err" id="createErr"></div>
+  <div class="modal-btns">
+    <button class="btn-cancel" id="closeCreateBtn">Cerrar</button>
+    <button class="btn-green" id="createBtn">Crear licencia</button>
+  </div>
+</dialog>
 
 <!-- MODAL CONFIRMAR -->
-<div class="modal-bg" id="confirmBg">
-  <div class="modal" style="width:400px">
-    <h3 id="confirmTitle"></h3>
-    <p class="confirm-desc" id="confirmDesc"></p>
-    <div class="modal-btns">
-      <button class="btn-cancel" onclick="closeConfirm()">Cancelar</button>
-      <button class="btn-danger" id="confirmBtn">Confirmar</button>
-    </div>
+<dialog id="confirmDialog" class="modal--sm" aria-labelledby="confirmTitle">
+  <h3 id="confirmTitle">Confirmar acción</h3>
+  <p class="confirm-desc" id="confirmDesc"></p>
+  <div class="modal-btns">
+    <button class="btn-cancel" id="cancelConfirmBtn">Cancelar</button>
+    <button class="btn-danger" id="confirmBtn">Confirmar</button>
   </div>
-</div>
+</dialog>
 
-<div class="toast" id="toast"></div>
+<output class="toast" id="toast"></output>
 
-<script>
+<script type="module">
+'use strict';
+
 const API = 'https://web-production-93435.up.railway.app';
-let ADMIN_KEY = '';
-// Track email sent per license: { licId: 'ok'|'fail'|'pending' }
+
+// ─── STATE ───
+let adminKey = '';
+let confirmCallback = null;
 const emailStatus = JSON.parse(localStorage.getItem('hm_email_status') || '{}');
+
+// ─── UTILS ───
+function esc(s) {
+  return String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+}
+
+function el(id) { return document.getElementById(id); }
+
 function saveEmailStatus() { localStorage.setItem('hm_email_status', JSON.stringify(emailStatus)); }
 
-function doLogin() {
-  const k = document.getElementById('keyInput').value.trim();
-  if (!k) return;
-  ADMIN_KEY = k;
-  fetch(`${API}/api/admin/licenses`, { headers: { 'X-Admin-Key': k } })
-    .then(r => {
-      if (r.ok) {
-        localStorage.setItem('hm_admin_key', k);
-        document.getElementById('login').style.display = 'none';
-        document.getElementById('app').style.display = 'block';
-        loadData();
-      } else { document.getElementById('loginErr').style.display = 'block'; ADMIN_KEY = ''; }
-    }).catch(() => { document.getElementById('loginErr').style.display = 'block'; ADMIN_KEY = ''; });
+function headers(extra = {}) {
+  return { 'X-Admin-Key': adminKey, ...extra };
 }
-document.getElementById('keyInput').addEventListener('keydown', e => { if (e.key === 'Enter') doLogin(); });
-function doLogout() { localStorage.removeItem('hm_admin_key'); location.reload(); }
 
+async function apiFetch(path, options = {}) {
+  return fetch(`${API}${path}`, { ...options, headers: { ...headers(), ...options.headers } });
+}
+
+// ─── TOAST ───
+let toastTimer;
+function showToast(msg) {
+  const t = el('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.classList.remove('show'), 3000);
+}
+
+// ─── LOG ───
+function addLog(type, msg) {
+  const box = el('logBox');
+  el('logSection').style.display = 'block';
+  const t = new Date().toLocaleTimeString('es');
+  const cls = type === 'ok' ? 'log-ok' : 'log-err';
+  const icon = type === 'ok' ? '✓' : '✗';
+  const entry = document.createElement('div');
+  entry.innerHTML = `<span class="log-ts">[${esc(t)}]</span><span class="${cls}">${icon} ${esc(msg)}</span>`;
+  box.prepend(entry);
+}
+
+function clearLogs() {
+  el('logBox').innerHTML = '';
+  el('logSection').style.display = 'none';
+}
+
+// ─── LOGIN ───
+async function doLogin() {
+  const k = el('keyInput').value.trim();
+  if (!k) return;
+  try {
+    const r = await fetch(`${API}/api/admin/licenses`, { headers: { 'X-Admin-Key': k } });
+    if (r.ok) {
+      adminKey = k;
+      localStorage.setItem('hm_admin_key', k);
+      el('login').style.display = 'none';
+      el('app').style.display = 'block';
+      loadData();
+    } else {
+      el('loginErr').style.display = 'block';
+    }
+  } catch {
+    el('loginErr').style.display = 'block';
+  }
+}
+
+function doLogout() {
+  localStorage.removeItem('hm_admin_key');
+  location.reload();
+}
+
+// ─── DATA ───
 async function loadData() {
   try {
     const [lics, custs] = await Promise.all([
-      fetch(`${API}/api/admin/licenses`, { headers: { 'X-Admin-Key': ADMIN_KEY } }).then(r => r.json()),
-      fetch(`${API}/api/admin/customers`, { headers: { 'X-Admin-Key': ADMIN_KEY } }).then(r => r.json()),
+      apiFetch('/api/admin/licenses').then(r => r.json()),
+      apiFetch('/api/admin/customers').then(r => r.json()),
     ]);
-    document.getElementById('sTotal').textContent = lics.length;
-    document.getElementById('sActive').textContent = lics.filter(l => l.status === 'active').length;
-    document.getElementById('sRevoked').textContent = lics.filter(l => ['revoked','refunded'].includes(l.status)).length;
-    document.getElementById('sCustomers').textContent = custs.length;
-    document.getElementById('lastUpdated').textContent = new Date().toLocaleTimeString('es');
 
-    const body = document.getElementById('licBody');
-    body.innerHTML = '';
-    lics.slice().reverse().forEach(lic => {
-      const isNew = (Date.now() - new Date(lic.created_at).getTime()) < 86400000;
-      const date = new Date(lic.created_at).toLocaleDateString('es', { day:'2-digit', month:'short' });
-      const email = lic.customer?.email || '—';
-      const newTag = isNew ? `<span class="badge badge-new">NUEVO</span>` : '';
-      const badge = lic.status === 'active'
-        ? `<span class="badge badge-active">● Activa</span>`
-        : lic.status === 'refunded'
-          ? `<span class="badge badge-refunded">↩ Reembolsada</span>`
-          : `<span class="badge badge-revoked">✕ Revocada</span>`;
+    el('sTotal').textContent = lics.length;
+    el('sActive').textContent = lics.filter(l => l.status === 'active').length;
+    el('sRevoked').textContent = lics.filter(l => ['revoked', 'refunded'].includes(l.status)).length;
+    el('sCustomers').textContent = custs.length;
+    el('lastUpdated').textContent = new Date().toLocaleTimeString('es');
 
-      const es = emailStatus[lic.id];
-      const emailCol = es === 'ok'
-        ? `<span class="mail-ok">✓ Enviado</span>`
-        : es === 'fail'
-          ? `<span class="mail-no">✗ Error</span>`
-          : es === 'pending'
-            ? `<span class="mail-pending">⟳ Enviando</span>`
-            : `<span class="mail-no">— Sin enviar</span>`;
-
-      const actions = lic.status === 'active'
-        ? `<div class="actions">
-            <button class="abtn abtn-send" onclick="sendKey(${lic.id},'${email}',this)">✉ Enviar key</button>
-            <button class="abtn abtn-reset" onclick="confirmAction('reset',${lic.id})">↺ Reset PC</button>
-            <button class="abtn abtn-rev" onclick="confirmAction('revoke',${lic.id})">✕ Revocar</button>
-           </div>`
-        : `<span style="color:var(--faint);font-size:11px">${lic.status}</span>`;
-
-      body.innerHTML += `<tr id="row-${lic.id}">
-        <td style="color:var(--faint)">#${lic.id}</td>
-        <td class="email-cell">${email}${newTag}</td>
-        <td><span class="mono">...${lic.key_last4}</span></td>
-        <td style="text-transform:capitalize;color:var(--muted)">${lic.plan}</td>
-        <td>${badge}</td>
-        <td id="email-status-${lic.id}">${emailCol}</td>
-        <td style="color:var(--faint);font-size:12px">${date}</td>
-        <td>${actions}</td>
-      </tr>`;
-    });
-
-    document.getElementById('tableLoading').style.display = 'none';
-    document.getElementById('licTable').style.display = 'table';
-  } catch(e) {
-    document.getElementById('tableLoading').textContent = 'Error al cargar datos.';
+    renderTable(lics);
+  } catch {
+    el('tableLoading').textContent = 'Error al cargar datos.';
   }
 }
+
+function renderTable(lics) {
+  const body = el('licBody');
+  body.innerHTML = '';
+
+  lics.slice().reverse().forEach(lic => {
+    const isNew = (Date.now() - new Date(lic.created_at).getTime()) < 86400000;
+    const date = new Date(lic.created_at).toLocaleDateString('es', { day: '2-digit', month: 'short' });
+    const email = lic.customer?.email || '—';
+    const newTag = isNew ? `<span class="badge badge-new">NUEVO</span>` : '';
+
+    const badge = {
+      active:   `<span class="badge badge-active">● Activa</span>`,
+      refunded: `<span class="badge badge-refunded">↩ Reembolsada</span>`,
+    }[lic.status] ?? `<span class="badge badge-revoked">✕ Revocada</span>`;
+
+    const es = emailStatus[lic.id];
+    const emailCol = {
+      ok:      `<span class="mail-ok">✓ Enviado</span>`,
+      fail:    `<span class="mail-no">✗ Error</span>`,
+      pending: `<span class="mail-pending">⟳ Enviando</span>`,
+    }[es] ?? `<span class="mail-no">— Sin enviar</span>`;
+
+    const actions = lic.status === 'active'
+      ? `<div class="actions">
+          <button class="abtn abtn-send"  data-action="send"  data-id="${lic.id}" data-email="${esc(email)}">✉ Enviar key</button>
+          <button class="abtn abtn-reset" data-action="reset" data-id="${lic.id}">↺ Reset PC</button>
+          <button class="abtn abtn-rev"   data-action="revoke" data-id="${lic.id}">✕ Revocar</button>
+         </div>`
+      : `<span class="td-inactive">${esc(lic.status)}</span>`;
+
+    const tr = document.createElement('tr');
+    tr.id = `row-${lic.id}`;
+    tr.innerHTML = `
+      <td class="td-id">#${lic.id}</td>
+      <td class="email-cell">${esc(email)}${newTag}</td>
+      <td><span class="mono">...${esc(lic.key_last4)}</span></td>
+      <td class="td-plan">${esc(lic.plan)}</td>
+      <td>${badge}</td>
+      <td id="email-status-${lic.id}">${emailCol}</td>
+      <td class="td-date">${esc(date)}</td>
+      <td>${actions}</td>`;
+    body.appendChild(tr);
+  });
+
+  el('tableLoading').style.display = 'none';
+  el('licTable').hidden = false;
+}
+
+// ─── ACTIONS (event delegation on tbody) ───
+el('licBody').addEventListener('click', e => {
+  const btn = e.target.closest('[data-action]');
+  if (!btn) return;
+  const { action, id, email } = btn.dataset;
+  if (action === 'send')   sendKey(Number(id), email, btn);
+  if (action === 'reset')  confirmAction('reset', Number(id));
+  if (action === 'revoke') confirmAction('revoke', Number(id));
+});
 
 async function sendKey(id, email, btn) {
   btn.disabled = true;
   btn.textContent = '⟳ Enviando...';
   emailStatus[id] = 'pending';
-  const el = document.getElementById(`email-status-${id}`);
-  if (el) el.innerHTML = `<span class="mail-pending">⟳ Enviando</span>`;
+  setEmailStatus(id, '<span class="mail-pending">⟳ Enviando</span>');
 
   try {
-    const r = await fetch(`${API}/api/admin/licenses/${id}/generate-key`, {
-      method: 'POST', headers: { 'X-Admin-Key': ADMIN_KEY }
-    });
+    const r = await apiFetch(`/api/admin/licenses/${id}/generate-key`, { method: 'POST' });
     const data = await r.json();
     if (data.ok) {
       emailStatus[id] = data.email_sent ? 'ok' : 'fail';
       saveEmailStatus();
-      if (el) el.innerHTML = data.email_sent
+      setEmailStatus(id, data.email_sent
         ? `<span class="mail-ok">✓ Enviado</span>`
-        : `<span class="mail-no">✗ Sin email</span>`;
-      const msg = data.email_sent ? `Email enviado · Key: ...${data.key.slice(-4)}` : `Key generada (sin email): ${data.key}`;
-      addLog(data.email_sent ? 'ok' : 'err', `${email} | ${msg}`);
-      showToast(data.email_sent ? `Email enviado a tu Gmail` : `Key generada — revisa el log`);
+        : `<span class="mail-no">✗ Sin email</span>`);
+      addLog(data.email_sent ? 'ok' : 'err',
+        data.email_sent ? `${email} | Email enviado · Key: ...${data.key.slice(-4)}` : `${email} | Key generada (sin email): ${data.key}`);
+      showToast(data.email_sent ? 'Email enviado a tu Gmail' : 'Key generada — revisa el log');
     } else {
       emailStatus[id] = 'fail'; saveEmailStatus();
-      if (el) el.innerHTML = `<span class="mail-no">✗ Error</span>`;
+      setEmailStatus(id, `<span class="mail-no">✗ Error</span>`);
       addLog('err', `Error: ${data.error || 'desconocido'}`);
     }
-  } catch(e) {
+  } catch {
     emailStatus[id] = 'fail'; saveEmailStatus();
-    if (el) el.innerHTML = `<span class="mail-no">✗ Error</span>`;
-    addLog('err', `Error de conexión`);
+    setEmailStatus(id, `<span class="mail-no">✗ Error</span>`);
+    addLog('err', 'Error de conexión');
   }
   btn.disabled = false;
   btn.textContent = '✉ Enviar key';
 }
 
-// ─── CONFIRM MODAL ───
-let _confirmFn = null;
-function confirmAction(type, id) {
-  const titles = { revoke: 'Revocar licencia', reset: 'Resetear dispositivos' };
-  const descs  = { revoke: `Licencia #${id} quedará revocada y el usuario no podrá usarla.`, reset: `Se desactivarán todos los dispositivos de la licencia #${id}. El cliente podrá activar en un PC nuevo.` };
-  document.getElementById('confirmTitle').textContent = titles[type];
-  document.getElementById('confirmDesc').textContent  = descs[type];
-  _confirmFn = type === 'revoke' ? () => revokeLicense(id) : () => resetDevices(id);
-  document.getElementById('confirmBtn').onclick = () => { closeConfirm(); _confirmFn(); };
-  document.getElementById('confirmBg').classList.add('open');
+function setEmailStatus(id, html) {
+  const cell = el(`email-status-${id}`);
+  if (cell) cell.innerHTML = html;
 }
-function closeConfirm() { document.getElementById('confirmBg').classList.remove('open'); }
+
+// ─── CONFIRM MODAL ───
+const CONFIRM_COPY = {
+  revoke: { title: 'Revocar licencia',      desc: id => `Licencia #${id} quedará revocada y el usuario no podrá usarla.` },
+  reset:  { title: 'Resetear dispositivos', desc: id => `Se desactivarán todos los dispositivos de la licencia #${id}. El cliente podrá activar en un PC nuevo.` },
+};
+
+function confirmAction(type, id) {
+  const copy = CONFIRM_COPY[type];
+  el('confirmTitle').textContent = copy.title;
+  el('confirmDesc').textContent  = copy.desc(id);
+  confirmCallback = type === 'revoke' ? () => revokeLicense(id) : () => resetDevices(id);
+  el('confirmDialog').showModal();
+}
+
+function closeConfirm() { el('confirmDialog').close(); }
 
 async function revokeLicense(id) {
-  const r = await fetch(`${API}/api/admin/licenses/${id}/revoke`, { method:'POST', headers:{'X-Admin-Key':ADMIN_KEY} });
+  const r = await apiFetch(`/api/admin/licenses/${id}/revoke`, { method: 'POST' });
   if ((await r.json()).ok) { addLog('ok', `Licencia #${id} revocada`); showToast('Licencia revocada'); loadData(); }
 }
+
 async function resetDevices(id) {
-  const r = await fetch(`${API}/api/admin/licenses/${id}/reset-devices`, { method:'POST', headers:{'X-Admin-Key':ADMIN_KEY} });
+  const r = await apiFetch(`/api/admin/licenses/${id}/reset-devices`, { method: 'POST' });
   if ((await r.json()).ok) { addLog('ok', `Dispositivos de #${id} reseteados`); showToast('Dispositivos reseteados'); loadData(); }
 }
 
 // ─── CREAR LICENCIA ───
-let _createdKey = '';
+let createdKey = '';
+
 function openCreateModal() {
-  document.getElementById('createModalBg').classList.add('open');
-  document.getElementById('keyResult').style.display = 'none';
-  document.getElementById('createErr').style.display = 'none';
-  document.getElementById('createBtn').style.display = '';
-  document.getElementById('createEmail').value = '';
-  document.getElementById('createName').value = '';
-  setTimeout(() => document.getElementById('createEmail').focus(), 100);
+  el('createDialog').showModal();
+  el('keyResult').style.display = 'none';
+  el('createErr').style.display = 'none';
+  el('createBtn').style.display = '';
+  el('createEmail').value = '';
+  el('createName').value = '';
+  setTimeout(() => el('createEmail').focus(), 100);
 }
-function closeCreateModal() { document.getElementById('createModalBg').classList.remove('open'); loadData(); }
+
+function closeCreateModal() {
+  el('createDialog').close();
+  loadData();
+}
 
 async function createLicense() {
-  const email = document.getElementById('createEmail').value.trim();
-  const name  = document.getElementById('createName').value.trim();
-  const plan  = document.getElementById('createPlan').value;
-  const send  = document.getElementById('createSendEmail').checked;
-  const errEl = document.getElementById('createErr');
-  const btn   = document.getElementById('createBtn');
+  const email = el('createEmail').value.trim();
+  const name  = el('createName').value.trim();
+  const plan  = el('createPlan').value;
+  const send  = el('createSendEmail').checked;
+  const errEl = el('createErr');
+  const btn   = el('createBtn');
+
   if (!email) { errEl.textContent = 'El email es obligatorio'; errEl.style.display = 'block'; return; }
   errEl.style.display = 'none';
-  btn.disabled = true; btn.textContent = 'Creando...';
-  try {
-    let cid;
-    const rc = await fetch(`${API}/api/admin/customers`, { method:'POST', headers:{'X-Admin-Key':ADMIN_KEY,'Content-Type':'application/json'}, body:JSON.stringify({email,name:name||null}) });
-    if (rc.ok) { cid = (await rc.json()).id; }
-    else { const all = await fetch(`${API}/api/admin/customers`,{headers:{'X-Admin-Key':ADMIN_KEY}}).then(r=>r.json()); cid = all.find(c=>c.email===email)?.id; }
-    if (!cid) { errEl.textContent = 'Error creando cliente'; errEl.style.display = 'block'; btn.disabled=false; btn.textContent='Crear licencia'; return; }
+  btn.disabled = true;
+  btn.textContent = 'Creando...';
 
-    const rl = await fetch(`${API}/api/admin/licenses`, { method:'POST', headers:{'X-Admin-Key':ADMIN_KEY,'Content-Type':'application/json'}, body:JSON.stringify({customer_id:cid,plan}) });
+  try {
+    // Buscar cliente existente primero para evitar IntegrityError en servidor
+    let customerId;
+    const allCustomers = await apiFetch('/api/admin/customers').then(r => r.json());
+    const existing = allCustomers.find(c => c.email.toLowerCase() === email.toLowerCase());
+
+    if (existing) {
+      customerId = existing.id;
+    } else {
+      const rc = await apiFetch('/api/admin/customers', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, name: name || null }),
+      });
+      if (!rc.ok) {
+        errEl.textContent = 'Error creando cliente';
+        errEl.style.display = 'block';
+        btn.disabled = false;
+        btn.textContent = 'Crear licencia';
+        return;
+      }
+      customerId = (await rc.json()).id;
+    }
+
+    if (!customerId) {
+      errEl.textContent = 'Error creando cliente';
+      errEl.style.display = 'block';
+      btn.disabled = false;
+      btn.textContent = 'Crear licencia';
+      return;
+    }
+
+    const rl = await apiFetch('/api/admin/licenses', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ customer_id: customerId, plan }),
+    });
     const lic = await rl.json();
-    _createdKey = lic.license_key;
-    document.getElementById('keyValue').textContent = _createdKey;
-    document.getElementById('keyResult').style.display = 'block';
+    createdKey = lic.license_key;
+    el('keyValue').textContent = createdKey;
+    el('keyResult').style.display = 'block';
     btn.style.display = 'none';
     addLog('ok', `Licencia #${lic.id} creada para ${email}`);
+
     if (send) {
-      await fetch(`${API}/api/admin/licenses/${lic.id}/generate-key`, { method:'POST', headers:{'X-Admin-Key':ADMIN_KEY} });
-      emailStatus[lic.id] = 'ok'; saveEmailStatus();
-      addLog('ok', `Notificación enviada a tu Gmail`);
+      await apiFetch(`/api/admin/licenses/${lic.id}/generate-key`, { method: 'POST' });
+      emailStatus[lic.id] = 'ok';
+      saveEmailStatus();
+      addLog('ok', 'Notificación enviada a tu Gmail');
       showToast('Licencia creada y email enviado');
     } else {
       showToast('Licencia creada');
     }
-  } catch(e) { errEl.textContent = 'Error de conexión'; errEl.style.display = 'block'; btn.disabled=false; btn.textContent='Crear licencia'; }
+  } catch {
+    errEl.textContent = 'Error de conexión';
+    errEl.style.display = 'block';
+    btn.disabled = false;
+    btn.textContent = 'Crear licencia';
+  }
 }
-function copyKey() { navigator.clipboard.writeText(_createdKey); showToast('Key copiada'); }
 
-// ─── LOG ───
-function addLog(type, msg) {
-  const box = document.getElementById('logBox');
-  const sec = document.getElementById('logSection');
-  if (!box) return;
-  sec.style.display = 'block';
-  const t = new Date().toLocaleTimeString('es');
-  const cls = type === 'ok' ? 'log-ok' : 'log-err';
-  const icon = type === 'ok' ? '✓' : '✗';
-  box.innerHTML = `<div><span class="log-ts">[${t}]</span><span class="${cls}">${icon} ${msg}</span></div>` + box.innerHTML;
+function copyKey() {
+  navigator.clipboard.writeText(createdKey);
+  showToast('Key copiada');
 }
-function clearLogs() { document.getElementById('logBox').innerHTML=''; document.getElementById('logSection').style.display='none'; }
 
-function showToast(msg) {
-  const t = document.getElementById('toast');
-  t.textContent = msg; t.classList.add('show');
-  setTimeout(() => t.classList.remove('show'), 3000);
-}
+// ─── EVENT LISTENERS ───
+el('loginBtn').addEventListener('click', doLogin);
+el('keyInput').addEventListener('keydown', e => { if (e.key === 'Enter') doLogin(); });
+el('logoutBtn').addEventListener('click', doLogout);
+el('refreshBtn').addEventListener('click', loadData);
+el('clearLogBtn').addEventListener('click', clearLogs);
+el('newLicBtn').addEventListener('click', openCreateModal);
+el('closeCreateBtn').addEventListener('click', closeCreateModal);
+el('createBtn').addEventListener('click', createLicense);
+el('copyKeyBtn').addEventListener('click', copyKey);
+el('cancelConfirmBtn').addEventListener('click', closeConfirm);
+el('confirmBtn').addEventListener('click', () => { closeConfirm(); confirmCallback?.(); });
 
 // ─── BOOT ───
-const saved = localStorage.getItem('hm_admin_key');
-if (saved) { document.getElementById('keyInput').value = saved; doLogin(); }
-setInterval(() => { if (ADMIN_KEY) loadData(); }, 60000);
+const savedKey = localStorage.getItem('hm_admin_key');
+if (savedKey) { el('keyInput').value = savedKey; await doLogin(); }
+setInterval(() => { if (adminKey) loadData(); }, 60000);
 </script>
 </body>
 </html>
