@@ -135,8 +135,7 @@ class ScreenVideoRecorder:
         self._monitor_changed.set()
 
     def set_transform(self, x, y, w, h) -> None:
-        """Coloca la pantalla LIBRE dentro del lienzo (estilo OBS): posición (x, y)
-        y tamaño (w, h), todo normalizado 0..1 respecto al lienzo de salida."""
+        """Coloca la pantalla como fuente dentro del lienzo de salida estilo OBS."""
         with self._monitor_lock:
             self._transform = (float(x), float(y), float(w), float(h))
             self._scale_mode = "transform"
@@ -157,8 +156,8 @@ class ScreenVideoRecorder:
         graph = av.filter.Graph()
         source = graph.add_buffer(template=template)
         if mode == "transform" and self._transform:
-            # Escala la fuente al tamaño elegido y la pega en su posición sobre
-            # un lienzo negro (el resto queda en negro), como una fuente en OBS.
+            # La fuente completa se escala y se pega sobre un lienzo negro.
+            # Así una fuente pequeña queda pequeña en el video final, como en OBS.
             tw, th, tx, ty = self._transform_pixels()
             scale = graph.add("scale", f"{tw}:{th}")
             framing = graph.add("pad", f"{self._out_w}:{self._out_h}:{tx}:{ty}:black")

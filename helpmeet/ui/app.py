@@ -1106,6 +1106,43 @@ class Api:
         from helpmeet.screenshot.capture import list_monitors
         return list_monitors()
 
+    def get_monitor_thumbnails(self):
+        """Devuelve una captura miniatura de cada monitor para el selector visual."""
+        import base64
+        import numpy as np
+        import mss
+        from helpmeet.video.preview import _encode_jpeg
+        import av
+
+        THUMB_H = 80
+        monitors = self.list_monitors()
+        result = []
+        try:
+            with mss.mss() as sct:
+                for mon in monitors:
+                    region = {
+                        "left": mon["left"], "top": mon["top"],
+                        "width": mon["width"], "height": mon["height"],
+                    }
+                    try:
+                        img = sct.grab(region)
+                        sw, sh = img.width, img.height
+                        th = THUMB_H
+                        tw = max(2, int(sw * THUMB_H / sh))
+                        tw -= tw % 2
+                        arr = np.frombuffer(img.rgb, dtype=np.uint8).reshape(sh, sw, 3)
+                        frame = av.VideoFrame.from_ndarray(arr, format="rgb24")
+                        scaled = frame.reformat(width=tw, height=th, format="yuvj420p",
+                                                interpolation="LANCZOS")
+                        jpeg = _encode_jpeg(scaled, tw, th)
+                        b64 = base64.b64encode(jpeg).decode() if jpeg else ""
+                    except Exception:
+                        b64 = ""
+                    result.append({**mon, "thumbnail": b64})
+        except Exception:
+            result = [{**m, "thumbnail": ""} for m in monitors]
+        return result
+
     def take_capture(self, monitor_index=1):
         # Durante una grabación de pantalla, las capturas van a SU reunión.
         if self._screen_active and self._screen_meeting_id:
@@ -1138,9 +1175,11 @@ class Api:
         from helpmeet.video.preview import ScreenPreview
         if self._screen_rec is not None:
             return {"ok": True, "recording": True, "meeting_id": self._screen_meeting_id}
+        # mss.monitors[0] es la pantalla virtual combinada; usar al menos 1
+        safe_index = max(1, int(monitor_index))
         if self._screen_preview is None:
-            mon = monitor_geometry(int(monitor_index))
-            mon["index"] = int(monitor_index)
+            mon = monitor_geometry(safe_index)
+            mon["index"] = safe_index
             self._screen_preview = ScreenPreview(mon, self._push_preview)
             self._screen_preview.start()
         return {"ok": True}
@@ -1148,9 +1187,10 @@ class Api:
     def set_screen_preview_monitor(self, monitor_index):
         """Cambia el monitor de la vista previa de espera."""
         from helpmeet.screenshot.capture import monitor_geometry
+        safe_index = max(1, int(monitor_index))
         if self._screen_preview is not None:
-            mon = monitor_geometry(int(monitor_index))
-            mon["index"] = int(monitor_index)
+            mon = monitor_geometry(safe_index)
+            mon["index"] = safe_index
             self._screen_preview.set_monitor(mon)
         return {"ok": True}
 
