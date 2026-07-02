@@ -161,7 +161,9 @@ const api = {
   // ---- Grabación de pantalla + biblioteca (backend REAL, ya implementado) ----
   startScreenRecording: (iid, idx) => call('start_screen_recording', iid, idx),
   stopScreenRecording: () => call('stop_screen_recording'),
-  transcribeMeetingVideo: (mid, force) => call('transcribe_meeting_video', mid, !!force),
+  transcribeMeetingVideo: (mid, force, clipSegments) => call('transcribe_meeting_video', mid, !!force, clipSegments || null),
+  getVideoThumbnails: (mid, count) => call('get_video_thumbnails', mid, count || 12),
+  getMediaVideoUrl: (mid) => call('get_media_video_url', mid),
   toggleScreenMicMute: (m) => call('toggle_screen_mic_mute', m),
   setScreenMonitor: (idx) => call('set_screen_monitor', idx),
   setScreenScaleMode: (mode) => call('set_screen_scale_mode', mode),
