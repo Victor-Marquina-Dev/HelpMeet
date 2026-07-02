@@ -1174,8 +1174,10 @@ class Api:
         result = []
         try:
             container = av.open(path)
+        except Exception:
+            return []
+        try:
             if not container.streams.video:
-                container.close()
                 return []
             stream = container.streams.video[0]
             for i in range(count):
@@ -1197,10 +1199,9 @@ class Api:
                 except Exception:
                     b64 = ""
                 result.append({"t": round(t, 2), "thumb": b64})
-            container.close()
-        except Exception:
             return result
-        return result
+        finally:
+            container.close()
 
     def take_capture(self, monitor_index=1):
         # Durante una grabación de pantalla, las capturas van a SU reunión.
