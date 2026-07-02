@@ -388,6 +388,16 @@ class Api:
     def set_window(self, window):
         self._window = window
 
+    def set_media_server(self, server):
+        self._media_server = server
+
+    def get_media_video_url(self, meeting_id):
+        """URL local para reproducir el vídeo de la reunión en un <video>."""
+        srv = getattr(self, "_media_server", None)
+        if not srv:
+            return None
+        return srv.url_for(int(meeting_id))
+
     def list_initiatives(self):
         return [_initiative_payload(i) for i in repo.list_initiatives(self._session)]
 
@@ -2681,6 +2691,19 @@ def run():
         _log.debug("No se pudo verificar el modelo en caché", exc_info=True)
     _set_windows_app_identity()
     api = Api()
+    from helpmeet.media_server import MediaServer
+
+    def _resolve_video(mid):
+        s = get_session()   # sesión propia: el server corre en otro hilo
+        try:
+            mm = repo.get_meeting(s, int(mid))
+            return mm.audio_path if mm and mm.audio_path else None
+        finally:
+            s.close()
+
+    media_server = MediaServer(_resolve_video)
+    media_server.start()
+    api.set_media_server(media_server)
     web_dir = Path(__file__).parent / "web"
     icon_path = web_dir / "assets" / "helpmeet.ico"
     window = webview.create_window(
