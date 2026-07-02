@@ -1,4 +1,4 @@
-import os
+﻿import os
 import sys
 import time
 import wave
@@ -1380,19 +1380,21 @@ class Api:
                            for u in sorted(m.utterances, key=lambda u: u.start_time)],
         }
 
-    def transcribe_meeting_video(self, meeting_id, force=False):
-        """Encola la transcripción del vídeo en SEGUNDO PLANO y vuelve enseguida,
-        para poder seguir grabando otro vídeo sin esperar."""
+    def transcribe_meeting_video(self, meeting_id, force=False, clip_segments=None):
+        """Encola la transcripción del vídeo en SEGUNDO PLANO y vuelve enseguida.
+
+        `clip_segments`: lista opcional de {"start": seg, "end": seg}. Si viene,
+        solo se transcribe ese/esos tramos del vídeo."""
         m = repo.get_meeting(self._session, int(meeting_id))
         if m is None or not m.audio_path or not os.path.exists(m.audio_path):
             return {"ok": False, "error": "No se encontró el video de esta reunión."}
         if m.utterances and not force:
             return {"ok": True, "already": True, "meeting_id": m.id}
-        self._enqueue_video_job(m.id, m.title, m.initiative_id, bool(force))
+        self._enqueue_video_job(m.id, m.title, m.initiative_id, bool(force), clip_segments)
         return {"ok": True, "queued": True, "meeting_id": m.id}
 
     def _transcribe_video(self, session, meeting_id, force=False,
-                          on_status=None, on_progress=None):
+                          on_status=None, on_progress=None, clip_segments=None):
         """Transcribe el .mp4 de una reunión usando `session` (la del worker).
 
         Las grabaciones nuevas usan las pistas aisladas de micrófono/sistema.
@@ -1410,17 +1412,36 @@ class Api:
         tmp = tempfile.NamedTemporaryFile(dir=tmp_dir, suffix=".wav", delete=False)
         wav = Path(tmp.name)
         tmp.close()
+        # Recorte opcional: si el usuario marcó tramos, se transcribe solo eso.
+        clip_norm = None
+        if clip_segments:
+            from helpmeet.media_segments import normalize_segments
+            from helpmeet.media import extract_audio_segments_to_wav, media_duration
+            duration = media_duration(m.audio_path)
+            clip_norm = normalize_segments(
+                [(seg["start"], seg["end"]) for seg in clip_segments], duration)
+            if not clip_norm:
+                # El worker ignora el valor de retorno: los errores se informan al
+                # usuario por excepción (los captura _job_worker y muestra el mensaje).
+                raise ValueError("La selección de recorte no es válida.")
+
         from helpmeet.media_storage import available_tracks
-        tracks = available_tracks(m.id, m.audio_path)
         new_segments = []
         try:
-            if tracks:
-                on_status("Cargando el modelo de transcripción…")
-            else:
-                on_status("Extrayendo el audio del video…")
-                extract_audio_to_wav(m.audio_path, str(wav))
+            if clip_norm:
+                on_status("Recortando el audio seleccionado…")
+                extract_audio_segments_to_wav(m.audio_path, clip_norm, str(wav))
                 tracks = [("others", wav)]
                 on_status("Cargando el modelo de transcripción…")
+            else:
+                tracks = available_tracks(m.id, m.audio_path)
+                if tracks:
+                    on_status("Cargando el modelo de transcripción…")
+                else:
+                    on_status("Extrayendo el audio del video…")
+                    extract_audio_to_wav(m.audio_path, str(wav))
+                    tracks = [("others", wav)]
+                    on_status("Cargando el modelo de transcripción…")
             try:
                 engine = self._get_local_engine()
             except Exception as exc:
@@ -1445,8 +1466,17 @@ class Api:
                 for seg in segments:
                     if self._is_job_cancelled(meeting_id):
                         raise _JobCancelled()
-                    if seg.text:
-                        new_segments.append((speaker, seg))
+                    if not seg.text:
+                        continue
+                    if clip_norm:
+                        from helpmeet.media_segments import map_local_to_global
+                        from helpmeet.transcription.segment import TranscribedSegment
+                        seg = TranscribedSegment(
+                            seg.text,
+                            map_local_to_global(seg.start, clip_norm),
+                            map_local_to_global(seg.end, clip_norm),
+                        )
+                    new_segments.append((speaker, seg))
 
             if not new_segments:
                 raise ValueError("No se detectó voz clara en el video.")
@@ -1705,7 +1735,7 @@ class Api:
         recorder.on_progress = lambda frac, _mid=mid: self._job_event(_mid, progress=frac)
         self._enqueue_job(mid, m.title, m.initiative_id, recorder.transcribe)
 
-    def _enqueue_video_job(self, meeting_id, title, initiative_id, force):
+    def _enqueue_video_job(self, meeting_id, title, initiative_id, force, clip_segments=None):
         """Encola la transcripción del .mp4 de una reunión en segundo plano."""
         on_status = lambda text, _mid=meeting_id: self._job_event(_mid, stage=text)
         on_progress = lambda frac, _mid=meeting_id: self._job_event(_mid, progress=frac)
@@ -1713,7 +1743,8 @@ class Api:
         def run():
             s = get_session()   # sesión propia del worker (otro hilo)
             try:
-                self._transcribe_video(s, meeting_id, force, on_status, on_progress)
+                self._transcribe_video(s, meeting_id, force, on_status, on_progress,
+                                       clip_segments=clip_segments)
             finally:
                 s.close()
         self._enqueue_job(meeting_id, title, initiative_id, run)
