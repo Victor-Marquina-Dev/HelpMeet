@@ -16,3 +16,24 @@ def test_drops_empty_or_inverted():
 
 def test_keeps_disjoint_sorted():
     assert normalize_segments([(8, 12), (2, 3)], 10) == [(2.0, 3.0), (8.0, 10.0)]
+
+
+from helpmeet.media_segments import map_local_to_global
+
+
+def test_map_local_to_global_single():
+    segs = [(1.0, 3.0)]
+    assert map_local_to_global(0.0, segs) == 1.0
+    assert map_local_to_global(1.5, segs) == 2.5
+
+
+def test_map_local_to_global_multi():
+    segs = [(1.0, 3.0), (4.0, 5.0)]
+    assert map_local_to_global(0.0, segs) == 1.0
+    assert map_local_to_global(2.0, segs) == 4.0
+    assert map_local_to_global(2.5, segs) == 4.5
+
+
+def test_map_local_to_global_past_end_clamps():
+    segs = [(1.0, 3.0), (4.0, 5.0)]
+    assert map_local_to_global(99.0, segs) == 5.0

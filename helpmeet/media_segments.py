@@ -27,3 +27,21 @@ def normalize_segments(segments, duration):
         else:
             merged.append((start, end))
     return merged
+
+
+def map_local_to_global(local_t, segments):
+    """Convierte un tiempo del audio recortado al tiempo del vídeo original.
+
+    `segments` debe estar ya normalizado (ver normalize_segments) y en el mismo
+    orden con el que se concatenó el audio. Si `local_t` cae más allá del total,
+    devuelve el fin del último tramo.
+    """
+    acc = 0.0
+    for start, end in segments:
+        dur = end - start
+        if local_t < acc + dur:
+            return start + (local_t - acc)
+        acc += dur
+    if segments:
+        return segments[-1][1]
+    return local_t
