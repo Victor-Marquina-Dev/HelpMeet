@@ -62,7 +62,7 @@ def test_transcription_preferences_are_persistent(monkeypatch, tmp_path):
 
     defaults = settings.get_transcription_settings()
     assert defaults["provider"] == "auto"
-    assert defaults["default_mic_muted"] is False
+    assert defaults["default_mic_muted"] is True
 
     saved = settings.set_transcription_settings({
         "provider": "local",

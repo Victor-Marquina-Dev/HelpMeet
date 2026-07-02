@@ -7,7 +7,7 @@
    2. Capa de API  ........ api.*  (pywebview con fallback MOCK)
    3. Estado central ...... STATE  + setAppState()
    4. Render de vistas .... renderMain(), renderActionBar()
-   5. Sidebar / búsqueda / glosario / archivo / papelera
+   5. Sidebar / búsqueda / glosario / archivados
    6. Modales, toasts, menús contextuales (reemplazan prompt/alert)
    7. Grabación / pantalla / procesamiento / recuperación
    8. Atajos de teclado
@@ -125,6 +125,7 @@ const api = {
   startRecording: (iid, title) => call('start_recording', iid, title),
   stopRecording: () => call('stop_recording'),
   listMonitors: () => call('list_monitors'),
+  getMonitorThumbnails: () => call('get_monitor_thumbnails'),
   takeCapture: (idx) => call('take_capture', idx),
   addNote: (text) => call('add_note', text),
   toggleMeetingMicMute: (muted) => call('toggle_meeting_mic_mute', muted),
@@ -355,7 +356,8 @@ const MOCK = (() => {
     },
     start_recording: (iid, title) => wait({ id: 'm' + (++mctr), title: title || 'Reunión sin título', initiative_id: iid, live: true }),
     stop_recording: () => wait({ status: 'ok', duration: '12:48', utterances: 24 }, 400),
-    list_monitors: () => wait([{ index: 0, width: 2560, height: 1440 }, { index: 1, width: 1920, height: 1080 }]),
+    list_monitors: () => wait([{ index: 1, width: 2560, height: 1440 }, { index: 2, width: 1920, height: 1080 }]),
+    get_monitor_thumbnails: () => wait([{ index: 1, left: 0, top: 0, width: 2560, height: 1440, thumbnail: '' }, { index: 2, left: 2560, top: 0, width: 1920, height: 1080, thumbnail: '' }]),
     take_capture: () => wait({ ok: true }),
     add_note: () => wait({ ok: true }),
     import_media: (iid) => wait({ id: 'm' + (++mctr), title: 'Vídeo importado', initiative_id: iid, utterances: 30 }, 600),
@@ -411,7 +413,8 @@ const STATE = {
   activeTab: 'transcript',
   provider: 'auto',      // auto | local | replicate (V2)
   monitors: [],
-  monitorIdx: 0,
+  monitorIdx: 1,
+  monitorThumbnails: {},
   screenScaleMode: load('hm.screenScaleMode', 'fit'),
   recElapsed: 0,
   recStartedAt: 0,
@@ -421,7 +424,7 @@ const STATE = {
   jobDeterminate: false,
   jobStartedAt: 0,
   jobClock: null,
-  micMuted: false,
+  micMuted: true,
   meetingMicMuted: false,
   screenPanelCollapsed: false,
   settings: { export_dir: '', token_set: false },
@@ -533,12 +536,14 @@ function openSearch() { const s = $('#search'); if (!s) return; s.classList.add(
 function renderMain() {
   const main = $('#main');
   document.body.setAttribute('data-screen', STATE.screen);
-  // Estado activo del nav lateral (Reuniones vs. Iniciativas)
+  // Estado activo del nav lateral (Calendario vs. Proyectos)
   const onMeetings  = STATE.screen === 'meetings';
   const onFavorites = STATE.screen === 'favorites';
+  const onArchive = STATE.screen === 'archive';
   $('#navMeetings')?.classList.toggle('active', onMeetings);
   $('#navFavorites')?.classList.toggle('active', onFavorites);
-  $('#navInitiatives')?.classList.toggle('active', !onMeetings && !onFavorites);
+  $('#btnArchive')?.classList.toggle('active', onArchive);
+  $('#navInitiatives')?.classList.toggle('active', !onMeetings && !onFavorites && !onArchive);
   switch (STATE.screen) {
     case 'welcome': return main.replaceChildren(viewWelcome());
     case 'meetings': return main.replaceChildren(viewMeetings());
@@ -566,8 +571,8 @@ function viewWelcome() {
     <div class="empty-inner">
       <div class="empty-logo"><img src="assets/helpmeet-symbol.svg" alt=""></div>
       <h2 class="empty-title">Helpmeet</h2>
-      <p>Listo para capturar contexto. Crea una nueva iniciativa o usa la barra de acciones de abajo para empezar a grabar.</p>
-      <button class="btn btn-welcome" id="wNew">${svg('plus', 18)} Nueva iniciativa</button>
+      <p>Listo para capturar contexto. Crea un nuevo proyecto o usa la barra de acciones de abajo para empezar a grabar.</p>
+      <button class="btn btn-welcome" id="wNew">${svg('plus', 18)} Nuevo proyecto</button>
       <button class="empty-diag" id="wDiag">Diagnóstico del sistema</button>
     </div>`;
   w.querySelector('#wNew').onclick = promptNewInitiative;
@@ -576,7 +581,7 @@ function viewWelcome() {
 }
 
 /* ============================================================
-   Vista de Reuniones · Calendario (estilo Stitch)
+   Vista de Calendario (estilo Stitch)
    ============================================================ */
 const CAL_MONTHS = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
 const CAL_MONTHS_SHORT = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
@@ -588,7 +593,7 @@ function _startOfWeek(d) { const x = new Date(d.getFullYear(), d.getMonth(), d.g
 // Paleta de colores para iniciativas (tonos suaves que encajan con el tema oscuro).
 const INIT_COLORS = ['#aacfbf', '#e8c17b', '#e0857b', '#86b5e0', '#a98fd6', '#8fc99b', '#e093c0', '#7fcdd0'];
 function _initColor(it) { return (it && it.color) || '#aacfbf'; }
-// '#rrggbb' -> 'rgba(r,g,b,a)' para fondos translúcidos del color de la iniciativa.
+// '#rrggbb' -> 'rgba(r,g,b,a)' para fondos translúcidos del color de el proyecto.
 function _hexA(hex, a) {
   let h = String(hex || '#aacfbf').replace('#', '');
   if (h.length === 3) h = h.split('').map(c => c + c).join('');
@@ -649,7 +654,7 @@ function _calDurMin(dur) {
 }
 
 // Evento dentro de una celda del MES (estilo Notion: punto + hora + título).
-// El punto toma el color de la iniciativa; pendiente = punto hueco.
+// El punto toma el color de el proyecto; pendiente = punto hueco.
 function _calEvent(m, it) {
   const time = _calFmtTime((m.started_at || '').substring(11, 16));
   const color = _initColor(it);
@@ -704,7 +709,7 @@ function viewFavorites() {
 
     byInit.forEach(({ it, meetings }, key) => {
       const mColor = it ? _initColor(it) : 'var(--text-muted)';
-      const initName = it ? it.name : 'Sin iniciativa';
+      const initName = it ? it.name : 'Sin proyecto';
       const isOpen = STATE._favOpen.has(key);
       // Cabecera de iniciativa (colapsable)
       const ihdr = el('div', 'fav-init-hdr' + (isOpen ? ' open' : ''));
@@ -779,7 +784,7 @@ function viewMeetings() {
   }
 
   head.innerHTML = `
-    <h1 class="page-title cal-page-title">Reuniones</h1>
+    <h1 class="page-title cal-page-title">Calendario</h1>
     <div class="cal-controls">
       <div class="cal-controls-left">
         <h2 class="cal-title"><span class="cal-title-main">${esc(titleMain)}</span><span class="cal-title-sep"> </span><span class="cal-title-sub">${esc(titleSub)}</span></h2>
@@ -799,7 +804,7 @@ function viewMeetings() {
     </div>`;
 
   // Filtro por iniciativa con dropdown personalizado (tema oscuro)
-  const filterItems = [{ value: 'all', label: 'Todas las iniciativas' }]
+  const filterItems = [{ value: 'all', label: 'Todos los proyectos' }]
     .concat(STATE.initiatives.map(it => ({ value: it.id, label: it.name, color: _initColor(it) })));
   const filterEl = customSelect({
     value: C.filter, items: filterItems, icon: 'filter', className: 'cal-filter', minWidth: 200,
@@ -819,7 +824,7 @@ function viewMeetings() {
   // ---- Estado vacío sutil (solo en mes; en semana la rejilla habla por sí sola) ----
   if (!Object.keys(byDay).length && C.view === 'month') {
     const hint = el('div', 'cal-empty');
-    hint.innerHTML = `${svg('calendar', 18)} <span>No hay reuniones${C.filter !== 'all' ? ' en esta iniciativa' : ''} en este periodo.</span>`;
+    hint.innerHTML = `${svg('calendar', 18)} <span>No hay reuniones${C.filter !== 'all' ? ' en este proyecto' : ''} en este periodo.</span>`;
     body.appendChild(hint);
   }
 
@@ -1061,23 +1066,23 @@ function viewInitiative() {
       <div class="init-actions" id="initActions">
         <button class="init-copy-md init-actions-rest ${ms.length ? '' : 'is-disabled'}" id="initCopyMd" title="${ms.length ? 'Copiar transcripción en Markdown' : 'Aún no hay reuniones que copiar'}">${svg('copy', 14)}<span>Copiar transcripción .md</span></button>
         <span class="init-actions-sep init-actions-rest"></span>
-        <button class="icon-btn ${ms.length ? '' : 'is-disabled'}" id="initSearchBtn" title="Buscar en esta iniciativa">${svg('search', 15)}</button>
+        <button class="icon-btn ${ms.length ? '' : 'is-disabled'}" id="initSearchBtn" title="Buscar en este proyecto">${svg('search', 15)}</button>
         <div class="init-actions-searchbox" id="initActionsSearchbox" hidden>
-          <input id="initSearch" type="search" class="init-inline-input" placeholder="Buscar en esta iniciativa…" aria-label="Buscar en esta iniciativa" autocomplete="off">
+          <input id="initSearch" type="search" class="init-inline-input" placeholder="Buscar en este proyecto…" aria-label="Buscar en este proyecto" autocomplete="off">
           <span class="tx-count" id="initSearchCount"></span>
           <button class="icon-btn sm" id="initSearchClear" title="Limpiar" aria-label="Limpiar" hidden>${svg('x', 13)}</button>
         </div>
         <span class="init-actions-sep init-actions-rest"></span>
         <button class="icon-btn init-actions-rest ${ms.length ? '' : 'is-disabled'}" id="initSelectBtn" title="Seleccionar reuniones para eliminar">${svg('checkSquare', 15)}</button>
-        <button class="icon-btn init-actions-rest" id="initOpenFolder" title="Abrir la carpeta completa de la iniciativa">${svg('folder', 15)}</button>
-        <button class="icon-btn init-actions-rest" id="initMenu" aria-label="Más acciones de la iniciativa">${svg('dots', 16)}</button>
+        <button class="icon-btn init-actions-rest" id="initOpenFolder" title="Abrir la carpeta completa del proyecto">${svg('folder', 15)}</button>
+        <button class="icon-btn init-actions-rest" id="initMenu" aria-label="Más acciones del proyecto">${svg('dots', 16)}</button>
       </div>
     </div>`;
 
   // Objetivo / contexto: editable, estilo bloque descripción (sin etiqueta ni pista).
   const objBox = el('div', 'obj-box');
   objBox.innerHTML = `<textarea id="initObjetivo" class="obj-text" rows="2"
-    placeholder="Contexto de la iniciativa"></textarea>`;
+    placeholder="Contexto del proyecto"></textarea>`;
   const ta = objBox.querySelector('#initObjetivo');
   ta.value = (it && it.description) || '';
   const _resizeObj = () => { ta.style.height = 'auto'; ta.style.height = Math.min(120, ta.scrollHeight) + 'px'; };
@@ -1124,7 +1129,7 @@ function viewInitiative() {
           <div class="rc-actions">
             <button class="icon-btn sm rc-act-btn${isFav ? ' fav-on' : ''}" data-act="fav" title="${isFav ? 'Quitar de favoritas' : 'Marcar como favorita'}">${svg('star', 13)}</button>
             <button class="icon-btn sm rc-act-btn" data-act="rename" title="Renombrar">${svg('edit', 13)}</button>
-            <button class="icon-btn sm rc-act-btn rc-act-danger" data-act="trash" title="Enviar a la papelera">${svg('trash', 13)}</button>
+            <button class="icon-btn sm rc-act-btn" data-act="archive" title="Archivar reunión">${svg('archive', 13)}</button>
           </div>
           ${pill}
         </div>`;
@@ -1169,7 +1174,7 @@ function viewInitiative() {
             btn.classList.toggle('fav-on', nowFav);
             btn.title = nowFav ? 'Quitar de favoritas' : 'Marcar como favorita';
             renderSidebar();
-          } else if (btn.dataset.act === 'trash') deleteMeeting(m.id);
+          } else if (btn.dataset.act === 'trash') archiveMeeting(m.id);
         });
       });
       container.appendChild(c);
@@ -1288,12 +1293,12 @@ function viewInitiative() {
     selBar.querySelector('#selDelete').onclick = () => {
       const n = selected.size; if (!n) return;
       confirmModal(
-        `Enviar ${n} reunión${n > 1 ? 'es' : ''} a la papelera`,
-        'Se moverán a la Papelera. Podrás restaurarlas desde allí.',
-        'Mover a papelera',
+        `Archivar ${n} reunión${n > 1 ? 'es' : ''}`,
+        'Se moverán a Archivados. Podrás restaurarlas cuando quieras.',
+        'Archivar',
         async () => {
-          for (const mid of [...selected]) await api.trashItem('meeting', mid);
-          toast('ok', `${n} reunión${n > 1 ? 'es' : ''} movida${n > 1 ? 's' : ''} a la papelera`);
+          for (const mid of [...selected]) await api.archiveItem('meeting', mid);
+          toast('ok', `${n} reunión${n > 1 ? 'es' : ''} archivada${n > 1 ? 's' : ''}`);
           exitSelectMode(); refreshAll(); updateLibraryCounts();
         }
       );
@@ -1395,7 +1400,7 @@ function wireInitiativeSearch(bar, list, results, ms) {
     list.hidden = true; results.hidden = false; results.replaceChildren();
     countEl.textContent = total ? `${total} resultado${total > 1 ? 's' : ''}` : 'Sin resultados';
     if (!total) {
-      results.innerHTML = '<p style="color:var(--text-muted);font-size:13px">Sin resultados en esta iniciativa.</p>';
+      results.innerHTML = '<p style="color:var(--text-muted);font-size:13px">Sin resultados en este proyecto.</p>';
       return;
     }
     // — Sección: reuniones por nombre —
@@ -1428,14 +1433,14 @@ function wireInitiativeSearch(bar, list, results, ms) {
   clearBtn.onclick = () => { input.value = ''; reset(); input.focus(); };
 }
 
-/* Copia el contexto.md completo de la iniciativa al portapapeles (para pegarlo
+/* Copia el contexto.md completo de el proyecto al portapapeles (para pegarlo
    directo en Claude Code). Refresca antes el export para llevar lo último. */
 async function copyInitiativeContext(iid, btn) {
   if (btn) btn.classList.add('is-loading');
   try {
     const r = await api.copyInitiativeContext(iid);
     if (!r || !r.text || !r.text.trim()) {
-      toast('info', 'Aún no hay nada que copiar en esta iniciativa.');
+      toast('info', 'Aún no hay nada que copiar en este proyecto.');
       return;
     }
     const ok = await copyText(r.text);
@@ -1473,7 +1478,7 @@ async function exportInitiativeNow(iid, btn) {
     const r = await api.exportInitiativeById(iid);
     if (r && r.path) { await api.openPath(r.path); toast('ok', 'Contexto exportado · carpeta abierta'); }
     else toast('err', 'La exportación no devolvió una carpeta.');
-  } catch (e) { toast('err', 'No se pudo exportar la iniciativa'); }
+  } catch (e) { toast('err', 'No se pudo exportar el proyecto'); }
   finally { if (btn) btn.classList.remove('is-loading'); }
 }
 
@@ -1481,10 +1486,10 @@ async function openInitiativeFolder(iid, btn) {
   if (btn) btn.classList.add('is-loading');
   try {
     const r = await api.openInitiativeFolder(iid);
-    if (r && r.ok) toast('ok', 'Carpeta de la iniciativa abierta');
-    else toast('err', 'No se pudo abrir la carpeta de la iniciativa');
+    if (r && r.ok) toast('ok', 'Carpeta del proyecto abierta');
+    else toast('err', 'No se pudo abrir la carpeta de el proyecto');
   } catch (e) {
-    toast('err', 'No se pudo abrir la carpeta de la iniciativa');
+    toast('err', 'No se pudo abrir la carpeta de el proyecto');
   } finally {
     if (btn) btn.classList.remove('is-loading');
   }
@@ -2099,7 +2104,7 @@ function participantsModal(t) {
   $('#overlayRoot').onclick = (e) => { if (e.target === $('#overlayRoot')) close(); };
 }
 
-/* Selector de hablante: lista los participantes de la iniciativa para asignar la
+/* Selector de hablante: lista los participantes de el proyecto para asignar la
    frase a uno concreto (o dejarla "Sin asignar / Los demás"). */
 function speakerMenu(u, node) {
   const parts = (STATE.transcript && STATE.transcript.participants) || [];
@@ -2333,7 +2338,7 @@ function viewSearch() {
     <div class="mhead-row"><h1 class="mtitle-h">Resultados</h1><div class="spacer"></div><button class="btn btn-ghost" id="clearSearch">Limpiar y volver al árbol</button></div>
     <div class="search-head"><span style="font-size:12px;color:var(--text-muted)"><b style="color:#e6eaf2" id="resCount">0</b> resultados para “<span id="resQuery"></span>”</span>${advanced ? '' : '<span class="pending-badge">FILTROS · PENDIENTE · PYTHON</span>'}</div>
     <div class="filters">
-      <button class="chip">Iniciativa ▾</button><button class="chip">Fecha ▾</button><button class="chip">Hablante ▾</button>
+      <button class="chip">Proyecto ▾</button><button class="chip">Fecha ▾</button><button class="chip">Hablante ▾</button>
       <span class="seg"><span class="on">Frase</span><span>Nota</span></span>
     </div>
     <div style="height:14px"></div>`;
@@ -2369,12 +2374,12 @@ function viewArchiveTrash(which) {
   const wrap = el('div'); wrap.style.cssText = 'display:flex;flex-direction:column;flex:1;min-height:0';
   const head = el('div', 'mhead');
   head.style.cssText = 'border-bottom:none';
-  head.innerHTML = `<div class="mhead-row"><h1 class="page-title">${isTrash ? 'Papelera' : 'Archivo'}</h1></div>`;
+  head.innerHTML = `<div class="mhead-row"><h1 class="page-title">Archivados</h1></div>`;
   if (isTrash) {
     const emptyBtn = el('button', 'btn btn-danger sm');
     emptyBtn.id = 'emptyTrash';
     emptyBtn.style.marginLeft = 'auto';
-    emptyBtn.innerHTML = svg('trash', 13) + ' Vaciar papelera';
+    emptyBtn.innerHTML = svg('trash', 13) + ' Vaciar';
     head.querySelector('.mhead-row').appendChild(emptyBtn);
   }
   const content = el('div', 'content');
@@ -2385,21 +2390,19 @@ function viewArchiveTrash(which) {
     items = items || [];
     list.replaceChildren();
     if (!items.length) {
-      list.appendChild(el('p', null, `<span style="color:var(--text-muted);font-size:13px">${isTrash ? 'La papelera está vacía.' : 'No hay nada archivado.'}</span>`));
+      list.appendChild(el('p', null, `<span style="color:var(--text-muted);font-size:13px">No hay nada archivado.</span>`));
       return;
     }
     items.forEach(x => {
-      const type = x.kind === 'initiative' ? 'INICIATIVA' : 'REUNIÓN';
+      const type = x.kind === 'initiative' ? 'PROYECTO' : 'REUNIÓN';
       const sub = x.kind === 'initiative' ? ((x.meeting_count || 0) + ' reuniones') : ('en ' + (x.initiative || '—'));
       const c = el('div', 'row-card'); c.style.cursor = 'default';
       c.innerHTML = `<span style="flex:none;font-size:10px;font-weight:700;letter-spacing:.4px;color:var(--text-secondary);border:1px solid var(--border-strong);border-radius:5px;padding:3px 7px">${type}</span>
         <div class="rc-body"><div class="rc-title">${esc(x.title)}</div><div class="rc-meta">${esc(sub)}${x.date ? ' · ' + esc(x.date) : ''}</div></div>
-        <div style="display:flex;gap:7px"><button class="btn" data-restore>Restaurar</button>${isTrash ? '<button class="btn btn-danger" data-del>Eliminar</button>' : '<button class="btn" data-trash>A papelera</button>'}</div>`;
+        <div style="display:flex;gap:7px"><button class="btn" data-restore>Restaurar</button>${isTrash ? '<button class="btn btn-danger" data-del>Eliminar</button>' : ''}</div>`;
       c.querySelector('[data-restore]').onclick = async () => { await api.restoreItem(x.kind, x.id); toast('ok', 'Restaurado'); reloadLibrary(which); refreshAll(); };
       if (isTrash) {
         c.querySelector('[data-del]').onclick = () => confirmModal('Eliminar permanentemente', 'Esta acción no se puede deshacer. Se borrará «' + x.title + '»' + (x.kind === 'initiative' ? ' y todas sus reuniones.' : '.'), 'Eliminar para siempre', async () => { await api.permanentlyDeleteItem(x.kind, x.id); toast('ok', 'Eliminado permanentemente'); reloadLibrary(which); });
-      } else {
-        c.querySelector('[data-trash]').onclick = async () => { await api.trashItem(x.kind, x.id); toast('ok', 'Movido a la papelera'); reloadLibrary(which); };
       }
       list.appendChild(c);
     });
@@ -2428,7 +2431,7 @@ function renderActionBar() {
   bar.classList.toggle('actionbar--dock', s === 'idle');
   if (s === 'idle') {
     const dis = canRecord ? '' : 'is-disabled';
-    const recTitle = canRecord ? 'Grabar reunión' : 'Selecciona una iniciativa';
+    const recTitle = canRecord ? 'Grabar reunión' : 'Selecciona un proyecto';
     bar.innerHTML = `
       <div class="dock">
         <button class="audio-chip dock-mic${STATE.micMuted ? ' muted' : ''}" id="btnMic" aria-pressed="${STATE.micMuted}" aria-label="${STATE.micMuted ? 'Activar micrófono' : 'Silenciar micrófono'}" title="${STATE.micMuted ? 'Activar micrófono' : 'Silenciar micrófono'}">
@@ -2511,9 +2514,9 @@ function viewAllInitiatives() {
 
   // Fila 1: título + botón nuevo
   const topRow = el('div', 'init-hub-top-row');
-  topRow.innerHTML = `<h1 class="page-title">Iniciativas</h1>`;
+  topRow.innerHTML = `<h1 class="page-title">Proyectos</h1>`;
   const newBtn = el('button', 'btn btn-primary');
-  newBtn.innerHTML = `${svg('plus', 13)} Nueva iniciativa`;
+  newBtn.innerHTML = `${svg('plus', 13)} Nuevo proyecto`;
   newBtn.onclick = promptNewInitiative;
   topRow.appendChild(newBtn);
   toolbar.appendChild(topRow);
@@ -2564,12 +2567,12 @@ function viewAllInitiatives() {
   const tableWrap = el('div', 'init-hub-table');
   const thead = el('div', 'init-hub-thead');
 
-  const colLabels = ['', '', 'Iniciativa', 'Estado', 'Última actividad', 'Reuniones', 'Pendientes', 'Notas', ''];
+  const colLabels = ['', '', 'Proyecto', 'Estado', 'Última actividad', 'Reuniones', 'Pendientes', 'Notas', ''];
   const _centeredCols = new Set([3, 4, 5, 6, 7]); // Estado, Actividad, Reuniones, Pendientes, Notas
   _cols.forEach((col, i) => {
     const cell = el('div', 'iht' + (_centeredCols.has(i) ? ' iht--center' : ''));
     cell.textContent = colLabels[i];
-    if (i === 2) { // solo columna "Iniciativa" es redimensionable
+    if (i === 2) { // solo columna "Proyecto" es redimensionable
       const handle = el('span', 'col-resizer');
       handle.addEventListener('mousedown', (e) => {
         e.preventDefault(); e.stopPropagation();
@@ -2646,7 +2649,7 @@ function viewAllInitiatives() {
     tbody.replaceChildren();
     const list = _getFiltered();
     if (!list.length) {
-      tbody.appendChild(el('p', 'files-empty', _search ? 'Sin iniciativas que coincidan.' : 'Aún no hay iniciativas.'));
+      tbody.appendChild(el('p', 'files-empty', _search ? 'Sin proyectos que coincidan.' : 'Aún no hay proyectos.'));
     } else {
       list.forEach(it => tbody.appendChild(renderRow(it)));
     }
@@ -2855,7 +2858,7 @@ function viewAllInitiatives() {
       </div>
       <div class="ihp-actions-title">Acciones rápidas</div>
       <div class="ihp-actions">
-        <button class="ihp-act ihp-open">${svg('folder', 13)}<span>Abrir iniciativa</span></button>
+        <button class="ihp-act ihp-open">${svg('folder', 13)}<span>Abrir proyecto</span></button>
         <button class="ihp-act ihp-pin-act">${svg('pin', 13)}<span>${it.pinned ? 'Desfijar' : 'Fijar'}</span></button>
         <button class="ihp-act ihp-edit">${svg('edit', 13)}<span>Editar</span></button>
         <button class="ihp-act ihp-export">${svg('download', 13)}<span>Exportar contexto</span></button>
@@ -3014,7 +3017,7 @@ function renderSidebar() {
     rest.forEach(it => _renderInitRow(tree, it));
   }
 
-  if (!all.length) tree.appendChild(el('div', 'tree-meeting', `<span style="color:var(--text-faint);font-size:11px">Sin iniciativas</span>`));
+  if (!all.length) tree.appendChild(el('div', 'tree-meeting', `<span style="color:var(--text-faint);font-size:11px">Sin proyectos</span>`));
 }
 
 async function selectInitiative(id) {
@@ -3303,7 +3306,7 @@ function promptCreateFolder(iid) {
 
 async function _importVideosToInit(iid) {
   const it = STATE.initiatives.find(x => x.id === iid);
-  const name = it ? it.name : 'la iniciativa';
+  const name = it ? it.name : 'el proyecto';
   const r = await api.importMediaMultiple(iid).catch(() => null);
   if (!r || r.cancelled) return;
   if (r.error) { toast('err', r.error); return; }
@@ -3337,17 +3340,17 @@ function openInitiativeMenu(e, iid) {
   const favs = _getMeetingFavs();
   const allFav = ms.length > 0 && ms.every(m => favs.has(m.id));
   openMenu(e, [
-    { label: pinned ? 'Desanclar iniciativa' : 'Anclar iniciativa', icon: 'pin', onClick: () => toggleInitiativePin(iid) },
+    { label: pinned ? 'Desanclar proyecto' : 'Anclar proyecto', icon: 'pin', onClick: () => toggleInitiativePin(iid) },
     { label: allFav ? 'Quitar de favoritas' : 'Añadir todas a favoritas', icon: 'star', onClick: () => _initAllFav(iid) },
     { label: 'Ver glosario', icon: 'search', onClick: () => openGlossary(iid) },
-    { label: 'Renombrar iniciativa', icon: 'edit', onClick: () => promptRenameInitiative(iid) },
+    { label: 'Renombrar proyecto', icon: 'edit', onClick: () => promptRenameInitiative(iid) },
     { label: 'Cambiar color', icon: 'palette', onClick: () => pickInitiativeColor(iid) },
     { sep: true },
     { label: 'Importar videos', icon: 'upload', onClick: () => _importVideosToInit(iid) },
     { sep: true },
     { label: 'Exportar a otra carpeta', icon: 'download', onClick: () => exportInitiativeTo(iid) },
     { sep: true },
-    { label: 'Enviar a la papelera', icon: 'trash', danger: true, onClick: () => deleteInitiative(iid) },
+    { label: 'Archivar proyecto', icon: 'archive', onClick: () => archiveInitiative(iid) },
   ]);
 }
 
@@ -3356,7 +3359,7 @@ function pickInitiativeColor(iid) {
   const current = _initColor(it);
   const m = el('div', 'modal-card color-picker-modal');
   m.innerHTML = `
-    <div class="modal-head"><span class="modal-title">Color de la iniciativa</span><button class="icon-btn" data-x>✕</button></div>
+    <div class="modal-head"><span class="modal-title">Color del proyecto</span><button class="icon-btn" data-x>✕</button></div>
     <div class="modal-body">
       <div class="color-swatches" id="colorSwatches"></div>
     </div>`;
@@ -3391,9 +3394,9 @@ function openMeetingMenu(e, mid) {
     { sep: true },
     { label: 'Renombrar reunión', icon: 'edit', onClick: () => promptRenameMeeting(mid) },
     { label: 'Cambiar fecha', icon: 'calendar', onClick: () => promptChangeMeetingDate(mid) },
-    { label: 'Mover a otra iniciativa', icon: 'folder', onClick: () => promptMoveMeeting(mid) },
+    { label: 'Mover a otro proyecto', icon: 'folder', onClick: () => promptMoveMeeting(mid) },
     { sep: true },
-    { label: 'Enviar a la papelera', icon: 'trash', danger: true, onClick: () => deleteMeeting(mid) },
+    { label: 'Archivar reunión', icon: 'archive', onClick: () => archiveMeeting(mid) },
   ]);
 }
 
@@ -3415,11 +3418,11 @@ async function doImportVideoForMeeting(mid) {
 function promptNewInitiative() {
   let color = INIT_COLORS[0];
   const m = el('div', 'modal');
-  m.setAttribute('role', 'dialog'); m.setAttribute('aria-label', 'Nueva iniciativa');
+  m.setAttribute('role', 'dialog'); m.setAttribute('aria-label', 'Nuevo proyecto');
   m.innerHTML = `
-    <div class="modal-head"><h3>Nueva iniciativa</h3><button class="icon-btn sm" data-x aria-label="Cerrar">${svg('x', 14)}</button></div>
+    <div class="modal-head"><h3>Nuevo proyecto</h3><button class="icon-btn sm" data-x aria-label="Cerrar">${svg('x', 14)}</button></div>
     <div class="modal-body">
-      <div><label>Nombre de la iniciativa</label><input class="field" type="text"><div class="field-error"></div></div>
+      <div><label>Nombre del proyecto</label><input class="field" type="text"><div class="field-error"></div></div>
       <div><label>Color</label>
         <div class="color-swatches">${INIT_COLORS.map((c, i) => `<button type="button" class="color-sw${i === 0 ? ' on' : ''}" data-color="${c}" style="--sw:${c}" aria-label="Color ${i + 1}"></button>`).join('')}</div>
       </div>
@@ -3440,7 +3443,7 @@ function promptNewInitiative() {
       if (it) {
         if (!it.color) it.color = color;
         STATE.initiatives.push(it); STATE.meetingsByInit[it.id] = [];
-        renderSidebar(); toast('ok', 'Iniciativa creada'); closeModal(); selectInitiative(it.id);
+        renderSidebar(); toast('ok', 'Proyecto creado'); closeModal(); selectInitiative(it.id);
       }
     } catch (e) { okBtn.classList.remove('is-loading'); err.textContent = 'No se pudo crear. ' + (e && e.message || ''); }
   };
@@ -3452,8 +3455,8 @@ function promptNewInitiative() {
 }
 function promptRenameInitiative(iid) {
   const it = STATE.initiatives.find(x => x.id === iid);
-  formModal('Renombrar iniciativa', 'Nuevo nombre', it ? it.name : '', 'Guardar', async (name) => {
-    await api.renameInitiative(iid, name); if (it) it.name = name; renderSidebar(); renderMain(); toast('ok', 'Iniciativa renombrada');
+  formModal('Renombrar proyecto', 'Nuevo nombre', it ? it.name : '', 'Guardar', async (name) => {
+    await api.renameInitiative(iid, name); if (it) it.name = name; renderSidebar(); renderMain(); toast('ok', 'Proyecto renombrado');
   });
 }
 function promptRenameMeeting(mid) {
@@ -3513,8 +3516,8 @@ function promptChangeMeetingDate(mid) {
 }
 function promptMoveMeeting(mid) {
   const m = el('div', 'modal'); m.setAttribute('role', 'dialog'); m.setAttribute('aria-label', 'Mover reunión');
-  m.innerHTML = `<div class="modal-head"><h3>Mover a otra iniciativa</h3><button class="icon-btn sm" data-x>${svg('x', 14)}</button></div>
-    <div class="modal-body"><label>Iniciativa destino</label><span id="moveMount"></span></div>
+  m.innerHTML = `<div class="modal-head"><h3>Mover a otro proyecto</h3><button class="icon-btn sm" data-x>${svg('x', 14)}</button></div>
+    <div class="modal-body"><label>Proyecto destino</label><span id="moveMount"></span></div>
     <div class="modal-foot"><button class="btn" data-c>Cancelar</button><button class="btn btn-primary" data-ok>Mover</button></div>`;
   let target = STATE.initiatives[0] && STATE.initiatives[0].id;
   const sel = customSelect({
@@ -3569,13 +3572,13 @@ function _pickInitiativeForImport() {
     m.innerHTML = `
       <div class="modal-card iap-modal">
         <div class="modal-head">
-          <span class="modal-title">¿A qué iniciativa importar?</span>
+          <span class="modal-title">¿A qué proyecto importar?</span>
           <button class="icon-btn" id="iapClose">${svg('x', 14)}</button>
         </div>
         <div class="modal-body iap-body">
-          <p class="iap-hint">Selecciona una iniciativa o crea una nueva.</p>
+          <p class="iap-hint">Selecciona un proyecto o crea uno nuevo.</p>
           <div class="iap-list" id="iapList"></div>
-          <button class="btn iap-new-btn" id="iapNew">${svg('plus', 13)} Nueva iniciativa</button>
+          <button class="btn iap-new-btn" id="iapNew">${svg('plus', 13)} Nuevo proyecto</button>
         </div>
       </div>`;
     const list = m.querySelector('#iapList');
@@ -3599,9 +3602,9 @@ function _promptNewInitiativeReturn(onCreated) {
   const m = el('div', 'modal');
   m.setAttribute('role', 'dialog');
   m.innerHTML = `
-    <div class="modal-head"><h3>Nueva iniciativa</h3><button class="icon-btn sm" data-x>${svg('x', 14)}</button></div>
+    <div class="modal-head"><h3>Nuevo proyecto</h3><button class="icon-btn sm" data-x>${svg('x', 14)}</button></div>
     <div class="modal-body" style="gap:12px">
-      <input class="field" id="niName2" placeholder="Nombre de la iniciativa" maxlength="120" autocomplete="off">
+      <input class="field" id="niName2" placeholder="Nombre del proyecto" maxlength="120" autocomplete="off">
     </div>
     <div class="modal-foot">
       <button class="btn" data-x>Cancelar</button>
@@ -3617,7 +3620,7 @@ function _promptNewInitiativeReturn(onCreated) {
       STATE.initiatives.unshift(r);
       renderSidebar();
       onCreated(r.id);
-    } else { toast('err', 'No se pudo crear la iniciativa'); onCreated(null); }
+    } else { toast('err', 'No se pudo crear el proyecto'); onCreated(null); }
   };
   m.querySelector('#niOk2').onclick = ok;
   inp.onkeydown = (e) => { if (e.key === 'Enter') ok(); };
@@ -3675,11 +3678,11 @@ function _nowDateShort() {
 }
 function startMeetingRecording() {
   if (STATE.appState !== 'idle') return;
-  if (!STATE.selInit) { toast('err', 'Selecciona una iniciativa antes de grabar'); return; }
+  if (!STATE.selInit) { toast('err', 'Selecciona un proyecto antes de grabar'); return; }
   formModal('Nueva reunión', 'Título de la reunión', _nowDateShort(), 'Empezar a grabar', beginMeetingRecording);
 }
 async function beginMeetingRecording(title) {
-  if (!STATE.selInit) { toast('err', 'Selecciona una iniciativa antes de grabar'); return; }
+  if (!STATE.selInit) { toast('err', 'Selecciona un proyecto antes de grabar'); return; }
   const r = await api.startRecording(STATE.selInit, title);
   if (!r || r.ok === false) throw new Error((r && r.error) || 'No se pudo iniciar la grabación');
   STATE.selMeeting = r.meeting_id;
@@ -3748,12 +3751,27 @@ async function openScreenPanel() {
   if (STATE.appState !== 'idle') return;
   STATE.recElapsed = 0; STATE.screenPanelCollapsed = false;
   STATE.screenRecording = false; STATE.screenMeetingId = null; STATE.screenPanelName = '';
-  // Colocación libre (OBS): por defecto la pantalla ocupa todo el lienzo.
+  // Inicia como OBS: fuente a pantalla completa, con tiradores sobre el borde.
   STATE.screenTransform = { x: 0, y: 0, w: 1, h: 1 };
+  // Asegurar que monitorIdx apunte a un monitor real (mss.monitors[0] = pantalla virtual)
+  if (!STATE.monitors.find(x => x.index === STATE.monitorIdx)) {
+    STATE.monitorIdx = STATE.monitors.length ? STATE.monitors[0].index : 1;
+  }
+  // Cargar miniaturas para el selector visual
+  try {
+    const thumbs = await api.getMonitorThumbnails();
+    if (thumbs && thumbs.length) {
+      STATE.monitorThumbnails = thumbs.reduce((acc, t) => { acc[t.index] = t.thumbnail; return acc; }, {});
+      const freshMons = thumbs.map(t => ({ index: t.index, left: t.left, top: t.top, width: t.width, height: t.height }));
+      STATE.monitors = freshMons;
+      if (!STATE.monitors.find(x => x.index === STATE.monitorIdx)) {
+        STATE.monitorIdx = STATE.monitors[0].index;
+      }
+    }
+  } catch (_) {}
   const r = await api.startScreenPreview(STATE.monitorIdx);
   if (!r || r.ok === false) { toast('err', (r && r.error) || 'No se pudo abrir la vista previa'); return; }
   if (r.recording) {
-    // El backend tiene una grabación activa que el JS no conocía: restaurar estado
     STATE.screenMeetingId = r.meeting_id || null;
     STATE.screenRecording = true;
     setAppState('screen-recording');
@@ -3787,11 +3805,13 @@ function showScreenPanel() {
   const sourceStyle = `left:${t.x * 100}%;top:${t.y * 100}%;width:${t.w * 100}%;height:${t.h * 100}%`;
   const handles = ['nw', 'n', 'ne', 'e', 'se', 's', 'sw', 'w']
     .map(h => `<span class="obs-h obs-${h}" data-h="${h}"></span>`).join('');
+  const moveIcon = `<span class="obs-move-icon" title="Arrastra para mover">⠿</span>`;
   const canvas = `
     <div class="obs-canvas" id="obsCanvas" style="aspect-ratio:${screenCanvasAspect()}">
-      ${recording ? '' : `<div class="obs-source" id="obsSource" style="${sourceStyle}">${handles}</div>`}
+      ${recording ? '' : `<div class="obs-dim" id="obsDim"></div><div class="obs-source" id="obsSource" style="${sourceStyle}">${handles}${moveIcon}</div>`}
       ${recording ? '<span class="obs-tag">grabando · composición final</span>' : ''}
     </div>`;
+  const resetBtn = !recording ? `<button class="btn btn-xs" id="scReset" title="Restablecer a pantalla completa" style="margin-left:auto;font-size:11px">Pantalla completa</button>` : '';
   const controls = recording
     ? `<button class="btn btn-stop" id="scStop"><span class="sq"></span>Detener vídeo</button>
        <button class="btn btn-lg ${STATE.micMuted ? 'btn-danger' : ''}" id="scMic">${micIcon()}${micLabel()}</button>
@@ -3801,26 +3821,99 @@ function showScreenPanel() {
        <button class="btn btn-lg ${STATE.micMuted ? 'btn-danger' : ''}" id="scMic">${micIcon()}${micLabel()}</button>
        <button class="btn btn-ghost" id="scCancel">Cancelar</button>`;
 
+  // Selector de monitores (miniaturas compactas para el dropdown)
+  const thumbs = STATE.monitorThumbnails || {};
+  const THUMB_H = 50;
+  const monPicker = (STATE.monitors.length ? STATE.monitors : []).map(mo => {
+    const ar = mo.width && mo.height ? mo.width / mo.height : 16 / 9;
+    const tw = Math.round(THUMB_H * ar);
+    const b64 = thumbs[mo.index] || '';
+    const sel = mo.index === STATE.monitorIdx;
+    const bg = b64 ? `background-image:url('data:image/jpeg;base64,${b64}')` : '';
+    return `<button type="button" class="mon-thumb${sel ? ' is-sel' : ''}" data-midx="${mo.index}" title="Pantalla ${mo.index} · ${mo.width}×${mo.height}" aria-pressed="${sel ? 'true' : 'false'}">
+      <div class="mon-thumb-screen" style="width:${tw}px;height:${THUMB_H}px;${bg}"></div>
+      <span class="mon-thumb-label">Pantalla ${mo.index}<br><span class="mon-thumb-res">${mo.width}×${mo.height}</span></span>
+    </button>`;
+  }).join('');
+  const selectedMonitor = STATE.monitors.find(mo => mo.index === STATE.monitorIdx);
+  const selectedLabel = selectedMonitor
+    ? `Pantalla ${selectedMonitor.index} · ${selectedMonitor.width}×${selectedMonitor.height}`
+    : 'Selecciona una pantalla';
+
+  // Dropdown de selección de pantalla (disponible siempre, incluso durante grabación)
+  const monDropHtml = monPicker
+    ? `<div class="mon-dropdown" id="monDropdown">
+        <button class="mon-dropdown-btn" id="monDropBtn" type="button" title="Cambiar pantalla">
+          ${svg('monitor', 13)}<span id="monDropLabel">${esc(selectedLabel)}</span>${svg('chevronDown', 11)}
+        </button>
+        <div class="mon-dropdown-pop" id="monDropPop">
+          <div class="mon-picker" id="monPicker">${monPicker}</div>
+        </div>
+      </div>`
+    : '';
+
   m.innerHTML = `
     ${head ? `<div class="modal-head">${head}${recording ? '<button class="icon-btn sc-collapse-btn" id="scCollapse" aria-label="Minimizar panel" title="Minimizar panel (−)" style="margin-left:auto">−</button>' : ''}</div>` : ''}
     <div class="screen-setup">
-      <span id="scMonMount"></span>
-      <input id="scName" class="field" placeholder="Nombre de la reunión" autocomplete="off" value="${esc(STATE.screenPanelName || '')}">
+      <input id="scName" class="field" placeholder="Ej. Demo cliente, revisión semanal..." autocomplete="off" value="${esc(STATE.screenPanelName || '')}">
+      ${monDropHtml}
     </div>
     ${canvas}
-    <div style="padding:14px 20px 18px;display:flex;gap:10px;align-items:center;flex-wrap:wrap">
-      ${controls}
+    <div style="padding:10px 20px 16px;display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+      ${controls}${resetBtn}
     </div>`;
 
-  m.querySelector('#scMonMount').replaceWith(customSelect({
-    value: STATE.monitorIdx, icon: 'monitor', className: 'cdrop-mon', minWidth: 210,
-    items: (STATE.monitors.length ? STATE.monitors : [{ index: 0, width: 0, height: 0 }]).map(mo => ({ value: mo.index, label: mo.width ? `Pantalla ${mo.index} · ${mo.width}×${mo.height}` : 'Pantalla 1' })),
-    onChange: (v) => {
-      STATE.monitorIdx = +v;
-      if (recording) api.setScreenMonitor(STATE.monitorIdx); else api.setScreenPreviewMonitor(STATE.monitorIdx);
-      const c = m.querySelector('#obsCanvas'); if (c) c.style.aspectRatio = screenCanvasAspect();
-    },
-  }));
+  if (!recording) {
+    const scReset = m.querySelector('#scReset');
+    if (scReset) scReset.onclick = () => {
+      STATE.screenTransform = { x: 0, y: 0, w: 1, h: 1 };
+      applyObsSource(); pushTransform();
+    };
+  }
+
+  // Dropdown de pantallas: disponible siempre (pre-grabación Y durante grabación)
+  {
+    const dropdown = m.querySelector('#monDropdown');
+    const dropBtn  = m.querySelector('#monDropBtn');
+    if (dropBtn && dropdown) {
+      dropBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        dropdown.classList.toggle('is-open');
+      });
+      const closeOutside = (e) => {
+        if (!dropdown.isConnected) { document.removeEventListener('click', closeOutside); return; }
+        if (!dropdown.contains(e.target)) dropdown.classList.remove('is-open');
+      };
+      document.addEventListener('click', closeOutside);
+    }
+
+    m.querySelector('#monPicker')?.addEventListener('click', (e) => {
+      const card = e.target.closest('.mon-thumb');
+      if (!card) return;
+      const idx = +card.dataset.midx;
+      dropdown?.classList.remove('is-open');
+      if (idx === STATE.monitorIdx) return;
+      STATE.monitorIdx = idx;
+      m.querySelectorAll('.mon-thumb').forEach(c => {
+        const isSelected = +c.dataset.midx === idx;
+        c.classList.toggle('is-sel', isSelected);
+        c.setAttribute('aria-pressed', isSelected ? 'true' : 'false');
+      });
+      const mon = STATE.monitors.find(mo => mo.index === idx);
+      const labelEl = m.querySelector('#monDropLabel');
+      if (labelEl && mon) labelEl.textContent = `Pantalla ${mon.index} · ${mon.width}×${mon.height}`;
+      const cv = m.querySelector('#obsCanvas'); if (cv) cv.style.aspectRatio = screenCanvasAspect();
+      const source = m.querySelector('#obsSource'); if (source) source.style.backgroundImage = 'none';
+      if (recording) {
+        // Cambio en caliente: actualiza la grabación y el preview simultáneamente
+        api.setScreenMonitor(STATE.monitorIdx);
+        api.setScreenPreviewMonitor(STATE.monitorIdx);
+        toast('ok', `Grabando Pantalla ${idx}`);
+      } else {
+        api.setScreenPreviewMonitor(STATE.monitorIdx);
+      }
+    });
+  }
   m.querySelector('#scName').oninput = (e) => { STATE.screenPanelName = e.target.value; };
   m.querySelector('#scName').onblur = (e) => {
     const v = e.target.value.trim();
@@ -3848,6 +3941,8 @@ function showScreenPanel() {
     wireObsCanvas(m.querySelector('#obsCanvas'));
   }
   const root = $('#overlayRoot'); root.replaceChildren(m); root.hidden = false;
+  // Inicializar la máscara DESPUÉS de insertar en el DOM (getElementById necesita el documento)
+  if (!recording) applyObsSource();
   root.onclick = (e) => {
     if (e.target !== root) return;
     if (recording) { STATE.screenPanelCollapsed = true; root.hidden = true; renderActionBar(); }
@@ -3869,22 +3964,39 @@ function pushTransform() {
   _txTimer = setTimeout(() => api.setScreenTransform(t.x, t.y, t.w, t.h), 60);
 }
 
-// Arrastrar para mover + tirar de los tiradores para estirar (estilo OBS).
+// Redimensionar arrastrando cualquier borde/esquina + mover desde el centro (estilo OBS).
 function wireObsCanvas(canvas) {
   if (!canvas) return;
   const source = canvas.querySelector('#obsSource');
   if (!source) return;
   const MIN = 0.05;
+  const EDGE = 18; // px: zona de borde donde el cursor cambia a resize
   let mode = null, handle = null, sx = 0, sy = 0, orig = null;
-  const onMove = (e) => {
+
+  // Detecta si el puntero está en el borde del recuadro y devuelve la dirección ('n','se',…)
+  function edgeAt(e) {
+    const r = source.getBoundingClientRect();
+    const lx = e.clientX - r.left, ly = e.clientY - r.top;
+    const nW = lx < EDGE, nE = lx > r.width - EDGE;
+    const nN = ly < EDGE, nS = ly > r.height - EDGE;
+    if (!nW && !nE && !nN && !nS) return null;
+    return (nN ? 'n' : nS ? 's' : '') + (nW ? 'w' : nE ? 'e' : '');
+  }
+
+  const CURSORS = { n:'ns-resize', s:'ns-resize', e:'ew-resize', w:'ew-resize',
+                    nw:'nwse-resize', se:'nwse-resize', ne:'nesw-resize', sw:'nesw-resize' };
+
+  function doMove(e) {
+    if (!mode) return;
     const rect = canvas.getBoundingClientRect();
+    if (!rect.width || !rect.height) return;
     const dx = (e.clientX - sx) / rect.width;
     const dy = (e.clientY - sy) / rect.height;
     let { x, y, w, h } = orig;
     if (mode === 'move') {
       x = clamp(orig.x + dx, 0, 1 - w);
       y = clamp(orig.y + dy, 0, 1 - h);
-    } else {
+    } else if (handle) {
       if (handle.includes('e')) w = clamp(orig.w + dx, MIN, 1 - orig.x);
       if (handle.includes('s')) h = clamp(orig.h + dy, MIN, 1 - orig.y);
       if (handle.includes('w')) { const nx = clamp(orig.x + dx, 0, orig.x + orig.w - MIN); w = orig.w + (orig.x - nx); x = nx; }
@@ -3892,20 +4004,43 @@ function wireObsCanvas(canvas) {
     }
     STATE.screenTransform = { x, y, w, h };
     applyObsSource();
-  };
-  const onUp = () => {
-    window.removeEventListener('pointermove', onMove);
-    window.removeEventListener('pointerup', onUp);
+  }
+
+  // Con setPointerCapture los eventos pointermove/pointerup llegan siempre a source,
+  // incluso cuando el puntero sale del elemento — no se necesitan listeners en window.
+  source.addEventListener('pointermove', (e) => {
+    if (!mode) {
+      const hn = e.target.closest('.obs-h');
+      const dir = hn ? hn.dataset.h : edgeAt(e);
+      source.style.cursor = dir ? (CURSORS[dir] || 'nwse-resize') : 'move';
+    } else {
+      doMove(e);
+    }
+  });
+
+  source.addEventListener('pointerup', (e) => {
+    if (!mode) return;
+    mode = null; handle = null;
+    source.style.cursor = 'move';
+    try { source.releasePointerCapture(e.pointerId); } catch (_) {}
     pushTransform();
-  };
+  });
+
+  source.addEventListener('pointercancel', () => { mode = null; handle = null; source.style.cursor = 'move'; });
+
   source.addEventListener('pointerdown', (e) => {
+    if (e.button !== 0) return;
     const hn = e.target.closest('.obs-h');
-    mode = hn ? 'resize' : 'move';
-    handle = hn ? hn.dataset.h : null;
+    if (hn) {
+      mode = 'resize'; handle = hn.dataset.h;
+    } else {
+      const dir = edgeAt(e);
+      mode = dir ? 'resize' : 'move';
+      handle = dir || null;
+    }
     sx = e.clientX; sy = e.clientY; orig = { ...STATE.screenTransform };
     e.preventDefault();
-    window.addEventListener('pointermove', onMove);
-    window.addEventListener('pointerup', onUp);
+    try { source.setPointerCapture(e.pointerId); } catch (_) {}
   });
 }
 
@@ -4043,32 +4178,156 @@ window.addEventListener('focus', tickTimer);
 function fmt(s) { const m = Math.floor(s / 60); return String(m).padStart(2, '0') + ':' + String(s % 60).padStart(2, '0'); }
 
 /* ============================================================
-   7e. Iniciativas/reuniones V2 (archivar/eliminar)
+   7e. Proyectos/reuniones V2 (archivar/eliminar)
    ============================================================ */
 function _afterRemoveFromTree(iid) {
-  // Si la iniciativa abierta se archivó/eliminó, volver a la bienvenida.
+  // Si el proyecto abierta se archivó/eliminó, volver a la bienvenida.
   if (iid && STATE.selInit === iid) { STATE.selInit = null; STATE.selMeeting = null; STATE.screen = 'welcome'; }
 }
 async function toggleInitiativePin(iid) {
   const r = await api.toggleInitiativePin(iid);
-  if (!r || !r.ok) { toast('err', 'No se pudo anclar la iniciativa'); return; }
+  if (!r || !r.ok) { toast('err', 'No se pudo anclar el proyecto'); return; }
   STATE.initiatives = await api.listInitiatives() || [];   // reordena: ancladas arriba
   renderSidebar();
-  toast('ok', r.pinned ? 'Iniciativa anclada' : 'Iniciativa desanclada');
+  toast('ok', r.pinned ? 'Proyecto anclado' : 'Proyecto desanclado');
 }
 function archiveInitiative(iid) {
-  confirmModal('Archivar iniciativa', 'Se moverá al Archivo. Podrás restaurarla cuando quieras.', 'Archivar', async () => {
+  confirmModal('Archivar proyecto', 'Se moverá al Archivo. Podrás restaurarla cuando quieras.', 'Archivar', async () => {
     const r = await api.archiveItem('initiative', iid);
     if (r && r.ok === false) { toast('err', r.error || 'No se pudo archivar'); return; }
-    toast('ok', 'Iniciativa archivada'); _afterRemoveFromTree(iid); STATE.initiatives = await api.listInitiatives() || []; renderSidebar(); renderMain(); updateLibraryCounts();
+    toast('ok', 'Proyecto archivado'); _afterRemoveFromTree(iid); STATE.initiatives = await api.listInitiatives() || []; renderSidebar(); renderMain(); updateLibraryCounts();
   }, false);
 }
 function deleteInitiative(iid) {
-  confirmModal('Enviar a la papelera', 'Se moverá a la Papelera con sus reuniones. Podrás restaurarla.', 'Mover a papelera', async () => {
-    const r = await api.trashItem('initiative', iid);
-    if (r && r.ok === false) { toast('err', r.error || 'No se pudo mover'); return; }
-    toast('ok', 'Iniciativa movida a la papelera'); _afterRemoveFromTree(iid); STATE.initiatives = await api.listInitiatives() || []; renderSidebar(); renderMain(); updateLibraryCounts();
-  });
+  archiveInitiative(iid);
+}
+
+/* ---- Tour inicial (spotlight style) ---- */
+const TOUR_KEY = 'hm.tour.v2';
+function showInitialTourIfNeeded(force) {
+  if (!force && load(TOUR_KEY, '') === '1') return;
+  if (document.querySelector('.setup-overlay') || document.getElementById('initialTour')) return;
+  STATE.sidebarOpen = true;
+  applySidebar();
+  renderActionBar();
+
+  // 4 pasos: los más importantes de la app
+  const steps = [
+    {
+      sel: '#navInitiatives', icon: 'folder', color: '#aacfbf',
+      title: 'Proyectos',
+      text: 'Organiza cada cliente o iniciativa aquí. Todo su historial de reuniones queda en un solo lugar.',
+    },
+    {
+      sel: '#abRecord', icon: 'mic', color: '#ff7a82',
+      title: 'Graba reuniones',
+      text: 'Un clic y Helpmeet escucha, transcribe en tiempo real y genera un resumen automático al terminar.',
+    },
+    {
+      sel: '#abScreen', icon: 'monitorDot', color: '#7eb8ff',
+      title: 'Captura videollamadas',
+      text: 'Graba lo que ocurre en tu pantalla: Meet, Zoom, Teams. Helpmeet transcribe y archiva todo.',
+    },
+    {
+      sel: null, icon: 'rocket', color: '#aacfbf',
+      title: '¡Todo listo para empezar!',
+      text: 'Crea tu primer proyecto y empieza a grabar. Helpmeet se encarga del resto.',
+    },
+  ];
+
+  let idx = 0;
+  const root = el('div', 'initial-tour');
+  root.id = 'initialTour';
+  root.innerHTML = `
+    <div class="tour-spotlight" id="tourSpot"></div>
+    <div class="tour-card" id="tourCard" role="dialog" aria-modal="true" aria-live="polite">
+      <div class="tour-icon-ring" id="tourRing"></div>
+      <div class="tour-dots" id="tourDots"></div>
+      <h3 id="tourTitle"></h3>
+      <p id="tourBody"></p>
+      <div class="tour-actions">
+        <button class="tour-skip" id="tourSkip">Omitir tour</button>
+        <button class="tour-next" id="tourNext"></button>
+      </div>
+    </div>`;
+  document.body.appendChild(root);
+
+  const spotEl  = document.getElementById('tourSpot');
+  const cardEl  = document.getElementById('tourCard');
+  const ringEl  = document.getElementById('tourRing');
+  const dotsEl  = document.getElementById('tourDots');
+  const titleEl = document.getElementById('tourTitle');
+  const bodyEl  = document.getElementById('tourBody');
+  const nextBtn = document.getElementById('tourNext');
+
+  const finish = (startProject) => {
+    save(TOUR_KEY, '1');
+    document.querySelectorAll('.tour-target').forEach(n => n.classList.remove('tour-target'));
+    root.classList.add('tour-out');
+    setTimeout(() => { root.remove(); if (startProject) document.getElementById('btnNewInitiative')?.click(); }, 300);
+  };
+
+  const placeCard = (target) => {
+    const CW = 308, CH = 260, PAD = 10;
+    const vw = window.innerWidth, vh = window.innerHeight;
+    if (!target) {
+      spotEl.style.display = 'none';
+      cardEl.style.cssText += ';top:50%;left:50%;transform:translate(-50%,-50%)';
+      return;
+    }
+    const r = target.getBoundingClientRect();
+    spotEl.style.cssText = `display:block;top:${r.top - PAD}px;left:${r.left - PAD}px;width:${r.width + PAD * 2}px;height:${r.height + PAD * 2}px`;
+    const below = vh - r.bottom, above = r.top, right = vw - r.right, left = r.left;
+    let top, lft;
+    if (below >= CH + 18) {
+      top = r.bottom + 16; lft = clamp(r.left + r.width / 2 - CW / 2, 14, vw - CW - 14);
+    } else if (above >= CH + 18) {
+      top = r.top - CH - 16; lft = clamp(r.left + r.width / 2 - CW / 2, 14, vw - CW - 14);
+    } else if (right >= CW + 18) {
+      top = clamp(r.top + r.height / 2 - CH / 2, 14, vh - CH - 14); lft = r.right + 16;
+    } else {
+      top = clamp(r.top + r.height / 2 - CH / 2, 14, vh - CH - 14); lft = Math.max(14, r.left - CW - 16);
+    }
+    cardEl.style.cssText = `top:${top}px;left:${lft}px;transform:none`;
+  };
+
+  const render = (animate) => {
+    const step = steps[idx];
+    const isLast = idx === steps.length - 1;
+
+    document.querySelectorAll('.tour-target').forEach(n => n.classList.remove('tour-target'));
+
+    dotsEl.innerHTML = steps.map((_, i) => `<span class="tour-dot${i === idx ? ' is-on' : ''}"></span>`).join('');
+    ringEl.innerHTML = `<span style="color:${step.color}">${svg(step.icon, 24)}</span>`;
+    ringEl.style.background = step.color + '1e';
+    ringEl.style.borderColor = step.color + '45';
+    titleEl.textContent = step.title;
+    bodyEl.textContent = step.text;
+    nextBtn.textContent = isLast ? '¡Crear mi primer proyecto!' : 'Siguiente →';
+
+    const target = step.sel ? document.querySelector(step.sel) : null;
+    if (target) target.classList.add('tour-target');
+    placeCard(target);
+  };
+
+  const nextStep = () => {
+    if (idx >= steps.length - 1) { finish(true); return; }
+    cardEl.classList.add('tour-step-out');
+    setTimeout(() => {
+      cardEl.classList.remove('tour-step-out');
+      cardEl.style.animation = 'none';
+      void cardEl.offsetWidth;
+      cardEl.style.animation = '';
+      idx++;
+      render(true);
+    }, 160);
+  };
+
+  document.getElementById('tourSkip').onclick = () => finish(false);
+  nextBtn.onclick = nextStep;
+  root.addEventListener('click', (e) => { if (e.target === root) finish(false); });
+
+  setTimeout(() => render(false), 100);
 }
 function archiveMeeting(mid) {
   confirmModal('Archivar reunión', 'Se moverá al Archivo. Podrás restaurarla.', 'Archivar', async () => {
@@ -4078,11 +4337,7 @@ function archiveMeeting(mid) {
   }, false);
 }
 function deleteMeeting(mid) {
-  confirmModal('Enviar a la papelera', 'Se moverá a la Papelera. Podrás restaurarla.', 'Mover a papelera', async () => {
-    const r = await api.trashItem('meeting', mid);
-    if (r && r.ok === false) { toast('err', r.error || 'No se pudo mover'); return; }
-    toast('ok', 'Reunión movida a la papelera'); if (STATE.selMeeting === mid) backToTree(); refreshAll(); updateLibraryCounts();
-  });
+  archiveMeeting(mid);
 }
 
 /* ============================================================
@@ -4193,14 +4448,21 @@ function applyScreenPreviewFit(p) {
 window.setScreenPreview = function (b64) {
   if (!b64) return;
   const url = 'url(data:image/jpeg;base64,' + b64 + ')';
-  // Siempre pintamos sobre el canvas completo (como OBS: fondo negro + pantalla encima).
-  // El obsSource es solo el marco/handles de posicionamiento (transparente).
   const canvas = document.getElementById('obsCanvas');
   if (canvas) {
-    canvas.style.backgroundImage = url;
-    canvas.style.backgroundSize = 'contain';      // mantiene proporción EXACTA, sin distorsión
-    canvas.style.backgroundPosition = 'center';
-    canvas.style.backgroundRepeat = 'no-repeat';
+    const source = document.getElementById('obsSource');
+    if (source) {
+      canvas.style.backgroundImage = 'none';
+      source.style.backgroundImage = url;
+      source.style.backgroundSize = '100% 100%';
+      source.style.backgroundPosition = 'center';
+      source.style.backgroundRepeat = 'no-repeat';
+    } else {
+      canvas.style.backgroundImage = url;
+      canvas.style.backgroundSize = 'contain';
+      canvas.style.backgroundPosition = 'center';
+      canvas.style.backgroundRepeat = 'no-repeat';
+    }
   }
 };
 // Tu backend (grabación de pantalla) llama setPreview(); es el mismo destino.
@@ -4529,7 +4791,7 @@ function viewSettings() {
 
     inner.querySelector('#svWipe').onclick = () => {
       confirmModal('Borrar todos los datos',
-        'Se borrarán TODOS tus datos locales: iniciativas, reuniones, transcripciones, notas, capturas y ajustes. Tu carpeta de exportación NO se toca. Esta acción no se puede deshacer.',
+        'Se borrarán TODOS tus datos locales: proyectos, reuniones, transcripciones, notas, capturas y ajustes. Tu carpeta de exportación NO se toca. Esta acción no se puede deshacer.',
         'Borrar todo', async () => {
           const r = await api.wipeAllData();
           if (r && r.ok) {
@@ -4573,7 +4835,7 @@ function bootstrapAvailable() {
   return !HAS_PYWEBVIEW() || typeof window.pywebview.api.get_bootstrap_state === 'function';
 }
 
-// Vuelca el estado de arranque (iniciativas, reuniones, monitores y contadores)
+// Vuelca el estado de arranque (proyectos, reuniones, monitores y contadores)
 // que llega en UNA sola llamada al backend.
 function applyBootstrap(b) {
   STATE.initiatives = b.initiatives || [];
@@ -4630,7 +4892,7 @@ function wireTopbar() {
   _ri('#railMeetings',    'calendar');
   _ri('#railFavorites',   'star');
   _ri('#railInitiatives', 'rocket');
-  _ri('#railTrash',       'trash');
+  _ri('#railArchive',     'archive');
   _ri('#railSettings',    'settings');
 
   // Clic en logo/marca → colapsar/expandir sidebar
@@ -4657,13 +4919,13 @@ function wireTopbar() {
     }
   };
   $('#btnNewInitiative').onclick = promptNewInitiative;
-  if ($('#btnArchive')) $('#btnArchive').onclick = () => { STATE.screen = 'archive'; renderMain(); };
-  $('#btnTrash').onclick = () => { STATE.screen = 'trash'; renderMain(); };
+  if ($('#btnArchive')) $('#btnArchive').onclick = () => { STATE.screen = 'archive'; renderMain(); renderTopStatus(); };
+  if ($('#btnTrash')) $('#btnTrash').onclick = () => { STATE.screen = 'trash'; renderMain(); };
   $('#btnSettingsSide').onclick = () => { STATE.screen = 'settings'; renderMain(); renderTopStatus(); };
   $('#railMeetings')?.addEventListener('click', () => { openMeetingsView(); });
   $('#railFavorites')?.addEventListener('click', () => { STATE.screen = 'favorites'; renderMain(); renderTopStatus(); });
   $('#railInitiatives')?.addEventListener('click', () => { STATE.screen = 'initiatives-list'; renderMain(); renderTopStatus(); });
-  $('#railArchive')?.addEventListener('click', () => { STATE.screen = 'archive'; renderMain(); });
+  $('#railArchive')?.addEventListener('click', () => { STATE.screen = 'archive'; renderMain(); renderTopStatus(); });
   $('#railTrash')?.addEventListener('click', () => { STATE.screen = 'trash'; renderMain(); });
   $('#railSettings')?.addEventListener('click', () => { STATE.screen = 'settings'; renderMain(); renderTopStatus(); });
   // Clic en cualquier parte de la fila: navega + colapsa/expande árbol
@@ -4736,28 +4998,21 @@ function showSetupOverlay(cfg) {
       </div>
 
       <div class="setup-cols">
-        <div class="setup-col-left">
-          <div class="setup-section" id="setupCfgWrap">
-            <div class="setup-section-title">Idioma y calidad</div>
-            <div class="pre-cfg">
-              <div class="pre-cfg-row"><span class="pre-cfg-lbl">Idioma</span><div class="cfg-chips" id="setupLangChips"></div></div>
-              <div class="pre-cfg-row"><span class="pre-cfg-lbl">Calidad</span><div class="cfg-chips" id="setupModelChips"></div></div>
-            </div>
-          </div>
-          <div class="setup-section">
-            <div class="setup-section-title">Carpeta de grabaciones</div>
-            <div class="setup-folder-row">
-              <span class="setup-folder-path" id="setupFolderPath">…</span>
-              <button class="btn setup-folder-btn" id="setupFolderBtn">Cambiar</button>
-            </div>
+        <div class="setup-section">
+          <div class="setup-section-title">Carpeta de grabaciones</div>
+          <div class="setup-folder-row">
+            <span class="setup-folder-path" id="setupFolderPath">…</span>
+            <button class="btn setup-folder-btn" id="setupFolderBtn">Cambiar</button>
           </div>
         </div>
-        <div class="setup-col-right">
-          <div class="setup-section setup-section-checks">
-            <div class="setup-section-title">Estado del sistema</div>
-            <div class="setup-checks" id="setupChecks"><span class="setup-check-placeholder">Comprobando…</span></div>
-          </div>
+        <div class="setup-section setup-section-checks">
+          <div class="setup-section-title">Estado del sistema</div>
+          <div class="setup-checks" id="setupChecks"><span class="setup-check-placeholder">Comprobando…</span></div>
         </div>
+      </div>
+      <div class="setup-section" id="setupCfgWrap">
+        <div class="setup-section-title">Idioma y calidad del modelo</div>
+        <div id="setupModelChips"></div>
       </div>
 
       <div class="setup-progress-wrap" id="setupProgressWrap" hidden>
@@ -4778,18 +5033,46 @@ function showSetupOverlay(cfg) {
   let _cfg = cfg || {};
   let _started = false;
 
+  // Nombre corto de cada calidad. El chip muestra el id real del modelo
+  // (base/small/medium/large-v3); la etiqueta va debajo, pequeña.
+  const TIER_LABEL = {
+    fast: 'Rápido', balanced: 'Recomendado', accurate: 'Preciso', max: 'Máxima',
+  };
+
   async function _loadChips() {
     try { _cfg = await api.v2.getTranscriptionSettings() || _cfg; } catch (e) { /* usa lo que hay */ }
     const byLang = _cfg.models_by_lang || {};
-    const langEl = ov.querySelector('#setupLangChips');
     const modelEl = ov.querySelector('#setupModelChips');
-    langEl.innerHTML = (_cfg.languages || []).map(lg =>
-      `<button class="cfg-chip${lg.id === _cfg.language ? ' on' : ''}" data-lang="${esc(lg.id)}">${esc(lg.label)}</button>`
+
+    // Recomendado por defecto: Español + calidad "Rápido" (small).
+    if (!_cfg.tier) {
+      try { _cfg = await api.v2.setTranscriptionSettings({ language: 'es', tier: 'balanced' }) || _cfg; } catch (e) { /* */ }
+    }
+
+    // Paso 1 — Idioma
+    const langChips = (_cfg.languages || []).map(lg =>
+      `<button class="cfg-chip setup-lang-chip${lg.id === _cfg.language ? ' on' : ''}" data-lang="${esc(lg.id)}">${esc(lg.label)}</button>`
     ).join('');
-    modelEl.innerHTML = (byLang[_cfg.language] || _cfg.models || []).map(mo =>
-      `<button class="cfg-chip${mo.tier === _cfg.tier ? ' on' : ''}" data-tier="${esc(mo.tier)}" title="${esc(mo.label)} · ${esc(mo.download)}">${esc(mo.id)}<span class="cfg-chip-sub">${esc(mo.download)}</span></button>`
-    ).join('');
-    langEl.querySelectorAll('[data-lang]').forEach(b => b.onclick = async () => {
+
+    // Paso 2 — Calidad (mismos modelos para ambos idiomas)
+    const models = byLang[_cfg.language] || _cfg.models || [];
+    const qualChips = models.map(mo => {
+      const active = mo.tier === _cfg.tier;
+      const isRec  = mo.tier === 'balanced';
+      return `<button class="cfg-chip setup-model-chip${active ? ' on' : ''}${isRec ? ' is-rec' : ''}${mo.downloaded ? ' is-dl' : ''}" data-tier="${esc(mo.tier)}" title="${esc(mo.label)}">${isRec ? '<span class="setup-q-star">★</span>' : ''}${esc(mo.id)}<span class="cfg-chip-sub">${esc(TIER_LABEL[mo.tier] || '')} · ${esc(mo.download)}</span></button>`;
+    }).join('');
+
+    modelEl.innerHTML = `
+      <div class="setup-pick">
+        <span class="setup-pick-lbl">Idioma</span>
+        <div class="setup-pick-chips">${langChips}</div>
+      </div>
+      <div class="setup-pick">
+        <span class="setup-pick-lbl">Calidad</span>
+        <div class="setup-pick-chips">${qualChips}</div>
+      </div>`;
+
+    modelEl.querySelectorAll('[data-lang]').forEach(b => b.onclick = async () => {
       try { _cfg = await api.v2.setTranscriptionSettings({ language: b.dataset.lang }) || _cfg; } catch (e) { /* */ }
       _loadChips();
     });
@@ -4797,6 +5080,7 @@ function showSetupOverlay(cfg) {
       try { _cfg = await api.v2.setTranscriptionSettings({ tier: b.dataset.tier }) || _cfg; } catch (e) { /* */ }
       _loadChips();
     });
+
     // Carpeta de destino
     const folderEl = ov.querySelector('#setupFolderPath');
     if (folderEl && _cfg.export_dir) folderEl.textContent = _cfg.export_dir;
@@ -4830,6 +5114,7 @@ function showSetupOverlay(cfg) {
       ov.style.display = 'none';
       ov.style.pointerEvents = 'none';
       if (ov.parentNode) ov.remove();
+      setTimeout(() => showInitialTourIfNeeded(false), 300);
     }, 450);
   }
 
@@ -4853,6 +5138,7 @@ function showSetupOverlay(cfg) {
       btn.textContent = 'Comenzar →';
       btn.disabled = false;
       btn.onclick = _enterApp;
+      _loadChecks();
     } else if (e.stage === 'error') {
       if (errEl) {
         errEl.hidden = false;
@@ -4913,7 +5199,16 @@ window.doLicenseActivate = async function() {
       await _finishInit();
     } else {
       if (errEl) {
-        errEl.textContent = (result && result.error) || 'Key invalida. Intentalo de nuevo.';
+        const _licErr = {
+          'license_not_found':           'Key no encontrada. Revisa que la escribiste correctamente.',
+          'license_already_activated':   'Esta key ya está en uso en otro equipo.',
+          'license_revoked':             'Esta licencia ha sido revocada.',
+          'license_expired':             'Esta licencia ha expirado.',
+          'already_activated_this_device': 'Este equipo ya está activado con esta licencia.',
+          'license_device_limit':        'Se alcanzó el límite de dispositivos para esta licencia.',
+        };
+        const raw = (result && result.error) || '';
+        errEl.textContent = _licErr[raw] || raw || 'Key inválida. Inténtalo de nuevo.';
         errEl.hidden = false;
       }
       input.classList.add('lic-shake');
@@ -4922,7 +5217,7 @@ window.doLicenseActivate = async function() {
       btn.innerHTML = 'Activar';
     }
   } catch (e) {
-    if (errEl) { errEl.textContent = 'Error inesperado. Intentalo de nuevo.'; errEl.hidden = false; }
+    if (errEl) { errEl.textContent = 'Error inesperado. Inténtalo de nuevo.'; errEl.hidden = false; }
     btn.disabled = false;
     btn.innerHTML = 'Activar';
   }
@@ -4980,6 +5275,7 @@ async function _finishInit() {
     }
   } catch (e) { console.warn('init', e); }
   renderSidebar(); renderActionBar(); renderMain();
+  setTimeout(() => showInitialTourIfNeeded(false), 500);
   if (!booted) {
     updateLibraryCounts();
     try { renderBgJobs(await api.getBackgroundJobs()); } catch (e) { /* sin jobs */ }
@@ -5025,3 +5321,4 @@ async function init() {
     setTimeout(poll, 60);
   })();
 })();
+

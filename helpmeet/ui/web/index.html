@@ -6,7 +6,7 @@
   <title>Helpmeet</title>
   <link rel="icon" type="image/svg+xml" href="assets/helpmeet-app-icon.svg?v=20260625-78">
   <link rel="alternate icon" type="image/x-icon" href="assets/helpmeet.ico?v=20260625-78">
-  <link rel="stylesheet" href="style.css?v=20260629-23">
+  <link rel="stylesheet" href="style.css?v=20260701-22">
 </head>
 <body data-app-state="idle" data-screen="welcome">
 
@@ -19,10 +19,10 @@
       <span class="brand-mark" aria-hidden="true"><img src="assets/helpmeet-symbol.svg?v=20260625-78" alt=""></span>
       <span class="brand-name">Helpmeet</span>
       <span class="topbar-sep" aria-hidden="true"></span>
-      <span class="brand-version" id="headerVersion">v1.2.7</span>
+      <span class="brand-version" id="headerVersion">v2.3.1</span>
     </div>
 
-    <!-- Centro: contexto activo (iniciativa › reunión) en reposo · estado de grabación/proceso cuando hay actividad -->
+    <!-- Centro: contexto activo (proyecto › reunión) en reposo · estado de grabación/proceso cuando hay actividad -->
     <div class="topbar-status" id="topbarStatus" aria-live="polite"></div>
 
     <!-- Controles de ventana frameless -->
@@ -35,25 +35,25 @@
 
   <!-- ============ CUERPO ============ -->
   <div class="body no-drag">
-    <!-- Sidebar de iniciativas/reuniones -->
-    <aside class="sidebar" id="sidebar" aria-label="Iniciativas y reuniones">
+    <!-- Sidebar de proyectos/calendario -->
+    <aside class="sidebar" id="sidebar" aria-label="Proyectos y calendario">
       <nav class="sidebar-nav" aria-label="Secciones">
-        <button class="nav-item" id="navMeetings">Reuniones</button>
+        <button class="nav-item" id="navMeetings">Calendario</button>
         <button class="nav-item" id="navFavorites">Favoritos</button>
         <div class="nav-item active" id="navInitiatives">
           <button class="nav-toggle" id="navInitiativesToggle" aria-expanded="true" aria-controls="sidebarTree">
-            <span class="nav-label">Iniciativas</span>
+            <span class="nav-label">Proyectos</span>
             <span class="nav-chev" aria-hidden="true"></span>
           </button>
           <button class="icon-btn sm" id="btnRefreshSidebar" aria-label="Actualizar lista" title="Actualizar"></button>
-          <button class="icon-btn sm" id="btnNewInitiative" aria-label="Nueva iniciativa" title="Nueva iniciativa (Ctrl+N)"></button>
+          <button class="icon-btn sm" id="btnNewInitiative" aria-label="Nuevo proyecto" title="Nuevo proyecto (Ctrl+N)"></button>
         </div>
       </nav>
-      <nav class="sidebar-tree" id="sidebarTree" aria-label="Lista de iniciativas">
+      <nav class="sidebar-tree" id="sidebarTree" aria-label="Lista de proyectos">
         <!-- inyectado por app.js -->
       </nav>
       <div class="sidebar-foot">
-        <button class="side-link" id="btnTrash">Papelera<span class="count" id="trashCount">0</span></button>
+        <button class="side-link" id="btnArchive">Archivados<span class="count" id="archiveCount">0</span></button>
         <button class="side-link" id="btnSettingsSide">Configuración</button>
       </div>
     </aside>
@@ -63,18 +63,18 @@
 
     <!-- Rail colapsado -->
     <aside class="sidebar-rail" id="sidebarRail" aria-label="Panel colapsado" hidden>
-      <button class="rail-btn" id="railMeetings" aria-label="Reuniones" title="Reuniones"></button>
+      <button class="rail-btn" id="railMeetings" aria-label="Calendario" title="Calendario"></button>
       <button class="rail-btn" id="railFavorites" aria-label="Favoritos" title="Favoritos"></button>
-      <button class="rail-btn" id="railInitiatives" aria-label="Iniciativas" title="Iniciativas"></button>
+      <button class="rail-btn" id="railInitiatives" aria-label="Proyectos" title="Proyectos"></button>
       <div class="rail-sep"></div>
-      <button class="rail-btn" id="railTrash" aria-label="Papelera" title="Papelera"></button>
+      <button class="rail-btn" id="railArchive" aria-label="Archivados" title="Archivados"></button>
       <button class="rail-btn rail-btn--foot" id="railSettings" aria-label="Configuración" title="Configuración"></button>
       <div class="rail-resize-handle no-drag" id="railResizeHandle" title="Arrastrar para expandir"></div>
     </aside>
 
     <!-- Área principal -->
     <main class="main" id="main" tabindex="-1">
-      <!-- inyectado por app.js: welcome | initiative | meeting | search | glossary | archive | trash -->
+      <!-- inyectado por app.js: welcome | project | meeting | search | glossary | archive -->
     </main>
   </div>
 
@@ -117,6 +117,6 @@
   <div class="toasts" id="toasts" aria-live="polite" aria-atomic="false"></div>
 
   <!-- Plantillas SVG de iconos. Inyectadas por app.js -->
-  <script src="app.js?v=20260629-23"></script>
+  <script src="app.js?v=20260701-22"></script>
 </body>
 </html>
