@@ -331,6 +331,17 @@ def set_setup_done(done: bool = True) -> None:
     _save(data)
 
 
+def get_last_activated_version() -> str:
+    """Versión de la app en la que el usuario activó su licencia por última vez."""
+    return _load().get("last_activated_version", "")
+
+
+def set_last_activated_version(version: str) -> None:
+    data = _load()
+    data["last_activated_version"] = version
+    _save(data)
+
+
 def set_transcription_settings(values: dict) -> dict:
     current = _load()
     if "provider" in values:

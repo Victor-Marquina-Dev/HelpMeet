@@ -236,10 +236,23 @@ def meeting_folder_name(meeting: Meeting) -> str:
     return f"{meeting.started_at:%Y-%m-%d_%H-%M-%S}_{meeting.id:04d}"
 
 
+_MARKER = ".helpmeet"
+
+
+def is_helpmeet_folder(path: Path) -> bool:
+    """True si la carpeta fue creada y es gestionada por Helpmeet."""
+    return (path / _MARKER).exists()
+
+
 def initiative_export_dir(initiative: Initiative, base_dir: Path) -> Path:
     """Carpeta de exportación de una iniciativa (la crea si no existe)."""
     out_dir = Path(base_dir) / _slug(initiative.name)
     out_dir.mkdir(parents=True, exist_ok=True)
+    # Marca la carpeta como propiedad de Helpmeet para distinguirla de carpetas
+    # preexistentes en caso de colisión de nombre (Windows ignora mayúsculas).
+    marker = out_dir / _MARKER
+    if not marker.exists():
+        marker.touch()
     return out_dir
 
 

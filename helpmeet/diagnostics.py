@@ -37,9 +37,30 @@ def disk_space(path) -> dict:
                 "label": f"No se pudo leer el disco ({exc})"}
 
 
+_MODEL_MIN_BYTES = 50 * 1024 * 1024   # 50 MB — un model.bin válido mínimo
+
+
 def whisper_model_status(model_name: str) -> dict:
-    """Comprueba si el modelo Whisper local ya está descargado (caché de Hugging
-    Face). Si no, la primera transcripción tendrá que descargarlo."""
+    """Comprueba si el modelo Whisper local ya está descargado.
+
+    Revisa en orden:
+    1. Carpeta local de Helpmeet (sin symlinks): DATA_DIR/models/{model}
+    2. Caché estándar de HuggingFace (con symlinks en Windows)
+
+    Solo marca como descargado si model.bin tiene al menos 50 MB (un blob
+    válido siempre pesa más; un symlink roto o descarga parcial no pasa).
+    """
+    # --- 1. Carpeta local propia de Helpmeet (prioridad, sin symlinks) ---
+    try:
+        from helpmeet import config
+        local_bin = Path(config.DATA_DIR) / "models" / model_name / "model.bin"
+        if local_bin.is_file() and local_bin.stat().st_size >= _MODEL_MIN_BYTES:
+            return {"status": "ok", "model": model_name, "downloaded": True,
+                    "label": f"Modelo «{model_name}» descargado"}
+    except Exception:
+        pass
+
+    # --- 2. Caché estándar de HuggingFace ---
     repo = f"Systran/faster-whisper-{model_name}"
     try:
         try:
@@ -49,30 +70,22 @@ def whisper_model_status(model_name: str) -> dict:
             cache = Path.home() / ".cache" / "huggingface" / "hub"
         folder = cache / ("models--" + repo.replace("/", "--"))
         snapshots = list(folder.glob("snapshots/*/")) if folder.exists() else []
+        for snap in snapshots:
+            model_bin = snap / "model.bin"
+            try:
+                # Seguimos el symlink (Windows) hasta el blob real
+                real_file = model_bin.resolve(strict=True)
+                if real_file.is_file() and real_file.stat().st_size >= _MODEL_MIN_BYTES:
+                    return {"status": "ok", "model": model_name, "downloaded": True,
+                            "label": f"Modelo «{model_name}» descargado"}
+            except OSError:
+                continue
         if snapshots:
-            # Existe la carpeta: comprobamos que model.bin esté completo (no a medias
-            # por una descarga interrumpida), porque si no la transcripción fallará.
-            complete = False
-            for snap in snapshots:
-                model_bin = snap / "model.bin"
-                try:
-                    # En Windows/HuggingFace puede ser enlace al blob real. `resolve`
-                    # evita marcar como 0 KB un enlace válido; si está roto, cae a warn.
-                    real_file = model_bin.resolve(strict=True)
-                    if real_file.is_file() and real_file.stat().st_size > 1024:
-                        complete = True
-                        break
-                except OSError:
-                    continue
-            if complete:
-                return {"status": "ok", "model": model_name, "downloaded": True,
-                        "label": f"Modelo «{model_name}» descargado"}
             return {"status": "warn", "model": model_name, "downloaded": False,
-                    "label": f"Modelo «{model_name}» quedó incompleto; se volverá a "
-                             "descargar en la próxima transcripción"}
+                    "label": f"Modelo «{model_name}» quedó incompleto; se descargará de nuevo"}
         return {"status": "warn", "model": model_name, "downloaded": False,
                 "label": f"Modelo «{model_name}» se descargará en la 1.ª transcripción"}
-    except Exception as exc:  # noqa: BLE001 - el diagnóstico nunca debe romper
+    except Exception as exc:  # noqa: BLE001
         return {"status": "warn", "model": model_name, "downloaded": False,
                 "label": f"No se pudo comprobar el modelo ({exc})"}
 

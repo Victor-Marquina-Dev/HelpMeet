@@ -69,6 +69,7 @@ const ICONS = {
   filter: '<path d="M22 3H2l8 9.46V19l4 2v-8.54L22 3z"/>',
   clock: '<circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/>',
   arrowUp: '<path d="M12 19V5M5 12l7-7 7 7"/>',
+  refresh: '<path d="M3 12a9 9 0 0 1 15-6.7L21 8M3 16l3-3 3 3M21 12a9 9 0 0 1-15 6.7L3 16"/>',
 };
 function svg(name, size) {
   size = size || 15;
@@ -101,11 +102,13 @@ async function call(method, ...args) {
 const api = {
   // ---- Contrato ACTUAL (sección 7) ----
   listInitiatives: () => call('list_initiatives'),
+  syncInitiativesWithFolders: () => call('sync_initiatives_with_folders'),
   toggleInitiativePin: (id) => call('toggle_initiative_pin', id),
   createInitiative: (name, color) => call('create_initiative', name, color),
   renameInitiative: (id, name) => call('rename_initiative', id, name),
   setInitiativeColor: (id, color) => call('set_initiative_color', id, color),
   renameMeeting: (id, title) => call('rename_meeting', id, title),
+  setMeetingDate: (id, date) => call('set_meeting_date', id, date),
   setMeetingContext: (id, text) => call('set_meeting_context', id, text),
   addMeetingNote: (id, text) => call('add_meeting_note', id, text),
   addNotePost: (mid, text) => call('add_note_post', mid, text),
@@ -208,6 +211,7 @@ const api = {
     assignUtteranceParticipant: (uid, pid) => call('assign_utterance_participant', uid, pid),
     cancelMeetingJob: (mid) => call('cancel_meeting_job', mid),
     runSetup: () => call('run_setup'),                               // @pending-python
+    clearWhisperCache: () => call('clear_whisper_cache'),            // @pending-python
   },
   // Controles de ventana frameless
   winMinimize: () => call('win_minimize'),
@@ -673,8 +677,8 @@ function viewFavorites() {
   }
 
   const head = el('div', 'mhead');
-  head.style.cssText = 'border-bottom:none;background:transparent';
-  head.innerHTML = `<div class="mhead-row"><h1 class="mtitle-h">Favoritas</h1></div>`;
+  head.style.cssText = 'border-bottom:none';
+  head.innerHTML = `<div class="mhead-row"><h1 class="page-title">Favoritos</h1></div>`;
   const content = el('div', 'content');
 
   if (!favList.length) {
@@ -775,19 +779,22 @@ function viewMeetings() {
   }
 
   head.innerHTML = `
-    <div class="cal-head-left">
-      <h1 class="cal-title"><span class="cal-title-main">${esc(titleMain)}</span><span class="cal-title-sub">${esc(titleSub)}</span></h1>
-      <div class="cal-nav">
-        <button class="cal-nav-today" id="calToday">Hoy</button>
-        <button class="cal-nav-btn" id="calPrev" title="Anterior" aria-label="Anterior">${svg('chevron', 15)}</button>
-        <button class="cal-nav-btn" id="calNext" title="Siguiente" aria-label="Siguiente">${svg('chevron', 15)}</button>
+    <h1 class="page-title cal-page-title">Reuniones</h1>
+    <div class="cal-controls">
+      <div class="cal-controls-left">
+        <h2 class="cal-title"><span class="cal-title-main">${esc(titleMain)}</span><span class="cal-title-sep"> </span><span class="cal-title-sub">${esc(titleSub)}</span></h2>
+        <div class="cal-nav">
+          <button class="cal-nav-today" id="calToday">Hoy</button>
+          <button class="cal-nav-btn" id="calPrev" title="Anterior" aria-label="Anterior">${svg('chevron', 15)}</button>
+          <button class="cal-nav-btn" id="calNext" title="Siguiente" aria-label="Siguiente">${svg('chevron', 15)}</button>
+        </div>
       </div>
-    </div>
-    <div class="cal-head-right">
-      <span id="calFilterMount"></span>
-      <div class="cal-toggle">
-        <button class="${C.view === 'month' ? 'active' : ''}" id="calViewMonth">Mes</button>
-        <button class="${C.view === 'week' ? 'active' : ''}" id="calViewWeek">Semana</button>
+      <div class="cal-controls-right">
+        <span id="calFilterMount"></span>
+        <div class="cal-toggle">
+          <button class="${C.view === 'month' ? 'active' : ''}" id="calViewMonth">Mes</button>
+          <button class="${C.view === 'week' ? 'active' : ''}" id="calViewWeek">Semana</button>
+        </div>
       </div>
     </div>`;
 
@@ -1621,6 +1628,7 @@ function viewMeeting() {
           <button class="icon-btn sm" id="mSearchClear" hidden>${svg('x', 13)}</button>
         </div>
         <span class="init-actions-sep mact-rest"></span>
+        <button class="icon-btn mact-rest${_isMeetingFav(t ? t.id : 0) ? ' fav-on' : ''}" id="mFav" title="${_isMeetingFav(t ? t.id : 0) ? 'Quitar de favoritos' : 'Añadir a favoritos'}">${svg('star', 15)}</button>
         <button class="icon-btn mact-rest" id="mOpen" title="Abrir la carpeta de la reunión">${svg('folder', 15)}</button>
         <button class="icon-btn mact-rest" id="mMenu" aria-label="Más acciones de la reunión">${svg('dots', 16)}</button>
       </div>
@@ -1640,6 +1648,17 @@ function viewMeeting() {
   head.querySelector('#mCopy').onclick = (e) => copyMeetingContext(STATE.selMeeting, e.currentTarget);
   head.querySelector('#mOpen').onclick = (e) => doOpenFolder(e.currentTarget);
   head.querySelector('#mMenu').onclick = (e) => openMeetingMenu(e, STATE.selMeeting);
+  const mFavBtn = head.querySelector('#mFav');
+  if (mFavBtn && t) {
+    mFavBtn.onclick = () => {
+      _toggleMeetingFav(t.id);
+      const nowFav = _isMeetingFav(t.id);
+      mFavBtn.classList.toggle('fav-on', nowFav);
+      mFavBtn.title = nowFav ? 'Quitar de favoritos' : 'Añadir a favoritos';
+      renderSidebar();
+      toast(nowFav ? 'ok' : 'info', nowFav ? 'Añadida a favoritos' : 'Quitada de favoritos');
+    };
+  }
   {
     const mSearchBtn = head.querySelector('#mSearch');
     const mSearchBox = head.querySelector('#mSearchBox');
@@ -2349,8 +2368,8 @@ function viewArchiveTrash(which) {
   const isTrash = which === 'trash';
   const wrap = el('div'); wrap.style.cssText = 'display:flex;flex-direction:column;flex:1;min-height:0';
   const head = el('div', 'mhead');
-  head.style.cssText = 'border-bottom:none;background:transparent';
-  head.innerHTML = `<div class="mhead-row"><h1 class="mtitle-h">${isTrash ? 'Papelera' : 'Archivo'}</h1></div>`;
+  head.style.cssText = 'border-bottom:none';
+  head.innerHTML = `<div class="mhead-row"><h1 class="page-title">${isTrash ? 'Papelera' : 'Archivo'}</h1></div>`;
   if (isTrash) {
     const emptyBtn = el('button', 'btn btn-danger sm');
     emptyBtn.id = 'emptyTrash';
@@ -2474,6 +2493,10 @@ function monitorSelectEl() {
 /* ============================================================
    4b. VISTA: TODAS LAS INICIATIVAS
    ============================================================ */
+const _initNotesKey = id => `hm.initNote.${id}`;
+function _getInitNote(id) { return localStorage.getItem(_initNotesKey(id)) || ''; }
+function _setInitNote(id, val) { val ? localStorage.setItem(_initNotesKey(id), val) : localStorage.removeItem(_initNotesKey(id)); }
+
 function viewAllInitiatives() {
   let _filter = 'all'; // all | pinned | active | paused | closed
   let _search = '';
@@ -2488,7 +2511,7 @@ function viewAllInitiatives() {
 
   // Fila 1: título + botón nuevo
   const topRow = el('div', 'init-hub-top-row');
-  topRow.innerHTML = `<h1 class="title-lg">Iniciativas</h1>`;
+  topRow.innerHTML = `<h1 class="page-title">Iniciativas</h1>`;
   const newBtn = el('button', 'btn btn-primary');
   newBtn.innerHTML = `${svg('plus', 13)} Nueva iniciativa`;
   newBtn.onclick = promptNewInitiative;
@@ -2522,11 +2545,12 @@ function viewAllInitiatives() {
   const _cols = [
     { fixed: true,  w: 20,  min: 20  },  // chevron
     { fixed: true,  w: 22,  min: 22  },  // pin
-    { fixed: false, w: 220, min: 110 },  // nombre
-    { fixed: false, w: 80,  min: 60  },  // estado
-    { fixed: false, w: 130, min: 80  },  // actividad
-    { fixed: false, w: 70,  min: 50  },  // reuniones
-    { fixed: false, w: 130, min: 80  },  // pendientes
+    { fixed: false, w: 200, min: 110 },  // nombre
+    { fixed: false, w: 72,  min: 60  },  // estado
+    { fixed: false, w: 110, min: 80  },  // actividad
+    { fixed: false, w: 62,  min: 50  },  // reuniones
+    { fixed: false, w: 115, min: 80  },  // pendientes
+    { fixed: false, w: 160, min: 80  },  // notas
     { fixed: true,  w: 34,  min: 34  },  // menú
   ];
   const _gridTpl = () => _cols.map(c => c.w + 'px').join(' ');
@@ -2540,9 +2564,10 @@ function viewAllInitiatives() {
   const tableWrap = el('div', 'init-hub-table');
   const thead = el('div', 'init-hub-thead');
 
-  const colLabels = ['', '', 'Iniciativa', 'Estado', 'Última actividad', 'Reuniones', 'Pendientes', ''];
+  const colLabels = ['', '', 'Iniciativa', 'Estado', 'Última actividad', 'Reuniones', 'Pendientes', 'Notas', ''];
+  const _centeredCols = new Set([3, 4, 5, 6, 7]); // Estado, Actividad, Reuniones, Pendientes, Notas
   _cols.forEach((col, i) => {
-    const cell = el('div', 'iht');
+    const cell = el('div', 'iht' + (_centeredCols.has(i) ? ' iht--center' : ''));
     cell.textContent = colLabels[i];
     if (i === 2) { // solo columna "Iniciativa" es redimensionable
       const handle = el('span', 'col-resizer');
@@ -2649,6 +2674,38 @@ function viewAllInitiatives() {
       <span class="ihr-activity">${_fmtActivity(it)}</span>
       <span class="ihr-meetings">${ms === undefined ? '…' : ms.length}</span>
       <span class="ihr-pending${pending > 0 ? ' has-pending' : ''}">${pending === null ? '…' : pending > 0 ? `${pending} por transcribir` : ''}</span>`;
+
+    // Celda de notas editable inline
+    const noteCell = el('div', 'ihr-note-cell');
+    const noteVal = _getInitNote(it.id);
+    noteCell.title = noteVal || 'Clic para agregar nota…';
+    noteCell.innerHTML = noteVal
+      ? `<span class="ihr-note-text">${esc(noteVal)}</span>`
+      : `<span class="ihr-note-placeholder">Agregar nota…</span>`;
+    noteCell.addEventListener('click', e => {
+      e.stopPropagation();
+      if (noteCell.querySelector('textarea')) return;
+      const cur = _getInitNote(it.id);
+      const ta = document.createElement('textarea');
+      ta.className = 'ihr-note-input';
+      ta.value = cur;
+      ta.placeholder = 'Escribe una nota…';
+      noteCell.replaceChildren(ta);
+      ta.focus();
+      const save = () => {
+        const v = ta.value.trim();
+        _setInitNote(it.id, v);
+        noteCell.title = v || 'Clic para agregar nota…';
+        noteCell.replaceChildren();
+        noteCell.innerHTML = v
+          ? `<span class="ihr-note-text">${esc(v)}</span>`
+          : `<span class="ihr-note-placeholder">Agregar nota…</span>`;
+      };
+      ta.addEventListener('blur', save);
+      ta.addEventListener('keydown', e => { if (e.key === 'Escape') { ta.value = _getInitNote(it.id); ta.blur(); } if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); ta.blur(); } });
+    });
+    row.appendChild(noteCell);
+
     const menuBtn = el('button', 'icon-btn ihr-menu-btn');
     menuBtn.innerHTML = svg('dots', 14);
     menuBtn.onclick = (e) => { e.stopPropagation(); openInitiativeMenu(e, it.id); };
@@ -2744,10 +2801,23 @@ function viewAllInitiatives() {
             if (isOpen) {
               wms.forEach(m => {
                 const mr = el('div', 'init-hub-meeting-row');
+                mr.dataset.mid = m.id;
                 const st = m.status || 'done';
                 const ds = st === 'pending' ? `border:1.5px solid ${mc};background:transparent` : `background:${mc}`;
-                mr.innerHTML = `<div class="ihm-info"><span class="stat ${st}" style="${ds}"></span><span class="ihm-title">${esc(m.title)}</span></div><span class="ihm-date">${m.time || ''}</span>`;
-                mr.onclick = (e) => { e.stopPropagation(); STATE.selInit = it.id; openMeeting(m.id); };
+                const isFav = _isMeetingFav(m.id);
+                mr.innerHTML = `<div class="ihm-info"><span class="stat ${st}" style="${ds}"></span><span class="ihm-title">${esc(m.title)}</span></div>
+                  <span class="ihm-date">${m.time || ''}</span>
+                  <button class="icon-btn sm ihm-fav-btn${isFav ? ' fav-on' : ''}" title="${isFav ? 'Quitar de favoritos' : 'Marcar como favorito'}">${svg('star', 12)}</button>`;
+                mr.querySelector('.ihm-fav-btn').onclick = (e) => {
+                  e.stopPropagation();
+                  _toggleMeetingFav(m.id);
+                  const nowFav = _isMeetingFav(m.id);
+                  const btn = mr.querySelector('.ihm-fav-btn');
+                  btn.classList.toggle('fav-on', nowFav);
+                  btn.title = nowFav ? 'Quitar de favoritos' : 'Marcar como favorito';
+                  renderSidebar();
+                };
+                mr.onclick = (e) => { if (e.target.closest('.ihm-fav-btn')) return; e.stopPropagation(); STATE.selInit = it.id; openMeeting(m.id); };
                 mr.oncontextmenu = (e) => { e.preventDefault(); e.stopPropagation(); openMeetingMenu(e, m.id); };
                 sub.appendChild(mr);
               });
@@ -2930,41 +3000,21 @@ function renderSidebar() {
   const all = STATE.initiatives;
   const pinned = all.filter(it => it.pinned);
   const rest = all.filter(it => !it.pinned);
-  const MAX = 5;
 
   // ── Fijadas ───────────────────────────────────────────────
   if (pinned.length) {
     const grpLabel = el('div', 'sidebar-group-label');
     grpLabel.innerHTML = `<span>${svg('pin', 10)} Fijadas</span><span class="sgr-count">${pinned.length}</span>`;
     tree.appendChild(grpLabel);
-    pinned.slice(0, MAX).forEach(it => _renderInitRow(tree, it));
-    if (pinned.length > MAX) {
-      const more = el('button', 'sidebar-see-more', `Ver más (${pinned.length - MAX})`);
-      more.onclick = () => { MAX === 5 ? pinned.forEach(it => _renderInitRow(tree, it)) : null; /* simple toggle */ };
-      tree.appendChild(more);
-    }
+    pinned.forEach(it => _renderInitRow(tree, it));
   }
 
   // ── Activas (no fijadas) ──────────────────────────────────
   if (rest.length) {
-    const grpLabel2 = el('div', 'sidebar-group-label');
-    grpLabel2.innerHTML = `<span>Activas</span><span class="sgr-count">${rest.length}</span>`;
-    tree.appendChild(grpLabel2);
-    rest.slice(0, MAX).forEach(it => _renderInitRow(tree, it));
-    if (rest.length > MAX) {
-      const more2 = el('button', 'sidebar-see-more', `Ver más (${rest.length - MAX})`);
-      let expanded = false;
-      more2.onclick = () => {
-        if (!expanded) {
-          expanded = true; more2.remove();
-          rest.slice(MAX).forEach(it => _renderInitRow(tree, it));
-        }
-      };
-      tree.appendChild(more2);
-    }
+    rest.forEach(it => _renderInitRow(tree, it));
   }
 
-  if (!all.length) tree.appendChild(el('div', 'tree-meeting', `<span style="color:var(--text-faint);font-size:11px">${q ? 'Sin resultados' : 'Sin iniciativas'}</span>`));
+  if (!all.length) tree.appendChild(el('div', 'tree-meeting', `<span style="color:var(--text-faint);font-size:11px">Sin iniciativas</span>`));
 }
 
 async function selectInitiative(id) {
@@ -3258,6 +3308,7 @@ async function _importVideosToInit(iid) {
   if (!r || r.cancelled) return;
   if (r.error) { toast('err', r.error); return; }
   if (r.ok) {
+    toast('info', `Registrando ${r.count} video${r.count !== 1 ? 's' : ''}…`);
     await refreshMeetings(iid);
     toast('ok', `${r.count} video${r.count !== 1 ? 's' : ''} importado${r.count !== 1 ? 's' : ''} en «${name}» · transcribiendo en 2.º plano`);
   }
@@ -3339,6 +3390,7 @@ function openMeetingMenu(e, mid) {
     { label: 'Importar video y transcribir…', icon: 'upload', onClick: () => doImportVideoForMeeting(mid) },
     { sep: true },
     { label: 'Renombrar reunión', icon: 'edit', onClick: () => promptRenameMeeting(mid) },
+    { label: 'Cambiar fecha', icon: 'calendar', onClick: () => promptChangeMeetingDate(mid) },
     { label: 'Mover a otra iniciativa', icon: 'folder', onClick: () => promptMoveMeeting(mid) },
     { sep: true },
     { label: 'Enviar a la papelera', icon: 'trash', danger: true, onClick: () => deleteMeeting(mid) },
@@ -3418,6 +3470,46 @@ function promptRenameMeeting(mid) {
     if (STATE.transcript) STATE.transcript.title = title;
     renderSidebar(); renderMain(); toast('ok', 'Reunión renombrada');
   });
+}
+function promptChangeMeetingDate(mid) {
+  // Fecha actual de la reunión
+  let currentDate = '';
+  for (const k in STATE.meetingsByInit) {
+    const m = STATE.meetingsByInit[k].find(x => x.id === mid);
+    if (m && m.started_at) { currentDate = m.started_at.slice(0, 10); break; }
+  }
+  const wrap = el('div', 'modal');
+  wrap.setAttribute('role', 'dialog'); wrap.setAttribute('aria-label', 'Cambiar fecha');
+  wrap.innerHTML = `
+    <div class="modal-head"><h3>Cambiar fecha</h3><button class="icon-btn sm" data-x>${svg('x', 14)}</button></div>
+    <div class="modal-body">
+      <label style="font-size:11px;color:var(--text-secondary);font-weight:600;display:block;margin-bottom:6px">Fecha del calendario</label>
+      <input class="field" type="date" id="datePickerInput" value="${esc(currentDate)}" style="width:100%">
+      <p style="font-size:11px;color:var(--text-muted);margin-top:8px">Si dejas vacío se usará la fecha de importación original.</p>
+    </div>
+    <div class="modal-foot">
+      <button class="btn" data-c>Cancelar</button>
+      <button class="btn btn-primary" data-ok>Guardar</button>
+    </div>`;
+  wrap.querySelector('[data-x]').onclick = closeModal;
+  wrap.querySelector('[data-c]').onclick = closeModal;
+  wrap.querySelector('[data-ok]').onclick = async () => {
+    const val = wrap.querySelector('#datePickerInput').value.trim();
+    const r = await api.setMeetingDate(mid, val || currentDate);
+    if (r && r.ok) {
+      // Actualizar fecha en STATE
+      for (const k in STATE.meetingsByInit) {
+        const m = STATE.meetingsByInit[k].find(x => x.id === mid);
+        if (m) { m.started_at = r.started_at; }
+      }
+      closeModal(); toast('ok', 'Fecha actualizada');
+      await refreshMeetings(STATE.selInit); renderMain();
+    } else {
+      toast('err', (r && r.error) || 'No se pudo cambiar la fecha');
+    }
+  };
+  openModal(wrap);
+  setTimeout(() => wrap.querySelector('#datePickerInput').focus(), 80);
 }
 function promptMoveMeeting(mid) {
   const m = el('div', 'modal'); m.setAttribute('role', 'dialog'); m.setAttribute('aria-label', 'Mover reunión');
@@ -3548,6 +3640,7 @@ async function doImport(btn) {
     if (r && r.error) { toast('err', 'No se pudo importar: ' + r.error); }
     else if (r && r.cancelled) { /* usuario cerró el diálogo */ }
     else if (r && r.ok) {
+      toast('info', `Registrando ${r.count} video${r.count !== 1 ? 's' : ''}…`);
       await refreshMeetings(initId);
       try { renderBgJobs(await api.getBackgroundJobs()); } catch { /* sin jobs */ }
       toast('ok', `${r.count} video${r.count !== 1 ? 's' : ''} importado${r.count !== 1 ? 's' : ''} · transcribiendo en 2.º plano`);
@@ -4291,8 +4384,8 @@ function openSettings() { STATE.screen = 'settings'; renderMain(); renderTopStat
 function viewSettings() {
   const wrap = el('div'); wrap.style.cssText = 'display:flex;flex-direction:column;flex:1;min-height:0';
   const head = el('div', 'mhead');
-  head.style.cssText = 'border-bottom:none;background:transparent';
-  head.innerHTML = `<div class="mhead-row"><h1 class="mtitle-h">Ajustes</h1></div>`;
+  head.style.cssText = 'border-bottom:none';
+  head.innerHTML = `<div class="mhead-row"><h1 class="page-title">Ajustes</h1></div>`;
   const content = el('div', 'content');
   const inner = el('div', 'sv-page');
   inner.style.maxWidth = '640px';
@@ -4529,48 +4622,69 @@ const WC_SVG = {
 };
 
 function wireTopbar() {
+  $('#btnRefreshSidebar').innerHTML = svg('refresh', 14);
   $('#btnNewInitiative').innerHTML = svg('plus', 14);
-  $('#btnNewInitiativeRail').innerHTML = svg('plus', 16);
-  $('#btnArchive')?.querySelector('.ico-archive')?.replaceWith(elFromHTML('<span class="ico">' + svg('archive', 14) + '</span>'));
-  $('#btnTrash').querySelector('.ico-trash')?.replaceWith(elFromHTML('<span class="ico">' + svg('trash', 14) + '</span>'));
-  $('#navInitiatives').querySelector('.ico-rocket')?.replaceWith(elFromHTML('<span class="ico">' + svg('rocket', 15) + '</span>'));
   $('#navInitiatives .nav-chev').innerHTML = svg('chevron', 17);
-  $('#navMeetings').querySelector('.ico-meetings')?.replaceWith(elFromHTML('<span class="ico">' + svg('calendar', 15) + '</span>'));
-  $('#btnSettingsSide').querySelector('.ico-settings')?.replaceWith(elFromHTML('<span class="ico">' + svg('settings', 14) + '</span>'));
-  // Rail
-  $('#railMeetings')?.querySelector('.ico-meetings')?.replaceWith(elFromHTML('<span class="ico">' + svg('calendar', 16) + '</span>'));
-  $('#railInitiatives')?.querySelector('.ico-rocket')?.replaceWith(elFromHTML('<span class="ico">' + svg('rocket', 16) + '</span>'));
-  $('#btnNewInitiativeRail').innerHTML = svg('plus', 16);
-  $('#railArchive')?.querySelector('.ico-archive')?.replaceWith(elFromHTML('<span class="ico">' + svg('archive', 15) + '</span>'));
-  $('#railTrash')?.querySelector('.ico-trash')?.replaceWith(elFromHTML('<span class="ico">' + svg('trash', 15) + '</span>'));
-  $('#railSettings')?.querySelector('.ico-settings')?.replaceWith(elFromHTML('<span class="ico">' + svg('settings', 15) + '</span>'));
+  // Iconos del rail colapsado
+  const _ri = (id, icon) => { const e = $(id); if (e) e.innerHTML = svg(icon, 17); };
+  _ri('#railMeetings',    'calendar');
+  _ri('#railFavorites',   'star');
+  _ri('#railInitiatives', 'rocket');
+  _ri('#railTrash',       'trash');
+  _ri('#railSettings',    'settings');
 
+  // Clic en logo/marca → colapsar/expandir sidebar
+  const brandEl = document.querySelector('.brand');
+  if (brandEl) brandEl.onclick = () => { STATE.sidebarOpen = !STATE.sidebarOpen; applySidebar(); };
+
+  $('#btnRefreshSidebar').onclick = async () => {
+    const btn = $('#btnRefreshSidebar');
+    if (btn.dataset.loading) return;
+    btn.dataset.loading = '1';
+    btn.classList.add('is-spinning');
+    try {
+      await api.syncInitiativesWithFolders();
+      STATE.initiatives = await api.listInitiatives() || [];
+      STATE.meetingsByInit = {};
+      await refreshAll();
+      renderSidebar();
+      if (STATE.screen === 'initiatives-list') renderMain();
+    } catch(e) {
+      toast('err', 'Error al actualizar');
+    } finally {
+      delete btn.dataset.loading;
+      btn.classList.remove('is-spinning');
+    }
+  };
   $('#btnNewInitiative').onclick = promptNewInitiative;
-  $('#btnNewInitiativeRail').onclick = promptNewInitiative;
   if ($('#btnArchive')) $('#btnArchive').onclick = () => { STATE.screen = 'archive'; renderMain(); };
   $('#btnTrash').onclick = () => { STATE.screen = 'trash'; renderMain(); };
   $('#btnSettingsSide').onclick = () => { STATE.screen = 'settings'; renderMain(); renderTopStatus(); };
-  $('#railMeetings')?.addEventListener('click', () => { STATE.sidebarOpen = true; applySidebar(); openMeetingsView(); });
-  $('#railInitiatives')?.addEventListener('click', () => { STATE.sidebarOpen = true; applySidebar(); });
-  $('#railArchive')?.addEventListener('click', () => { STATE.sidebarOpen = true; applySidebar(); STATE.screen = 'archive'; renderMain(); });
-  $('#railTrash')?.addEventListener('click', () => { STATE.sidebarOpen = true; applySidebar(); STATE.screen = 'trash'; renderMain(); });
-  $('#railSettings')?.addEventListener('click', () => { STATE.sidebarOpen = true; applySidebar(); STATE.screen = 'settings'; renderMain(); renderTopStatus(); });
+  $('#railMeetings')?.addEventListener('click', () => { openMeetingsView(); });
+  $('#railFavorites')?.addEventListener('click', () => { STATE.screen = 'favorites'; renderMain(); renderTopStatus(); });
+  $('#railInitiatives')?.addEventListener('click', () => { STATE.screen = 'initiatives-list'; renderMain(); renderTopStatus(); });
+  $('#railArchive')?.addEventListener('click', () => { STATE.screen = 'archive'; renderMain(); });
+  $('#railTrash')?.addEventListener('click', () => { STATE.screen = 'trash'; renderMain(); });
+  $('#railSettings')?.addEventListener('click', () => { STATE.screen = 'settings'; renderMain(); renderTopStatus(); });
+  // Clic en cualquier parte de la fila: navega + colapsa/expande árbol
   $('#navInitiativesToggle').onclick = () => {
-    STATE.openInits = {};   // colapsa todo lo abierto en el árbol
+    const tree = $('#sidebarTree');
+    const wasCollapsed = tree.classList.contains('is-collapsed');
+    if (wasCollapsed) {
+      tree.classList.remove('is-collapsed');
+      $('#navInitiatives').classList.remove('collapsed');
+      $('#navInitiativesToggle').setAttribute('aria-expanded', 'true');
+    } else {
+      tree.classList.add('is-collapsed');
+      $('#navInitiatives').classList.add('collapsed');
+      $('#navInitiativesToggle').setAttribute('aria-expanded', 'false');
+    }
+    STATE.openInits = {};
     STATE.selInit = null; STATE.selMeeting = null;
     STATE.screen = 'initiatives-list';
     renderSidebar(); renderMain(); renderTopStatus();
   };
-  // El chevron colapsa/expande el árbol sin navegar
-  $('#navInitiatives .nav-chev').onclick = (e) => {
-    e.stopPropagation();
-    const tree = $('#sidebarTree');
-    const collapsed = tree.classList.toggle('is-collapsed');
-    $('#navInitiatives').classList.toggle('collapsed', collapsed);
-    $('#navInitiativesToggle').setAttribute('aria-expanded', String(!collapsed));
-  };
   $('#navMeetings').onclick = openMeetingsView;
-  $('#navFavorites')?.querySelector('.ico-star')?.replaceWith(elFromHTML('<span class="ico">' + svg('star', 15) + '</span>'));
   if ($('#navFavorites')) $('#navFavorites').onclick = () => { STATE.screen = 'favorites'; renderMain(); renderTopStatus(); };
 
   // Controles de ventana frameless — iconos SVG estilo Win11
@@ -4618,28 +4732,32 @@ function showSetupOverlay(cfg) {
       <div class="setup-hero">
         <img class="setup-logo-img" src="assets/helpmeet-symbol.svg" alt="">
         <h1 class="setup-h1">Bienvenido a Helpmeet</h1>
-        <p class="setup-sub">Vamos a preparar el motor de transcripción antes de tu primera grabación.<br>Solo se hace una vez y tardará unos minutos.</p>
+        <p class="setup-sub">Vamos a preparar el motor de transcripción antes de tu primera grabación. Solo se hace una vez y tardará unos minutos.</p>
       </div>
 
-      <div class="setup-section" id="setupCfgWrap">
-        <div class="setup-section-title">Idioma y calidad</div>
-        <div class="pre-cfg">
-          <div class="pre-cfg-row"><span class="pre-cfg-lbl">Idioma</span><div class="cfg-chips" id="setupLangChips"></div></div>
-          <div class="pre-cfg-row"><span class="pre-cfg-lbl">Calidad</span><div class="cfg-chips" id="setupModelChips"></div></div>
+      <div class="setup-cols">
+        <div class="setup-col-left">
+          <div class="setup-section" id="setupCfgWrap">
+            <div class="setup-section-title">Idioma y calidad</div>
+            <div class="pre-cfg">
+              <div class="pre-cfg-row"><span class="pre-cfg-lbl">Idioma</span><div class="cfg-chips" id="setupLangChips"></div></div>
+              <div class="pre-cfg-row"><span class="pre-cfg-lbl">Calidad</span><div class="cfg-chips" id="setupModelChips"></div></div>
+            </div>
+          </div>
+          <div class="setup-section">
+            <div class="setup-section-title">Carpeta de grabaciones</div>
+            <div class="setup-folder-row">
+              <span class="setup-folder-path" id="setupFolderPath">…</span>
+              <button class="btn setup-folder-btn" id="setupFolderBtn">Cambiar</button>
+            </div>
+          </div>
         </div>
-      </div>
-
-      <div class="setup-section">
-        <div class="setup-section-title">Carpeta de grabaciones</div>
-        <div class="setup-folder-row">
-          <span class="setup-folder-path" id="setupFolderPath">…</span>
-          <button class="btn setup-folder-btn" id="setupFolderBtn">Cambiar</button>
+        <div class="setup-col-right">
+          <div class="setup-section setup-section-checks">
+            <div class="setup-section-title">Estado del sistema</div>
+            <div class="setup-checks" id="setupChecks"><span class="setup-check-placeholder">Comprobando…</span></div>
+          </div>
         </div>
-      </div>
-
-      <div class="setup-section">
-        <div class="setup-section-title">Estado del sistema</div>
-        <div class="setup-checks" id="setupChecks"><span class="setup-check-placeholder">Comprobando…</span></div>
       </div>
 
       <div class="setup-progress-wrap" id="setupProgressWrap" hidden>
@@ -4730,12 +4848,27 @@ function showSetupOverlay(cfg) {
       if (label) label.textContent = `Cargando en memoria… ${pct}%`;
     } else if (e.stage === 'done') {
       if (fill) fill.style.width = '100%';
-      if (label) label.textContent = '¡Listo! El motor ya está caliente.';
+      if (label) label.textContent = 'Completado';
+      if (errEl) errEl.hidden = true;
       btn.textContent = 'Comenzar →';
       btn.disabled = false;
       btn.onclick = _enterApp;
     } else if (e.stage === 'error') {
-      if (errEl) { errEl.hidden = false; errEl.textContent = e.error || 'Error durante la instalación.'; }
+      if (errEl) {
+        errEl.hidden = false;
+        const msg = e.error || 'Error durante la instalación.';
+        errEl.innerHTML =
+          `<span class="setup-error-text">${esc(msg)}</span>` +
+          `<a class="setup-clear-cache" href="#">Limpiar caché y reintentar</a>`;
+        errEl.querySelector('.setup-clear-cache').onclick = async (ev) => {
+          ev.preventDefault();
+          try { await api.v2.clearWhisperCache(); } catch (_) { /* */ }
+          errEl.hidden = true;
+          if (label) label.textContent = 'Preparando…';
+          if (fill) fill.style.width = '3%';
+          btn.click();
+        };
+      }
       if (label) label.textContent = 'Se produjo un error.';
       btn.textContent = 'Reintentar';
       btn.disabled = false;

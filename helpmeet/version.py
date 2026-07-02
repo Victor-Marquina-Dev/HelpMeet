@@ -1,3 +1,3 @@
 """Versión pública de Helpmeet."""
 
-__version__ = "1.2.7"
+__version__ = "2.3.0"

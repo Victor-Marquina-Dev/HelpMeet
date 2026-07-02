@@ -29,6 +29,7 @@ VersionInfoVersion={#MyAppVersion}
 PrivilegesRequired=lowest
 PrivilegesRequiredOverridesAllowed=dialog
 DefaultDirName={autopf}\Helpmeet
+DisableDirPage=no
 DisableProgramGroupPage=yes
 UninstallDisplayName={#MyAppName}
 UninstallDisplayIcon={app}\{#MyAppExeName}

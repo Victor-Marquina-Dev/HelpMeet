@@ -23,7 +23,7 @@ from helpmeet.session.recorder import MeetingRecorder
 from helpmeet.export.exporter import (
     export_meeting, export_initiative, meeting_export_dir, build_meeting_context,
     build_transcript_txt, transcript_filename, export_transcript_package,
-    transcript_package_filename, organize_meeting_folder,
+    transcript_package_filename, organize_meeting_folder, initiative_export_dir,
 )
 from helpmeet import config
 from helpmeet import settings
@@ -262,6 +262,89 @@ def _reveal_in_explorer(path: str) -> None:
         pass
 
 
+def _import_meetings_from_folder(session, initiative, init_folder):
+    """Importa reuniones desde la estructura de carpetas de una versión anterior.
+
+    Estructura esperada:
+      <init_folder>/<YYYY-MM mes>/<YYYY-MM-DD_HH-MM-SS_NNNN>/
+        grabacion.mp4   (opcional)
+        transcripcion.md
+    """
+    import re
+    from datetime import datetime
+    from helpmeet.db.models import Meeting, Utterance
+
+    FOLDER_RE = re.compile(r'^(\d{4}-\d{2}-\d{2})_(\d{2}-\d{2}-\d{2})_\d+$')
+    UTT_RE = re.compile(r'^\[(\d+):(\d+)\] ([^:]+): (.+)$')
+
+    for month_dir in sorted(init_folder.iterdir()):
+        if not month_dir.is_dir():
+            continue
+        for meeting_dir in sorted(month_dir.iterdir()):
+            if not meeting_dir.is_dir():
+                continue
+            m = FOLDER_RE.match(meeting_dir.name)
+            if not m:
+                continue
+            date_str, time_str = m.group(1), m.group(2).replace('-', ':')
+            try:
+                started_at = datetime.strptime(f"{date_str} {time_str}", "%Y-%m-%d %H:%M:%S")
+            except ValueError:
+                continue
+            # Título desde el .md o generar uno
+            title = meeting_dir.name
+            md_path = meeting_dir / "transcripcion.md"
+            if md_path.exists():
+                for line in md_path.read_text(encoding="utf-8").splitlines():
+                    if line.startswith("## Reuni"):
+                        title = line.split(":", 1)[-1].strip() if ":" in line else line.strip()
+                        break
+            # Ruta de vídeo
+            video_path = None
+            for ext in (".mp4", ".mkv", ".webm", ".mov", ".avi"):
+                candidate = meeting_dir / f"grabacion{ext}"
+                if candidate.exists():
+                    video_path = str(candidate)
+                    break
+            # Parsear utterances del .md antes de crear el meeting
+            utterance_objects = []
+            if md_path.exists():
+                lines = md_path.read_text(encoding="utf-8").splitlines()
+                parsed = []
+                for line in lines:
+                    um = UTT_RE.match(line.strip())
+                    if um:
+                        mins, secs = int(um.group(1)), int(um.group(2))
+                        raw_speaker = um.group(3).strip()
+                        parsed.append({
+                            "speaker": "me" if raw_speaker.lower() in ("yo", "me") else "others",
+                            "text": um.group(4).strip(),
+                            "start": float(mins * 60 + secs),
+                        })
+                for idx, p in enumerate(parsed):
+                    end = parsed[idx + 1]["start"] if idx + 1 < len(parsed) else p["start"] + 5.0
+                    utterance_objects.append(Utterance(
+                        speaker=p["speaker"],
+                        text=p["text"],
+                        start_time=p["start"],
+                        end_time=end,
+                    ))
+            # Crear meeting con utterances en la misma transacción (evita orphan-cascade)
+            meeting = Meeting(
+                initiative_id=initiative.id,
+                title=title,
+                started_at=started_at,
+                audio_path=video_path,
+                utterances=utterance_objects,
+            )
+            session.add(meeting)
+    try:
+        session.commit()
+    except Exception:
+        session.rollback()
+        raise
+
+
 class Api:
     import os as _os
     _LICENSE_SERVER = _os.environ.get(
@@ -374,6 +457,48 @@ class Api:
         i = repo.create_initiative(self._session, name, color=color)
         return _initiative_payload(i)
 
+    def sync_initiatives_with_folders(self):
+        """Sincroniza iniciativas con las carpetas en export_dir.
+        - Carpeta borrada + iniciativa tenía reuniones → papelera.
+        - Carpeta nueva sin iniciativa en DB → crea iniciativa.
+        """
+        from pathlib import Path
+        _SKIP = {"recuperados"}  # carpetas reservadas por Helpmeet
+        export_dir = Path(settings.get_export_dir())
+        if not export_dir.exists():
+            return {"trashed": [], "created": []}
+        folders = [p for p in export_dir.iterdir() if p.is_dir()]
+        folder_names_lower = {p.name.lower(): p.name for p in folders}
+        initiatives = repo.list_initiatives(self._session)
+        init_names_lower = {i.name.lower(): i for i in initiatives}
+        trashed, created = [], []
+        # Iniciativas en DB cuya carpeta desapareció
+        for name_lower, init in init_names_lower.items():
+            meetings = repo.list_meetings(self._session, init.id)
+            if not meetings:
+                continue
+            if name_lower not in folder_names_lower:
+                repo.trash_item(self._session, "initiative", init.id)
+                trashed.append(init.id)
+        # Carpetas → crear iniciativa si no existe, luego importar reuniones si está vacía
+        for folder_path in folders:
+            name_lower = folder_path.name.lower()
+            if name_lower in _SKIP:
+                continue
+            try:
+                if name_lower not in init_names_lower:
+                    new_init = repo.create_initiative(self._session, folder_path.name)
+                    created.append(new_init.id)
+                    _import_meetings_from_folder(self._session, new_init, folder_path)
+                else:
+                    existing_init = init_names_lower[name_lower]
+                    existing_meetings = repo.list_meetings(self._session, existing_init.id)
+                    if not existing_meetings:
+                        _import_meetings_from_folder(self._session, existing_init, folder_path)
+            except Exception:
+                self._session.rollback()
+        return {"trashed": trashed, "created": created}
+
     def rename_initiative(self, initiative_id, name):
         repo.rename_initiative(self._session, int(initiative_id), name)
         return {"ok": True}
@@ -385,6 +510,28 @@ class Api:
     def rename_meeting(self, meeting_id, title):
         repo.rename_meeting(self._session, int(meeting_id), title)
         return {"ok": True}
+
+    def set_meeting_date(self, meeting_id, date_str):
+        """Cambia la fecha del calendario de una reunión (started_at).
+        date_str: 'YYYY-MM-DD' o 'YYYY-MM-DDTHH:MM'. Vacío = no cambiar."""
+        from datetime import timezone
+        date_str = (date_str or "").strip()
+        if not date_str:
+            return {"ok": False, "error": "Fecha vacía"}
+        m = repo.get_meeting(self._session, int(meeting_id))
+        if m is None:
+            return {"ok": False, "error": "Reunión no encontrada"}
+        try:
+            if "T" in date_str:
+                dt = datetime.strptime(date_str, "%Y-%m-%dT%H:%M")
+            else:
+                dt = datetime.strptime(date_str, "%Y-%m-%d")
+                dt = dt.replace(hour=m.started_at.hour, minute=m.started_at.minute)
+            m.started_at = dt.replace(tzinfo=timezone.utc) if dt.tzinfo is None else dt
+            self._session.commit()
+            return {"ok": True, "started_at": m.started_at.strftime("%Y-%m-%d %H:%M")}
+        except ValueError:
+            return {"ok": False, "error": "Formato de fecha inválido"}
 
     def set_meeting_context(self, meeting_id, context):
         meeting = repo.set_meeting_context(self._session, int(meeting_id), context)
@@ -1670,6 +1817,11 @@ class Api:
         token = settings.get_license_token()
         if not token:
             return {"ok": False, "reason": "no_license"}
+        # Versión: si el major version cambió (ej. 1.x → 2.x), pedir re-activación
+        last_ver = settings.get_last_activated_version()
+        if last_ver:
+            if last_ver.split(".")[0] != __version__.split(".")[0]:
+                return {"ok": False, "reason": "new_version"}
         r = self._license_socket("/api/license/validate", {
             "activation_token": token, "device_id": self._get_device_id(),
         })
@@ -1733,6 +1885,8 @@ class Api:
         if r.get("ok"):
             settings.set_license_token(r["activation_token"])
             settings.set_last_license_check(datetime.now(timezone.utc).isoformat())
+            settings.set_last_activated_version(__version__)
+            settings.set_setup_done(False)   # mostrar setup tras activar en versión nueva
             return {"ok": True, "plan": r.get("plan")}
         _em = {"not_found": "Key no encontrada.", "revoked": "Licencia revocada."}
         err = r.get("error", "unknown")
@@ -1821,8 +1975,49 @@ class Api:
                         stop.set()
                         poll_t.join(timeout=2)
 
-                _push({"stage": "loading", "pct": 0.82, "model": model})
-                engine = self._get_engine()          # pre-carga en memoria
+                def _load_engine_with_ticker():
+                    """Carga el motor con ticker de progreso. Si model.bin está
+                    corrupto, limpia el caché y re-descarga automáticamente (1 reintento)."""
+                    for _attempt in range(2):
+                        _push({"stage": "loading", "pct": 0.82, "model": model})
+                        _lpct = [0.82]
+                        _lstop = threading.Event()
+                        def _tick():
+                            while not _lstop.wait(1.5):
+                                _lpct[0] = min(0.97, _lpct[0] + 0.022)
+                                _push({"stage": "loading", "pct": _lpct[0]})
+                        _tick_t = threading.Thread(target=_tick, daemon=True)
+                        _tick_t.start()
+                        try:
+                            eng = self._get_engine()
+                            return eng                   # éxito
+                        except Exception as exc:
+                            if _attempt == 0 and "model.bin" in str(exc):
+                                # model.bin corrupto: limpia y re-descarga
+                                _push({"stage": "downloading", "pct": 0.02, "model": model,
+                                       "size_label": f"~{expected_mb} MB (limpiando caché…)"})
+                                self.clear_whisper_cache()
+                                self._engine = None
+                                stop2 = threading.Event()
+                                pt2 = threading.Thread(
+                                    target=_poll, args=(model, expected_mb, stop2), daemon=True
+                                )
+                                pt2.start()
+                                try:
+                                    from huggingface_hub import snapshot_download
+                                    snapshot_download(repo_id=f"Systran/faster-whisper-{model}")
+                                except Exception:
+                                    pass
+                                finally:
+                                    stop2.set(); pt2.join(timeout=2)
+                                continue               # reintenta carga
+                            raise
+                        finally:
+                            _lstop.set()
+                            _tick_t.join(timeout=2)
+                    raise RuntimeError("No se pudo cargar el modelo tras limpiar el caché.")
+
+                engine = _load_engine_with_ticker()
                 loaded = getattr(engine, "model_name", model)
                 if loaded != model:
                     _push({"stage": "fallback", "pct": 0.9, "model": loaded})
@@ -1835,6 +2030,39 @@ class Api:
 
         threading.Thread(target=_do, daemon=True).start()
         return {"ok": True}
+
+    def clear_whisper_cache(self):
+        """Elimina los modelos de Whisper del caché de HuggingFace y de la
+        carpeta local de Helpmeet para forzar una nueva descarga limpia."""
+        import shutil
+        removed = []
+        # 1. Carpeta local de Helpmeet (DATA_DIR/models/)
+        local_models = Path(config.DATA_DIR) / "models"
+        if local_models.exists():
+            for d in local_models.iterdir():
+                if d.is_dir():
+                    try:
+                        shutil.rmtree(d)
+                        removed.append(f"local:{d.name}")
+                    except Exception as exc:
+                        _log.warning("No se pudo eliminar carpeta local %s: %s", d, exc)
+        # 2. Caché estándar de HuggingFace
+        try:
+            from huggingface_hub import constants
+            cache = Path(constants.HF_HUB_CACHE)
+        except Exception:
+            cache = Path.home() / ".cache" / "huggingface" / "hub"
+        for d in cache.glob("models--Systran--faster-whisper-*"):
+            if d.is_dir():
+                try:
+                    shutil.rmtree(d)
+                    removed.append(d.name)
+                except Exception as exc:
+                    _log.warning("No se pudo eliminar caché HF %s: %s", d, exc)
+        self._engine = None
+        self._local_engine = None
+        self._setup_running = False
+        return {"ok": True, "removed": removed}
 
     def get_recording_preflight(self, kind, monitor_index=1):
         """Diagnóstico específico que se recalcula antes de cada grabación."""
@@ -1978,15 +2206,42 @@ class Api:
             return result[0] if isinstance(result, (list, tuple)) else result
         return None
 
-    def import_media(self, initiative_id):
-        """Pide un vídeo/audio y lo transcribe en SEGUNDO PLANO (local, gratis).
+    def _move_to_initiative_folder(self, src: str, initiative_id: int) -> str:
+        """Mueve el archivo a la carpeta de exportación de la iniciativa.
 
-        Devuelve enseguida el nombre del archivo elegido; la transcripción avanza
-        por detrás (se ve en el indicador de trabajos), así no bloquea la app ni
-        cuenta el rato que tardas en elegir el archivo."""
+        Si ya está dentro de esa carpeta no hace nada. Si hay conflicto de
+        nombre agrega un sufijo numérico. Devuelve la ruta final del archivo."""
+        initiative = repo.get_initiative(self._session, initiative_id)
+        if initiative is None:
+            return src
+        base_dir = settings.get_export_dir()
+        dest_dir = initiative_export_dir(initiative, base_dir)
+        src_path = Path(src)
+        dest = dest_dir / src_path.name
+        # Si ya está en el destino correcto, no mover
+        if src_path.resolve() == dest.resolve():
+            return str(dest)
+        # Resolver conflictos de nombre
+        if dest.exists():
+            stem, suffix = src_path.stem, src_path.suffix
+            n = 1
+            while dest.exists():
+                dest = dest_dir / f"{stem}_{n}{suffix}"
+                n += 1
+        try:
+            shutil.move(str(src_path), str(dest))
+            _log.info("Video movido a carpeta de iniciativa: %s", dest)
+        except Exception as exc:
+            _log.warning("No se pudo mover el video a la carpeta de iniciativa: %s", exc)
+            return src  # si falla el move, usar ruta original
+        return str(dest)
+
+    def import_media(self, initiative_id):
+        """Pide un vídeo/audio, lo mueve a la carpeta de la iniciativa y lo transcribe."""
         src = self._pick_file()
         if not src:
             return {"ok": False, "cancelled": True}
+        src = self._move_to_initiative_folder(src, int(initiative_id))
         filename = Path(src).name
         title = Path(src).stem or "Vídeo importado"
         meeting = repo.start_meeting(self._session, int(initiative_id), title)
@@ -2006,12 +2261,13 @@ class Api:
         return list(result) if result else []
 
     def import_media_multiple(self, initiative_id):
-        """Abre selector múltiple y encola todos los archivos en segundo plano."""
+        """Abre selector múltiple, mueve los archivos a la carpeta de la iniciativa y encola."""
         files = self._pick_files()
         if not files:
             return {"ok": False, "cancelled": True, "count": 0}
         imported = []
         for src in files:
+            src = self._move_to_initiative_folder(src, int(initiative_id))
             filename = Path(src).name
             title = Path(src).stem or "Vídeo importado"
             meeting = repo.start_meeting(self._session, int(initiative_id), title)
@@ -2065,8 +2321,13 @@ class Api:
         try:
             if not os.path.exists(src):
                 raise ValueError("El archivo seleccionado ya no está disponible.")
+            # Guardar ruta del archivo original para que aparezca el panel de video
+            meeting.audio_path = src
+            session.commit()
             on_status("Extrayendo el audio del archivo…")
             extract_audio_to_wav(src, str(wav))
+            if self._is_job_cancelled(meeting_id):
+                raise _JobCancelled()
             audio_seconds = _wav_seconds(wav)
             on_status("Preparando el modelo (la 1ª vez se descarga)…")
             try:
@@ -2078,9 +2339,13 @@ class Api:
             rows = []
             for seg in engine.transcribe_file(str(wav), on_progress=on_progress,
                                               no_speech_max=0.95, quality="accurate"):
+                if self._is_job_cancelled(meeting_id):
+                    raise _JobCancelled()
                 if seg.text:
                     rows.append({"speaker": "others", "text": seg.text,
                                  "start_time": seg.start, "end_time": seg.end})
+            if self._is_job_cancelled(meeting_id):
+                raise _JobCancelled()
             if not rows:
                 raise ValueError(
                     "No se detectó voz en el archivo. Comprueba que tenga audio audible."

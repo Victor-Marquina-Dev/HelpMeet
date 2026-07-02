@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Helpmeet Admin</title>
+<link rel="icon" type="image/svg+xml" href="assets/helpmeet-app-icon.svg">
 <style>
 * { box-sizing: border-box; margin: 0; padding: 0; }
 :root {
@@ -21,7 +22,8 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
 /* ─── LOGIN ─── */
 #login { display: flex; align-items: center; justify-content: center; min-height: 100vh; }
 .lcard { background: var(--card); border: 1px solid var(--border); border-radius: 20px; padding: 44px; width: 360px; text-align: center; }
-.lcard .logo { font-size: 28px; font-weight: 800; color: var(--accent); letter-spacing: -.5px; margin-bottom: 6px; }
+.lcard .logo { display: inline-flex; align-items: center; justify-content: center; gap: 10px; font-size: 28px; font-weight: 800; color: var(--accent); letter-spacing: -.5px; margin-bottom: 6px; }
+.brand-logo { width: 34px; height: 34px; display: block; }
 .lcard p { color: var(--muted); font-size: 13px; margin-bottom: 28px; }
 .inp { width: 100%; padding: 11px 14px; background: #0d0f0e; border: 1px solid var(--border2); border-radius: 10px; color: var(--text); font-size: 13px; font-family: monospace; outline: none; margin-bottom: 12px; }
 .inp:focus { border-color: var(--accent); }
@@ -32,7 +34,8 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
 /* ─── APP ─── */
 #app { display: none; }
 .topbar { height: 58px; background: var(--card); border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; padding: 0 28px; position: sticky; top: 0; z-index: 50; }
-.topbar .brand { font-weight: 800; font-size: 16px; color: var(--accent); letter-spacing: -.3px; }
+.topbar .brand { display: inline-flex; align-items: center; gap: 9px; font-weight: 800; font-size: 16px; color: var(--accent); letter-spacing: -.3px; }
+.topbar .brand-logo { width: 25px; height: 25px; }
 .topbar .right { display: flex; align-items: center; gap: 14px; }
 .topbar .ts { font-size: 11px; color: var(--faint); }
 .btn-sm { padding: 7px 14px; font-size: 12px; font-weight: 600; border: 1px solid var(--border2); background: var(--card2); color: var(--muted); border-radius: 8px; cursor: pointer; transition: .15s; }
@@ -124,6 +127,26 @@ dialog.modal--sm { width: 400px; }
 .confirm-desc { color: var(--muted); font-size: 13px; line-height: 1.6; margin-bottom: 4px; }
 .btn-danger { padding: 9px 18px; background: var(--red); border: none; border-radius: 9px; color: #fff; font-weight: 700; cursor: pointer; font-size: 13px; }
 
+/* devices badge */
+.dev-badge { display: inline-flex; align-items: center; gap: 5px; font-size: 11px; }
+.dev-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--faint); }
+.dev-dot--on { background: var(--green); }
+.dev-count { color: var(--muted); }
+.dev-expand { background: none; border: none; color: var(--faint); cursor: pointer; font-size: 11px; margin-left: 4px; padding: 2px 5px; border-radius: 4px; transition: .12s; }
+.dev-expand:hover { background: var(--card2); color: var(--accent); }
+
+/* activation detail row */
+.detail-row td { padding: 0; border-bottom: 1px solid var(--border); }
+.detail-inner { padding: 10px 18px 14px 36px; }
+.act-table { width: 100%; border-collapse: collapse; font-size: 11.5px; }
+.act-table th { background: none; padding: 5px 10px; text-align: left; font-size: 10px; color: var(--faint); border-bottom: 1px solid var(--border); text-transform: uppercase; letter-spacing: .06em; }
+.act-table td { padding: 7px 10px; border-bottom: 1px solid rgba(255,255,255,.04); color: var(--muted); }
+.act-table tr:last-child td { border-bottom: none; }
+.act-status-on  { color: var(--green); font-weight: 600; }
+.act-status-off { color: var(--faint); }
+.act-ver  { font-family: monospace; color: var(--accent); }
+.no-acts  { color: var(--faint); font-size: 12px; padding: 8px 0; }
+
 /* toast */
 .toast { position: fixed; bottom: 24px; right: 24px; background: var(--card2); border: 1px solid var(--border2); border-radius: 12px; padding: 13px 20px; font-size: 13px; display: none; z-index: 999; box-shadow: 0 8px 32px rgba(0,0,0,.4); }
 .toast.show { display: block; }
@@ -133,7 +156,7 @@ dialog.modal--sm { width: 400px; }
 
 <div id="login">
   <div class="lcard">
-    <div class="logo">⚡ Helpmeet</div>
+    <div class="logo"><img class="brand-logo" src="assets/helpmeet-symbol.svg" alt="">Helpmeet</div>
     <p>Panel de administración</p>
     <input class="inp" type="password" id="keyInput" placeholder="Admin Key" autocomplete="off" aria-label="Admin Key">
     <button class="btn-primary" id="loginBtn">Entrar</button>
@@ -143,7 +166,7 @@ dialog.modal--sm { width: 400px; }
 
 <div id="app">
   <div class="topbar">
-    <span class="brand">⚡ Helpmeet Admin</span>
+    <span class="brand"><img class="brand-logo" src="assets/helpmeet-symbol.svg" alt="">Helpmeet Admin</span>
     <div class="right">
       <span class="ts" id="lastUpdated"></span>
       <button class="btn-sm" id="refreshBtn">↻ Actualizar</button>
@@ -180,7 +203,7 @@ dialog.modal--sm { width: 400px; }
         <thead>
           <tr>
             <th>#</th><th>Cliente</th><th>Key</th><th>Plan</th>
-            <th>Estado</th><th>Email</th><th>Creada</th><th>Acciones</th>
+            <th>Estado</th><th>Dispositivos</th><th>Email</th><th>Creada</th><th>Acciones</th>
           </tr>
         </thead>
         <tbody id="licBody"></tbody>
@@ -334,13 +357,50 @@ async function loadData() {
   }
 }
 
+function fmtDate(dt) {
+  if (!dt) return '—';
+  return new Date(dt).toLocaleDateString('es', { day: '2-digit', month: 'short', year: '2-digit' });
+}
+function fmtDatetime(dt) {
+  if (!dt) return '—';
+  const d = new Date(dt);
+  return d.toLocaleDateString('es', { day: '2-digit', month: 'short' }) + ' ' + d.toLocaleTimeString('es', { hour: '2-digit', minute: '2-digit' });
+}
+
+function renderActivationDetail(acts, colspan) {
+  const tr = document.createElement('tr');
+  tr.className = 'detail-row';
+  const td = document.createElement('td');
+  td.colSpan = colspan;
+  if (!acts || acts.length === 0) {
+    td.innerHTML = `<div class="detail-inner"><span class="no-acts">Sin dispositivos activados aún.</span></div>`;
+  } else {
+    const rows = acts.map(a => `
+      <tr>
+        <td>${esc(a.device_name || '—')}</td>
+        <td>${esc(a.os || '—')}</td>
+        <td><span class="act-ver">${esc(a.app_version || '—')}</span></td>
+        <td class="${a.status === 'active' ? 'act-status-on' : 'act-status-off'}">${a.status === 'active' ? '● Activo' : '○ Inactivo'}</td>
+        <td class="td-date">${fmtDatetime(a.first_activated_at)}</td>
+        <td class="td-date">${fmtDatetime(a.last_seen_at)}</td>
+      </tr>`).join('');
+    td.innerHTML = `<div class="detail-inner">
+      <table class="act-table">
+        <thead><tr><th>Dispositivo</th><th>OS</th><th>Versión app</th><th>Estado</th><th>Primera activación</th><th>Última validación</th></tr></thead>
+        <tbody>${rows}</tbody>
+      </table></div>`;
+  }
+  tr.appendChild(td);
+  return tr;
+}
+
 function renderTable(lics) {
   const body = el('licBody');
   body.innerHTML = '';
 
   lics.slice().reverse().forEach(lic => {
     const isNew = (Date.now() - new Date(lic.created_at).getTime()) < 86400000;
-    const date = new Date(lic.created_at).toLocaleDateString('es', { day: '2-digit', month: 'short' });
+    const date = fmtDate(lic.created_at);
     const email = lic.customer?.email || '—';
     const newTag = isNew ? `<span class="badge badge-new">NUEVO</span>` : '';
 
@@ -356,6 +416,14 @@ function renderTable(lics) {
       pending: `<span class="mail-pending">⟳ Enviando</span>`,
     }[es] ?? `<span class="mail-no">— Sin enviar</span>`;
 
+    const acts = lic.activations || [];
+    const activeCount = acts.filter(a => a.status === 'active').length;
+    const devDot = activeCount > 0
+      ? `<span class="dev-dot dev-dot--on"></span>`
+      : `<span class="dev-dot"></span>`;
+    const devCol = `<div class="dev-badge">${devDot}<span class="dev-count">${activeCount}/${lic.max_devices}</span>
+      <button class="dev-expand" data-action="toggle" data-id="${lic.id}" title="Ver historial de dispositivos">▾ ${acts.length}</button></div>`;
+
     const actions = lic.status === 'active'
       ? `<div class="actions">
           <button class="abtn abtn-send"  data-action="send"  data-id="${lic.id}" data-email="${esc(email)}">✉ Enviar key</button>
@@ -366,12 +434,14 @@ function renderTable(lics) {
 
     const tr = document.createElement('tr');
     tr.id = `row-${lic.id}`;
+    tr.dataset.acts = JSON.stringify(acts);
     tr.innerHTML = `
       <td class="td-id">#${lic.id}</td>
       <td class="email-cell">${esc(email)}${newTag}</td>
       <td><span class="mono">...${esc(lic.key_last4)}</span></td>
       <td class="td-plan">${esc(lic.plan)}</td>
       <td>${badge}</td>
+      <td>${devCol}</td>
       <td id="email-status-${lic.id}">${emailCol}</td>
       <td class="td-date">${esc(date)}</td>
       <td>${actions}</td>`;
@@ -390,6 +460,20 @@ el('licBody').addEventListener('click', e => {
   if (action === 'send')   sendKey(Number(id), email, btn);
   if (action === 'reset')  confirmAction('reset', Number(id));
   if (action === 'revoke') confirmAction('revoke', Number(id));
+  if (action === 'toggle') {
+    const mainRow = document.getElementById(`row-${id}`);
+    const existing = document.getElementById(`detail-${id}`);
+    if (existing) {
+      existing.remove();
+      btn.textContent = `▾ ${JSON.parse(mainRow.dataset.acts).length}`;
+    } else {
+      const acts = JSON.parse(mainRow.dataset.acts);
+      const detailRow = renderActivationDetail(acts, 9);
+      detailRow.id = `detail-${id}`;
+      mainRow.after(detailRow);
+      btn.textContent = `▴ ${acts.length}`;
+    }
+  }
 });
 
 async function sendKey(id, email, btn) {

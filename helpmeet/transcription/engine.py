@@ -19,6 +19,38 @@ def _model_cache_dir(model_name: str) -> Path | None:
     return cache / ("models--" + repo.replace("/", "--"))
 
 
+def _local_model_dir(model_name: str) -> Path:
+    """Carpeta propia de Helpmeet para modelos descargados SIN symlinks.
+
+    Usada como fallback cuando el caché de HuggingFace usa symlinks de Windows
+    que apuntan a blobs corruptos o incompletos. Los archivos aquí son copias
+    reales; `local_dir_use_symlinks=False` garantiza que la descarga no deje
+    referencias a blobs inaccesibles.
+    """
+    return Path(config.DATA_DIR) / "models" / model_name
+
+
+def _download_to_local_dir(model_name: str) -> Path:
+    """Descarga el modelo a la carpeta local de Helpmeet (sin symlinks).
+
+    Devuelve la ruta al directorio con los archivos del modelo, lista para
+    pasarla directamente a WhisperModel().
+    """
+    import logging
+    log = logging.getLogger("helpmeet")
+    local_dir = _local_model_dir(model_name)
+    shutil.rmtree(local_dir, ignore_errors=True)
+    local_dir.mkdir(parents=True, exist_ok=True)
+    from huggingface_hub import snapshot_download
+    local_path = snapshot_download(
+        repo_id=f"Systran/faster-whisper-{model_name}",
+        local_dir=str(local_dir),
+        local_dir_use_symlinks=False,   # archivos reales, no symlinks de Windows
+    )
+    log.info("Modelo '%s' descargado a carpeta local: %s", model_name, local_path)
+    return Path(local_path)
+
+
 def _is_corrupt_model_error(exc: Exception) -> bool:
     """¿El fallo es por un modelo descargado a medias (model.bin roto/incompleto)?"""
     msg = str(exc).lower()
@@ -75,22 +107,20 @@ def _is_network_error(exc: Exception) -> bool:
 def _load_single_model(model_name: str) -> WhisperModel:
     """Carga el modelo con manejo robusto de errores.
 
-    Estrategia de fallback (en orden):
-    1. Intento normal con compute_type del config.
-    2. Si falla por AVX2/CPU incompatible → reintenta con float32 (universal).
-    3. Si sigue fallando → borra caché y re-descarga + float32.
+    Estrategia (en orden):
+    1. Si ya existe copia local sin symlinks → carga desde ahí.
+    2. Si no → intento normal desde caché HuggingFace.
+    3. Si falla por compute_type → reintenta con float32.
+    4. Si falla por corrupción (model.bin roto/symlink muerto) →
+       descarga a carpeta local SIN symlinks y carga desde la ruta real.
     """
     import logging
     log = logging.getLogger("helpmeet")
     _sizes = {'base': 150, 'small': 460, 'medium': 1500, 'large-v3': 3000}
 
-    def _create(compute_type: str | None = None):
+    def _create(model_path: str, compute_type: str | None = None) -> WhisperModel:
         ct = compute_type or config.WHISPER_COMPUTE_TYPE
-        return WhisperModel(
-            model_name,
-            device=config.WHISPER_DEVICE,
-            compute_type=ct,
-        )
+        return WhisperModel(model_path, device=config.WHISPER_DEVICE, compute_type=ct)
 
     def _no_internet_error(exc) -> RuntimeError:
         size_mb = _sizes.get(model_name, 500)
@@ -100,55 +130,76 @@ def _load_single_model(model_name: str) -> WhisperModel:
             f"Conéctate a internet y vuelve a intentarlo. Detalle: {exc}"
         )
 
-    # Intento 1: configuración normal
+    # Paso 1: usar copia local si ya existe (evita el sistema de symlinks de HF)
+    local_dir = _local_model_dir(model_name)
+    if (local_dir / "model.bin").exists() and (local_dir / "model.bin").stat().st_size > 1_000_000:
+        log.debug("Cargando modelo '%s' desde carpeta local: %s", model_name, local_dir)
+        try:
+            model = _create(str(local_dir))
+            log.info("Modelo '%s' cargado desde carpeta local correctamente", model_name)
+            return model
+        except Exception as exc_local:
+            log.warning("Fallo cargando desde carpeta local (%s), reintentando con HF cache", exc_local)
+            shutil.rmtree(local_dir, ignore_errors=True)
+
+    # Paso 2: intento normal desde caché HuggingFace
     log.debug("Cargando modelo Whisper '%s' (compute_type=%s)", model_name, config.WHISPER_COMPUTE_TYPE)
     try:
-        model = _create()
+        model = _create(model_name)
         log.info("Modelo '%s' cargado correctamente", model_name)
         return model
     except Exception as exc:  # noqa: BLE001
         if _is_network_error(exc):
-            log.exception("Error de red al descargar modelo '%s'", model_name)
             raise _no_internet_error(exc) from exc
         if _is_corrupt_model_error(exc):
             log.warning(
-                "Modelo '%s': caché incompleta/corrupta (%s). Se limpiará y se "
-                "descargará nuevamente.",
+                "Modelo '%s': caché incompleta/corrupta (%s). "
+                "Se descargará a carpeta local sin symlinks.",
                 model_name, exc,
             )
         elif _is_compute_type_error(exc):
             log.warning(
-                "Modelo '%s': compute_type='%s' no disponible en este equipo. "
-                "Reintentando con float32.",
+                "Modelo '%s': compute_type='%s' no disponible. Reintentando con float32.",
                 model_name, config.WHISPER_COMPUTE_TYPE,
             )
             try:
-                model = _create("float32")
-                log.info("Modelo '%s' cargado correctamente con float32 (fallback)", model_name)
+                model = _create(model_name, "float32")
+                log.info("Modelo '%s' cargado con float32", model_name)
                 return model
             except Exception as exc2:  # noqa: BLE001
                 if _is_network_error(exc2):
-                    log.exception("Error de red al descargar modelo '%s'", model_name)
                     raise _no_internet_error(exc2) from exc2
                 if not _is_corrupt_model_error(exc2):
                     log.exception("Fallo con float32 en modelo '%s'", model_name)
                     raise
-                log.warning("Modelo '%s': caché corrupta también con float32.", model_name)
+                log.warning("Modelo '%s': caché corrupta con float32 también.", model_name)
         else:
             log.exception("Error inesperado al cargar modelo '%s'", model_name)
             raise
 
-    # Caché corrupta → borrar y re-descargar con float32
-    folder = _model_cache_dir(model_name)
+    # Paso 3 (caché HF corrupta): limpiar caché HF Y descargar a carpeta local sin symlinks.
+    # Esto resuelve el problema de symlinks de Windows apuntando a blobs vacíos/corruptos.
+    hf_folder = _model_cache_dir(model_name)
     log.warning(
-        "Modelo '%s': caché corrupta. Borrando '%s' y re-descargando…",
-        model_name, folder,
+        "Modelo '%s': caché corrupta. Limpiando HF cache y descargando a carpeta local…",
+        model_name,
     )
-    if folder and folder.exists():
-        shutil.rmtree(folder, ignore_errors=True)
+    if hf_folder and hf_folder.exists():
+        try:
+            shutil.rmtree(hf_folder)
+        except Exception:
+            import time
+            renamed = hf_folder.parent / f"{hf_folder.name}.corrupt.{int(time.time())}"
+            try:
+                hf_folder.rename(renamed)
+                log.warning("HF cache renombrado a '%s' (archivos bloqueados)", renamed)
+            except Exception as rename_exc:
+                log.error("No se pudo eliminar ni renombrar '%s': %s", hf_folder, rename_exc)
+
     try:
-        model = _create("float32")
-        log.info("Modelo '%s' re-descargado y cargado con float32", model_name)
+        local_path = _download_to_local_dir(model_name)
+        model = _create(str(local_path), "float32")
+        log.info("Modelo '%s' cargado correctamente desde carpeta local (sin symlinks)", model_name)
         return model
     except Exception as exc3:  # noqa: BLE001
         log.exception("Fallo definitivo al cargar modelo '%s'", model_name)
