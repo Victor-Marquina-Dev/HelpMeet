@@ -121,3 +121,54 @@ def extract_audio_to_wav(src_path: str, dest_path: str, rate: int = TARGET_RATE)
         dest.unlink(missing_ok=True)
         raise ValueError("No se pudo extraer audio utilizable del archivo.")
     return str(dest)
+
+
+def extract_audio_segments_to_wav(src_path, segments, dest_path, rate=TARGET_RATE):
+    """Extrae el audio de cada tramo (inicio, fin) y lo concatena en un WAV mono.
+
+    `segments` es una lista de tuplas en segundos, ya normalizada. Usa seek para
+    no decodificar el vídeo entero. Devuelve la ruta del WAV.
+    """
+    dest = Path(dest_path)
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    container = av.open(src_path)
+    if not container.streams.audio:
+        container.close()
+        raise ValueError("El archivo no tiene pista de audio.")
+    audio_stream = container.streams.audio[0]
+    resampler = AudioResampler(format="s16", layout="mono", rate=rate)
+    written = 0
+    try:
+        with wave.open(str(dest), "wb") as wav:
+            wav.setnchannels(1)
+            wav.setsampwidth(2)
+            wav.setframerate(rate)
+
+            def write_frames(frames):
+                nonlocal written
+                for frame in frames:
+                    wav.writeframesraw(frame.to_ndarray().tobytes())
+                    written += 1
+
+            time_base = float(audio_stream.time_base)
+            for start, end in segments:
+                seek_pts = int(start / time_base) if time_base else int(start * 1_000_000)
+                container.seek(seek_pts, stream=audio_stream,
+                               backward=True, any_frame=False)
+                for frame in container.decode(audio=0):
+                    t = float(frame.pts * audio_stream.time_base) if frame.pts is not None else 0.0
+                    if t < start:
+                        continue
+                    if t >= end:
+                        break
+                    write_frames(resampler.resample(frame))
+            write_frames(resampler.resample(None))
+    except Exception:
+        dest.unlink(missing_ok=True)
+        raise
+    finally:
+        container.close()
+    if not written:
+        dest.unlink(missing_ok=True)
+        raise ValueError("No se pudo extraer audio de los tramos indicados.")
+    return str(dest)
