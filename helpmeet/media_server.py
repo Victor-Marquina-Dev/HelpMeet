@@ -55,6 +55,12 @@ class MediaServer:
                     if len(spec) > 1 and spec[1]:
                         end = int(spec[1])
                     end = min(end, size - 1)
+                    if start >= size:
+                        self.send_response(416)
+                        self.send_header("Content-Range", f"bytes */{size}")
+                        self.send_header("Content-Length", "0")
+                        self.end_headers()
+                        return
                 length = max(0, end - start + 1)
                 self.send_response(status)
                 self.send_header("Content-Type", "video/mp4")
@@ -90,3 +96,5 @@ class MediaServer:
         if self._httpd:
             self._httpd.shutdown()
             self._httpd = None
+            self._thread = None
+            self.base_url = ""

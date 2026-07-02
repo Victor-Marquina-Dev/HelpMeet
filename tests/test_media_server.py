@@ -29,3 +29,18 @@ def test_unknown_meeting_returns_404(tmp_path):
             assert e.code == 404
     finally:
         server.stop()
+
+
+def test_serves_open_ended_range(tmp_path):
+    f = tmp_path / "video.mp4"
+    f.write_bytes(b"ABCDEFGHIJ")
+    server = MediaServer(lambda mid: str(f) if mid == 7 else None)
+    base = server.start()
+    try:
+        req = urllib.request.Request(f"{base}/media/7", headers={"Range": "bytes=5-"})
+        resp = urllib.request.urlopen(req, timeout=5)
+        assert resp.status == 206
+        assert resp.read() == b"FGHIJ"
+        assert resp.headers["Content-Range"] == "bytes 5-9/10"
+    finally:
+        server.stop()
