@@ -1143,6 +1143,55 @@ class Api:
             result = [{**m, "thumbnail": ""} for m in monitors]
         return result
 
+    def get_video_thumbnails(self, meeting_id, count=12):
+        """Devuelve `count` miniaturas equiespaciadas del vídeo como JPEG base64.
+
+        Cada elemento: {"t": segundos, "thumb": base64_o_vacío}. Se usa para
+        dibujar la línea de tiempo del recortador."""
+        import base64
+        import av
+        from helpmeet.media import media_duration
+        from helpmeet.video.preview import _encode_jpeg
+        m = repo.get_meeting(self._session, int(meeting_id))
+        if not m or not m.audio_path or not os.path.exists(m.audio_path):
+            return []
+        path = m.audio_path
+        duration = media_duration(path)
+        if duration <= 0:
+            return []
+        count = max(1, min(int(count), 40))
+        THUMB_H = 60
+        result = []
+        try:
+            container = av.open(path)
+            if not container.streams.video:
+                container.close()
+                return []
+            stream = container.streams.video[0]
+            for i in range(count):
+                t = duration * (i + 0.5) / count
+                try:
+                    if stream.time_base:
+                        seek_pts = int(t / float(stream.time_base))
+                    else:
+                        seek_pts = int(t * 1_000_000)
+                    container.seek(seek_pts, stream=stream, backward=True, any_frame=False)
+                    frame = next(container.decode(video=0))
+                    sw, sh = frame.width, frame.height
+                    tw = max(2, int(sw * THUMB_H / sh))
+                    tw -= tw % 2
+                    scaled = frame.reformat(width=tw, height=THUMB_H,
+                                            format="yuvj420p", interpolation="LANCZOS")
+                    jpeg = _encode_jpeg(scaled, tw, THUMB_H)
+                    b64 = base64.b64encode(jpeg).decode() if jpeg else ""
+                except Exception:
+                    b64 = ""
+                result.append({"t": round(t, 2), "thumb": b64})
+            container.close()
+        except Exception:
+            return result
+        return result
+
     def take_capture(self, monitor_index=1):
         # Durante una grabación de pantalla, las capturas van a SU reunión.
         if self._screen_active and self._screen_meeting_id:
