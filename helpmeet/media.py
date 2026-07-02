@@ -123,7 +123,12 @@ def extract_audio_to_wav(src_path: str, dest_path: str, rate: int = TARGET_RATE)
     return str(dest)
 
 
-def extract_audio_segments_to_wav(src_path, segments, dest_path, rate=TARGET_RATE):
+def extract_audio_segments_to_wav(
+    src_path: str,
+    segments: list[tuple[float, float]],
+    dest_path: str,
+    rate: int = TARGET_RATE,
+) -> str:
     """Extrae el audio de cada tramo (inicio, fin) y lo concatena en un WAV mono.
 
     `segments` es una lista de tuplas en segundos, ya normalizada. Usa seek para
@@ -147,13 +152,19 @@ def extract_audio_segments_to_wav(src_path, segments, dest_path, rate=TARGET_RAT
             def write_frames(frames):
                 nonlocal written
                 for frame in frames:
-                    wav.writeframesraw(frame.to_ndarray().tobytes())
-                    written += 1
+                    raw = frame.to_ndarray().tobytes()
+                    wav.writeframesraw(raw)
+                    written += len(raw)
 
-            time_base = float(audio_stream.time_base)
+            if audio_stream.time_base:
+                def to_pts(s):
+                    return int(s / float(audio_stream.time_base))
+            else:
+                def to_pts(s):
+                    return int(s * 1_000_000)
+
             for start, end in segments:
-                seek_pts = int(start / time_base) if time_base else int(start * 1_000_000)
-                container.seek(seek_pts, stream=audio_stream,
+                container.seek(to_pts(start), stream=audio_stream,
                                backward=True, any_frame=False)
                 for frame in container.decode(audio=0):
                     t = float(frame.pts * audio_stream.time_base) if frame.pts is not None else 0.0
