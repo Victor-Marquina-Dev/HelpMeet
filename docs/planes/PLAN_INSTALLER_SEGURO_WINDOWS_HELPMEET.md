@@ -752,6 +752,41 @@ Notas clave de esas referencias:
 
 ---
 
+## Costes reales para quitar el aviso (actualizado 2026)
+
+Hay tres formas de firmar, de más barata a más cara. El precio es aproximado y varía
+según el proveedor:
+
+| Opción | Coste | ¿Token físico? | ¿Quita "Editor desconocido"? | ¿Elimina SmartScreen el día 1? |
+|---|---|---|---|---|
+| **Microsoft Trusted Signing** (Azure) | **~10 USD/mes** (~120 USD/año) | No | Sí | No — la reputación se acumula |
+| **Certificado OV** (Certum, Sectigo…) | **~90–200 USD/año** + token USB ~50–80 USD la 1.ª vez | Sí (USB o HSM en nube) | Sí | No — la reputación se acumula |
+| **Certificado EV** | **~300–500 USD/año** | Sí (USB/HSM) | Sí | Ayuda más, pero ya no está garantizado |
+
+### Notas que conviene entender
+
+- **Desde 2023, los certificados OV y EV obligan a guardar la clave en hardware**
+  (un token USB) o en un servicio en la nube. Por eso el coste extra del token.
+- **Microsoft Trusted Signing NO necesita token** y se integra con el pipeline
+  `scripts/build_release.ps1` que ya existe. Requisito: Microsoft valida la identidad de
+  la empresa (MimoTech) y ha pedido cierta antigüedad de la organización; si no califica,
+  la alternativa barata es un OV de Certum.
+- **Ninguna opción borra el aviso mágicamente el primer día.** Lo que sí se consigue
+  enseguida: el mensaje deja de decir *"Editor desconocido"* y muestra **MimoTech**, y la
+  reputación se acumula por **editor/certificado** (no por archivo). Es decir, cada nueva
+  versión firmada con el mismo certificado **hereda** la confianza ya ganada.
+- La reputación mejora con: descargas reales desde una fuente oficial, sin reportes
+  negativos, y usando siempre el mismo certificado.
+
+### Recomendación coste/beneficio
+
+Empezar con **Microsoft Trusted Signing (~10 USD/mes)**: es lo más barato, no requiere
+token físico y el pipeline ya está preparado. Si MimoTech no califica, un **certificado
+OV de Certum (~90–100 USD/año)** es la mejor alternativa. El **EV** solo compensa si se
+busca máxima confianza empresarial y se puede asumir el gasto.
+
+---
+
 ### Próximo paso recomendado
 
 1. Contratar **Microsoft Trusted Signing** en Azure (~9 USD/mes) o comprar certificado OV (~70-150 USD/año).
