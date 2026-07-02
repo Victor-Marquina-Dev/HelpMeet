@@ -682,24 +682,14 @@ async function createLicense() {
       return;
     }
     const lic = await rl.json();
-    // Generar key real y enviar email en el mismo paso
-    btn.textContent = 'Generando key...';
-    const rg = await apiFetch(`/api/admin/licenses/${lic.id}/generate-key`, { method: 'POST' });
-    if (!rg.ok) {
-      errEl.textContent = 'Licencia creada pero error al generar la key. Usa "Enviar key" en la tabla.';
-      errEl.style.display = 'block';
-      btn.disabled = false;
-      btn.textContent = 'Crear licencia';
-      loadData();
-      return;
-    }
-    const gdata = await rg.json();
-    createdKey = gdata.key;
+    // create_license genera la key y envía el email en el mismo paso, con la
+    // misma key que devuelve aquí: así el panel y el email coinciden siempre.
+    createdKey = lic.license_key;
     el('keyValue').textContent = createdKey;
     el('keyResult').style.display = 'block';
     btn.style.display = 'none';
     addLog('ok', `Licencia #${lic.id} creada para ${email} — key: ···${createdKey.slice(-4)}`);
-    showToast(gdata.email_sent ? 'Licencia creada · Email enviado a tu Gmail' : 'Licencia creada · Key generada');
+    showToast(lic.email_sent ? 'Licencia creada · Email enviado a tu Gmail' : 'Licencia creada · Key generada');
   } catch {
     errEl.textContent = 'Error de conexión';
     errEl.style.display = 'block';
