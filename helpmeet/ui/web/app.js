@@ -1973,6 +1973,10 @@ async function openClipEditor(wrap, t, isRetx) {
       </div>
     </div>`;
   wrap.appendChild(ed);
+  if (!url) {
+    ed.querySelector('.clip-total').textContent = 'No se pudo cargar el vídeo';
+    return;
+  }
 
   const video = ed.querySelector('.clip-video');
   const tl = ed.querySelector('.clip-tl');
@@ -2034,15 +2038,21 @@ async function openClipEditor(wrap, t, isRetx) {
         else state.b = Math.max(t2, state.a + 0.2);
         paintSel();
       };
-      const up = () => { handle.releasePointerCapture(e.pointerId); handle.removeEventListener('pointermove', move); handle.removeEventListener('pointerup', up); };
+      const end = () => {
+        handle.releasePointerCapture(e.pointerId);
+        handle.removeEventListener('pointermove', move);
+        handle.removeEventListener('pointerup', end);
+        handle.removeEventListener('pointercancel', end);
+      };
       handle.addEventListener('pointermove', move);
-      handle.addEventListener('pointerup', up);
+      handle.addEventListener('pointerup', end);
+      handle.addEventListener('pointercancel', end);
     });
   }
   drag(hL, true); drag(hR, false);
 
   tl.addEventListener('click', e => {
-    if (e.target.classList.contains('clip-h')) return;
+    if (e.target.closest('.clip-h')) return;
     const rect = tl.getBoundingClientRect();
     video.currentTime = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width)) * state.dur;
   });
