@@ -16,6 +16,7 @@
   --accent: #aacfbf; --accent-dim: rgba(170,207,191,.1);
   --text: #e2e8e4; --muted: #9ca89f; --faint: #5c6660;
   --on-accent: #0a1a12;
+  --radius: 12px;
 }
 body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; font-size: 14px; }
 
@@ -33,123 +34,136 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
 
 /* ─── APP ─── */
 #app { display: none; }
-.topbar { height: 58px; background: var(--card); border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; padding: 0 28px; position: sticky; top: 0; z-index: 50; }
+.topbar { height: 56px; background: var(--card); border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; padding: 0 28px; position: sticky; top: 0; z-index: 50; }
 .topbar .brand { display: inline-flex; align-items: center; gap: 9px; font-weight: 800; font-size: 16px; color: var(--accent); letter-spacing: -.3px; }
-.topbar .brand-logo { width: 25px; height: 25px; }
-.topbar .right { display: flex; align-items: center; gap: 14px; }
+.topbar .brand .brand-logo { width: 24px; height: 24px; }
+.topbar .right { display: flex; align-items: center; gap: 10px; }
 .topbar .ts { font-size: 11px; color: var(--faint); }
-.btn-sm { padding: 7px 14px; font-size: 12px; font-weight: 600; border: 1px solid var(--border2); background: var(--card2); color: var(--muted); border-radius: 8px; cursor: pointer; transition: .15s; }
+.btn-sm { padding: 7px 13px; font-size: 12px; font-weight: 600; border: 1px solid var(--border2); background: transparent; color: var(--muted); border-radius: 8px; cursor: pointer; transition: .15s; white-space: nowrap; }
 .btn-sm:hover { color: var(--text); border-color: var(--accent); }
 
-.main { max-width: 1160px; margin: 0 auto; padding: 28px 20px; }
+.main { max-width: 1100px; margin: 0 auto; padding: 28px 20px 60px; }
 
 /* ─── STATS ─── */
-.stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin-bottom: 28px; }
-.stat { background: var(--card); border: 1px solid var(--border); border-radius: 14px; padding: 22px 20px; }
-.stat .n { font-size: 34px; font-weight: 800; color: var(--accent); line-height: 1; }
+.stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 32px; }
+.stat { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); padding: 20px 18px; }
+.stat .n { font-size: 32px; font-weight: 800; color: var(--accent); line-height: 1; }
 .stat .n--green { color: var(--green); }
 .stat .n--red { color: var(--red); }
-.stat .l { font-size: 12px; color: var(--muted); margin-top: 6px; }
+.stat .l { font-size: 11px; color: var(--muted); margin-top: 5px; text-transform: uppercase; letter-spacing: .04em; }
 
 /* ─── LOG ─── */
-.section-hd { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
-.section-title { font-size: 13px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; }
-.log-box { background: #080a09; border: 1px solid var(--border); border-radius: 12px; padding: 16px; font-family: monospace; font-size: 12px; max-height: 140px; overflow-y: auto; line-height: 2; }
+.log-section { margin-bottom: 24px; display: none; }
+.section-hd { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+.section-title { font-size: 12px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: .07em; }
+.log-box { background: #080a09; border: 1px solid var(--border); border-radius: 10px; padding: 14px 16px; font-family: monospace; font-size: 12px; max-height: 130px; overflow-y: auto; line-height: 2; }
 .log-ok  { color: var(--green); }
 .log-err { color: var(--red); }
 .log-ts  { color: var(--faint); margin-right: 8px; }
-#logSection { display: none; margin-bottom: 24px; }
+
+/* ─── SECTION HEADER ─── */
+.tbar { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+.tbar-left { display: flex; align-items: center; gap: 10px; }
 
 /* ─── TABLE ─── */
-.tbar { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
-.table-wrap { background: var(--card); border: 1px solid var(--border); border-radius: 14px; overflow: hidden; }
-.table-loading { padding: 40px; text-align: center; color: var(--muted); }
+.table-wrap { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; }
+.table-loading { padding: 40px; text-align: center; color: var(--muted); font-size: 13px; }
+.table-empty { padding: 28px; text-align: center; color: var(--faint); font-size: 13px; }
 table { width: 100%; border-collapse: collapse; }
-th { background: var(--card2); padding: 11px 16px; text-align: left; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: var(--faint); border-bottom: 1px solid var(--border); }
-td { padding: 13px 16px; border-bottom: 1px solid var(--border); vertical-align: middle; }
+th { background: var(--card2); padding: 10px 14px; text-align: left; font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .07em; color: var(--faint); border-bottom: 1px solid var(--border); }
+td { padding: 12px 14px; border-bottom: 1px solid var(--border); vertical-align: middle; }
 tr:last-child td { border-bottom: none; }
-tr:hover td { background: rgba(255,255,255,.018); }
+tr:hover td { background: rgba(255,255,255,.015); }
 
+/* ─── BADGES ─── */
 .badge { display: inline-flex; align-items: center; gap: 5px; padding: 3px 9px; border-radius: 20px; font-size: 11px; font-weight: 700; }
 .badge-active   { background: var(--green-dim); color: var(--green); }
 .badge-revoked  { background: var(--red-dim); color: var(--red); }
 .badge-refunded { background: var(--yellow-dim); color: var(--yellow); }
-.badge-new { background: var(--accent-dim); color: var(--accent); margin-left: 5px; font-size: 10px; }
+.badge-count { background: rgba(255,255,255,.06); color: var(--muted); font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: 20px; }
 
-.td-id    { color: var(--faint); }
-.td-plan  { text-transform: capitalize; color: var(--muted); }
-.td-date  { color: var(--faint); font-size: 12px; }
-.td-inactive { color: var(--faint); font-size: 11px; }
-
+/* ─── CELLS ─── */
+.td-id    { color: var(--faint); font-size: 12px; }
+.td-plan  { text-transform: capitalize; color: var(--muted); font-size: 12px; }
+.td-date  { color: var(--faint); font-size: 11.5px; white-space: nowrap; }
 .mono { font-family: monospace; font-size: 12px; letter-spacing: .05em; color: var(--accent); }
-.email-cell { max-width: 220px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.email-cell { max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; }
+.badge-new { background: var(--accent-dim); color: var(--accent); margin-left: 5px; font-size: 9px; padding: 2px 7px; }
 
 /* email status */
 .mail-ok      { display: inline-flex; align-items: center; gap: 4px; color: var(--green); font-size: 11px; font-weight: 600; }
 .mail-no      { color: var(--faint); font-size: 11px; }
 .mail-pending { color: var(--yellow); font-size: 11px; }
 
-/* action buttons */
-.actions { display: flex; gap: 6px; flex-wrap: wrap; }
-.abtn { padding: 6px 11px; font-size: 11px; font-weight: 600; border: none; border-radius: 7px; cursor: pointer; transition: .12s; white-space: nowrap; }
-.abtn:disabled { opacity: .45; cursor: default; }
-.abtn-send  { background: rgba(74,222,128,.12); color: var(--green); }
-.abtn-send:hover:not(:disabled) { background: rgba(74,222,128,.2); }
-.abtn-reset { background: rgba(170,207,191,.1); color: var(--accent); }
-.abtn-reset:hover { background: rgba(170,207,191,.18); }
-.abtn-rev   { background: var(--red-dim); color: var(--red); }
-.abtn-rev:hover { background: rgba(248,113,113,.18); }
-
-.btn-green { padding: 9px 18px; background: var(--accent); border: none; border-radius: 10px; color: var(--on-accent); font-weight: 700; font-size: 13px; cursor: pointer; }
-.btn-green:hover { background: #c5ebda; }
-
-/* ─── MODAL ─── */
-dialog { background: var(--card); border: 1px solid var(--border2); border-radius: 18px; padding: 32px; width: 460px; max-width: 95vw; color: var(--text); position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); margin: 0; }
-dialog::backdrop { background: rgba(0,0,0,.7); backdrop-filter: blur(2px); }
-dialog h3 { font-size: 17px; font-weight: 700; margin-bottom: 18px; }
-dialog.modal--sm { width: 400px; }
-.check-label { display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 13px; color: var(--muted); }
-.modal-field { margin-bottom: 14px; }
-.modal-field label { display: block; font-size: 11px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: .05em; margin-bottom: 6px; }
-.modal-field input,
-.modal-field select { width: 100%; padding: 10px 14px; background: #0d0f0e; border: 1px solid var(--border2); border-radius: 9px; color: var(--text); font-size: 13px; outline: none; }
-.modal-field input:focus,
-.modal-field select:focus { border-color: var(--accent); }
-.modal-btns { display: flex; gap: 10px; justify-content: flex-end; margin-top: 22px; }
-.btn-cancel { padding: 9px 18px; background: var(--card2); border: none; border-radius: 9px; color: var(--muted); cursor: pointer; font-size: 13px; }
-.btn-cancel:hover { color: var(--text); }
-.key-result { display: none; margin-top: 18px; background: #080a09; border: 1px solid rgba(74,222,128,.2); border-radius: 12px; padding: 20px; text-align: center; }
-.key-result .lbl { font-size: 11px; color: var(--muted); margin-bottom: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: .06em; }
-.key-result code { font-size: 20px; letter-spacing: 3px; color: var(--green); font-weight: 700; font-family: monospace; }
-.key-result .copy-btn { margin-top: 12px; background: var(--card2); border: none; border-radius: 7px; padding: 6px 14px; color: var(--muted); cursor: pointer; font-size: 12px; }
-
-/* confirm modal */
-.confirm-desc { color: var(--muted); font-size: 13px; line-height: 1.6; margin-bottom: 4px; }
-.btn-danger { padding: 9px 18px; background: var(--red); border: none; border-radius: 9px; color: #fff; font-weight: 700; cursor: pointer; font-size: 13px; }
-
-/* devices badge */
+/* devices */
 .dev-badge { display: inline-flex; align-items: center; gap: 5px; font-size: 11px; }
-.dev-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--faint); }
+.dev-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--faint); flex-shrink: 0; }
 .dev-dot--on { background: var(--green); }
 .dev-count { color: var(--muted); }
-.dev-expand { background: none; border: none; color: var(--faint); cursor: pointer; font-size: 11px; margin-left: 4px; padding: 2px 5px; border-radius: 4px; transition: .12s; }
+.dev-expand { background: none; border: none; color: var(--faint); cursor: pointer; font-size: 11px; margin-left: 2px; padding: 2px 5px; border-radius: 4px; transition: .12s; }
 .dev-expand:hover { background: var(--card2); color: var(--accent); }
 
-/* activation detail row */
+/* detail row */
 .detail-row td { padding: 0; border-bottom: 1px solid var(--border); }
-.detail-inner { padding: 10px 18px 14px 36px; }
+.detail-inner { padding: 8px 16px 14px 32px; }
 .act-table { width: 100%; border-collapse: collapse; font-size: 11.5px; }
 .act-table th { background: none; padding: 5px 10px; text-align: left; font-size: 10px; color: var(--faint); border-bottom: 1px solid var(--border); text-transform: uppercase; letter-spacing: .06em; }
-.act-table td { padding: 7px 10px; border-bottom: 1px solid rgba(255,255,255,.04); color: var(--muted); }
+.act-table td { padding: 6px 10px; border-bottom: 1px solid rgba(255,255,255,.04); color: var(--muted); }
 .act-table tr:last-child td { border-bottom: none; }
 .act-status-on  { color: var(--green); font-weight: 600; }
 .act-status-off { color: var(--faint); }
 .act-ver  { font-family: monospace; color: var(--accent); }
-.no-acts  { color: var(--faint); font-size: 12px; padding: 8px 0; }
+.no-acts  { color: var(--faint); font-size: 12px; padding: 8px 0; display: block; }
+
+/* ─── ACTION BUTTONS ─── */
+.actions { display: flex; gap: 5px; }
+.abtn { padding: 5px 10px; font-size: 11px; font-weight: 600; border: none; border-radius: 6px; cursor: pointer; transition: .12s; white-space: nowrap; display: inline-flex; align-items: center; gap: 4px; }
+.abtn:disabled { opacity: .4; cursor: default; }
+.abtn-send  { background: rgba(74,222,128,.12); color: var(--green); }
+.abtn-send:hover:not(:disabled) { background: rgba(74,222,128,.2); }
+.abtn-reset { background: rgba(170,207,191,.1); color: var(--accent); }
+.abtn-reset:hover:not(:disabled) { background: rgba(170,207,191,.18); }
+.abtn-rev   { background: var(--red-dim); color: var(--red); }
+.abtn-rev:hover:not(:disabled) { background: rgba(248,113,113,.18); }
+
+/* ─── BTN GREEN ─── */
+.btn-green { padding: 8px 16px; background: var(--accent); border: none; border-radius: 9px; color: var(--on-accent); font-weight: 700; font-size: 13px; cursor: pointer; transition: .12s; }
+.btn-green:hover { background: #c5ebda; }
+
+/* ─── REVOKED SECTION ─── */
+.revoked-section { margin-top: 28px; }
+.revoked-toggle-btn { display: flex; align-items: center; gap: 6px; background: none; border: 1px solid var(--border); border-radius: 8px; padding: 6px 12px; color: var(--muted); font-size: 12px; font-weight: 600; cursor: pointer; transition: .12s; }
+.revoked-toggle-btn:hover { border-color: var(--red); color: var(--red); }
+.revoked-table-wrap { margin-top: 10px; opacity: .8; }
+.revoked-table-wrap td { font-size: 12px; }
+
+/* ─── MODAL ─── */
+dialog { background: var(--card); border: 1px solid var(--border2); border-radius: 18px; padding: 30px; width: 440px; max-width: 95vw; color: var(--text); position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); margin: 0; }
+dialog::backdrop { background: rgba(0,0,0,.7); backdrop-filter: blur(2px); }
+dialog h3 { font-size: 16px; font-weight: 700; margin-bottom: 18px; }
+dialog.modal--sm { width: 380px; }
+.modal-field { margin-bottom: 13px; }
+.modal-field label { display: block; font-size: 11px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: .05em; margin-bottom: 5px; }
+.modal-field input,
+.modal-field select { width: 100%; padding: 9px 13px; background: #0d0f0e; border: 1px solid var(--border2); border-radius: 8px; color: var(--text); font-size: 13px; outline: none; }
+.modal-field input:focus,
+.modal-field select:focus { border-color: var(--accent); }
+.modal-btns { display: flex; gap: 8px; justify-content: flex-end; margin-top: 20px; }
+.btn-cancel { padding: 8px 16px; background: transparent; border: 1px solid var(--border2); border-radius: 8px; color: var(--muted); cursor: pointer; font-size: 13px; }
+.btn-cancel:hover { color: var(--text); }
+.key-result { display: none; margin-top: 16px; background: #080a09; border: 1px solid rgba(74,222,128,.2); border-radius: 10px; padding: 18px; text-align: center; }
+.key-result .lbl { font-size: 11px; color: var(--muted); margin-bottom: 9px; font-weight: 600; text-transform: uppercase; letter-spacing: .06em; }
+.key-result code { font-size: 20px; letter-spacing: 3px; color: var(--green); font-weight: 700; font-family: monospace; }
+.key-result .copy-btn { margin-top: 10px; background: var(--card2); border: none; border-radius: 6px; padding: 5px 13px; color: var(--muted); cursor: pointer; font-size: 12px; }
+
+/* confirm modal */
+.confirm-desc { color: var(--muted); font-size: 13px; line-height: 1.6; }
+.btn-danger { padding: 8px 16px; background: var(--red); border: none; border-radius: 8px; color: #fff; font-weight: 700; cursor: pointer; font-size: 13px; }
 
 /* toast */
-.toast { position: fixed; bottom: 24px; right: 24px; background: var(--card2); border: 1px solid var(--border2); border-radius: 12px; padding: 13px 20px; font-size: 13px; display: none; z-index: 999; box-shadow: 0 8px 32px rgba(0,0,0,.4); }
+.toast { position: fixed; bottom: 22px; right: 22px; background: var(--card2); border: 1px solid var(--border2); border-radius: 10px; padding: 11px 18px; font-size: 13px; display: none; z-index: 999; box-shadow: 0 8px 32px rgba(0,0,0,.5); }
 .toast.show { display: block; }
+.modal-err { color: var(--red); font-size: 12px; margin-top: 10px; display: none; }
 </style>
 </head>
 <body>
@@ -177,14 +191,14 @@ dialog.modal--sm { width: 400px; }
   <div class="main">
     <!-- STATS -->
     <div class="stats">
-      <div class="stat"><div class="n" id="sTotal">—</div><div class="l">Licencias totales</div></div>
+      <div class="stat"><div class="n" id="sTotal">—</div><div class="l">Totales</div></div>
       <div class="stat"><div class="n n--green" id="sActive">—</div><div class="l">Activas</div></div>
       <div class="stat"><div class="n n--red" id="sRevoked">—</div><div class="l">Revocadas</div></div>
       <div class="stat"><div class="n" id="sCustomers">—</div><div class="l">Clientes</div></div>
     </div>
 
     <!-- LOG -->
-    <div id="logSection">
+    <div class="log-section" id="logSection">
       <div class="section-hd">
         <div class="section-title">Actividad reciente</div>
         <button class="btn-sm" id="clearLogBtn">Limpiar</button>
@@ -192,12 +206,15 @@ dialog.modal--sm { width: 400px; }
       <div class="log-box" id="logBox"></div>
     </div>
 
-    <!-- TABLE -->
+    <!-- LICENCIAS ACTIVAS -->
     <div class="tbar">
-      <div class="section-title">Licencias</div>
+      <div class="tbar-left">
+        <div class="section-title">Licencias activas</div>
+        <span class="badge-count" id="activeCount">0</span>
+      </div>
       <button class="btn-green" id="newLicBtn">+ Nueva licencia</button>
     </div>
-    <div class="table-wrap">
+    <div class="table-wrap" id="activeWrap">
       <div class="table-loading" id="tableLoading">Cargando…</div>
       <table id="licTable" hidden>
         <thead>
@@ -208,6 +225,30 @@ dialog.modal--sm { width: 400px; }
         </thead>
         <tbody id="licBody"></tbody>
       </table>
+    </div>
+
+    <!-- LICENCIAS REVOCADAS -->
+    <div class="revoked-section">
+      <div class="tbar">
+        <div class="tbar-left">
+          <div class="section-title">Historial revocadas</div>
+          <span class="badge-count" id="revokedCount">0</span>
+        </div>
+        <button class="revoked-toggle-btn" id="toggleRevokedBtn">Mostrar ▾</button>
+      </div>
+      <div id="revokedSection" hidden>
+        <div class="table-wrap revoked-table-wrap">
+          <table id="revokedTable">
+            <thead>
+              <tr>
+                <th>#</th><th>Cliente</th><th>Key</th><th>Plan</th>
+                <th>Estado</th><th>Dispositivos</th><th>Revocada</th>
+              </tr>
+            </thead>
+            <tbody id="revokedBody"></tbody>
+          </table>
+        </div>
+      </div>
     </div>
   </div>
 </div>
@@ -231,15 +272,12 @@ dialog.modal--sm { width: 400px; }
       <option value="team">Team</option>
     </select>
   </div>
-  <label class="check-label" for="createSendEmail">
-    <input type="checkbox" id="createSendEmail" checked> Notificarme por email al crear
-  </label>
   <div class="key-result" id="keyResult">
     <div class="lbl">Key generada — cópiala ahora</div>
     <code id="keyValue"></code>
     <button class="copy-btn" id="copyKeyBtn">Copiar</button>
   </div>
-  <div class="err" id="createErr"></div>
+  <div class="modal-err" id="createErr"></div>
   <div class="modal-btns">
     <button class="btn-cancel" id="closeCreateBtn">Cerrar</button>
     <button class="btn-green" id="createBtn">Crear licencia</button>
@@ -263,24 +301,17 @@ dialog.modal--sm { width: 400px; }
 
 const API = 'https://web-production-93435.up.railway.app';
 
-// ─── STATE ───
 let adminKey = '';
 let confirmCallback = null;
 const emailStatus = JSON.parse(localStorage.getItem('hm_email_status') || '{}');
+let revokedVisible = false;
 
-// ─── UTILS ───
 function esc(s) {
   return String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 }
-
 function el(id) { return document.getElementById(id); }
-
 function saveEmailStatus() { localStorage.setItem('hm_email_status', JSON.stringify(emailStatus)); }
-
-function headers(extra = {}) {
-  return { 'X-Admin-Key': adminKey, ...extra };
-}
-
+function headers(extra = {}) { return { 'X-Admin-Key': adminKey, ...extra }; }
 async function apiFetch(path, options = {}) {
   return fetch(`${API}${path}`, { ...options, headers: { ...headers(), ...options.headers } });
 }
@@ -297,16 +328,14 @@ function showToast(msg) {
 
 // ─── LOG ───
 function addLog(type, msg) {
-  const box = el('logBox');
   el('logSection').style.display = 'block';
   const t = new Date().toLocaleTimeString('es');
   const cls = type === 'ok' ? 'log-ok' : 'log-err';
   const icon = type === 'ok' ? '✓' : '✗';
   const entry = document.createElement('div');
   entry.innerHTML = `<span class="log-ts">[${esc(t)}]</span><span class="${cls}">${icon} ${esc(msg)}</span>`;
-  box.prepend(entry);
+  el('logBox').prepend(entry);
 }
-
 function clearLogs() {
   el('logBox').innerHTML = '';
   el('logSection').style.display = 'none';
@@ -331,11 +360,7 @@ async function doLogin() {
     el('loginErr').style.display = 'block';
   }
 }
-
-function doLogout() {
-  localStorage.removeItem('hm_admin_key');
-  location.reload();
-}
+function doLogout() { localStorage.removeItem('hm_admin_key'); location.reload(); }
 
 // ─── DATA ───
 async function loadData() {
@@ -344,14 +369,19 @@ async function loadData() {
       apiFetch('/api/admin/licenses').then(r => r.json()),
       apiFetch('/api/admin/customers').then(r => r.json()),
     ]);
+    const active  = lics.filter(l => l.status === 'active');
+    const revoked = lics.filter(l => l.status !== 'active');
 
-    el('sTotal').textContent = lics.length;
-    el('sActive').textContent = lics.filter(l => l.status === 'active').length;
-    el('sRevoked').textContent = lics.filter(l => ['revoked', 'refunded'].includes(l.status)).length;
+    el('sTotal').textContent     = lics.length;
+    el('sActive').textContent    = active.length;
+    el('sRevoked').textContent   = revoked.length;
     el('sCustomers').textContent = custs.length;
     el('lastUpdated').textContent = new Date().toLocaleTimeString('es');
+    el('activeCount').textContent  = active.length;
+    el('revokedCount').textContent = revoked.length;
 
-    renderTable(lics);
+    renderActiveTable(active);
+    renderRevokedTable(revoked);
   } catch {
     el('tableLoading').textContent = 'Error al cargar datos.';
   }
@@ -386,7 +416,7 @@ function renderActivationDetail(acts, colspan) {
       </tr>`).join('');
     td.innerHTML = `<div class="detail-inner">
       <table class="act-table">
-        <thead><tr><th>Dispositivo</th><th>OS</th><th>Versión app</th><th>Estado</th><th>Primera activación</th><th>Última validación</th></tr></thead>
+        <thead><tr><th>Dispositivo</th><th>OS</th><th>Versión</th><th>Estado</th><th>Primera activación</th><th>Último acceso</th></tr></thead>
         <tbody>${rows}</tbody>
       </table></div>`;
   }
@@ -394,21 +424,26 @@ function renderActivationDetail(acts, colspan) {
   return tr;
 }
 
-function renderTable(lics) {
+function renderActiveTable(lics) {
   const body = el('licBody');
   body.innerHTML = '';
+  el('tableLoading').style.display = 'none';
+
+  if (lics.length === 0) {
+    el('licTable').hidden = true;
+    const empty = document.createElement('div');
+    empty.className = 'table-empty';
+    empty.textContent = 'No hay licencias activas.';
+    el('activeWrap').appendChild(empty);
+    return;
+  }
+
+  el('licTable').hidden = false;
 
   lics.slice().reverse().forEach(lic => {
     const isNew = (Date.now() - new Date(lic.created_at).getTime()) < 86400000;
-    const date = fmtDate(lic.created_at);
-    const email = lic.customer?.email || '—';
+    const email  = lic.customer?.email || '—';
     const newTag = isNew ? `<span class="badge badge-new">NUEVO</span>` : '';
-
-    const badge = {
-      active:   `<span class="badge badge-active">● Activa</span>`,
-      refunded: `<span class="badge badge-refunded">↩ Reembolsada</span>`,
-    }[lic.status] ?? `<span class="badge badge-revoked">✕ Revocada</span>`;
-
     const es = emailStatus[lic.id];
     const emailCol = {
       ok:      `<span class="mail-ok">✓ Enviado</span>`,
@@ -418,19 +453,15 @@ function renderTable(lics) {
 
     const acts = lic.activations || [];
     const activeCount = acts.filter(a => a.status === 'active').length;
-    const devDot = activeCount > 0
-      ? `<span class="dev-dot dev-dot--on"></span>`
-      : `<span class="dev-dot"></span>`;
+    const devDot = activeCount > 0 ? `<span class="dev-dot dev-dot--on"></span>` : `<span class="dev-dot"></span>`;
     const devCol = `<div class="dev-badge">${devDot}<span class="dev-count">${activeCount}/${lic.max_devices}</span>
-      <button class="dev-expand" data-action="toggle" data-id="${lic.id}" title="Ver historial de dispositivos">▾ ${acts.length}</button></div>`;
+      <button class="dev-expand" data-action="toggle" data-id="${lic.id}" data-table="active" title="Ver historial">▾ ${acts.length}</button></div>`;
 
-    const actions = lic.status === 'active'
-      ? `<div class="actions">
-          <button class="abtn abtn-send"  data-action="send"  data-id="${lic.id}" data-email="${esc(email)}">✉ Enviar key</button>
-          <button class="abtn abtn-reset" data-action="reset" data-id="${lic.id}">↺ Reset PC</button>
-          <button class="abtn abtn-rev"   data-action="revoke" data-id="${lic.id}">✕ Revocar</button>
-         </div>`
-      : `<span class="td-inactive">${esc(lic.status)}</span>`;
+    const actions = `<div class="actions">
+      <button class="abtn abtn-send"  data-action="send"  data-id="${lic.id}" data-email="${esc(email)}">✉ Enviar key</button>
+      <button class="abtn abtn-reset" data-action="reset" data-id="${lic.id}">↺ Reset PC</button>
+      <button class="abtn abtn-rev"   data-action="revoke" data-id="${lic.id}">✕ Revocar</button>
+    </div>`;
 
     const tr = document.createElement('tr');
     tr.id = `row-${lic.id}`;
@@ -438,50 +469,82 @@ function renderTable(lics) {
     tr.innerHTML = `
       <td class="td-id">#${lic.id}</td>
       <td class="email-cell">${esc(email)}${newTag}</td>
-      <td><span class="mono">...${esc(lic.key_last4)}</span></td>
+      <td><span class="mono">···${esc(lic.key_last4)}</span></td>
       <td class="td-plan">${esc(lic.plan)}</td>
-      <td>${badge}</td>
+      <td><span class="badge badge-active">● Activa</span></td>
       <td>${devCol}</td>
       <td id="email-status-${lic.id}">${emailCol}</td>
-      <td class="td-date">${esc(date)}</td>
+      <td class="td-date">${esc(fmtDate(lic.created_at))}</td>
       <td>${actions}</td>`;
     body.appendChild(tr);
   });
-
-  el('tableLoading').style.display = 'none';
-  el('licTable').hidden = false;
 }
 
-// ─── ACTIONS (event delegation on tbody) ───
-el('licBody').addEventListener('click', e => {
+function renderRevokedTable(lics) {
+  const body = el('revokedBody');
+  body.innerHTML = '';
+
+  lics.slice().reverse().forEach(lic => {
+    const email = lic.customer?.email || '—';
+    const acts  = lic.activations || [];
+    const badge = lic.status === 'refunded'
+      ? `<span class="badge badge-refunded">↩ Reembolsada</span>`
+      : `<span class="badge badge-revoked">✕ Revocada</span>`;
+    const devCol = `<div class="dev-badge"><span class="dev-dot"></span><span class="dev-count">${acts.length}</span>
+      <button class="dev-expand" data-action="toggle" data-id="${lic.id}-r" data-table="revoked" title="Ver historial">▾</button></div>`;
+
+    const tr = document.createElement('tr');
+    tr.id = `row-${lic.id}-r`;
+    tr.dataset.acts = JSON.stringify(acts);
+    tr.innerHTML = `
+      <td class="td-id">#${lic.id}</td>
+      <td class="email-cell">${esc(email)}</td>
+      <td><span class="mono">···${esc(lic.key_last4)}</span></td>
+      <td class="td-plan">${esc(lic.plan)}</td>
+      <td>${badge}</td>
+      <td>${devCol}</td>
+      <td class="td-date">${esc(fmtDate(lic.updated_at || lic.created_at))}</td>`;
+    body.appendChild(tr);
+  });
+}
+
+// ─── EVENT DELEGATION ───
+function toggleDetail(btn, id, table) {
+  const mainRow  = document.getElementById(`row-${id}`);
+  const detailId = `detail-${id}`;
+  const existing = document.getElementById(detailId);
+  const isRevoked = table === 'revoked';
+  const acts = JSON.parse(mainRow.dataset.acts);
+  if (existing) {
+    existing.remove();
+    btn.textContent = isRevoked ? '▾' : `▾ ${acts.length}`;
+  } else {
+    const detailRow = renderActivationDetail(acts, isRevoked ? 7 : 9);
+    detailRow.id = detailId;
+    mainRow.after(detailRow);
+    btn.textContent = isRevoked ? '▴' : `▴ ${acts.length}`;
+  }
+}
+
+function handleTableClick(e) {
   const btn = e.target.closest('[data-action]');
   if (!btn) return;
-  const { action, id, email } = btn.dataset;
+  const { action, id, email, table } = btn.dataset;
   if (action === 'send')   sendKey(Number(id), email, btn);
   if (action === 'reset')  confirmAction('reset', Number(id));
   if (action === 'revoke') confirmAction('revoke', Number(id));
-  if (action === 'toggle') {
-    const mainRow = document.getElementById(`row-${id}`);
-    const existing = document.getElementById(`detail-${id}`);
-    if (existing) {
-      existing.remove();
-      btn.textContent = `▾ ${JSON.parse(mainRow.dataset.acts).length}`;
-    } else {
-      const acts = JSON.parse(mainRow.dataset.acts);
-      const detailRow = renderActivationDetail(acts, 9);
-      detailRow.id = `detail-${id}`;
-      mainRow.after(detailRow);
-      btn.textContent = `▴ ${acts.length}`;
-    }
-  }
-});
+  if (action === 'toggle') toggleDetail(btn, id, table);
+}
 
+el('licBody').addEventListener('click', handleTableClick);
+el('revokedBody').addEventListener('click', handleTableClick);
+
+// ─── SEND KEY ───
 async function sendKey(id, email, btn) {
   btn.disabled = true;
   btn.textContent = '⟳ Enviando...';
   emailStatus[id] = 'pending';
   setEmailStatus(id, '<span class="mail-pending">⟳ Enviando</span>');
-
   try {
     const r = await apiFetch(`/api/admin/licenses/${id}/generate-key`, { method: 'POST' });
     const data = await r.json();
@@ -492,8 +555,8 @@ async function sendKey(id, email, btn) {
         ? `<span class="mail-ok">✓ Enviado</span>`
         : `<span class="mail-no">✗ Sin email</span>`);
       addLog(data.email_sent ? 'ok' : 'err',
-        data.email_sent ? `${email} | Email enviado · Key: ...${data.key.slice(-4)}` : `${email} | Key generada (sin email): ${data.key}`);
-      showToast(data.email_sent ? 'Email enviado a tu Gmail' : 'Key generada — revisa el log');
+        data.email_sent ? `${email} | Email enviado · Key: ···${data.key.slice(-4)}` : `${email} | Key generada (sin email): ${data.key}`);
+      showToast(data.email_sent ? 'Email enviado' : 'Key generada — revisa el log');
     } else {
       emailStatus[id] = 'fail'; saveEmailStatus();
       setEmailStatus(id, `<span class="mail-no">✗ Error</span>`);
@@ -507,18 +570,16 @@ async function sendKey(id, email, btn) {
   btn.disabled = false;
   btn.textContent = '✉ Enviar key';
 }
-
 function setEmailStatus(id, html) {
   const cell = el(`email-status-${id}`);
   if (cell) cell.innerHTML = html;
 }
 
-// ─── CONFIRM MODAL ───
+// ─── CONFIRM ───
 const CONFIRM_COPY = {
-  revoke: { title: 'Revocar licencia',      desc: id => `Licencia #${id} quedará revocada y el usuario no podrá usarla.` },
+  revoke: { title: 'Revocar licencia',      desc: id => `La licencia #${id} quedará revocada. El cliente no podrá usarla. Podrás crear una nueva licencia para ese email.` },
   reset:  { title: 'Resetear dispositivos', desc: id => `Se desactivarán todos los dispositivos de la licencia #${id}. El cliente podrá activar en un PC nuevo.` },
 };
-
 function confirmAction(type, id) {
   const copy = CONFIRM_COPY[type];
   el('confirmTitle').textContent = copy.title;
@@ -526,17 +587,23 @@ function confirmAction(type, id) {
   confirmCallback = type === 'revoke' ? () => revokeLicense(id) : () => resetDevices(id);
   el('confirmDialog').showModal();
 }
-
 function closeConfirm() { el('confirmDialog').close(); }
 
 async function revokeLicense(id) {
   const r = await apiFetch(`/api/admin/licenses/${id}/revoke`, { method: 'POST' });
-  if ((await r.json()).ok) { addLog('ok', `Licencia #${id} revocada`); showToast('Licencia revocada'); loadData(); }
+  if ((await r.json()).ok) {
+    addLog('ok', `Licencia #${id} revocada`);
+    showToast('Licencia revocada — ya puedes crear una nueva para ese email');
+    loadData();
+  }
 }
-
 async function resetDevices(id) {
   const r = await apiFetch(`/api/admin/licenses/${id}/reset-devices`, { method: 'POST' });
-  if ((await r.json()).ok) { addLog('ok', `Dispositivos de #${id} reseteados`); showToast('Dispositivos reseteados'); loadData(); }
+  if ((await r.json()).ok) {
+    addLog('ok', `Dispositivos de #${id} reseteados`);
+    showToast('Dispositivos reseteados');
+    loadData();
+  }
 }
 
 // ─── CREAR LICENCIA ───
@@ -548,20 +615,15 @@ function openCreateModal() {
   el('createErr').style.display = 'none';
   el('createBtn').style.display = '';
   el('createEmail').value = '';
-  el('createName').value = '';
+  el('createName').value  = '';
   setTimeout(() => el('createEmail').focus(), 100);
 }
-
-function closeCreateModal() {
-  el('createDialog').close();
-  loadData();
-}
+function closeCreateModal() { el('createDialog').close(); loadData(); }
 
 async function createLicense() {
   const email = el('createEmail').value.trim();
   const name  = el('createName').value.trim();
   const plan  = el('createPlan').value;
-  const send  = el('createSendEmail').checked;
   const errEl = el('createErr');
   const btn   = el('createBtn');
 
@@ -571,11 +633,23 @@ async function createLicense() {
   btn.textContent = 'Creando...';
 
   try {
-    // Buscar cliente existente primero para evitar IntegrityError en servidor
+    // Solo bloquear si ya tiene una licencia ACTIVA
+    const allLics = await apiFetch('/api/admin/licenses').then(r => r.json());
+    const dup = allLics.find(l =>
+      l.customer?.email?.toLowerCase() === email.toLowerCase() && l.status === 'active'
+    );
+    if (dup) {
+      errEl.textContent = `Este cliente ya tiene una licencia activa (···${dup.key_last4}). Revócala antes de crear una nueva.`;
+      errEl.style.display = 'block';
+      btn.disabled = false;
+      btn.textContent = 'Crear licencia';
+      return;
+    }
+
+    // Reutilizar cliente existente
     let customerId;
     const allCustomers = await apiFetch('/api/admin/customers').then(r => r.json());
     const existing = allCustomers.find(c => c.email.toLowerCase() === email.toLowerCase());
-
     if (existing) {
       customerId = existing.id;
     } else {
@@ -594,35 +668,38 @@ async function createLicense() {
       customerId = (await rc.json()).id;
     }
 
-    if (!customerId) {
-      errEl.textContent = 'Error creando cliente';
-      errEl.style.display = 'block';
-      btn.disabled = false;
-      btn.textContent = 'Crear licencia';
-      return;
-    }
-
     const rl = await apiFetch('/api/admin/licenses', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ customer_id: customerId, plan }),
     });
+    if (!rl.ok) {
+      const data = await rl.json().catch(() => ({}));
+      errEl.textContent = data.detail || data.error || 'Error al crear la licencia en el servidor';
+      errEl.style.display = 'block';
+      btn.disabled = false;
+      btn.textContent = 'Crear licencia';
+      return;
+    }
     const lic = await rl.json();
-    createdKey = lic.license_key;
+    // Generar key real y enviar email en el mismo paso
+    btn.textContent = 'Generando key...';
+    const rg = await apiFetch(`/api/admin/licenses/${lic.id}/generate-key`, { method: 'POST' });
+    if (!rg.ok) {
+      errEl.textContent = 'Licencia creada pero error al generar la key. Usa "Enviar key" en la tabla.';
+      errEl.style.display = 'block';
+      btn.disabled = false;
+      btn.textContent = 'Crear licencia';
+      loadData();
+      return;
+    }
+    const gdata = await rg.json();
+    createdKey = gdata.key;
     el('keyValue').textContent = createdKey;
     el('keyResult').style.display = 'block';
     btn.style.display = 'none';
-    addLog('ok', `Licencia #${lic.id} creada para ${email}`);
-
-    if (send) {
-      await apiFetch(`/api/admin/licenses/${lic.id}/generate-key`, { method: 'POST' });
-      emailStatus[lic.id] = 'ok';
-      saveEmailStatus();
-      addLog('ok', 'Notificación enviada a tu Gmail');
-      showToast('Licencia creada y email enviado');
-    } else {
-      showToast('Licencia creada');
-    }
+    addLog('ok', `Licencia #${lic.id} creada para ${email} — key: ···${createdKey.slice(-4)}`);
+    showToast(gdata.email_sent ? 'Licencia creada · Email enviado a tu Gmail' : 'Licencia creada · Key generada');
   } catch {
     errEl.textContent = 'Error de conexión';
     errEl.style.display = 'block';
@@ -631,10 +708,14 @@ async function createLicense() {
   }
 }
 
-function copyKey() {
-  navigator.clipboard.writeText(createdKey);
-  showToast('Key copiada');
-}
+function copyKey() { navigator.clipboard.writeText(createdKey); showToast('Key copiada'); }
+
+// ─── TOGGLE REVOCADAS ───
+el('toggleRevokedBtn').addEventListener('click', () => {
+  revokedVisible = !revokedVisible;
+  el('revokedSection').hidden = !revokedVisible;
+  el('toggleRevokedBtn').textContent = revokedVisible ? 'Ocultar ▴' : 'Mostrar ▾';
+});
 
 // ─── EVENT LISTENERS ───
 el('loginBtn').addEventListener('click', doLogin);
