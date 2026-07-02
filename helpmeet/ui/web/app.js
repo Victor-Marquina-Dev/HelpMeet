@@ -1943,22 +1943,125 @@ function videoPanel(t) {
   open.title = 'Abrir carpeta';
   open.onclick = () => api.openPath(folderPath);
   actions.appendChild(open);
-  const bt = el('button', hasTx ? 'btn' : 'btn btn-primary', hasTx ? 'Retranscribir' : 'Transcribir');
-  if (hasTx) bt.title = 'Volver a transcribir este vídeo';
-  bt.onclick = () => {
-    if (hasTx) {
-      confirmModal('Retranscribir', 'Se reemplazará la transcripción actual usando el motor de mayor calidad disponible.', 'Retranscribir', () => transcribeScreenVideo(STATE.selMeeting, true));
-    } else transcribeScreenVideo(STATE.selMeeting, false);
-  };
+  const bt = el('button', hasTx ? 'btn' : 'btn btn-primary', hasTx ? 'Retranscribir' : 'Recortar y transcribir');
+  bt.onclick = () => openClipEditor(wrap, t, hasTx);
   actions.appendChild(bt);
   wrap.querySelector('.rec-actions').replaceWith(actions);
   return wrap;
 }
 
-async function transcribeScreenVideo(mid, force) {
+// Recortador estilo CapCut: reproductor + línea de tiempo con miniaturas + manijas.
+async function openClipEditor(wrap, t, isRetx) {
+  if (wrap.querySelector('.clip-editor')) { wrap.querySelector('.clip-editor').remove(); return; }
+  const mid = t.meeting_id || STATE.selMeeting;
+  const url = await api.getMediaVideoUrl(mid);
+  const ed = el('div', 'clip-editor');
+  ed.innerHTML = `
+    <video class="clip-video" src="${esc(url || '')}" preload="metadata"></video>
+    <div class="clip-tl">
+      <div class="clip-thumbs"></div>
+      <div class="clip-sel"><span class="clip-h l"></span><span class="clip-h r"></span></div>
+      <div class="clip-cursor"></div>
+    </div>
+    <div class="clip-scale"><span>0:00</span><span class="clip-dur">--:--</span></div>
+    <div class="clip-segs"></div>
+    <div class="clip-foot">
+      <div class="clip-total">Marca un trozo para transcribir</div>
+      <div class="clip-actions">
+        <button class="btn clip-cancel">Cancelar</button>
+        <button class="btn btn-primary clip-go" disabled>Transcribir selección →</button>
+      </div>
+    </div>`;
+  wrap.appendChild(ed);
+
+  const video = ed.querySelector('.clip-video');
+  const tl = ed.querySelector('.clip-tl');
+  const sel = ed.querySelector('.clip-sel');
+  const hL = sel.querySelector('.l'), hR = sel.querySelector('.r');
+  const cursor = ed.querySelector('.clip-cursor');
+  const segsBox = ed.querySelector('.clip-segs');
+  const totalEl = ed.querySelector('.clip-total');
+  const goBtn = ed.querySelector('.clip-go');
+  const state = { dur: 0, a: 0, b: 0, segs: [] };
+  const fmt = s => `${Math.floor(s/60)}:${String(Math.floor(s%60)).padStart(2,'0')}`;
+
+  api.getVideoThumbnails(mid, 12).then(thumbs => {
+    ed.querySelector('.clip-thumbs').innerHTML = (thumbs || []).map(th =>
+      `<i style="background-image:url(data:image/jpeg;base64,${th.thumb})"></i>`).join('');
+  });
+
+  function paintSel() {
+    sel.style.left = (state.a / state.dur * 100) + '%';
+    sel.style.width = ((state.b - state.a) / state.dur * 100) + '%';
+    const secs = Math.max(0, state.b - state.a);
+    totalEl.innerHTML = `Se transcribirá <b>${fmt(secs)}</b> de ${fmt(state.dur)}`;
+    updateGo();
+  }
+  function paintSegs() {
+    segsBox.innerHTML = state.segs.map((s, i) =>
+      `<span class="clip-pill" data-i="${i}">Trozo ${i+1} · ${fmt(s.start)}–${fmt(s.end)} <span class="x">✕</span></span>`
+    ).join('') + `<button class="clip-add">+ añadir otro trozo</button>`;
+    segsBox.querySelectorAll('.x').forEach(x => x.onclick = e => {
+      state.segs.splice(+e.target.closest('.clip-pill').dataset.i, 1); paintSegs(); updateGo();
+    });
+    segsBox.querySelector('.clip-add').onclick = () => {
+      if (state.b - state.a >= 0.5) { state.segs.push({ start: state.a, end: state.b }); paintSegs(); updateGo(); }
+    };
+  }
+  function updateGo() {
+    const pending = (state.b - state.a) >= 0.5 ? 1 : 0;
+    goBtn.disabled = (state.segs.length + pending) === 0;
+  }
+
+  video.addEventListener('loadedmetadata', () => {
+    state.dur = video.duration || 0;
+    state.a = 0; state.b = state.dur;
+    ed.querySelector('.clip-dur').textContent = fmt(state.dur);
+    paintSel(); paintSegs();
+  });
+  video.addEventListener('timeupdate', () => {
+    if (state.dur) cursor.style.left = (video.currentTime / state.dur * 100) + '%';
+  });
+
+  function drag(handle, isLeft) {
+    handle.addEventListener('pointerdown', e => {
+      e.preventDefault(); handle.setPointerCapture(e.pointerId);
+      const move = ev => {
+        const rect = tl.getBoundingClientRect();
+        let frac = Math.min(1, Math.max(0, (ev.clientX - rect.left) / rect.width));
+        const t2 = frac * state.dur;
+        if (isLeft) state.a = Math.min(t2, state.b - 0.2);
+        else state.b = Math.max(t2, state.a + 0.2);
+        paintSel();
+      };
+      const up = () => { handle.releasePointerCapture(e.pointerId); handle.removeEventListener('pointermove', move); handle.removeEventListener('pointerup', up); };
+      handle.addEventListener('pointermove', move);
+      handle.addEventListener('pointerup', up);
+    });
+  }
+  drag(hL, true); drag(hR, false);
+
+  tl.addEventListener('click', e => {
+    if (e.target.classList.contains('clip-h')) return;
+    const rect = tl.getBoundingClientRect();
+    video.currentTime = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width)) * state.dur;
+  });
+
+  ed.querySelector('.clip-cancel').onclick = () => ed.remove();
+  goBtn.onclick = async () => {
+    const all = state.segs.slice();
+    if ((state.b - state.a) >= 0.5) all.push({ start: state.a, end: state.b });
+    if (!all.length) return;
+    goBtn.disabled = true; goBtn.textContent = 'Transcribiendo…';
+    ed.remove();
+    await transcribeScreenVideo(mid, isRetx, all);
+  };
+}
+
+async function transcribeScreenVideo(mid, force, clipSegments) {
   // La transcripción del vídeo va en SEGUNDO PLANO: puedes seguir grabando otro.
   let f = null;
-  try { f = await api.transcribeMeetingVideo(mid, force); }
+  try { f = await api.transcribeMeetingVideo(mid, force, clipSegments || null); }
   catch (e) { f = { ok: false, error: e && e.message }; }
   if (f && f.already) { toast('info', 'Este vídeo ya está transcrito'); return; }
   if (f && f.ok) {
