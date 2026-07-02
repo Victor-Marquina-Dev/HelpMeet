@@ -34,14 +34,16 @@ def map_local_to_global(local_t, segments):
 
     `segments` debe estar ya normalizado (ver normalize_segments) y en el mismo
     orden con el que se concatenó el audio. Si `local_t` cae más allá del total,
-    devuelve el fin del último tramo.
+    devuelve el fin del último tramo. Pasar una lista vacía es un error del
+    llamador y lanza ValueError.
     """
+    if not segments:
+        raise ValueError("segments must be non-empty; call normalize_segments first")
+    local_t = max(0.0, local_t)
     acc = 0.0
     for start, end in segments:
         dur = end - start
         if local_t < acc + dur:
             return start + (local_t - acc)
         acc += dur
-    if segments:
-        return segments[-1][1]
-    return local_t
+    return segments[-1][1]
