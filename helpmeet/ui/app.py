@@ -1415,9 +1415,12 @@ class Api:
         # Recorte opcional: si el usuario marcó tramos, se transcribe solo eso.
         clip_norm = None
         if clip_segments:
-            from helpmeet.media_segments import normalize_segments
+            from helpmeet.media_segments import normalize_segments, map_local_to_global
             from helpmeet.media import extract_audio_segments_to_wav, media_duration
+            from helpmeet.transcription.segment import TranscribedSegment
             duration = media_duration(m.audio_path)
+            if duration <= 0:
+                raise ValueError("No se pudo determinar la duración del vídeo.")
             clip_norm = normalize_segments(
                 [(seg["start"], seg["end"]) for seg in clip_segments], duration)
             if not clip_norm:
@@ -1469,8 +1472,6 @@ class Api:
                     if not seg.text:
                         continue
                     if clip_norm:
-                        from helpmeet.media_segments import map_local_to_global
-                        from helpmeet.transcription.segment import TranscribedSegment
                         seg = TranscribedSegment(
                             seg.text,
                             map_local_to_global(seg.start, clip_norm),
