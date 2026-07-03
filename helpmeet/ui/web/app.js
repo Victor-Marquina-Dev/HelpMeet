@@ -2029,7 +2029,9 @@ async function openClipEditor(wrap, t, isRetx) {
 
   function drag(handle, isLeft) {
     handle.addEventListener('pointerdown', e => {
-      e.preventDefault(); handle.setPointerCapture(e.pointerId);
+      e.preventDefault();
+      // Captura opcional: si falla, los listeners en window siguen el puntero igual.
+      try { handle.setPointerCapture(e.pointerId); } catch (err) { /* sin captura */ }
       const move = ev => {
         const rect = tl.getBoundingClientRect();
         let frac = Math.min(1, Math.max(0, (ev.clientX - rect.left) / rect.width));
@@ -2039,14 +2041,16 @@ async function openClipEditor(wrap, t, isRetx) {
         paintSel();
       };
       const end = () => {
-        handle.releasePointerCapture(e.pointerId);
-        handle.removeEventListener('pointermove', move);
-        handle.removeEventListener('pointerup', end);
-        handle.removeEventListener('pointercancel', end);
+        try { handle.releasePointerCapture(e.pointerId); } catch (err) { /* ya liberada */ }
+        window.removeEventListener('pointermove', move);
+        window.removeEventListener('pointerup', end);
+        window.removeEventListener('pointercancel', end);
       };
-      handle.addEventListener('pointermove', move);
-      handle.addEventListener('pointerup', end);
-      handle.addEventListener('pointercancel', end);
+      // En window (no en la manija): el arrastre sigue aunque el ratón se salga
+      // de la manija de 12px — así nunca "se suelta" a mitad de camino.
+      window.addEventListener('pointermove', move);
+      window.addEventListener('pointerup', end);
+      window.addEventListener('pointercancel', end);
     });
   }
   drag(hL, true); drag(hR, false);

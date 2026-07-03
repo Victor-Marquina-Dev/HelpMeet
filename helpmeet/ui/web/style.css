@@ -2759,16 +2759,21 @@ body[data-sidebar="collapsed"] .actionbar--dock { left: 52px; }
   border: 1px solid var(--border-subtle); border-radius: var(--r-lg);
   display: flex; flex-direction: column; gap: 10px; animation: setupFadeIn .2s ease; }
 .clip-video { width: 100%; max-height: 220px; background: #000; border-radius: var(--r-md); }
-.clip-tl { position: relative; height: 46px; border-radius: var(--r-md); overflow: hidden;
-  border: 1px solid var(--border-subtle); cursor: pointer; }
-.clip-thumbs { display: flex; height: 100%; }
+/* Sin overflow:hidden en .clip-tl: las manijas sobresalen y deben verse enteras.
+   El recorte redondeado se aplica solo a la tira de miniaturas. */
+.clip-tl { position: relative; height: 46px; margin: 0 6px; cursor: pointer; user-select: none; }
+.clip-thumbs { display: flex; height: 100%; overflow: hidden;
+  border-radius: var(--r-md); border: 1px solid var(--border-subtle); }
 .clip-thumbs i { flex: 1; background-size: cover; background-position: center;
   border-right: 1px solid rgba(0,0,0,.3); }
 .clip-sel { position: absolute; top: 0; bottom: 0; border: 2px solid var(--accent);
   background: rgba(170,207,191,.16); box-sizing: border-box; }
-.clip-h { position: absolute; top: 50%; transform: translateY(-50%); width: 9px; height: 66%;
-  background: var(--accent); border-radius: 3px; cursor: ew-resize; touch-action: none; }
-.clip-h.l { left: -5px; } .clip-h.r { right: -5px; }
+.clip-h { position: absolute; top: 50%; transform: translateY(-50%); width: 12px; height: 82%;
+  background: var(--accent); border-radius: 4px; cursor: ew-resize; touch-action: none;
+  z-index: 2; box-shadow: 0 1px 4px rgba(0,0,0,.45); }
+/* Zona de agarre ampliada (invisible): facilita atrapar la manija con el ratón. */
+.clip-h::after { content: ''; position: absolute; inset: -10px; }
+.clip-h.l { left: -6px; } .clip-h.r { right: -6px; }
 .clip-cursor { position: absolute; top: -2px; bottom: -2px; width: 2px; background: #fff; pointer-events: none; }
 .clip-scale { display: flex; justify-content: space-between; font-family: var(--font-mono);
   font-size: 9px; color: var(--text-faint); }
