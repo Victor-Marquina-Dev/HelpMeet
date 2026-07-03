@@ -1958,6 +1958,12 @@ async function openClipEditor(wrap, t, isRetx) {
   const ed = el('div', 'clip-editor');
   ed.innerHTML = `
     <video class="clip-video" src="${esc(url || '')}" preload="metadata"></video>
+    <div class="clip-ctrl">
+      <button class="btn clip-skip" data-d="-10">« −10s</button>
+      <button class="btn clip-play">▶ Reproducir</button>
+      <button class="btn clip-skip" data-d="10">+10s »</button>
+      <span class="clip-time">0:00 / 0:00</span>
+    </div>
     <div class="clip-tl">
       <div class="clip-thumbs"></div>
       <div class="clip-sel"><span class="clip-h l"></span><span class="clip-h r"></span></div>
@@ -1981,7 +1987,6 @@ async function openClipEditor(wrap, t, isRetx) {
   const video = ed.querySelector('.clip-video');
   const tl = ed.querySelector('.clip-tl');
   const sel = ed.querySelector('.clip-sel');
-  const hL = sel.querySelector('.l'), hR = sel.querySelector('.r');
   const cursor = ed.querySelector('.clip-cursor');
   const segsBox = ed.querySelector('.clip-segs');
   const totalEl = ed.querySelector('.clip-total');
@@ -2017,46 +2022,81 @@ async function openClipEditor(wrap, t, isRetx) {
     goBtn.disabled = (state.segs.length + pending) === 0;
   }
 
+  // Controles de reproducción: play/pausa y saltos de ±10 s.
+  const playBtn = ed.querySelector('.clip-play');
+  const timeEl = ed.querySelector('.clip-time');
+  playBtn.onclick = () => { if (video.paused) video.play(); else video.pause(); };
+  video.addEventListener('click', () => playBtn.onclick());
+  video.addEventListener('play', () => { playBtn.textContent = '⏸ Pausa'; });
+  video.addEventListener('pause', () => { playBtn.textContent = '▶ Reproducir'; });
+  ed.querySelectorAll('.clip-skip').forEach(b => b.onclick = () => {
+    if (!state.dur) return;
+    video.currentTime = Math.min(state.dur, Math.max(0, video.currentTime + Number(b.dataset.d)));
+  });
+
   video.addEventListener('loadedmetadata', () => {
     state.dur = video.duration || 0;
     state.a = 0; state.b = state.dur;
     ed.querySelector('.clip-dur').textContent = fmt(state.dur);
+    timeEl.textContent = `0:00 / ${fmt(state.dur)}`;
     paintSel(); paintSegs();
   });
   video.addEventListener('timeupdate', () => {
-    if (state.dur) cursor.style.left = (video.currentTime / state.dur * 100) + '%';
+    if (!state.dur) return;
+    cursor.style.left = (video.currentTime / state.dur * 100) + '%';
+    timeEl.textContent = `${fmt(video.currentTime)} / ${fmt(state.dur)}`;
   });
 
-  function drag(handle, isLeft) {
-    handle.addEventListener('pointerdown', e => {
-      e.preventDefault();
-      // Captura opcional: si falla, los listeners en window siguen el puntero igual.
-      try { handle.setPointerCapture(e.pointerId); } catch (err) { /* sin captura */ }
-      const move = ev => {
-        const rect = tl.getBoundingClientRect();
-        let frac = Math.min(1, Math.max(0, (ev.clientX - rect.left) / rect.width));
-        const t2 = frac * state.dur;
-        if (isLeft) state.a = Math.min(t2, state.b - 0.2);
-        else state.b = Math.max(t2, state.a + 0.2);
-        paintSel();
-      };
-      const end = () => {
-        try { handle.releasePointerCapture(e.pointerId); } catch (err) { /* ya liberada */ }
-        window.removeEventListener('pointermove', move);
-        window.removeEventListener('pointerup', end);
-        window.removeEventListener('pointercancel', end);
-      };
-      // En window (no en la manija): el arrastre sigue aunque el ratón se salga
-      // de la manija de 12px — así nunca "se suelta" a mitad de camino.
-      window.addEventListener('pointermove', move);
-      window.addEventListener('pointerup', end);
-      window.addEventListener('pointercancel', end);
-    });
+  // Arrastre de manijas con el patrón del panel de grabación (que ya funciona en
+  // esta app): pointerdown en la línea de tiempo COMPLETA y captura en ella; la
+  // manija se elige por cercanía (GRAB_PX), no hace falta acertarle a 12px.
+  const GRAB_PX = 16;
+  let dragSide = null;      // 'a' | 'b' | null
+  let clickSuppressed = false;
+
+  function sideAt(ev) {
+    if (!state.dur) return null;
+    const rect = tl.getBoundingClientRect();
+    const xA = rect.left + (state.a / state.dur) * rect.width;
+    const xB = rect.left + (state.b / state.dur) * rect.width;
+    const dA = Math.abs(ev.clientX - xA), dB = Math.abs(ev.clientX - xB);
+    if (Math.min(dA, dB) > GRAB_PX) return null;
+    return dA <= dB ? 'a' : 'b';
   }
-  drag(hL, true); drag(hR, false);
+
+  tl.addEventListener('pointerdown', e => {
+    if (e.button !== 0 || !state.dur) return;
+    const h = e.target.closest('.clip-h');
+    dragSide = h ? (h.classList.contains('l') ? 'a' : 'b') : sideAt(e);
+    if (!dragSide) return;              // clic normal → lo maneja el click (seek)
+    clickSuppressed = true;             // que el click posterior no mueva el vídeo
+    e.preventDefault();
+    try { tl.setPointerCapture(e.pointerId); } catch (err) { /* sin captura */ }
+  });
+
+  tl.addEventListener('pointermove', e => {
+    if (!dragSide) {
+      tl.style.cursor = sideAt(e) ? 'ew-resize' : 'pointer';
+      return;
+    }
+    const rect = tl.getBoundingClientRect();
+    const frac = Math.min(1, Math.max(0, (e.clientX - rect.left) / rect.width));
+    const t2 = frac * state.dur;
+    if (dragSide === 'a') state.a = Math.min(t2, state.b - 0.2);
+    else state.b = Math.max(t2, state.a + 0.2);
+    paintSel();
+  });
+
+  function endDrag(e) {
+    if (!dragSide) return;
+    dragSide = null;
+    try { tl.releasePointerCapture(e.pointerId); } catch (err) { /* ya liberada */ }
+  }
+  tl.addEventListener('pointerup', endDrag);
+  tl.addEventListener('pointercancel', endDrag);
 
   tl.addEventListener('click', e => {
-    if (e.target.closest('.clip-h')) return;
+    if (clickSuppressed) { clickSuppressed = false; return; }
     const rect = tl.getBoundingClientRect();
     video.currentTime = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width)) * state.dur;
   });

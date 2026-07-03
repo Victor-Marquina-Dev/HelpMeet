@@ -2758,7 +2758,12 @@ body[data-sidebar="collapsed"] .actionbar--dock { left: 52px; }
 .clip-editor { margin-top: 10px; padding: 12px; background: var(--bg-surface);
   border: 1px solid var(--border-subtle); border-radius: var(--r-lg);
   display: flex; flex-direction: column; gap: 10px; animation: setupFadeIn .2s ease; }
-.clip-video { width: 100%; max-height: 220px; background: #000; border-radius: var(--r-md); }
+.clip-video { width: 100%; max-height: 220px; background: #000; border-radius: var(--r-md); cursor: pointer; }
+/* Controles de reproducción: play/pausa y saltos de ±10 s */
+.clip-ctrl { display: flex; align-items: center; justify-content: center; gap: 8px; }
+.clip-ctrl .clip-play { min-width: 120px; font-weight: 600; }
+.clip-ctrl .clip-skip { font-family: var(--font-mono); font-size: 11px; }
+.clip-time { margin-left: auto; font-family: var(--font-mono); font-size: 10.5px; color: var(--text-muted); }
 /* Sin overflow:hidden en .clip-tl: las manijas sobresalen y deben verse enteras.
    El recorte redondeado se aplica solo a la tira de miniaturas. */
 .clip-tl { position: relative; height: 46px; margin: 0 6px; cursor: pointer; user-select: none; }
