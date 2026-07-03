@@ -204,9 +204,9 @@ body[data-app-state="screen-recording"] .rec-rail { display: block; }
 
 /* ============ TOPBAR ============ */
 .topbar {
-  flex: none; height: 40px; display: flex; align-items: center; gap: 14px;
-  padding: 0 0 0 14px; border-bottom: 1px solid var(--border-subtle);
-  background: var(--bg-sidebar); z-index: 10000; position: relative;
+  flex: none; height: 48px; display: flex; align-items: center; gap: 14px;
+  padding: 0 0 0 12px; border-bottom: 1px solid var(--border-subtle);
+  background: var(--bg-app); z-index: 10000; position: relative;
 }
 
 /* Handles de resize de ventana frameless */
@@ -223,22 +223,23 @@ body[data-app-state="screen-recording"] .rec-rail { display: block; }
 .wr-se { bottom: 0; right: 0; width: 10px; height: 10px; cursor: se-resize; }
 .wr-sw { bottom: 0; left: 0; width: 10px; height: 10px; cursor: sw-resize; }
 .brand {
-  display: flex; align-items: flex-end; gap: 9px;
-  height: 24px; cursor: pointer; user-select: none;
+  display: flex; align-items: center; gap: 9px;
+  height: 30px; cursor: pointer; user-select: none;
 }
 .brand-mark {
-  width: 22px; height: 22px; border-radius: var(--r-md);
-  border: 1px solid var(--border-subtle); background: var(--bg-surface);
+  width: 30px; height: 30px; border-radius: 8px; border: none;
+  background: linear-gradient(135deg, var(--brand-green-2), var(--brand-green));
   display: flex; align-items: center; justify-content: center; flex: none;
 }
-.brand-mark img { display: block; width: 13px; height: 13px; }
+.brand-mark img { display: block; width: 17px; height: 17px; }
 .brand-name {
-  font-size: 12.3px; font-weight: 700; letter-spacing: -.2px;
-  line-height: 1; padding-bottom: 4px;
+  font-size: 15px; font-weight: 600; letter-spacing: -.2px;
+  line-height: 1; color: var(--text-secondary);
 }
 .brand-version {
-  font-family: var(--font-mono); font-size: 9px; color: var(--text-faint);
-  letter-spacing: .02em; line-height: 1; padding-bottom: 4px;
+  font-family: var(--font-mono); font-size: 10px; color: var(--text-faint);
+  background: #eef1f5; border-radius: 10px; padding: 2px 7px;
+  letter-spacing: .02em; line-height: 1; align-self: center;
 }
 /* Hay versión nueva publicada: el chip se vuelve clicable y llama la atención. */
 .brand-version.has-update { color: var(--accent); cursor: pointer; }
@@ -250,19 +251,19 @@ body[data-app-state="screen-recording"] .rec-rail { display: block; }
 .ctx-entry + .ctx-entry { margin-top: -4px; }
 
 .topbar-sep { width: 1px; height: 24px; background: var(--border-subtle); flex: none; margin: 0 2px; }
-.brand .topbar-sep { height: 20px; margin: 0 1px 2px 6px; }
+.brand .topbar-sep { display: none; }
 .topbar-right { display: flex; align-items: center; gap: 9px; flex: none; }
 
 /* Botones de control de ventana frameless (estilo Windows 11) */
-.win-controls { display: flex; align-items: center; height: 40px; margin-left: auto; gap: 4px; padding: 0 8px; }
+.win-controls { display: flex; align-items: center; height: 48px; margin-left: auto; gap: 0; padding: 0; }
 .wc-btn {
-  width: 28px; height: 22px; border: none; background: var(--hover-med); border-radius: 5px;
+  width: 46px; height: 48px; border: none; background: transparent; border-radius: 0;
   color: var(--text-secondary); font-size: 10px; cursor: pointer;
   display: flex; align-items: center; justify-content: center;
   transition: background .1s, color .1s;
 }
-.wc-btn:hover { background: var(--hover-med); color: #fff; }
-.wc-close:hover { background: #c42b1c; color: #fff; }
+.wc-btn:hover { background: var(--hover-med); color: var(--text-primary); }
+.wc-close:hover { background: #e81123; color: #fff; }
 .wc-min svg, .wc-max svg, .wc-close svg { display: block; pointer-events: none; }
 
 /* Buscador compacto: solo lupa en reposo, se expande al enfocar */
