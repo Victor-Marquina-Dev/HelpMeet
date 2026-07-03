@@ -52,6 +52,8 @@ const ICONS = {
   fastForward: '<path d="m13 19 9-7-9-7v14z"/><path d="m2 19 9-7-9-7v14z"/>',
   markIn: '<path d="M3 19V5"/><path d="m13 6-6 6 6 6"/><path d="M7 12h14"/>',
   markOut: '<path d="M21 5v14"/><path d="M3 12h14"/><path d="m11 18 6-6-6-6"/>',
+  expand: '<path d="M15 3h6v6"/><path d="m21 3-7 7"/><path d="m3 21 7-7"/><path d="M9 21H3v-6"/>',
+  shrink: '<path d="M4 14h6v6"/><path d="m10 14-7 7"/><path d="m21 3-7 7"/><path d="M20 10h-6V4"/>',
   check: '<path d="M20 6 9 17l-5-5"/>',
   checkSquare: '<rect width="18" height="18" x="3" y="3" rx="2"/><path d="m9 12 2 2 4-4"/>',
   x: '<path d="M18 6 6 18M6 6l12 12"/>',
@@ -1957,20 +1959,26 @@ function videoPanel(t) {
 
 // Recortador estilo CapCut: reproductor + línea de tiempo con miniaturas + manijas.
 async function openClipEditor(wrap, t, isRetx) {
-  if (wrap.querySelector('.clip-editor')) { wrap.querySelector('.clip-editor').remove(); return; }
+  const existing = wrap.querySelector('.clip-editor');
+  if (existing) {
+    existing.remove();
+    document.querySelectorAll('.clip-backdrop').forEach(b => b.remove());
+    return;
+  }
   const mid = t.meeting_id || STATE.selMeeting;
   const url = await api.getMediaVideoUrl(mid);
   const ed = el('div', 'clip-editor');
   ed.innerHTML = `
     <video class="clip-video" src="${esc(url || '')}" preload="metadata"></video>
     <div class="clip-ctrl">
-      <button class="btn clip-cbtn clip-skip" data-d="-10" title="Retroceder 10 segundos">${svg('rewind', 14)}<span class="clip-cnum">10</span></button>
-      <button class="btn clip-cbtn clip-play" title="Reproducir el trozo seleccionado">${svg('play', 16)}</button>
-      <button class="btn clip-cbtn clip-skip" data-d="10" title="Avanzar 10 segundos"><span class="clip-cnum">10</span>${svg('fastForward', 14)}</button>
+      <button class="clip-cbtn clip-skip" data-d="-10" title="Retroceder 10 segundos">${svg('rewind', 14)}<span class="clip-cnum">10</span></button>
+      <button class="clip-cbtn clip-play" title="Reproducir el trozo seleccionado">${svg('play', 16)}</button>
+      <button class="clip-cbtn clip-skip" data-d="10" title="Avanzar 10 segundos"><span class="clip-cnum">10</span>${svg('fastForward', 14)}</button>
       <span class="clip-ctrl-sep"></span>
-      <button class="btn clip-cbtn clip-mark-a" title="El trozo empieza aquí (posición actual del vídeo)">${svg('markIn', 14)}</button>
-      <button class="btn clip-cbtn clip-mark-b" title="El trozo termina aquí (posición actual del vídeo)">${svg('markOut', 14)}</button>
+      <button class="clip-cbtn clip-mark-a" title="El trozo empieza aquí (posición actual del vídeo)">${svg('markIn', 14)}</button>
+      <button class="clip-cbtn clip-mark-b" title="El trozo termina aquí (posición actual del vídeo)">${svg('markOut', 14)}</button>
       <span class="clip-time">0:00 / 0:00</span>
+      <button class="clip-cbtn clip-max" title="Ampliar en ventana grande">${svg('expand', 14)}</button>
     </div>
     <div class="clip-tl">
       <div class="clip-thumbs"></div>
@@ -2011,7 +2019,7 @@ async function openClipEditor(wrap, t, isRetx) {
     sel.style.left = (state.a / state.dur * 100) + '%';
     sel.style.width = ((state.b - state.a) / state.dur * 100) + '%';
     const secs = Math.max(0, state.b - state.a);
-    totalEl.innerHTML = `Se transcribirá <b>${fmt(secs)}</b> de ${fmt(state.dur)}`;
+    totalEl.innerHTML = `Se transcribirá <b>${fmt(secs)}</b> de ${fmt(state.dur)} <span class="clip-range">· ${fmt(state.a)} – ${fmt(state.b)}</span>`;
     updateGo();
   }
   function paintSegs() {
@@ -2067,6 +2075,33 @@ async function openClipEditor(wrap, t, isRetx) {
     state.b = Math.min(state.dur, Math.max(video.currentTime, state.a + 0.2));
     paintSel();
   };
+
+  // Modo ventana grande: el editor pasa a un modal amplio dentro de la app
+  // (no pantalla completa del sistema). Conserva el estado: vídeo y selección.
+  const maxBtn = ed.querySelector('.clip-max');
+  const backdrop = el('div', 'clip-backdrop');
+  let maximized = false;
+  const onKey = e => { if (e.key === 'Escape' && maximized) maxBtn.onclick(); };
+  maxBtn.onclick = () => {
+    maximized = !maximized;
+    ed.classList.toggle('clip-editor--max', maximized);
+    if (maximized) {
+      document.body.appendChild(backdrop);
+      backdrop.onclick = () => maxBtn.onclick();
+      document.addEventListener('keydown', onKey);
+    } else {
+      backdrop.remove();
+      document.removeEventListener('keydown', onKey);
+    }
+    maxBtn.innerHTML = svg(maximized ? 'shrink' : 'expand', 14);
+    maxBtn.title = maximized ? 'Volver al panel (Esc)' : 'Ampliar en ventana grande';
+  };
+
+  function closeEditor() {
+    backdrop.remove();
+    document.removeEventListener('keydown', onKey);
+    ed.remove();
+  }
 
   video.addEventListener('loadedmetadata', () => {
     state.dur = video.duration || 0;
@@ -2158,13 +2193,13 @@ async function openClipEditor(wrap, t, isRetx) {
     video.currentTime = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width)) * state.dur;
   });
 
-  ed.querySelector('.clip-cancel').onclick = () => ed.remove();
+  ed.querySelector('.clip-cancel').onclick = () => closeEditor();
   goBtn.onclick = async () => {
     const all = state.segs.slice();
     if ((state.b - state.a) >= 0.5) all.push({ start: state.a, end: state.b });
     if (!all.length) return;
     goBtn.disabled = true; goBtn.textContent = 'Transcribiendo…';
-    ed.remove();
+    closeEditor();
     await transcribeScreenVideo(mid, isRetx, all);
   };
 }
