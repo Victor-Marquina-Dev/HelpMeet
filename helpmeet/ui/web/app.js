@@ -5065,6 +5065,18 @@ function viewSettings() {
         </div>
       </div>
 
+      <div class="sv-section">
+        <div class="sv-sec-title">${svg('download', 14)} Actualizaciones</div>
+        <div class="sv-row">
+          <span class="sv-lbl">Versión instalada</span>
+          <span class="mono" style="color:var(--text-primary)">v${esc(STATE.version || '')}</span>
+        </div>
+        <div class="sv-row" style="margin-top:8px">
+          <span id="svUpdStatus" style="color:var(--text-muted); font-size:11.5px"></span>
+          <button class="btn" id="svUpdCheck">Buscar actualizaciones</button>
+        </div>
+      </div>
+
       <div class="sv-section sv-section--actions">
         <button class="sv-act" id="svDiag">${svg('check', 13)} Diagnóstico</button>
         <button class="sv-act sv-act--danger" id="svWipe">${svg('trash', 13)} Borrar datos</button>
@@ -5111,6 +5123,27 @@ function viewSettings() {
     inner.querySelector('#svAiReset').onclick = async () => { const r = await api.setAiInstructions(''); inner.querySelector('#svAiInstr').value = (r && r.text) || ''; toast('ok', 'Restablecido'); };
     inner.querySelector('#svDir').onclick = async () => { const r = await api.chooseExportDir(); if (r && r.ok) { toast('ok', 'Carpeta actualizada'); openSettings(); } };
     inner.querySelector('#svDiag').onclick = () => openDiagnostics();
+    // Actualizaciones: comprueba bajo demanda; si hay versión nueva, el botón
+    // pasa a "Descargar" y abre el enlace en el navegador.
+    const updBtn = inner.querySelector('#svUpdCheck');
+    const updStatus = inner.querySelector('#svUpdStatus');
+    updBtn.onclick = async () => {
+      updBtn.disabled = true; updBtn.textContent = 'Comprobando…';
+      let u = null;
+      try { u = await api.checkForUpdate(); } catch (e) { u = null; }
+      if (u && u.available) {
+        updStatus.textContent = `Nueva versión ${u.version} disponible`;
+        updStatus.style.color = 'var(--accent)';
+        updBtn.disabled = false;
+        updBtn.textContent = `Descargar ${u.version}`;
+        updBtn.classList.add('btn-primary');
+        updBtn.onclick = () => api.openUrl(u.url);
+      } else {
+        updStatus.textContent = u ? 'Tienes la última versión' : 'No se pudo comprobar (¿sin internet?)';
+        updBtn.disabled = false;
+        updBtn.textContent = 'Buscar actualizaciones';
+      }
+    };
     // Sección licencia
     if (HAS_PYWEBVIEW()) {
       api.getLicenseInfo().then(info => {

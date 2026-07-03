@@ -199,15 +199,18 @@ body[data-app-state="screen-recording"] .rec-rail { display: block; }
 }
 
 /* Handles de resize de ventana frameless */
-.wr { position: fixed; z-index: 9999; -webkit-app-region: no-drag; app-region: no-drag; }
-.wr-n  { top: 0; left: 5px; right: 5px; height: 4px; cursor: n-resize; }
-.wr-s  { bottom: 0; left: 5px; right: 5px; height: 4px; cursor: s-resize; }
-.wr-e  { right: 0; top: 5px; bottom: 5px; width: 4px; cursor: e-resize; }
-.wr-w  { left: 0; top: 5px; bottom: 5px; width: 4px; cursor: w-resize; }
-.wr-ne { top: 0; right: 0; width: 8px; height: 8px; cursor: ne-resize; }
-.wr-nw { top: 0; left: 0; width: 8px; height: 8px; cursor: nw-resize; }
-.wr-se { bottom: 0; right: 0; width: 8px; height: 8px; cursor: se-resize; }
-.wr-sw { bottom: 0; left: 0; width: 8px; height: 8px; cursor: sw-resize; }
+/* Por ENCIMA de la topbar (z 10000): si no, el borde superior y sus esquinas
+   quedan tapados y no se puede redimensionar desde arriba. El tour (12000+)
+   sigue por encima, como debe. */
+.wr { position: fixed; z-index: 11000; -webkit-app-region: no-drag; app-region: no-drag; }
+.wr-n  { top: 0; left: 10px; right: 10px; height: 5px; cursor: n-resize; }
+.wr-s  { bottom: 0; left: 10px; right: 10px; height: 5px; cursor: s-resize; }
+.wr-e  { right: 0; top: 10px; bottom: 10px; width: 5px; cursor: e-resize; }
+.wr-w  { left: 0; top: 10px; bottom: 10px; width: 5px; cursor: w-resize; }
+.wr-ne { top: 0; right: 0; width: 10px; height: 10px; cursor: ne-resize; }
+.wr-nw { top: 0; left: 0; width: 10px; height: 10px; cursor: nw-resize; }
+.wr-se { bottom: 0; right: 0; width: 10px; height: 10px; cursor: se-resize; }
+.wr-sw { bottom: 0; left: 0; width: 10px; height: 10px; cursor: sw-resize; }
 .brand {
   display: flex; align-items: flex-end; gap: 9px;
   height: 24px; cursor: pointer; user-select: none;
