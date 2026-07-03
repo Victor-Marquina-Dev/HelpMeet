@@ -226,6 +226,14 @@ body[data-app-state="screen-recording"] .rec-rail { display: block; }
   font-family: var(--font-mono); font-size: 9px; color: var(--text-faint);
   letter-spacing: .02em; line-height: 1; padding-bottom: 4px;
 }
+/* Hay versión nueva publicada: el chip se vuelve clicable y llama la atención. */
+.brand-version.has-update { color: var(--accent); cursor: pointer; }
+.brand-version.has-update:hover { color: var(--accent-hover); text-decoration: underline; }
+
+/* Entradas de contexto consecutivas: la etiqueta "Contexto" solo en la primera,
+   y las siguientes pegadas — se leen como un único grupo. */
+.ctx-entry + .ctx-entry .u-tag { visibility: hidden; }
+.ctx-entry + .ctx-entry { margin-top: -4px; }
 
 .topbar-sep { width: 1px; height: 24px; background: var(--border-subtle); flex: none; margin: 0 2px; }
 .brand .topbar-sep { height: 20px; margin: 0 1px 2px 6px; }

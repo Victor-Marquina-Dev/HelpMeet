@@ -171,6 +171,8 @@ const api = {
   transcribeMeetingVideo: (mid, force, clipSegments) => call('transcribe_meeting_video', mid, !!force, clipSegments || null),
   getVideoThumbnails: (mid, count) => call('get_video_thumbnails', mid, count || 12),
   getMediaVideoUrl: (mid) => call('get_media_video_url', mid),
+  checkForUpdate: () => call('check_for_update'),
+  openUrl: (u) => call('open_url', u),
   toggleScreenMicMute: (m) => call('toggle_screen_mic_mute', m),
   setScreenMonitor: (idx) => call('set_screen_monitor', idx),
   setScreenScaleMode: (mode) => call('set_screen_scale_mode', mode),
@@ -5197,6 +5199,7 @@ function applyBootstrap(b) {
   const ac = $('#archiveCount'), tc = $('#trashCount');
   if (ac) ac.textContent = STATE.archiveCount; if (tc) tc.textContent = STATE.trashCount;
   if (b.version) { STATE.version = b.version; const ve = $('#headerVersion'); if (ve) ve.textContent = 'v' + b.version; }
+  checkForUpdateOnce();
   if (b.default_mic_muted != null) { STATE.micMuted = !!b.default_mic_muted; updateMicChip(); }
   // Restaurar estado de grabación de pantalla si el backend la tenía activa
   if (b.screen_recording) {
@@ -5205,6 +5208,26 @@ function applyBootstrap(b) {
     setAppState('screen-recording');
     startTimer();
   }
+}
+
+// Aviso de actualización: consulta una sola vez por sesión, en segundo plano.
+// Si hay versión nueva, el chip de versión del header se vuelve clicable y
+// abre la descarga en el navegador. Sin internet: silencio total.
+let _updateChecked = false;
+async function checkForUpdateOnce() {
+  if (_updateChecked) return;
+  _updateChecked = true;
+  let u = null;
+  try { u = await api.checkForUpdate(); } catch (e) { return; }
+  if (!u || !u.available) return;
+  const ve = $('#headerVersion');
+  if (ve) {
+    ve.textContent = `v${u.current} · ⬆ ${u.version} disponible`;
+    ve.classList.add('has-update');
+    ve.title = `Nueva versión ${u.version} — clic para descargar`;
+    ve.onclick = () => api.openUrl(u.url);
+  }
+  toast('info', `Nueva versión ${u.version} disponible — clic en la versión (arriba) para descargar`);
 }
 
 async function refreshAll() {

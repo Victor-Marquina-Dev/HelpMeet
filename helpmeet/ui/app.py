@@ -398,6 +398,44 @@ class Api:
             return None
         return srv.url_for(int(meeting_id))
 
+    def check_for_update(self):
+        """Consulta si hay una versión más nueva publicada de la app.
+
+        La UI lo llama en segundo plano al arrancar; sin internet o sin versión
+        publicada devuelve {"available": False} y no molesta al usuario."""
+        import json
+        import urllib.request
+        try:
+            req = urllib.request.Request(
+                f"{self._LICENSE_SERVER}/api/version",
+                headers={"User-Agent": f"Helpmeet/{__version__}"},
+            )
+            with urllib.request.urlopen(req, timeout=6) as resp:
+                data = json.loads(resp.read().decode("utf-8"))
+        except Exception:
+            return {"available": False, "current": __version__}
+
+        def _tuple(v):
+            try:
+                return tuple(int(x) for x in str(v).split("."))
+            except Exception:
+                return (0,)
+
+        latest = str(data.get("version") or "").strip()
+        url = str(data.get("url") or "").strip()
+        if latest and url and _tuple(latest) > _tuple(__version__):
+            return {"available": True, "version": latest, "url": url,
+                    "current": __version__}
+        return {"available": False, "current": __version__}
+
+    def open_url(self, url):
+        """Abre un enlace http(s) en el navegador del usuario."""
+        import webbrowser
+        if isinstance(url, str) and url.startswith(("http://", "https://")):
+            webbrowser.open(url)
+            return {"ok": True}
+        return {"ok": False}
+
     def list_initiatives(self):
         return [_initiative_payload(i) for i in repo.list_initiatives(self._session)]
 
