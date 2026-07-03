@@ -1972,23 +1972,24 @@ async function openClipEditor(wrap, t, isRetx) {
     <video class="clip-video" src="${esc(url || '')}" preload="metadata"></video>
     <div class="clip-ctrl">
       <button class="clip-cbtn clip-skip" data-d="-10" title="Retroceder 10 segundos">${svg('rewind', 14)}<span class="clip-cnum">10</span></button>
-      <button class="clip-cbtn clip-play" title="Reproducir el trozo seleccionado">${svg('play', 16)}</button>
+      <button class="clip-cbtn clip-play" title="Reproducir la sección seleccionada">${svg('play', 16)}</button>
       <button class="clip-cbtn clip-skip" data-d="10" title="Avanzar 10 segundos"><span class="clip-cnum">10</span>${svg('fastForward', 14)}</button>
       <span class="clip-ctrl-sep"></span>
-      <button class="clip-cbtn clip-mark-a" title="El trozo empieza aquí (posición actual del vídeo)">${svg('markIn', 14)}</button>
-      <button class="clip-cbtn clip-mark-b" title="El trozo termina aquí (posición actual del vídeo)">${svg('markOut', 14)}</button>
+      <button class="clip-cbtn clip-mark-a" title="La sección empieza aquí (posición actual del vídeo)">${svg('markIn', 14)}</button>
+      <button class="clip-cbtn clip-mark-b" title="La sección termina aquí (posición actual del vídeo)">${svg('markOut', 14)}</button>
       <span class="clip-time">0:00 / 0:00</span>
       <button class="clip-cbtn clip-max" title="Ampliar en ventana grande">${svg('expand', 14)}</button>
     </div>
     <div class="clip-tl">
       <div class="clip-thumbs"></div>
+      <div class="clip-section-marks"></div>
       <div class="clip-sel"><span class="clip-h l"></span><span class="clip-h r"></span></div>
       <div class="clip-cursor"></div>
     </div>
     <div class="clip-scale"><span>0:00</span><span class="clip-dur">--:--</span></div>
     <div class="clip-segs"></div>
     <div class="clip-foot">
-      <div class="clip-total">Marca un trozo para transcribir</div>
+      <div class="clip-total">Carga el video para crear la primera sección</div>
       <div class="clip-actions">
         <button class="btn clip-cancel">Cancelar</button>
         <button class="btn btn-primary clip-go" disabled>Transcribir selección →</button>
@@ -2005,9 +2006,10 @@ async function openClipEditor(wrap, t, isRetx) {
   const sel = ed.querySelector('.clip-sel');
   const cursor = ed.querySelector('.clip-cursor');
   const segsBox = ed.querySelector('.clip-segs');
+  const marksBox = ed.querySelector('.clip-section-marks');
   const totalEl = ed.querySelector('.clip-total');
   const goBtn = ed.querySelector('.clip-go');
-  const state = { dur: 0, a: 0, b: 0, segs: [] };
+  const state = { dur: 0, a: 0, b: 0, segs: [], active: 0 };
   const fmt = s => `${Math.floor(s/60)}:${String(Math.floor(s%60)).padStart(2,'0')}`;
 
   api.getVideoThumbnails(mid, 12).then(thumbs => {
@@ -2015,37 +2017,129 @@ async function openClipEditor(wrap, t, isRetx) {
       `<i style="background-image:url(data:image/jpeg;base64,${th.thumb})"></i>`).join('');
   });
 
+  function sortedSegs() {
+    return state.segs.map((s, i) => ({ ...s, i })).sort((a, b) => a.start - b.start || a.end - b.end);
+  }
+  function currentSeg() {
+    return state.segs[state.active] || null;
+  }
+  function syncActiveSection() {
+    const seg = currentSeg();
+    if (!seg) return;
+    seg.start = state.a;
+    seg.end = state.b;
+  }
+  function totalSelected() {
+    let total = 0;
+    let cursor = null;
+    for (const s of sortedSegs()) {
+      if (cursor === null || s.start > cursor) {
+        total += Math.max(0, s.end - s.start);
+        cursor = s.end;
+      } else if (s.end > cursor) {
+        total += s.end - cursor;
+        cursor = s.end;
+      }
+    }
+    return Math.min(state.dur || total, total);
+  }
+  function isFullyCovered() {
+    if (!state.dur || !state.segs.length) return false;
+    let cursor = 0;
+    for (const s of sortedSegs()) {
+      if (s.start > cursor + 0.15) return false;
+      cursor = Math.max(cursor, s.end);
+      if (cursor >= state.dur - 0.15) return true;
+    }
+    return false;
+  }
+  function spaceNextToActive() {
+    const cur = currentSeg();
+    if (!cur || !state.dur) return null;
+    const sorted = sortedSegs();
+    const pos = sorted.findIndex(s => s.i === state.active);
+    const rightLimit = pos >= 0 && sorted[pos + 1] ? sorted[pos + 1].start : state.dur;
+    if (rightLimit - cur.end >= 0.5) {
+      return { start: cur.end, end: Math.min(rightLimit, cur.end + Math.min(5, rightLimit - cur.end)) };
+    }
+    const leftLimit = pos > 0 ? sorted[pos - 1].end : 0;
+    if (cur.start - leftLimit >= 0.5) {
+      return { start: Math.max(leftLimit, cur.start - Math.min(5, cur.start - leftLimit)), end: cur.start };
+    }
+    return null;
+  }
+  function activateSection(index) {
+    const seg = state.segs[index];
+    if (!seg) return;
+    state.active = index;
+    state.a = seg.start;
+    state.b = seg.end;
+    paintSel();
+    paintSegs();
+  }
   function paintSel() {
+    if (!state.dur) return;
     sel.style.left = (state.a / state.dur * 100) + '%';
     sel.style.width = ((state.b - state.a) / state.dur * 100) + '%';
-    const secs = Math.max(0, state.b - state.a);
-    totalEl.innerHTML = `Se transcribirá <b>${fmt(secs)}</b> de ${fmt(state.dur)} <span class="clip-range">· ${fmt(state.a)} – ${fmt(state.b)}</span>`;
+    syncActiveSection();
+    const secs = totalSelected();
+    totalEl.innerHTML = `Se transcribirá <b>${fmt(secs)}</b> de ${fmt(state.dur)} <span class="clip-range">· Sección ${state.active + 1}: ${fmt(state.a)} – ${fmt(state.b)}</span>`;
     updateGo();
   }
   function paintSegs() {
+    const canAdd = !!spaceNextToActive() && !isFullyCovered();
+    marksBox.innerHTML = state.segs.map((s, i) => {
+      if (!state.dur || i === state.active) return '';
+      const left = s.start / state.dur * 100;
+      const width = (s.end - s.start) / state.dur * 100;
+      return `<button type="button" class="clip-section-mark" data-i="${i}" style="left:${left}%;width:${width}%" title="Sección ${i + 1}"></button>`;
+    }).join('');
+    marksBox.querySelectorAll('.clip-section-mark').forEach(mark => mark.onclick = e => {
+      e.stopPropagation();
+      activateSection(+mark.dataset.i);
+    });
+    const addLabel = canAdd ? '+ añadir sección'
+      : (isFullyCovered() ? 'Todo el video está cubierto' : 'Sin espacio junto a la sección activa');
     segsBox.innerHTML = state.segs.map((s, i) =>
-      `<span class="clip-pill" data-i="${i}">Trozo ${i+1} · ${fmt(s.start)}–${fmt(s.end)} <span class="x">✕</span></span>`
-    ).join('') + `<button class="clip-add">+ añadir otro trozo</button>`;
+      `<button type="button" class="clip-pill${i === state.active ? ' is-active' : ''}" data-i="${i}">Sección ${i+1} · ${fmt(s.start)}–${fmt(s.end)} <span class="x" title="Eliminar sección">×</span></button>`
+    ).join('') + `<button type="button" class="clip-add" ${canAdd ? '' : 'disabled'}>${addLabel}</button>`;
+    segsBox.querySelectorAll('.clip-pill').forEach(p => p.onclick = e => {
+      if (e.target.closest('.x')) return;
+      activateSection(+p.dataset.i);
+    });
     segsBox.querySelectorAll('.x').forEach(x => x.onclick = e => {
-      state.segs.splice(+e.target.closest('.clip-pill').dataset.i, 1); paintSegs(); updateGo();
+      const idx = +e.target.closest('.clip-pill').dataset.i;
+      state.segs.splice(idx, 1);
+      if (!state.segs.length) {
+        state.segs.push({ start: 0, end: state.dur });
+        state.active = 0;
+      } else {
+        state.active = Math.max(0, Math.min(state.active > idx ? state.active - 1 : state.active, state.segs.length - 1));
+      }
+      const seg = currentSeg();
+      state.a = seg.start; state.b = seg.end;
+      paintSel(); paintSegs(); updateGo();
     });
     segsBox.querySelector('.clip-add').onclick = () => {
-      if (state.b - state.a >= 0.5) { state.segs.push({ start: state.a, end: state.b }); paintSegs(); updateGo(); }
+      const next = spaceNextToActive();
+      if (!next || isFullyCovered()) return;
+      const insertAt = state.active + 1;
+      state.segs.splice(insertAt, 0, next);
+      activateSection(insertAt);
     };
   }
   function updateGo() {
-    const pending = (state.b - state.a) >= 0.5 ? 1 : 0;
-    goBtn.disabled = (state.segs.length + pending) === 0;
+    goBtn.disabled = !state.segs.some(s => (s.end - s.start) >= 0.5);
   }
 
   // Controles de reproducción: play/pausa y saltos de ±10 s.
   const playBtn = ed.querySelector('.clip-play');
   const timeEl = ed.querySelector('.clip-time');
-  let playingClip = false;   // reproduciendo el trozo → pausa al llegar a su fin
+  let playingClip = false;   // reproduciendo la sección → pausa al llegar a su fin
   playBtn.onclick = () => {
     if (video.paused) {
-      // Play arranca en el INICIO del trozo si el cursor está fuera de él;
-      // si pausaste a mitad del trozo, reanuda donde ibas.
+      // Play arranca en el INICIO de la sección si el cursor está fuera de ella;
+      // si pausaste a mitad de la sección, reanuda donde ibas.
       if (state.dur && (video.currentTime < state.a - 0.05 || video.currentTime >= state.b - 0.05)) {
         video.currentTime = state.a;
       }
@@ -2057,23 +2151,23 @@ async function openClipEditor(wrap, t, isRetx) {
   };
   video.addEventListener('click', () => playBtn.onclick());
   video.addEventListener('play', () => { playBtn.innerHTML = svg('pause', 16); playBtn.title = 'Pausa'; });
-  video.addEventListener('pause', () => { playBtn.innerHTML = svg('play', 16); playBtn.title = 'Reproducir el trozo seleccionado'; });
+  video.addEventListener('pause', () => { playBtn.innerHTML = svg('play', 16); playBtn.title = 'Reproducir la sección seleccionada'; });
   ed.querySelectorAll('.clip-skip').forEach(b => b.onclick = () => {
     if (!state.dur) return;
-    playingClip = false;   // navegación libre: no auto-pausar en el fin del trozo
+    playingClip = false;   // navegación libre: no auto-pausar en el fin de la sección
     video.currentTime = Math.min(state.dur, Math.max(0, video.currentTime + Number(b.dataset.d)));
   });
 
-  // Marcar el trozo viendo el vídeo: fija inicio/fin en la posición actual.
+  // Marcar la sección viendo el vídeo: fija inicio/fin en la posición actual.
   ed.querySelector('.clip-mark-a').onclick = () => {
     if (!state.dur) return;
     state.a = Math.max(0, Math.min(video.currentTime, state.b - 0.2));
-    paintSel();
+    paintSel(); paintSegs();
   };
   ed.querySelector('.clip-mark-b').onclick = () => {
     if (!state.dur) return;
     state.b = Math.min(state.dur, Math.max(video.currentTime, state.a + 0.2));
-    paintSel();
+    paintSel(); paintSegs();
   };
 
   // Modo ventana grande: el editor pasa a un modal amplio dentro de la app
@@ -2106,6 +2200,8 @@ async function openClipEditor(wrap, t, isRetx) {
   video.addEventListener('loadedmetadata', () => {
     state.dur = video.duration || 0;
     state.a = 0; state.b = state.dur;
+    state.segs = [{ start: 0, end: state.dur }];
+    state.active = 0;
     ed.querySelector('.clip-dur').textContent = fmt(state.dur);
     timeEl.textContent = `0:00 / ${fmt(state.dur)}`;
     paintSel(); paintSegs();
@@ -2114,7 +2210,7 @@ async function openClipEditor(wrap, t, isRetx) {
     if (!state.dur) return;
     cursor.style.left = (video.currentTime / state.dur * 100) + '%';
     timeEl.textContent = `${fmt(video.currentTime)} / ${fmt(state.dur)}`;
-    // Vista previa del trozo: al llegar a su fin, pausa (queda listo para replay).
+    // Vista previa de la sección: al llegar a su fin, pausa (queda listo para replay).
     if (playingClip && !video.paused && video.currentTime >= state.b - 0.03) {
       video.pause(); playingClip = false;
     }
@@ -2175,6 +2271,7 @@ async function openClipEditor(wrap, t, isRetx) {
     const onUp = () => {
       document.removeEventListener('mousemove', onMove);
       document.removeEventListener('mouseup', onUp);
+      paintSegs();
     };
     document.addEventListener('mousemove', onMove);
     document.addEventListener('mouseup', onUp);
@@ -2195,8 +2292,8 @@ async function openClipEditor(wrap, t, isRetx) {
 
   ed.querySelector('.clip-cancel').onclick = () => closeEditor();
   goBtn.onclick = async () => {
-    const all = state.segs.slice();
-    if ((state.b - state.a) >= 0.5) all.push({ start: state.a, end: state.b });
+    syncActiveSection();
+    const all = state.segs.filter(s => (s.end - s.start) >= 0.5);
     if (!all.length) return;
     goBtn.disabled = true; goBtn.textContent = 'Transcribiendo…';
     closeEditor();

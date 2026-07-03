@@ -2778,9 +2778,10 @@ body[data-sidebar="collapsed"] .actionbar--dock { left: 52px; }
 
 /* Modo ventana grande: modal amplio dentro de la app (no pantalla completa). */
 .clip-backdrop { position: fixed; inset: 0; background: rgba(0, 0, 0, .62); z-index: 8000; }
-.clip-editor--max { position: fixed; inset: 30px 56px; z-index: 8001; margin: 0;
-  overflow: auto; box-shadow: var(--shadow-modal); }
-.clip-editor--max .clip-video { max-height: calc(100vh - 300px); }
+.clip-editor--max { position: fixed; inset: 58px 56px 28px; z-index: 8001; margin: 0;
+  padding: 18px; overflow: auto; box-shadow: var(--shadow-modal); }
+.clip-editor--max .clip-video { max-height: calc(100vh - 360px); }
+.clip-editor--max .clip-ctrl { padding-top: 2px; }
 /* Sin overflow:hidden en .clip-tl: las manijas sobresalen y deben verse enteras.
    El recorte redondeado se aplica solo a la tira de miniaturas. */
 .clip-tl { position: relative; height: 46px; margin: 0 6px; cursor: pointer;
@@ -2789,6 +2790,13 @@ body[data-sidebar="collapsed"] .actionbar--dock { left: 52px; }
   border-radius: var(--r-md); border: 1px solid var(--border-subtle); }
 .clip-thumbs i { flex: 1; background-size: cover; background-position: center;
   border-right: 1px solid rgba(0,0,0,.3); }
+.clip-section-marks { position: absolute; inset: 0; pointer-events: none; }
+.clip-section-mark {
+  position: absolute; top: 0; bottom: 0; border: 1px solid rgba(170,207,191,.7);
+  background: rgba(170,207,191,.1); box-sizing: border-box; pointer-events: auto;
+  cursor: pointer;
+}
+.clip-section-mark:hover { background: rgba(170,207,191,.18); border-color: var(--accent); }
 .clip-sel { position: absolute; top: 0; bottom: 0; border: 2px solid var(--accent);
   background: rgba(170,207,191,.16); box-sizing: border-box; }
 .clip-h { position: absolute; top: 50%; transform: translateY(-50%); width: 12px; height: 82%;
@@ -2801,12 +2809,15 @@ body[data-sidebar="collapsed"] .actionbar--dock { left: 52px; }
 .clip-scale { display: flex; justify-content: space-between; font-family: var(--font-mono);
   font-size: 9px; color: var(--text-faint); }
 .clip-segs { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
-.clip-pill { background: var(--accent-soft); border: 1px solid var(--accent); color: #cce8dc;
+.clip-pill { background: var(--bg-elevated); border: 1px solid var(--border-strong); color: var(--text-secondary);
   border-radius: var(--r-pill); padding: 4px 10px; font-size: 11px; font-family: var(--font-mono);
-  display: inline-flex; align-items: center; gap: 6px; }
+  display: inline-flex; align-items: center; gap: 6px; cursor: pointer; }
+.clip-pill:hover { color: var(--text-primary); border-color: var(--accent); }
+.clip-pill.is-active { background: var(--accent-soft); border-color: var(--accent); color: #cce8dc; }
 .clip-pill .x { color: var(--text-muted); cursor: pointer; }
 .clip-add { background: transparent; border: 1px dashed var(--border-strong); color: var(--text-muted);
   border-radius: var(--r-pill); padding: 4px 10px; font-size: 11px; cursor: pointer; }
+.clip-add:disabled { opacity: .55; cursor: default; border-style: solid; }
 .clip-foot { display: flex; align-items: center; justify-content: space-between;
   border-top: 1px dashed var(--border-subtle); padding-top: 10px; }
 .clip-total { font-size: 11.5px; color: var(--accent); }
