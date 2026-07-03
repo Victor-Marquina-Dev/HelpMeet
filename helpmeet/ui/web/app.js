@@ -1962,6 +1962,8 @@ async function openClipEditor(wrap, t, isRetx) {
       <button class="btn clip-skip" data-d="-10">« −10s</button>
       <button class="btn clip-play">▶ Reproducir</button>
       <button class="btn clip-skip" data-d="10">+10s »</button>
+      <button class="btn clip-mark-a" title="El trozo empieza donde está el vídeo ahora">⇤ Inicio aquí</button>
+      <button class="btn clip-mark-b" title="El trozo termina donde está el vídeo ahora">Fin aquí ⇥</button>
       <span class="clip-time">0:00 / 0:00</span>
     </div>
     <div class="clip-tl">
@@ -1971,6 +1973,7 @@ async function openClipEditor(wrap, t, isRetx) {
     </div>
     <div class="clip-scale"><span>0:00</span><span class="clip-dur">--:--</span></div>
     <div class="clip-segs"></div>
+    <div class="clip-qrow" hidden><span class="clip-qlbl">Calidad</span><div class="clip-quality"></div></div>
     <div class="clip-foot">
       <div class="clip-total">Marca un trozo para transcribir</div>
       <div class="clip-actions">
@@ -2034,6 +2037,40 @@ async function openClipEditor(wrap, t, isRetx) {
     video.currentTime = Math.min(state.dur, Math.max(0, video.currentTime + Number(b.dataset.d)));
   });
 
+  // Marcar el trozo viendo el vídeo: fija inicio/fin en la posición actual.
+  ed.querySelector('.clip-mark-a').onclick = () => {
+    if (!state.dur) return;
+    state.a = Math.max(0, Math.min(video.currentTime, state.b - 0.2));
+    paintSel();
+  };
+  ed.querySelector('.clip-mark-b').onclick = () => {
+    if (!state.dur) return;
+    state.b = Math.min(state.dur, Math.max(video.currentTime, state.a + 0.2));
+    paintSel();
+  };
+
+  // Calidad del modelo: mismas fichas que en ajustes, editables aquí mismo.
+  (async () => {
+    let cfg = null;
+    try { cfg = await api.v2.getTranscriptionSettings(); } catch (err) { /* sin v2 */ }
+    if (!cfg) return;
+    const models = (cfg.models_by_lang || {})[cfg.language] || cfg.models || [];
+    if (!models.length) return;
+    const qrow = ed.querySelector('.clip-qrow');
+    const box = ed.querySelector('.clip-quality');
+    qrow.hidden = false;
+    const paintQ = (tier) => {
+      box.innerHTML = models.map(mo =>
+        `<button class="cfg-chip clip-q${mo.tier === tier ? ' on' : ''}" data-tier="${esc(mo.tier)}" title="${esc(mo.label)}">${mo.tier === 'balanced' ? '★ ' : ''}${esc(mo.id)}<span class="cfg-chip-sub">${esc(mo.download)}</span></button>`
+      ).join('');
+      box.querySelectorAll('[data-tier]').forEach(b => b.onclick = async () => {
+        try { await api.v2.setTranscriptionSettings({ tier: b.dataset.tier }); } catch (err) { /* */ }
+        paintQ(b.dataset.tier);
+      });
+    };
+    paintQ(cfg.tier);
+  })();
+
   video.addEventListener('loadedmetadata', () => {
     state.dur = video.duration || 0;
     state.a = 0; state.b = state.dur;
@@ -2074,11 +2111,17 @@ async function openClipEditor(wrap, t, isRetx) {
     try { tl.setPointerCapture(e.pointerId); } catch (err) { /* sin captura */ }
   });
 
+  // Evita que un arrastre nativo (drag & drop del navegador) robe el puntero.
+  ed.addEventListener('dragstart', e => e.preventDefault());
+
   tl.addEventListener('pointermove', e => {
     if (!dragSide) {
       tl.style.cursor = sideAt(e) ? 'ew-resize' : 'pointer';
       return;
     }
+    // Guarda infalible: si el botón físico ya no está pulsado (pointerup
+    // perdido en WebView2), el arrastre termina aquí y no "se queda pegado".
+    if (!(e.buttons & 1)) { dragSide = null; return; }
     const rect = tl.getBoundingClientRect();
     const frac = Math.min(1, Math.max(0, (e.clientX - rect.left) / rect.width));
     const t2 = frac * state.dur;
@@ -2094,6 +2137,7 @@ async function openClipEditor(wrap, t, isRetx) {
   }
   tl.addEventListener('pointerup', endDrag);
   tl.addEventListener('pointercancel', endDrag);
+  tl.addEventListener('lostpointercapture', () => { dragSide = null; });
 
   tl.addEventListener('click', e => {
     if (clickSuppressed) { clickSuppressed = false; return; }
