@@ -47,6 +47,11 @@ const ICONS = {
   note: '<path d="M12 5v14M5 12h14"/>',
   warn: '<path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/><path d="M12 9v4M12 17h.01"/>',
   play: '<path d="m6 3 14 9-14 9V3z"/>',
+  pause: '<rect x="6" y="4" width="4" height="16" rx="1"/><rect x="14" y="4" width="4" height="16" rx="1"/>',
+  rewind: '<path d="m11 19-9-7 9-7v14z"/><path d="m22 19-9-7 9-7v14z"/>',
+  fastForward: '<path d="m13 19 9-7-9-7v14z"/><path d="m2 19 9-7-9-7v14z"/>',
+  markIn: '<path d="M3 19V5"/><path d="m13 6-6 6 6 6"/><path d="M7 12h14"/>',
+  markOut: '<path d="M21 5v14"/><path d="M3 12h14"/><path d="m11 18 6-6-6-6"/>',
   check: '<path d="M20 6 9 17l-5-5"/>',
   checkSquare: '<rect width="18" height="18" x="3" y="3" rx="2"/><path d="m9 12 2 2 4-4"/>',
   x: '<path d="M18 6 6 18M6 6l12 12"/>',
@@ -1959,11 +1964,12 @@ async function openClipEditor(wrap, t, isRetx) {
   ed.innerHTML = `
     <video class="clip-video" src="${esc(url || '')}" preload="metadata"></video>
     <div class="clip-ctrl">
-      <button class="btn clip-skip" data-d="-10">« −10s</button>
-      <button class="btn clip-play">▶ Reproducir</button>
-      <button class="btn clip-skip" data-d="10">+10s »</button>
-      <button class="btn clip-mark-a" title="El trozo empieza donde está el vídeo ahora">⇤ Inicio aquí</button>
-      <button class="btn clip-mark-b" title="El trozo termina donde está el vídeo ahora">Fin aquí ⇥</button>
+      <button class="btn clip-cbtn clip-skip" data-d="-10" title="Retroceder 10 segundos">${svg('rewind', 14)}<span class="clip-cnum">10</span></button>
+      <button class="btn clip-cbtn clip-play" title="Reproducir el trozo seleccionado">${svg('play', 16)}</button>
+      <button class="btn clip-cbtn clip-skip" data-d="10" title="Avanzar 10 segundos"><span class="clip-cnum">10</span>${svg('fastForward', 14)}</button>
+      <span class="clip-ctrl-sep"></span>
+      <button class="btn clip-cbtn clip-mark-a" title="El trozo empieza aquí (posición actual del vídeo)">${svg('markIn', 14)}</button>
+      <button class="btn clip-cbtn clip-mark-b" title="El trozo termina aquí (posición actual del vídeo)">${svg('markOut', 14)}</button>
       <span class="clip-time">0:00 / 0:00</span>
     </div>
     <div class="clip-tl">
@@ -1973,7 +1979,6 @@ async function openClipEditor(wrap, t, isRetx) {
     </div>
     <div class="clip-scale"><span>0:00</span><span class="clip-dur">--:--</span></div>
     <div class="clip-segs"></div>
-    <div class="clip-qrow" hidden><span class="clip-qlbl">Calidad</span><div class="clip-quality"></div></div>
     <div class="clip-foot">
       <div class="clip-total">Marca un trozo para transcribir</div>
       <div class="clip-actions">
@@ -2028,12 +2033,26 @@ async function openClipEditor(wrap, t, isRetx) {
   // Controles de reproducción: play/pausa y saltos de ±10 s.
   const playBtn = ed.querySelector('.clip-play');
   const timeEl = ed.querySelector('.clip-time');
-  playBtn.onclick = () => { if (video.paused) video.play(); else video.pause(); };
+  let playingClip = false;   // reproduciendo el trozo → pausa al llegar a su fin
+  playBtn.onclick = () => {
+    if (video.paused) {
+      // Play arranca en el INICIO del trozo si el cursor está fuera de él;
+      // si pausaste a mitad del trozo, reanuda donde ibas.
+      if (state.dur && (video.currentTime < state.a - 0.05 || video.currentTime >= state.b - 0.05)) {
+        video.currentTime = state.a;
+      }
+      playingClip = true;
+      video.play();
+    } else {
+      video.pause();
+    }
+  };
   video.addEventListener('click', () => playBtn.onclick());
-  video.addEventListener('play', () => { playBtn.textContent = '⏸ Pausa'; });
-  video.addEventListener('pause', () => { playBtn.textContent = '▶ Reproducir'; });
+  video.addEventListener('play', () => { playBtn.innerHTML = svg('pause', 16); playBtn.title = 'Pausa'; });
+  video.addEventListener('pause', () => { playBtn.innerHTML = svg('play', 16); playBtn.title = 'Reproducir el trozo seleccionado'; });
   ed.querySelectorAll('.clip-skip').forEach(b => b.onclick = () => {
     if (!state.dur) return;
+    playingClip = false;   // navegación libre: no auto-pausar en el fin del trozo
     video.currentTime = Math.min(state.dur, Math.max(0, video.currentTime + Number(b.dataset.d)));
   });
 
@@ -2049,28 +2068,6 @@ async function openClipEditor(wrap, t, isRetx) {
     paintSel();
   };
 
-  // Calidad del modelo: mismas fichas que en ajustes, editables aquí mismo.
-  (async () => {
-    let cfg = null;
-    try { cfg = await api.v2.getTranscriptionSettings(); } catch (err) { /* sin v2 */ }
-    if (!cfg) return;
-    const models = (cfg.models_by_lang || {})[cfg.language] || cfg.models || [];
-    if (!models.length) return;
-    const qrow = ed.querySelector('.clip-qrow');
-    const box = ed.querySelector('.clip-quality');
-    qrow.hidden = false;
-    const paintQ = (tier) => {
-      box.innerHTML = models.map(mo =>
-        `<button class="cfg-chip clip-q${mo.tier === tier ? ' on' : ''}" data-tier="${esc(mo.tier)}" title="${esc(mo.label)}">${mo.tier === 'balanced' ? '★ ' : ''}${esc(mo.id)}<span class="cfg-chip-sub">${esc(mo.download)}</span></button>`
-      ).join('');
-      box.querySelectorAll('[data-tier]').forEach(b => b.onclick = async () => {
-        try { await api.v2.setTranscriptionSettings({ tier: b.dataset.tier }); } catch (err) { /* */ }
-        paintQ(b.dataset.tier);
-      });
-    };
-    paintQ(cfg.tier);
-  })();
-
   video.addEventListener('loadedmetadata', () => {
     state.dur = video.duration || 0;
     state.a = 0; state.b = state.dur;
@@ -2082,13 +2079,17 @@ async function openClipEditor(wrap, t, isRetx) {
     if (!state.dur) return;
     cursor.style.left = (video.currentTime / state.dur * 100) + '%';
     timeEl.textContent = `${fmt(video.currentTime)} / ${fmt(state.dur)}`;
+    // Vista previa del trozo: al llegar a su fin, pausa (queda listo para replay).
+    if (playingClip && !video.paused && video.currentTime >= state.b - 0.03) {
+      video.pause(); playingClip = false;
+    }
   });
 
-  // Arrastre de manijas con el patrón del panel de grabación (que ya funciona en
-  // esta app): pointerdown en la línea de tiempo COMPLETA y captura en ella; la
-  // manija se elige por cercanía (GRAB_PX), no hace falta acertarle a 12px.
+  // Arrastre con eventos de RATÓN a nivel de documento — el mismo patrón del
+  // redimensionado del sidebar, que funciona de forma fiable en este WebView2.
+  // Bordes → mover esa manija (GRAB_PX de tolerancia); interior → mover el
+  // bloque entero de la selección; fuera → clic para posicionar el vídeo.
   const GRAB_PX = 16;
-  let dragSide = null;      // 'a' | 'b' | null
   let clickSuppressed = false;
 
   function sideAt(ev) {
@@ -2100,47 +2101,59 @@ async function openClipEditor(wrap, t, isRetx) {
     if (Math.min(dA, dB) > GRAB_PX) return null;
     return dA <= dB ? 'a' : 'b';
   }
+  function insideSel(ev) {
+    if (!state.dur) return false;
+    const rect = tl.getBoundingClientRect();
+    const t2 = (ev.clientX - rect.left) / rect.width * state.dur;
+    return t2 > state.a && t2 < state.b;
+  }
 
-  tl.addEventListener('pointerdown', e => {
-    if (e.button !== 0 || !state.dur) return;
-    const h = e.target.closest('.clip-h');
-    dragSide = h ? (h.classList.contains('l') ? 'a' : 'b') : sideAt(e);
-    if (!dragSide) return;              // clic normal → lo maneja el click (seek)
-    clickSuppressed = true;             // que el click posterior no mueva el vídeo
-    e.preventDefault();
-    try { tl.setPointerCapture(e.pointerId); } catch (err) { /* sin captura */ }
-  });
-
-  // Evita que un arrastre nativo (drag & drop del navegador) robe el puntero.
+  // Evita que un arrastre nativo (drag & drop del navegador) robe el ratón.
   ed.addEventListener('dragstart', e => e.preventDefault());
 
-  tl.addEventListener('pointermove', e => {
-    if (!dragSide) {
-      tl.style.cursor = sideAt(e) ? 'ew-resize' : 'pointer';
-      return;
-    }
-    // Guarda infalible: si el botón físico ya no está pulsado (pointerup
-    // perdido en WebView2), el arrastre termina aquí y no "se queda pegado".
-    if (!(e.buttons & 1)) { dragSide = null; return; }
-    const rect = tl.getBoundingClientRect();
-    const frac = Math.min(1, Math.max(0, (e.clientX - rect.left) / rect.width));
-    const t2 = frac * state.dur;
-    if (dragSide === 'a') state.a = Math.min(t2, state.b - 0.2);
-    else state.b = Math.max(t2, state.a + 0.2);
-    paintSel();
+  tl.addEventListener('mousedown', e => {
+    if (e.button !== 0 || !state.dur) return;
+    const h = e.target.closest('.clip-h');
+    let mode = h ? (h.classList.contains('l') ? 'a' : 'b') : sideAt(e);
+    if (!mode && insideSel(e)) mode = 'move';
+    if (!mode) return;                  // clic normal → lo maneja el click (seek)
+    e.preventDefault();
+    const startX = e.clientX;
+    const a0 = state.a, b0 = state.b;
+    const onMove = ev => {
+      clickSuppressed = true;           // hubo arrastre → el click posterior no busca
+      const rect = tl.getBoundingClientRect();
+      if (mode === 'move') {
+        // Desplaza el bloque completo manteniendo su duración.
+        const dt = (ev.clientX - startX) / rect.width * state.dur;
+        const len = b0 - a0;
+        const na = Math.max(0, Math.min(a0 + dt, state.dur - len));
+        state.a = na; state.b = na + len;
+      } else {
+        const frac = Math.min(1, Math.max(0, (ev.clientX - rect.left) / rect.width));
+        const t2 = frac * state.dur;
+        if (mode === 'a') state.a = Math.max(0, Math.min(t2, state.b - 0.2));
+        else state.b = Math.min(state.dur, Math.max(t2, state.a + 0.2));
+      }
+      paintSel();
+    };
+    const onUp = () => {
+      document.removeEventListener('mousemove', onMove);
+      document.removeEventListener('mouseup', onUp);
+    };
+    document.addEventListener('mousemove', onMove);
+    document.addEventListener('mouseup', onUp);
   });
 
-  function endDrag(e) {
-    if (!dragSide) return;
-    dragSide = null;
-    try { tl.releasePointerCapture(e.pointerId); } catch (err) { /* ya liberada */ }
-  }
-  tl.addEventListener('pointerup', endDrag);
-  tl.addEventListener('pointercancel', endDrag);
-  tl.addEventListener('lostpointercapture', () => { dragSide = null; });
+  // Feedback del cursor: ↔ en las manijas, "agarrar" dentro del bloque.
+  tl.addEventListener('mousemove', e => {
+    if (e.buttons & 1) return;   // durante un arrastre lo gestiona document
+    tl.style.cursor = sideAt(e) ? 'ew-resize' : (insideSel(e) ? 'grab' : 'pointer');
+  });
 
   tl.addEventListener('click', e => {
     if (clickSuppressed) { clickSuppressed = false; return; }
+    playingClip = false;
     const rect = tl.getBoundingClientRect();
     video.currentTime = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width)) * state.dur;
   });
