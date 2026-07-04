@@ -1635,15 +1635,16 @@ function refreshMeetingTitleJob() {
   } else if (!job && spin) {
     spin.remove();
   }
-  const copy = group.querySelector('.meeting-title-copy');
-  const old = group.querySelector('[data-meeting-job]');
-  if (!copy) return;
+  // La barra de progreso vive bajo los tabs (#meetingJobRow), no en el título.
+  const row = document.querySelector('#meetingJobRow');
+  if (!row) return;
+  const old = row.querySelector('[data-meeting-job]');
   if (job) {
     const tmp = el('div');
     tmp.innerHTML = meetingJobMarkup(job);
     const fresh = tmp.firstElementChild;
     _wireJobCancel(fresh);
-    if (old) old.replaceWith(fresh); else copy.appendChild(fresh);
+    if (old) old.replaceWith(fresh); else row.appendChild(fresh);
   } else if (old) old.remove();
 }
 
@@ -1689,7 +1690,6 @@ function viewMeeting() {
             ${meetingDateStr ? `<span class="init-created">${esc(meetingDateStr)}</span>` : ''}
             ${videoDur}
           </div>
-          ${meetingJobMarkup(meetingJob)}
         </div>
       </div>
       <div class="init-actions meeting-actions" id="meetingActions">
@@ -1712,7 +1712,8 @@ function viewMeeting() {
         const label = { transcript: 'Transcripción', notas: 'Notas', archivos: 'Archivos' }[tab];
         return `<button class="tab ${STATE.activeTab === tab ? 'active' : ''}" data-tab="${tab}" role="tab">${label}</button>`;
       }).join('')}
-    </div>`;
+    </div>
+    <div class="meeting-job-row" id="meetingJobRow">${meetingJobMarkup(meetingJob)}</div>`;
   const content = el('div', 'content');
   if (STATE.activeTab === 'notas') content.classList.add('notes-mode');
   content.appendChild(renderTab(STATE.activeTab, t));

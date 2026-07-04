@@ -1014,6 +1014,13 @@ body:has(#actionbar.actionbar--dock) .content { padding-bottom: 120px; }
 .row-card .rc-size::before { content: '·'; margin-right: 6px; opacity: .5; }
 /* Icono del origen (audio / pantalla / importado) en la línea de metadatos */
 .rc-kind { display: inline-flex; align-items: center; color: var(--text-muted); }
+
+/* Vista de reunión: tabs pegados al título; el progreso de transcripción
+   va DEBAJO de los tabs, no en la línea del título. */
+.meeting-head .tabs { margin-top: 6px; }
+.meeting-job-row { padding: 0 2px; }
+.meeting-job-row:empty { display: none; }
+.meeting-job-row .meeting-title-job { margin: 8px 0 2px; max-width: 420px; }
 .rc-right { display: flex; align-items: center; gap: 8px; flex: none; }
 .rc-actions { display: flex; gap: 2px; opacity: 0; pointer-events: none; transition: opacity .15s; }
 .row-card:hover .rc-actions { opacity: 1; pointer-events: auto; }
