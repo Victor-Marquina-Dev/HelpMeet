@@ -5343,12 +5343,9 @@ function wireTopbar() {
       secHdr.setAttribute('aria-expanded', body.hidden ? 'false' : 'true');
     };
   }
-  // Iconos de la sección "Accesos directos", botón "Nuevo proyecto" y pie
+  // Iconos del botón "Nuevo proyecto" y del pie (Accesos directos va sin iconos)
   const _si = (sel, icon) => { const e = $(sel); if (e) e.innerHTML = svg(icon, 20); };
   _si('#btnNewProjectTop .np-ico', 'plus');
-  _si('#navHome .si-ico',      'home');
-  _si('#navFavorites .si-ico', 'star');
-  _si('#navMeetings .si-ico',  'calendar');
   _si('#btnArchive .sl-ico',   'archive');
   _si('#btnSettingsSide .sl-ico', 'settings');
   // Iconos del rail colapsado
