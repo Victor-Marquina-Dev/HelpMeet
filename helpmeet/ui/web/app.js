@@ -77,6 +77,7 @@ const ICONS = {
   clock: '<circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/>',
   arrowUp: '<path d="M12 19V5M5 12l7-7 7 7"/>',
   refresh: '<path d="M3 12a9 9 0 0 1 15-6.7L21 8M3 16l3-3 3 3M21 12a9 9 0 0 1-15 6.7L3 16"/>',
+  home: '<path d="M3 10.5 12 3l9 7.5"/><path d="M5 9.5V20a1 1 0 0 0 1 1h4v-6h4v6h4a1 1 0 0 0 1-1V9.5"/>',
 };
 function svg(name, size) {
   size = size || 15;
@@ -84,6 +85,27 @@ function svg(name, size) {
   return `<svg width="${size}" height="${size}" viewBox="0 0 24 24"${stroke}>${ICONS[name] || ''}</svg>`;
 }
 function ico(name, size) { return `<span class="ico">${svg(name, size)}</span>`; }
+
+// Iniciales de 2 letras a partir del nombre del proyecto (para el avatar).
+// Dos palabras → primera letra de cada una; una palabra → sus 2 primeras;
+// vacío → "·".
+function initialsFor(name) {
+  const s = (name || '').trim();
+  if (!s) return '·';
+  const parts = s.split(/\s+/).filter(Boolean);
+  if (parts.length >= 2) return (parts[0][0] + parts[1][0]).toUpperCase();
+  return s.slice(0, 2).toUpperCase();
+}
+
+// Color estable derivado del nombre (paleta tipo Google Material).
+// El mismo nombre da siempre el mismo color.
+function avatarColorFor(name) {
+  const palette = ['#1a73e8', '#188038', '#a142f4', '#e8710a', '#12a4af', '#d93025', '#9334e6', '#1e8e3e'];
+  const s = (name || '');
+  let h = 0;
+  for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) >>> 0;
+  return palette[h % palette.length];
+}
 
 /* ============================================================
    2. CAPA DE API
@@ -551,10 +573,12 @@ function renderMain() {
   const onMeetings  = STATE.screen === 'meetings';
   const onFavorites = STATE.screen === 'favorites';
   const onArchive = STATE.screen === 'archive';
+  const onHome = STATE.screen === 'welcome';
+  $('#navHome')?.classList.toggle('active', onHome);
   $('#navMeetings')?.classList.toggle('active', onMeetings);
   $('#navFavorites')?.classList.toggle('active', onFavorites);
   $('#btnArchive')?.classList.toggle('active', onArchive);
-  $('#navInitiatives')?.classList.toggle('active', !onMeetings && !onFavorites && !onArchive);
+  $('#navInitiatives')?.classList.toggle('active', !onMeetings && !onFavorites && !onArchive && !onHome);
   switch (STATE.screen) {
     case 'welcome': return main.replaceChildren(viewWelcome());
     case 'meetings': return main.replaceChildren(viewMeetings());
@@ -3262,7 +3286,8 @@ function _renderInitRow(tree, it) {
   const row = el('div', 'tree-initiative' + (open ? ' open' : '') + (isSelected ? ' selected' : ''));
   row.dataset.iid = it.id;
   row.title = it.name || '';
-  row.innerHTML = `<span class="chev">${svg('chevron', 12)}</span><span class="init-dot" style="background:${_initColor(it)}"></span><span class="name">${esc(it.name)}</span>${it.pinned ? '<span class="pin-ind">' + svg('pin', 10) + '</span>' : ''}<span class="count">${ms.length || ''}</span>`;
+  const av = `<span class="proj-av" style="background:${avatarColorFor(it.name)}">${esc(initialsFor(it.name))}</span>`;
+  row.innerHTML = `<span class="chev">${svg('chevron', 14)}</span>${av}<span class="name">${esc(it.name)}</span>${it.pinned ? '<span class="pin-ind">' + svg('pin', 12) + '</span>' : ''}<span class="count">${ms.length || ''}</span>`;
   row.onclick = () => selectInitiative(it.id);
   row.oncontextmenu = (e) => { e.preventDefault(); openInitiativeMenu(e, it.id); };
   tree.appendChild(row);
@@ -3362,9 +3387,16 @@ function renderSidebar() {
     pinned.forEach(it => _renderInitRow(tree, it));
   }
 
-  // ── Activas (no fijadas) ──────────────────────────────────
-  if (rest.length) {
-    rest.forEach(it => _renderInitRow(tree, it));
+  // ── Activas (no fijadas) — con corte "Mostrar todo" ───────
+  const VISIBLE_LIMIT = 8;
+  const showAll = !!STATE.showAllProjects;
+  const visible = showAll ? rest : rest.slice(0, VISIBLE_LIMIT);
+  visible.forEach(it => _renderInitRow(tree, it));
+  if (!showAll && rest.length > VISIBLE_LIMIT) {
+    const more = el('div', 'sb-show-more');
+    more.innerHTML = `<span class="sm-ico">${svg('chevronDown', 16)}</span><span>Mostrar todo</span>`;
+    more.onclick = () => { STATE.showAllProjects = true; renderSidebar(); };
+    tree.appendChild(more);
   }
 
   if (!all.length) tree.appendChild(el('div', 'tree-meeting', `<span style="color:var(--text-faint);font-size:11px">Sin proyectos</span>`));
@@ -5291,6 +5323,14 @@ function wireTopbar() {
   $('#btnRefreshSidebar').innerHTML = svg('refresh', 14);
   $('#btnNewInitiative').innerHTML = svg('plus', 14);
   $('#navInitiatives .nav-chev').innerHTML = svg('chevron', 17);
+  // Iconos de la sección "Accesos directos", botón "Nuevo proyecto" y pie
+  const _si = (sel, icon) => { const e = $(sel); if (e) e.innerHTML = svg(icon, 20); };
+  _si('#btnNewProjectTop .np-ico', 'plus');
+  _si('#navHome .si-ico',      'home');
+  _si('#navFavorites .si-ico', 'star');
+  _si('#navMeetings .si-ico',  'calendar');
+  _si('#btnArchive .sl-ico',   'archive');
+  _si('#btnSettingsSide .sl-ico', 'settings');
   // Iconos del rail colapsado
   const _ri = (id, icon) => { const e = $(id); if (e) e.innerHTML = svg(icon, 17); };
   _ri('#railMeetings',    'calendar');
@@ -5323,6 +5363,8 @@ function wireTopbar() {
     }
   };
   $('#btnNewInitiative').onclick = promptNewInitiative;
+  if ($('#btnNewProjectTop')) $('#btnNewProjectTop').onclick = promptNewInitiative;
+  if ($('#navHome')) $('#navHome').onclick = () => { STATE.screen = 'welcome'; STATE.selInit = null; STATE.selMeeting = null; renderSidebar(); renderMain(); renderTopStatus(); };
   if ($('#btnArchive')) $('#btnArchive').onclick = () => { STATE.screen = 'archive'; renderMain(); renderTopStatus(); };
   if ($('#btnTrash')) $('#btnTrash').onclick = () => { STATE.screen = 'trash'; renderMain(); };
   $('#btnSettingsSide').onclick = () => { STATE.screen = 'settings'; renderMain(); renderTopStatus(); };

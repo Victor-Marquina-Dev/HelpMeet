@@ -6,7 +6,7 @@
   <title>Helpmeet</title>
   <link rel="icon" type="image/svg+xml" href="assets/helpmeet-app-icon.svg?v=20260625-78">
   <link rel="alternate icon" type="image/x-icon" href="assets/helpmeet.ico?v=20260625-78">
-  <link rel="stylesheet" href="style.css?v=20260703-06">
+  <link rel="stylesheet" href="style.css?v=20260703-07">
 </head>
 <body data-app-state="idle" data-screen="welcome">
 
@@ -37,24 +37,32 @@
   <div class="body no-drag">
     <!-- Sidebar de proyectos/calendario -->
     <aside class="sidebar" id="sidebar" aria-label="Proyectos y calendario">
-      <nav class="sidebar-nav" aria-label="Secciones">
-        <button class="nav-item" id="navMeetings">Calendario</button>
-        <button class="nav-item" id="navFavorites">Favoritos</button>
-        <div class="nav-item active" id="navInitiatives">
-          <button class="nav-toggle" id="navInitiativesToggle" aria-expanded="true" aria-controls="sidebarTree">
-            <span class="nav-label">Proyectos</span>
-            <span class="nav-chev" aria-hidden="true"></span>
-          </button>
-          <button class="icon-btn sm" id="btnRefreshSidebar" aria-label="Actualizar lista" title="Actualizar"></button>
-          <button class="icon-btn sm" id="btnNewInitiative" aria-label="Nuevo proyecto" title="Nuevo proyecto (Ctrl+N)"></button>
-        </div>
+      <button class="new-project-btn no-drag" id="btnNewProjectTop" title="Nuevo proyecto (Ctrl+N)">
+        <span class="np-ico" aria-hidden="true"></span><span>Nuevo proyecto</span>
+      </button>
+
+      <nav class="sidebar-nav" aria-label="Accesos directos">
+        <div class="sb-section-title">Accesos directos</div>
+        <button class="side-item" id="navHome"><span class="si-ico" aria-hidden="true"></span><span class="si-label">Inicio</span></button>
+        <button class="side-item" id="navFavorites"><span class="si-ico" aria-hidden="true"></span><span class="si-label">Favoritos</span><span class="si-count" id="favCount"></span></button>
+        <button class="side-item" id="navMeetings"><span class="si-ico" aria-hidden="true"></span><span class="si-label">Calendario</span></button>
       </nav>
+
+      <div class="nav-item sb-projects-hdr" id="navInitiatives">
+        <button class="nav-toggle" id="navInitiativesToggle" aria-expanded="true" aria-controls="sidebarTree">
+          <span class="nav-label">Proyectos</span>
+          <span class="nav-chev" aria-hidden="true"></span>
+        </button>
+        <button class="icon-btn sm" id="btnRefreshSidebar" aria-label="Actualizar lista" title="Actualizar"></button>
+        <button class="icon-btn sm" id="btnNewInitiative" aria-label="Nuevo proyecto" title="Nuevo proyecto (Ctrl+N)"></button>
+      </div>
+
       <nav class="sidebar-tree" id="sidebarTree" aria-label="Lista de proyectos">
         <!-- inyectado por app.js -->
       </nav>
       <div class="sidebar-foot">
-        <button class="side-link" id="btnArchive">Archivados<span class="count" id="archiveCount">0</span></button>
-        <button class="side-link" id="btnSettingsSide">Configuración</button>
+        <button class="side-link" id="btnArchive"><span class="sl-ico" aria-hidden="true"></span><span class="sl-label">Archivados</span><span class="count" id="archiveCount">0</span></button>
+        <button class="side-link" id="btnSettingsSide"><span class="sl-ico" aria-hidden="true"></span><span class="sl-label">Configuración</span></button>
       </div>
     </aside>
 
@@ -117,6 +125,6 @@
   <div class="toasts" id="toasts" aria-live="polite" aria-atomic="false"></div>
 
   <!-- Plantillas SVG de iconos. Inyectadas por app.js -->
-  <script src="app.js?v=20260703-06"></script>
+  <script src="app.js?v=20260703-07"></script>
 </body>
 </html>
