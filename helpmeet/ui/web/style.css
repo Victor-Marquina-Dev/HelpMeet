@@ -1060,7 +1060,7 @@ body[data-sidebar="collapsed"] .sidebar-rail {
   width: 38px; height: 34px; border-radius: 11px; border: none; flex: none;
   background: var(--newbtn-bg); cursor: pointer;
   display: flex; align-items: center; justify-content: center;
-  margin: 8px 0 30px;   /* deja el hueco de la cabecera "Accesos directos" */
+  margin: 8px 0 10px;   /* alineado con el botón "Nuevo proyecto" expandido */
   transition: box-shadow .15s;
 }
 .rail-new:hover { box-shadow: 0 1px 3px rgba(60, 64, 67, .3); }
@@ -1079,14 +1079,12 @@ body[data-sidebar="collapsed"] .sidebar-rail {
   transition: box-shadow .15s;
 }
 .home-card:hover { box-shadow: 0 1px 6px rgba(60, 64, 67, .15); }
-.hc-ic {
-  width: 38px; height: 38px; border-radius: 50%; flex: none;
-  background: var(--accent-soft); color: var(--accent);
-  display: inline-flex; align-items: center; justify-content: center;
-}
+.hc-av { width: 30px; height: 30px; font-size: 10.5px; }
 .hc-info { flex: 1; min-width: 0; }
 .hc-title { font-size: 13px; font-weight: 600; color: var(--text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.hc-sub { font-size: 11px; color: var(--text-muted); margin-top: 2px; }
+.hc-title .hc-kind { display: inline-flex; margin-left: 7px; color: var(--text-muted); vertical-align: -2px; }
+.hc-sub { font-size: 11px; color: var(--text-muted); margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.hc-sub .hc-proj { font-weight: 600; color: var(--text-secondary); }
 .hc-chip {
   border: 1px solid var(--border-strong); border-radius: 16px;
   padding: 6px 14px; font-size: 11.5px; font-weight: 600;
@@ -3139,24 +3137,29 @@ body[data-theme="dark"] {
   --text-secondary: #d4ccc0;
   --text-muted: #a89f91;
   --text-faint: #82796c;
-  --accent: #3ddc97;             /* menta luminosa sobre oscuro */
-  --accent-hover: #6fe3b5;
+  --accent: #35c489;             /* menta suave sobre oscuro (menos neón) */
+  --accent-hover: #4fd39c;
   --on-accent: #06281c;
-  --accent-soft: rgba(61, 220, 151, 0.13);
+  --accent-soft: rgba(53, 196, 137, 0.11);
   --hover-soft: rgba(255, 250, 240, 0.05);
   --hover-med: rgba(255, 250, 240, 0.09);
-  --sel-bg: rgba(61, 220, 151, 0.17);
-  --sel-text: #b8ecd6;
-  --newbtn-bg: #31473c;
-  --newbtn-text: #b8ecd6;
+  --sel-bg: rgba(53, 196, 137, 0.13);
+  --sel-text: #9adfc2;
+  --newbtn-bg: #2b3d34;
+  --newbtn-text: #a9dcc4;
   --shadow-pop: 0 8px 28px rgba(0, 0, 0, .5);
   --shadow-modal: 0 16px 48px rgba(0, 0, 0, .6);
   --shadow-soft: 0 4px 16px rgba(0, 0, 0, .4);
 }
 body[data-theme="dark"] ::-webkit-scrollbar-thumb { background: #4c443a; }
-body[data-theme="dark"] ::selection { background: rgba(61, 220, 151, .3); }
+body[data-theme="dark"] ::selection { background: rgba(53, 196, 137, .28); }
 body[data-theme="dark"] .brand-version { background: #342e28; }
 body[data-theme="dark"] .brand-mark { background: #2a2521; border-color: #4c443a; }
+/* Avatares atenuados en oscuro (sus colores pastel deslumbran sobre marrón) */
+body[data-theme="dark"] .proj-av { filter: brightness(.82) saturate(.9); }
+body[data-theme="dark"] .fav-init-dot { filter: brightness(.82) saturate(.9); }
+/* Anillo de foco menos intenso en oscuro */
+body[data-theme="dark"] :focus-visible { outline-color: rgba(53, 196, 137, .5); }
 body[data-theme="dark"] .home-card:hover,
 body[data-theme="dark"] .row-card:hover,
 body[data-theme="dark"] .sv-upd-card { box-shadow: 0 1px 8px rgba(0, 0, 0, .35); }

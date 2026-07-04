@@ -678,12 +678,13 @@ function viewHomeFeed() {
         : m.has_video ? `Grabación${m.dur && m.dur !== '—' ? ' ' + m.dur : ''} · sin transcribir`
         : 'Pendiente';
       const icon = m.source === 'audio' ? 'mic' : m.source === 'import' ? 'upload' : m.source === 'screen' ? 'monitorDot' : 'calendar';
+      const avColor = it ? (it.color || avatarColorFor(it.name)) : 'var(--text-faint)';
       const card = el('div', 'home-card');
       card.innerHTML = `
-        <span class="hc-ic">${svg(icon, 18)}</span>
+        <span class="proj-av hc-av" style="background:${avColor}">${it ? esc(initialsFor(it.name)) : '·'}</span>
         <div class="hc-info">
-          <div class="hc-title">${esc(m.title)}</div>
-          <div class="hc-sub">${it ? esc(it.name) + ' · ' : ''}${esc(sub)}</div>
+          <div class="hc-title">${esc(m.title)}<span class="hc-kind" title="${m.source === 'audio' ? 'Audio de reunión' : m.source === 'import' ? 'Vídeo importado' : 'Grabación de pantalla'}">${svg(icon, 13)}</span></div>
+          <div class="hc-sub"><span class="hc-proj">${it ? esc(it.name) : 'Sin proyecto'}</span> · ${esc(sub)}</div>
         </div>
         <button class="hc-chip${done || proc ? '' : ' primary'}">${done ? 'Ver notas' : proc ? 'Ver progreso' : 'Transcribir'}</button>`;
       const go = (tab) => {
@@ -2099,6 +2100,10 @@ function videoPanel(t) {
   const bt = el('button', hasTx ? 'btn' : 'btn btn-primary', hasTx ? 'Retranscribir' : 'Recortar y transcribir');
   bt.onclick = () => openClipEditor(wrap, t, hasTx);
   actions.appendChild(bt);
+  // Transcribir directo, sin pasar por el recortador (vídeo completo)
+  const btNow = el('button', 'btn', hasTx ? 'Retranscribir todo' : 'Transcribir ahora');
+  btNow.onclick = () => transcribeScreenVideo(t.id, hasTx, null);
+  actions.appendChild(btNow);
   wrap.querySelector('.rec-actions').replaceWith(actions);
   return wrap;
 }
