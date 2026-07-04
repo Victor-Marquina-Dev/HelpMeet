@@ -77,6 +77,7 @@ const ICONS = {
   clock: '<circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/>',
   arrowUp: '<path d="M12 19V5M5 12l7-7 7 7"/>',
   refresh: '<path d="M3 12a9 9 0 0 1 15-6.7L21 8M3 16l3-3 3 3M21 12a9 9 0 0 1-15 6.7L3 16"/>',
+  menu: '<path d="M4 6h16M4 12h16M4 18h16"/>',
 };
 function svg(name, size) {
   size = size || 15;
@@ -94,6 +95,16 @@ function initialsFor(name) {
   const parts = s.split(/\s+/).filter(Boolean);
   if (parts.length >= 2) return (parts[0][0] + parts[1][0]).toUpperCase();
   return s.slice(0, 2).toUpperCase();
+}
+
+// Icono del origen de una reunión (audio grabado, pantalla grabada o
+// vídeo importado) para la línea de metadatos de su tarjeta.
+function _kindIcon(m) {
+  const k = m && m.source;
+  if (k === 'audio')  return `<span class="rc-kind" title="Audio de reunión">${svg('mic', 12)}</span>`;
+  if (k === 'screen') return `<span class="rc-kind" title="Grabación de pantalla">${svg('monitor', 12)}</span>`;
+  if (k === 'import') return `<span class="rc-kind" title="Vídeo importado">${svg('upload', 12)}</span>`;
+  return '';
 }
 
 // Color estable derivado del nombre (paleta tipo Google Material).
@@ -717,7 +728,14 @@ function viewFavorites() {
 
   const head = el('div', 'mhead');
   head.style.cssText = 'border-bottom:none';
-  head.innerHTML = `<div class="mhead-row"><h1 class="page-title">Favoritos</h1></div>`;
+  head.innerHTML = `<div class="mhead-row"><h1 class="page-title">Favoritos</h1><span class="spacer"></span>${favList.length ? `<button class="btn sm" id="favClearAll" title="Quitar todas las reuniones de favoritos">${svg('star', 13)}<span>Quitar todos</span></button>` : ''}</div>`;
+  const clearBtn = head.querySelector('#favClearAll');
+  if (clearBtn) clearBtn.onclick = () => {
+    const n = favList.length;
+    localStorage.setItem('hm.favMeetings', '[]');
+    toast('ok', `Se quitaron ${n} de favoritos`);
+    renderSidebar(); renderMain();
+  };
   const content = el('div', 'content');
 
   if (!favList.length) {
@@ -747,10 +765,19 @@ function viewFavorites() {
       const isOpen = STATE._favOpen.has(key);
       // Cabecera de iniciativa (colapsable)
       const ihdr = el('div', 'fav-init-hdr' + (isOpen ? ' open' : ''));
-      ihdr.innerHTML = `<span class="fav-chev">${svg('chevron', 10)}</span><span class="fav-init-dot" style="background:${mColor}"></span><span class="fav-init-name">${esc(initName)}</span><span class="fav-init-cnt">${meetings.length}</span>`;
+      ihdr.innerHTML = `<span class="fav-chev">${svg('chevron', 10)}</span><span class="fav-init-dot" style="background:${mColor}"></span><span class="fav-init-name">${esc(initName)}</span><span class="fav-init-cnt">${meetings.length}</span><button class="icon-btn sm fav-grp-clear" title="Quitar este proyecto de favoritos">${svg('x', 12)}</button>`;
       ihdr.onclick = () => {
         STATE._favOpen.has(key) ? STATE._favOpen.delete(key) : STATE._favOpen.add(key);
         renderMain();
+      };
+      const grpClear = ihdr.querySelector('.fav-grp-clear');
+      if (grpClear) grpClear.onclick = (e) => {
+        e.stopPropagation();
+        const s = _getMeetingFavs();
+        meetings.forEach(m => s.delete(m.id));
+        localStorage.setItem('hm.favMeetings', JSON.stringify([...s]));
+        toast('ok', `Se quitaron ${meetings.length} de favoritos`);
+        renderSidebar(); renderMain();
       };
       list.appendChild(ihdr);
       if (!isOpen) return; // colapsado: no renderizar cards
@@ -1166,7 +1193,7 @@ function viewInitiative() {
       c.innerHTML = `
         <div class="rc-sel"><span class="rc-cb"></span></div>
         <div class="rc-date"><span class="rc-mon">${mon}</span><span class="rc-day">${day}</span></div>
-        <div class="rc-body"><div class="rc-title">${esc(m.title)}</div><div class="rc-meta">${m.dur ? esc(m.dur) : ''}${m.size ? '<span class="rc-size">' + esc(m.size) + '</span>' : ''}</div></div>
+        <div class="rc-body"><div class="rc-title">${esc(m.title)}</div><div class="rc-meta">${_kindIcon(m)}${m.dur ? esc(m.dur) : ''}${m.size ? '<span class="rc-size">' + esc(m.size) + '</span>' : ''}</div></div>
         <div class="rc-right">
           <div class="rc-actions">
             <button class="icon-btn sm rc-act-btn${isFav ? ' fav-on' : ''}" data-act="fav" title="${isFav ? 'Quitar de favoritas' : 'Marcar como favorita'}">${svg('star', 13)}</button>
@@ -5365,9 +5392,15 @@ function wireTopbar() {
   _ri('#railArchive',     'archive');
   _ri('#railSettings',    'settings');
 
-  // Clic en logo/marca → colapsar/expandir sidebar
+  // Botón hamburguesa (como Gmail) → colapsar/expandir sidebar
+  const menuBtn = $('#btnMenu');
+  if (menuBtn) {
+    menuBtn.innerHTML = svg('menu', 20);
+    menuBtn.onclick = () => { STATE.sidebarOpen = !STATE.sidebarOpen; applySidebar(); };
+  }
+  // El logo/marca ya no alterna el panel (lo hace la hamburguesa)
   const brandEl = document.querySelector('.brand');
-  if (brandEl) brandEl.onclick = () => { STATE.sidebarOpen = !STATE.sidebarOpen; applySidebar(); };
+  if (brandEl) brandEl.onclick = null;
 
   $('#btnRefreshSidebar').onclick = async () => {
     const btn = $('#btnRefreshSidebar');

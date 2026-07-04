@@ -14,9 +14,9 @@
   /* Bordes */
   --border-subtle: #e4e7ec;      /* separadores suaves */
   --border-strong: #d3d7de;      /* bordes de tarjetas/botones */
-  /* Texto */
-  --text-primary: #1f1f1f;       /* texto principal */
-  --text-secondary: #444746;     /* texto secundario */
+  /* Texto — negro elegante para que resalte sobre el blanco */
+  --text-primary: #15181b;       /* texto principal (casi negro) */
+  --text-secondary: #3a3d40;     /* texto secundario */
   --text-muted: #5f6368;         /* atenuado */
   --text-faint: #80868b;         /* muy atenuado */
   /* Acentos — verde menta Helpmeet para lo interactivo */
@@ -222,16 +222,27 @@ body[data-app-state="screen-recording"] .rec-rail { display: block; }
 .wr-nw { top: 0; left: 0; width: 10px; height: 10px; cursor: nw-resize; }
 .wr-se { bottom: 0; right: 0; width: 10px; height: 10px; cursor: se-resize; }
 .wr-sw { bottom: 0; left: 0; width: 10px; height: 10px; cursor: sw-resize; }
+/* Botón hamburguesa al inicio de la barra (como Gmail) */
+.topbar-menu {
+  width: 38px; height: 38px; flex: none;
+  border: none; border-radius: 50%; background: transparent;
+  color: var(--text-secondary); cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  transition: background .12s, color .12s;
+}
+.topbar-menu:hover { background: var(--hover-med); color: var(--text-primary); }
+
 .brand {
   display: flex; align-items: center; gap: 9px;
-  height: 30px; cursor: pointer; user-select: none;
+  height: 32px; cursor: default; user-select: none;
 }
 .brand-mark {
-  width: 30px; height: 30px; border-radius: 8px; border: none;
-  background: linear-gradient(135deg, var(--brand-green-2), var(--brand-green));
+  width: 32px; height: 32px; border-radius: 10px; border: none;
+  background: linear-gradient(140deg, #3ddc97 0%, var(--brand-green) 55%, #0a9268 100%);
+  box-shadow: 0 2px 6px rgba(16, 185, 129, .35), inset 0 1px 0 rgba(255, 255, 255, .28);
   display: flex; align-items: center; justify-content: center; flex: none;
 }
-.brand-mark img { display: block; width: 17px; height: 17px; }
+.brand-mark img { display: block; width: 18px; height: 18px; filter: drop-shadow(0 1px 1px rgba(0, 0, 0, .18)); }
 .brand-name {
   font-size: 15px; font-weight: 600; letter-spacing: -.2px;
   line-height: 1; color: var(--text-secondary);
@@ -1001,6 +1012,8 @@ body:has(#actionbar.actionbar--dock) .content { padding-bottom: 120px; }
 .row-card .rc-title { font-size: 11px; font-weight: 600; }
 .row-card .rc-meta { font-size: 9.6px; color: var(--text-muted); margin-top: 1px; display: flex; align-items: center; gap: 6px; }
 .row-card .rc-size::before { content: '·'; margin-right: 6px; opacity: .5; }
+/* Icono del origen (audio / pantalla / importado) en la línea de metadatos */
+.rc-kind { display: inline-flex; align-items: center; color: var(--text-muted); }
 .rc-right { display: flex; align-items: center; gap: 8px; flex: none; }
 .rc-actions { display: flex; gap: 2px; opacity: 0; pointer-events: none; transition: opacity .15s; }
 .row-card:hover .rc-actions { opacity: 1; pointer-events: auto; }
@@ -1355,7 +1368,7 @@ body[data-sidebar="collapsed"] .actionbar--dock { left: 52px; }
 .settings-head > div { min-width: 0; }
 .settings-head p { margin: 3px 0 0; color: var(--text-muted); font-size: 9.8px; }
 .settings-head .icon-btn { margin-left: auto; }
-.settings-body { gap: 12px; padding: 16px; background: var(--bg-app); }
+.settings-body { gap: 12px; padding: 16px; background: transparent; }
 
 .settings-section .sec-head { display: flex; align-items: center; gap: 8px; margin-bottom: 9px; }
 .row-inline { display: flex; gap: 9px; align-items: center; }
@@ -1800,8 +1813,8 @@ body[data-sidebar="collapsed"] .actionbar--dock { left: 52px; }
 /* ============================================================
    Rediseño cabecera de iniciativa (estilo Stitch)
    ============================================================ */
-.init-head { padding-top: 14px; padding-bottom: 6px; border-bottom: none; background: var(--bg-app); }
-.init-head ~ .content { padding-top: 8px; background: var(--bg-app); }
+.init-head { padding-top: 14px; padding-bottom: 6px; border-bottom: none; background: transparent; }
+.init-head ~ .content { padding-top: 8px; background: transparent; }
 .init-status-row { display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:0; }
 .init-title-group { display:flex; align-items:baseline; gap:10px; min-width:0; }
 .init-created { font-size:10.2px; color:var(--text-muted); white-space:nowrap; flex:none; }
@@ -1954,7 +1967,7 @@ body[data-sidebar="collapsed"] .actionbar--dock { left: 52px; }
   align-items: flex-end;
   gap: 10px;
   padding: 12px 16px 14px;
-  background: var(--bg-app);
+  background: transparent;
   border-bottom: 1px solid var(--border-subtle);
 }
 .notes-copy-all { flex: none; margin-bottom: 2px; }
@@ -2186,7 +2199,7 @@ body[data-sidebar="collapsed"] .actionbar--dock { left: 52px; }
    ============================================================ */
 .cal-head {
   display: flex; flex-direction: column; gap: 10px;
-  padding: 16px 28px 14px; border-bottom: none; background: var(--bg-app);
+  padding: 16px 28px 14px; border-bottom: none; background: transparent;
 }
 .cal-page-title { margin: 0; }
 .cal-controls {
@@ -2471,7 +2484,7 @@ body[data-sidebar="collapsed"] .actionbar--dock { left: 52px; }
   flex: none; padding: 20px 28px 12px;
   display: flex; flex-direction: column; gap: 10px;
   border-bottom: 1px solid var(--border-subtle);
-  background: var(--bg-app);
+  background: transparent;
 }
 .init-hub-top-row { display: flex; align-items: center; gap: 12px; justify-content: space-between; }
 .init-hub-searchbox {

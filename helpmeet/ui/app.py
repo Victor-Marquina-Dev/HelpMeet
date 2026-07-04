@@ -643,6 +643,20 @@ class Api:
         total = int((m.ended_at - m.started_at).total_seconds()) if m.ended_at else 0
         mm, ss = divmod(max(0, total), 60)
         is_video = bool(m.audio_path and str(m.audio_path).lower().endswith(".mp4"))
+        # Origen de la reunión para la UI: audio grabado, pantalla grabada o
+        # vídeo importado. Las grabaciones de pantalla usan el nombre
+        # "DD-MM-YY HH-MM-SS.mp4" (ver start_screen_record); los importados
+        # conservan su nombre original.
+        import re as _re
+        stem = Path(m.audio_path).stem if m.audio_path else ""
+        if not m.audio_path:
+            source = ""
+        elif not is_video:
+            source = "audio"
+        elif _re.fullmatch(r"\d{2}-\d{2}-\d{2} \d{2}-\d{2}-\d{2}", stem):
+            source = "screen"
+        else:
+            source = "import"
         if m.id in transcribing:
             status = "processing"   # transcribiéndose en segundo plano
         elif is_video and frase_count == 0:
@@ -664,6 +678,7 @@ class Api:
             "dur": f"{mm:02d}:{ss:02d}" if m.ended_at else "—",
             "size": _human_size(m.audio_path),
             "has_video": is_video,
+            "source": source,
         }
 
     def list_meetings(self, initiative_id):
