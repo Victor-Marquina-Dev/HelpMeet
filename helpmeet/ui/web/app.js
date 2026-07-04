@@ -47,6 +47,13 @@ const ICONS = {
   note: '<path d="M12 5v14M5 12h14"/>',
   warn: '<path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/><path d="M12 9v4M12 17h.01"/>',
   play: '<path d="m6 3 14 9-14 9V3z"/>',
+  pause: '<rect x="6" y="4" width="4" height="16" rx="1"/><rect x="14" y="4" width="4" height="16" rx="1"/>',
+  rewind: '<path d="m11 19-9-7 9-7v14z"/><path d="m22 19-9-7 9-7v14z"/>',
+  fastForward: '<path d="m13 19 9-7-9-7v14z"/><path d="m2 19 9-7-9-7v14z"/>',
+  markIn: '<path d="M3 19V5"/><path d="m13 6-6 6 6 6"/><path d="M7 12h14"/>',
+  markOut: '<path d="M21 5v14"/><path d="M3 12h14"/><path d="m11 18 6-6-6-6"/>',
+  expand: '<path d="M15 3h6v6"/><path d="m21 3-7 7"/><path d="m3 21 7-7"/><path d="M9 21H3v-6"/>',
+  shrink: '<path d="M4 14h6v6"/><path d="m10 14-7 7"/><path d="m21 3-7 7"/><path d="M20 10h-6V4"/>',
   check: '<path d="M20 6 9 17l-5-5"/>',
   checkSquare: '<rect width="18" height="18" x="3" y="3" rx="2"/><path d="m9 12 2 2 4-4"/>',
   x: '<path d="M18 6 6 18M6 6l12 12"/>',
@@ -161,7 +168,11 @@ const api = {
   // ---- Grabación de pantalla + biblioteca (backend REAL, ya implementado) ----
   startScreenRecording: (iid, idx) => call('start_screen_recording', iid, idx),
   stopScreenRecording: () => call('stop_screen_recording'),
-  transcribeMeetingVideo: (mid, force) => call('transcribe_meeting_video', mid, !!force),
+  transcribeMeetingVideo: (mid, force, clipSegments) => call('transcribe_meeting_video', mid, !!force, clipSegments || null),
+  getVideoThumbnails: (mid, count) => call('get_video_thumbnails', mid, count || 12),
+  getMediaVideoUrl: (mid) => call('get_media_video_url', mid),
+  checkForUpdate: () => call('check_for_update'),
+  openUrl: (u) => call('open_url', u),
   toggleScreenMicMute: (m) => call('toggle_screen_mic_mute', m),
   setScreenMonitor: (idx) => call('set_screen_monitor', idx),
   setScreenScaleMode: (mode) => call('set_screen_scale_mode', mode),
@@ -1941,22 +1952,361 @@ function videoPanel(t) {
   open.title = 'Abrir carpeta';
   open.onclick = () => api.openPath(folderPath);
   actions.appendChild(open);
-  const bt = el('button', hasTx ? 'btn' : 'btn btn-primary', hasTx ? 'Retranscribir' : 'Transcribir');
-  if (hasTx) bt.title = 'Volver a transcribir este vídeo';
-  bt.onclick = () => {
-    if (hasTx) {
-      confirmModal('Retranscribir', 'Se reemplazará la transcripción actual usando el motor de mayor calidad disponible.', 'Retranscribir', () => transcribeScreenVideo(STATE.selMeeting, true));
-    } else transcribeScreenVideo(STATE.selMeeting, false);
-  };
+  const bt = el('button', hasTx ? 'btn' : 'btn btn-primary', hasTx ? 'Retranscribir' : 'Recortar y transcribir');
+  bt.onclick = () => openClipEditor(wrap, t, hasTx);
   actions.appendChild(bt);
   wrap.querySelector('.rec-actions').replaceWith(actions);
   return wrap;
 }
 
-async function transcribeScreenVideo(mid, force) {
+// Recortador estilo CapCut: reproductor + línea de tiempo con miniaturas + manijas.
+async function openClipEditor(wrap, t, isRetx) {
+  const existing = wrap.querySelector('.clip-editor');
+  if (existing) {
+    existing.remove();
+    document.querySelectorAll('.clip-backdrop').forEach(b => b.remove());
+    return;
+  }
+  const mid = t.meeting_id || STATE.selMeeting;
+  const url = await api.getMediaVideoUrl(mid);
+  const ed = el('div', 'clip-editor');
+  ed.innerHTML = `
+    <video class="clip-video" src="${esc(url || '')}" preload="metadata"></video>
+    <div class="clip-ctrl">
+      <button class="clip-cbtn clip-skip" data-d="-10" title="Retroceder 10 segundos">${svg('rewind', 14)}<span class="clip-cnum">10</span></button>
+      <button class="clip-cbtn clip-play" title="Reproducir la sección seleccionada">${svg('play', 16)}</button>
+      <button class="clip-cbtn clip-skip" data-d="10" title="Avanzar 10 segundos"><span class="clip-cnum">10</span>${svg('fastForward', 14)}</button>
+      <span class="clip-ctrl-sep"></span>
+      <button class="clip-cbtn clip-mark-a" title="La sección empieza aquí (posición actual del vídeo)">${svg('markIn', 14)}</button>
+      <button class="clip-cbtn clip-mark-b" title="La sección termina aquí (posición actual del vídeo)">${svg('markOut', 14)}</button>
+      <span class="clip-time">0:00 / 0:00</span>
+      <button class="clip-cbtn clip-max" title="Ampliar en ventana grande">${svg('expand', 14)}</button>
+    </div>
+    <div class="clip-tl">
+      <div class="clip-thumbs"></div>
+      <div class="clip-section-marks"></div>
+      <div class="clip-sel"><span class="clip-h l"></span><span class="clip-h r"></span></div>
+      <div class="clip-cursor"></div>
+    </div>
+    <div class="clip-scale"><span>0:00</span><span class="clip-dur">--:--</span></div>
+    <div class="clip-segs"></div>
+    <div class="clip-foot">
+      <div class="clip-total">Carga el video para crear la primera sección</div>
+      <div class="clip-actions">
+        <button class="btn clip-cancel">Cancelar</button>
+        <button class="btn btn-primary clip-go" disabled>Transcribir selección →</button>
+      </div>
+    </div>`;
+  wrap.appendChild(ed);
+  if (!url) {
+    ed.querySelector('.clip-total').textContent = 'No se pudo cargar el vídeo';
+    return;
+  }
+
+  const video = ed.querySelector('.clip-video');
+  const tl = ed.querySelector('.clip-tl');
+  const sel = ed.querySelector('.clip-sel');
+  const cursor = ed.querySelector('.clip-cursor');
+  const segsBox = ed.querySelector('.clip-segs');
+  const marksBox = ed.querySelector('.clip-section-marks');
+  const totalEl = ed.querySelector('.clip-total');
+  const goBtn = ed.querySelector('.clip-go');
+  const state = { dur: 0, a: 0, b: 0, segs: [], active: 0 };
+  const fmt = s => `${Math.floor(s/60)}:${String(Math.floor(s%60)).padStart(2,'0')}`;
+
+  api.getVideoThumbnails(mid, 12).then(thumbs => {
+    ed.querySelector('.clip-thumbs').innerHTML = (thumbs || []).map(th =>
+      `<i style="background-image:url(data:image/jpeg;base64,${th.thumb})"></i>`).join('');
+  });
+
+  function sortedSegs() {
+    return state.segs.map((s, i) => ({ ...s, i })).sort((a, b) => a.start - b.start || a.end - b.end);
+  }
+  function currentSeg() {
+    return state.segs[state.active] || null;
+  }
+  function syncActiveSection() {
+    const seg = currentSeg();
+    if (!seg) return;
+    seg.start = state.a;
+    seg.end = state.b;
+  }
+  function totalSelected() {
+    let total = 0;
+    let cursor = null;
+    for (const s of sortedSegs()) {
+      if (cursor === null || s.start > cursor) {
+        total += Math.max(0, s.end - s.start);
+        cursor = s.end;
+      } else if (s.end > cursor) {
+        total += s.end - cursor;
+        cursor = s.end;
+      }
+    }
+    return Math.min(state.dur || total, total);
+  }
+  function isFullyCovered() {
+    if (!state.dur || !state.segs.length) return false;
+    let cursor = 0;
+    for (const s of sortedSegs()) {
+      if (s.start > cursor + 0.15) return false;
+      cursor = Math.max(cursor, s.end);
+      if (cursor >= state.dur - 0.15) return true;
+    }
+    return false;
+  }
+  function spaceNextToActive() {
+    const cur = currentSeg();
+    if (!cur || !state.dur) return null;
+    const sorted = sortedSegs();
+    const pos = sorted.findIndex(s => s.i === state.active);
+    const rightLimit = pos >= 0 && sorted[pos + 1] ? sorted[pos + 1].start : state.dur;
+    if (rightLimit - cur.end >= 0.5) {
+      return { start: cur.end, end: Math.min(rightLimit, cur.end + Math.min(5, rightLimit - cur.end)) };
+    }
+    const leftLimit = pos > 0 ? sorted[pos - 1].end : 0;
+    if (cur.start - leftLimit >= 0.5) {
+      return { start: Math.max(leftLimit, cur.start - Math.min(5, cur.start - leftLimit)), end: cur.start };
+    }
+    return null;
+  }
+  function activateSection(index) {
+    const seg = state.segs[index];
+    if (!seg) return;
+    state.active = index;
+    state.a = seg.start;
+    state.b = seg.end;
+    paintSel();
+    paintSegs();
+  }
+  function paintSel() {
+    if (!state.dur) return;
+    sel.style.left = (state.a / state.dur * 100) + '%';
+    sel.style.width = ((state.b - state.a) / state.dur * 100) + '%';
+    syncActiveSection();
+    const secs = totalSelected();
+    totalEl.innerHTML = `Se transcribirá <b>${fmt(secs)}</b> de ${fmt(state.dur)} <span class="clip-range">· Sección ${state.active + 1}: ${fmt(state.a)} – ${fmt(state.b)}</span>`;
+    updateGo();
+  }
+  function paintSegs() {
+    const canAdd = !!spaceNextToActive() && !isFullyCovered();
+    marksBox.innerHTML = state.segs.map((s, i) => {
+      if (!state.dur || i === state.active) return '';
+      const left = s.start / state.dur * 100;
+      const width = (s.end - s.start) / state.dur * 100;
+      return `<button type="button" class="clip-section-mark" data-i="${i}" style="left:${left}%;width:${width}%" title="Sección ${i + 1}"></button>`;
+    }).join('');
+    marksBox.querySelectorAll('.clip-section-mark').forEach(mark => mark.onclick = e => {
+      e.stopPropagation();
+      activateSection(+mark.dataset.i);
+    });
+    const addLabel = canAdd ? '+ añadir sección'
+      : (isFullyCovered() ? 'Todo el video está cubierto' : 'Sin espacio junto a la sección activa');
+    segsBox.innerHTML = state.segs.map((s, i) =>
+      `<button type="button" class="clip-pill${i === state.active ? ' is-active' : ''}" data-i="${i}">Sección ${i+1} · ${fmt(s.start)}–${fmt(s.end)} <span class="x" title="Eliminar sección">×</span></button>`
+    ).join('') + `<button type="button" class="clip-add" ${canAdd ? '' : 'disabled'}>${addLabel}</button>`;
+    segsBox.querySelectorAll('.clip-pill').forEach(p => p.onclick = e => {
+      if (e.target.closest('.x')) return;
+      activateSection(+p.dataset.i);
+    });
+    segsBox.querySelectorAll('.x').forEach(x => x.onclick = e => {
+      const idx = +e.target.closest('.clip-pill').dataset.i;
+      state.segs.splice(idx, 1);
+      if (!state.segs.length) {
+        state.segs.push({ start: 0, end: state.dur });
+        state.active = 0;
+      } else {
+        state.active = Math.max(0, Math.min(state.active > idx ? state.active - 1 : state.active, state.segs.length - 1));
+      }
+      const seg = currentSeg();
+      state.a = seg.start; state.b = seg.end;
+      paintSel(); paintSegs(); updateGo();
+    });
+    segsBox.querySelector('.clip-add').onclick = () => {
+      const next = spaceNextToActive();
+      if (!next || isFullyCovered()) return;
+      const insertAt = state.active + 1;
+      state.segs.splice(insertAt, 0, next);
+      activateSection(insertAt);
+    };
+  }
+  function updateGo() {
+    goBtn.disabled = !state.segs.some(s => (s.end - s.start) >= 0.5);
+  }
+
+  // Controles de reproducción: play/pausa y saltos de ±10 s.
+  const playBtn = ed.querySelector('.clip-play');
+  const timeEl = ed.querySelector('.clip-time');
+  let playingClip = false;   // reproduciendo la sección → pausa al llegar a su fin
+  playBtn.onclick = () => {
+    if (video.paused) {
+      // Play arranca en el INICIO de la sección si el cursor está fuera de ella;
+      // si pausaste a mitad de la sección, reanuda donde ibas.
+      if (state.dur && (video.currentTime < state.a - 0.05 || video.currentTime >= state.b - 0.05)) {
+        video.currentTime = state.a;
+      }
+      playingClip = true;
+      video.play();
+    } else {
+      video.pause();
+    }
+  };
+  video.addEventListener('click', () => playBtn.onclick());
+  video.addEventListener('play', () => { playBtn.innerHTML = svg('pause', 16); playBtn.title = 'Pausa'; });
+  video.addEventListener('pause', () => { playBtn.innerHTML = svg('play', 16); playBtn.title = 'Reproducir la sección seleccionada'; });
+  ed.querySelectorAll('.clip-skip').forEach(b => b.onclick = () => {
+    if (!state.dur) return;
+    playingClip = false;   // navegación libre: no auto-pausar en el fin de la sección
+    video.currentTime = Math.min(state.dur, Math.max(0, video.currentTime + Number(b.dataset.d)));
+  });
+
+  // Marcar la sección viendo el vídeo: fija inicio/fin en la posición actual.
+  ed.querySelector('.clip-mark-a').onclick = () => {
+    if (!state.dur) return;
+    state.a = Math.max(0, Math.min(video.currentTime, state.b - 0.2));
+    paintSel(); paintSegs();
+  };
+  ed.querySelector('.clip-mark-b').onclick = () => {
+    if (!state.dur) return;
+    state.b = Math.min(state.dur, Math.max(video.currentTime, state.a + 0.2));
+    paintSel(); paintSegs();
+  };
+
+  // Modo ventana grande: el editor pasa a un modal amplio dentro de la app
+  // (no pantalla completa del sistema). Conserva el estado: vídeo y selección.
+  const maxBtn = ed.querySelector('.clip-max');
+  const backdrop = el('div', 'clip-backdrop');
+  let maximized = false;
+  const onKey = e => { if (e.key === 'Escape' && maximized) maxBtn.onclick(); };
+  maxBtn.onclick = () => {
+    maximized = !maximized;
+    ed.classList.toggle('clip-editor--max', maximized);
+    if (maximized) {
+      document.body.appendChild(backdrop);
+      backdrop.onclick = () => maxBtn.onclick();
+      document.addEventListener('keydown', onKey);
+    } else {
+      backdrop.remove();
+      document.removeEventListener('keydown', onKey);
+    }
+    maxBtn.innerHTML = svg(maximized ? 'shrink' : 'expand', 14);
+    maxBtn.title = maximized ? 'Volver al panel (Esc)' : 'Ampliar en ventana grande';
+  };
+
+  function closeEditor() {
+    backdrop.remove();
+    document.removeEventListener('keydown', onKey);
+    ed.remove();
+  }
+
+  video.addEventListener('loadedmetadata', () => {
+    state.dur = video.duration || 0;
+    state.a = 0; state.b = state.dur;
+    state.segs = [{ start: 0, end: state.dur }];
+    state.active = 0;
+    ed.querySelector('.clip-dur').textContent = fmt(state.dur);
+    timeEl.textContent = `0:00 / ${fmt(state.dur)}`;
+    paintSel(); paintSegs();
+  });
+  video.addEventListener('timeupdate', () => {
+    if (!state.dur) return;
+    cursor.style.left = (video.currentTime / state.dur * 100) + '%';
+    timeEl.textContent = `${fmt(video.currentTime)} / ${fmt(state.dur)}`;
+    // Vista previa de la sección: al llegar a su fin, pausa (queda listo para replay).
+    if (playingClip && !video.paused && video.currentTime >= state.b - 0.03) {
+      video.pause(); playingClip = false;
+    }
+  });
+
+  // Arrastre con eventos de RATÓN a nivel de documento — el mismo patrón del
+  // redimensionado del sidebar, que funciona de forma fiable en este WebView2.
+  // Bordes → mover esa manija (GRAB_PX de tolerancia); interior → mover el
+  // bloque entero de la selección; fuera → clic para posicionar el vídeo.
+  const GRAB_PX = 16;
+  let clickSuppressed = false;
+
+  function sideAt(ev) {
+    if (!state.dur) return null;
+    const rect = tl.getBoundingClientRect();
+    const xA = rect.left + (state.a / state.dur) * rect.width;
+    const xB = rect.left + (state.b / state.dur) * rect.width;
+    const dA = Math.abs(ev.clientX - xA), dB = Math.abs(ev.clientX - xB);
+    if (Math.min(dA, dB) > GRAB_PX) return null;
+    return dA <= dB ? 'a' : 'b';
+  }
+  function insideSel(ev) {
+    if (!state.dur) return false;
+    const rect = tl.getBoundingClientRect();
+    const t2 = (ev.clientX - rect.left) / rect.width * state.dur;
+    return t2 > state.a && t2 < state.b;
+  }
+
+  // Evita que un arrastre nativo (drag & drop del navegador) robe el ratón.
+  ed.addEventListener('dragstart', e => e.preventDefault());
+
+  tl.addEventListener('mousedown', e => {
+    if (e.button !== 0 || !state.dur) return;
+    const h = e.target.closest('.clip-h');
+    let mode = h ? (h.classList.contains('l') ? 'a' : 'b') : sideAt(e);
+    if (!mode && insideSel(e)) mode = 'move';
+    if (!mode) return;                  // clic normal → lo maneja el click (seek)
+    e.preventDefault();
+    const startX = e.clientX;
+    const a0 = state.a, b0 = state.b;
+    const onMove = ev => {
+      clickSuppressed = true;           // hubo arrastre → el click posterior no busca
+      const rect = tl.getBoundingClientRect();
+      if (mode === 'move') {
+        // Desplaza el bloque completo manteniendo su duración.
+        const dt = (ev.clientX - startX) / rect.width * state.dur;
+        const len = b0 - a0;
+        const na = Math.max(0, Math.min(a0 + dt, state.dur - len));
+        state.a = na; state.b = na + len;
+      } else {
+        const frac = Math.min(1, Math.max(0, (ev.clientX - rect.left) / rect.width));
+        const t2 = frac * state.dur;
+        if (mode === 'a') state.a = Math.max(0, Math.min(t2, state.b - 0.2));
+        else state.b = Math.min(state.dur, Math.max(t2, state.a + 0.2));
+      }
+      paintSel();
+    };
+    const onUp = () => {
+      document.removeEventListener('mousemove', onMove);
+      document.removeEventListener('mouseup', onUp);
+      paintSegs();
+    };
+    document.addEventListener('mousemove', onMove);
+    document.addEventListener('mouseup', onUp);
+  });
+
+  // Feedback del cursor: ↔ en las manijas, "agarrar" dentro del bloque.
+  tl.addEventListener('mousemove', e => {
+    if (e.buttons & 1) return;   // durante un arrastre lo gestiona document
+    tl.style.cursor = sideAt(e) ? 'ew-resize' : (insideSel(e) ? 'grab' : 'pointer');
+  });
+
+  tl.addEventListener('click', e => {
+    if (clickSuppressed) { clickSuppressed = false; return; }
+    playingClip = false;
+    const rect = tl.getBoundingClientRect();
+    video.currentTime = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width)) * state.dur;
+  });
+
+  ed.querySelector('.clip-cancel').onclick = () => closeEditor();
+  goBtn.onclick = async () => {
+    syncActiveSection();
+    const all = state.segs.filter(s => (s.end - s.start) >= 0.5);
+    if (!all.length) return;
+    goBtn.disabled = true; goBtn.textContent = 'Transcribiendo…';
+    closeEditor();
+    await transcribeScreenVideo(mid, isRetx, all);
+  };
+}
+
+async function transcribeScreenVideo(mid, force, clipSegments) {
   // La transcripción del vídeo va en SEGUNDO PLANO: puedes seguir grabando otro.
   let f = null;
-  try { f = await api.transcribeMeetingVideo(mid, force); }
+  try { f = await api.transcribeMeetingVideo(mid, force, clipSegments || null); }
   catch (e) { f = { ok: false, error: e && e.message }; }
   if (f && f.already) { toast('info', 'Este vídeo ya está transcrito'); return; }
   if (f && f.ok) {
@@ -4715,6 +5065,18 @@ function viewSettings() {
         </div>
       </div>
 
+      <div class="sv-section">
+        <div class="sv-sec-title">${svg('download', 14)} Actualizaciones</div>
+        <div class="sv-row">
+          <span class="sv-lbl">Versión instalada</span>
+          <span class="mono" style="color:var(--text-primary)">v${esc(STATE.version || '')}</span>
+        </div>
+        <div class="sv-row" style="margin-top:8px">
+          <span id="svUpdStatus" style="color:var(--text-muted); font-size:11.5px"></span>
+          <button class="btn" id="svUpdCheck">Buscar actualizaciones</button>
+        </div>
+      </div>
+
       <div class="sv-section sv-section--actions">
         <button class="sv-act" id="svDiag">${svg('check', 13)} Diagnóstico</button>
         <button class="sv-act sv-act--danger" id="svWipe">${svg('trash', 13)} Borrar datos</button>
@@ -4761,6 +5123,27 @@ function viewSettings() {
     inner.querySelector('#svAiReset').onclick = async () => { const r = await api.setAiInstructions(''); inner.querySelector('#svAiInstr').value = (r && r.text) || ''; toast('ok', 'Restablecido'); };
     inner.querySelector('#svDir').onclick = async () => { const r = await api.chooseExportDir(); if (r && r.ok) { toast('ok', 'Carpeta actualizada'); openSettings(); } };
     inner.querySelector('#svDiag').onclick = () => openDiagnostics();
+    // Actualizaciones: comprueba bajo demanda; si hay versión nueva, el botón
+    // pasa a "Descargar" y abre el enlace en el navegador.
+    const updBtn = inner.querySelector('#svUpdCheck');
+    const updStatus = inner.querySelector('#svUpdStatus');
+    updBtn.onclick = async () => {
+      updBtn.disabled = true; updBtn.textContent = 'Comprobando…';
+      let u = null;
+      try { u = await api.checkForUpdate(); } catch (e) { u = null; }
+      if (u && u.available) {
+        updStatus.textContent = `Nueva versión ${u.version} disponible`;
+        updStatus.style.color = 'var(--accent)';
+        updBtn.disabled = false;
+        updBtn.textContent = `Descargar ${u.version}`;
+        updBtn.classList.add('btn-primary');
+        updBtn.onclick = () => api.openUrl(u.url);
+      } else {
+        updStatus.textContent = u ? 'Tienes la última versión' : 'No se pudo comprobar (¿sin internet?)';
+        updBtn.disabled = false;
+        updBtn.textContent = 'Buscar actualizaciones';
+      }
+    };
     // Sección licencia
     if (HAS_PYWEBVIEW()) {
       api.getLicenseInfo().then(info => {
@@ -4849,6 +5232,7 @@ function applyBootstrap(b) {
   const ac = $('#archiveCount'), tc = $('#trashCount');
   if (ac) ac.textContent = STATE.archiveCount; if (tc) tc.textContent = STATE.trashCount;
   if (b.version) { STATE.version = b.version; const ve = $('#headerVersion'); if (ve) ve.textContent = 'v' + b.version; }
+  checkForUpdateOnce();
   if (b.default_mic_muted != null) { STATE.micMuted = !!b.default_mic_muted; updateMicChip(); }
   // Restaurar estado de grabación de pantalla si el backend la tenía activa
   if (b.screen_recording) {
@@ -4857,6 +5241,26 @@ function applyBootstrap(b) {
     setAppState('screen-recording');
     startTimer();
   }
+}
+
+// Aviso de actualización: consulta una sola vez por sesión, en segundo plano.
+// Si hay versión nueva, el chip de versión del header se vuelve clicable y
+// abre la descarga en el navegador. Sin internet: silencio total.
+let _updateChecked = false;
+async function checkForUpdateOnce() {
+  if (_updateChecked) return;
+  _updateChecked = true;
+  let u = null;
+  try { u = await api.checkForUpdate(); } catch (e) { return; }
+  if (!u || !u.available) return;
+  const ve = $('#headerVersion');
+  if (ve) {
+    ve.textContent = `v${u.current} · ⬆ ${u.version} disponible`;
+    ve.classList.add('has-update');
+    ve.title = `Nueva versión ${u.version} — clic para descargar`;
+    ve.onclick = () => api.openUrl(u.url);
+  }
+  toast('info', `Nueva versión ${u.version} disponible — clic en la versión (arriba) para descargar`);
 }
 
 async function refreshAll() {

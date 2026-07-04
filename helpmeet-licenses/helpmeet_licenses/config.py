@@ -12,6 +12,10 @@ class Settings(BaseSettings):
     cors_origins: str = "*"
     gmail_user: Optional[str] = None          # tu Gmail: victor.marquina30@gmail.com
     gmail_app_password: Optional[str] = None  # contraseña de aplicación de Google
+    # Última versión publicada de la app de escritorio. Para publicar una nueva:
+    # cambiar estas variables de entorno en Railway (sin tocar código).
+    latest_app_version: str = ""              # p. ej. "2.5.0"
+    latest_app_url: str = ""                  # enlace de descarga del instalador
 
     model_config = {"env_file": ".env", "env_file_encoding": "utf-8"}
 

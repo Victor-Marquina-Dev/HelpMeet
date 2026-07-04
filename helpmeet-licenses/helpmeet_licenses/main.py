@@ -5,7 +5,7 @@ from helpmeet_licenses.config import settings
 from helpmeet_licenses.database import engine
 from helpmeet_licenses.models import Base  # noqa: F401 — registra tablas
 from helpmeet_licenses import models  # noqa: F401
-from helpmeet_licenses.routers import licenses, admin, gumroad
+from helpmeet_licenses.routers import licenses, admin, gumroad, version
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -29,6 +29,7 @@ app.add_middleware(
 app.include_router(licenses.router)
 app.include_router(admin.router)
 app.include_router(gumroad.router)
+app.include_router(version.router)
 
 @app.get("/health")
 @app.get("/salud")

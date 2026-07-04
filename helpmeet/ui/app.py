@@ -388,6 +388,54 @@ class Api:
     def set_window(self, window):
         self._window = window
 
+    def set_media_server(self, server):
+        self._media_server = server
+
+    def get_media_video_url(self, meeting_id):
+        """URL local para reproducir el vídeo de la reunión en un <video>."""
+        srv = getattr(self, "_media_server", None)
+        if not srv:
+            return None
+        return srv.url_for(int(meeting_id))
+
+    def check_for_update(self):
+        """Consulta si hay una versión más nueva publicada de la app.
+
+        La UI lo llama en segundo plano al arrancar; sin internet o sin versión
+        publicada devuelve {"available": False} y no molesta al usuario."""
+        import json
+        import urllib.request
+        try:
+            req = urllib.request.Request(
+                f"{self._LICENSE_SERVER}/api/version",
+                headers={"User-Agent": f"Helpmeet/{__version__}"},
+            )
+            with urllib.request.urlopen(req, timeout=6) as resp:
+                data = json.loads(resp.read().decode("utf-8"))
+        except Exception:
+            return {"available": False, "current": __version__}
+
+        def _tuple(v):
+            try:
+                return tuple(int(x) for x in str(v).split("."))
+            except Exception:
+                return (0,)
+
+        latest = str(data.get("version") or "").strip()
+        url = str(data.get("url") or "").strip()
+        if latest and url and _tuple(latest) > _tuple(__version__):
+            return {"available": True, "version": latest, "url": url,
+                    "current": __version__}
+        return {"available": False, "current": __version__}
+
+    def open_url(self, url):
+        """Abre un enlace http(s) en el navegador del usuario."""
+        import webbrowser
+        if isinstance(url, str) and url.startswith(("http://", "https://")):
+            webbrowser.open(url)
+            return {"ok": True}
+        return {"ok": False}
+
     def list_initiatives(self):
         return [_initiative_payload(i) for i in repo.list_initiatives(self._session)]
 
@@ -1143,6 +1191,56 @@ class Api:
             result = [{**m, "thumbnail": ""} for m in monitors]
         return result
 
+    def get_video_thumbnails(self, meeting_id, count=12):
+        """Devuelve `count` miniaturas equiespaciadas del vídeo como JPEG base64.
+
+        Cada elemento: {"t": segundos, "thumb": base64_o_vacío}. Se usa para
+        dibujar la línea de tiempo del recortador."""
+        import base64
+        import av
+        from helpmeet.media import media_duration
+        from helpmeet.video.preview import _encode_jpeg
+        m = repo.get_meeting(self._session, int(meeting_id))
+        if not m or not m.audio_path or not os.path.exists(m.audio_path):
+            return []
+        path = m.audio_path
+        duration = media_duration(path)
+        if duration <= 0:
+            return []
+        count = max(1, min(int(count), 40))
+        THUMB_H = 60
+        result = []
+        try:
+            container = av.open(path)
+        except Exception:
+            return []
+        try:
+            if not container.streams.video:
+                return []
+            stream = container.streams.video[0]
+            for i in range(count):
+                t = duration * (i + 0.5) / count
+                try:
+                    if stream.time_base:
+                        seek_pts = int(t / float(stream.time_base))
+                    else:
+                        seek_pts = int(t * 1_000_000)
+                    container.seek(seek_pts, stream=stream, backward=True, any_frame=False)
+                    frame = next(container.decode(video=0))
+                    sw, sh = frame.width, frame.height
+                    tw = max(2, int(sw * THUMB_H / sh))
+                    tw -= tw % 2
+                    scaled = frame.reformat(width=tw, height=THUMB_H,
+                                            format="yuvj420p", interpolation="LANCZOS")
+                    jpeg = _encode_jpeg(scaled, tw, THUMB_H)
+                    b64 = base64.b64encode(jpeg).decode() if jpeg else ""
+                except Exception:
+                    b64 = ""
+                result.append({"t": round(t, 2), "thumb": b64})
+            return result
+        finally:
+            container.close()
+
     def take_capture(self, monitor_index=1):
         # Durante una grabación de pantalla, las capturas van a SU reunión.
         if self._screen_active and self._screen_meeting_id:
@@ -1380,19 +1478,21 @@ class Api:
                            for u in sorted(m.utterances, key=lambda u: u.start_time)],
         }
 
-    def transcribe_meeting_video(self, meeting_id, force=False):
-        """Encola la transcripción del vídeo en SEGUNDO PLANO y vuelve enseguida,
-        para poder seguir grabando otro vídeo sin esperar."""
+    def transcribe_meeting_video(self, meeting_id, force=False, clip_segments=None):
+        """Encola la transcripción del vídeo en SEGUNDO PLANO y vuelve enseguida.
+
+        `clip_segments`: lista opcional de {"start": seg, "end": seg}. Si viene,
+        solo se transcribe ese/esos tramos del vídeo."""
         m = repo.get_meeting(self._session, int(meeting_id))
         if m is None or not m.audio_path or not os.path.exists(m.audio_path):
             return {"ok": False, "error": "No se encontró el video de esta reunión."}
         if m.utterances and not force:
             return {"ok": True, "already": True, "meeting_id": m.id}
-        self._enqueue_video_job(m.id, m.title, m.initiative_id, bool(force))
+        self._enqueue_video_job(m.id, m.title, m.initiative_id, bool(force), clip_segments)
         return {"ok": True, "queued": True, "meeting_id": m.id}
 
     def _transcribe_video(self, session, meeting_id, force=False,
-                          on_status=None, on_progress=None):
+                          on_status=None, on_progress=None, clip_segments=None):
         """Transcribe el .mp4 de una reunión usando `session` (la del worker).
 
         Las grabaciones nuevas usan las pistas aisladas de micrófono/sistema.
@@ -1410,17 +1510,39 @@ class Api:
         tmp = tempfile.NamedTemporaryFile(dir=tmp_dir, suffix=".wav", delete=False)
         wav = Path(tmp.name)
         tmp.close()
+        # Recorte opcional: si el usuario marcó tramos, se transcribe solo eso.
+        clip_norm = None
+        if clip_segments:
+            from helpmeet.media_segments import normalize_segments, map_local_to_global
+            from helpmeet.media import extract_audio_segments_to_wav, media_duration
+            from helpmeet.transcription.segment import TranscribedSegment
+            duration = media_duration(m.audio_path)
+            if duration <= 0:
+                raise ValueError("No se pudo determinar la duración del vídeo.")
+            clip_norm = normalize_segments(
+                [(seg["start"], seg["end"]) for seg in clip_segments], duration)
+            if not clip_norm:
+                # El worker ignora el valor de retorno: los errores se informan al
+                # usuario por excepción (los captura _job_worker y muestra el mensaje).
+                raise ValueError("La selección de recorte no es válida.")
+
         from helpmeet.media_storage import available_tracks
-        tracks = available_tracks(m.id, m.audio_path)
         new_segments = []
         try:
-            if tracks:
-                on_status("Cargando el modelo de transcripción…")
-            else:
-                on_status("Extrayendo el audio del video…")
-                extract_audio_to_wav(m.audio_path, str(wav))
+            if clip_norm:
+                on_status("Recortando el audio seleccionado…")
+                extract_audio_segments_to_wav(m.audio_path, clip_norm, str(wav))
                 tracks = [("others", wav)]
                 on_status("Cargando el modelo de transcripción…")
+            else:
+                tracks = available_tracks(m.id, m.audio_path)
+                if tracks:
+                    on_status("Cargando el modelo de transcripción…")
+                else:
+                    on_status("Extrayendo el audio del video…")
+                    extract_audio_to_wav(m.audio_path, str(wav))
+                    tracks = [("others", wav)]
+                    on_status("Cargando el modelo de transcripción…")
             try:
                 engine = self._get_local_engine()
             except Exception as exc:
@@ -1445,8 +1567,15 @@ class Api:
                 for seg in segments:
                     if self._is_job_cancelled(meeting_id):
                         raise _JobCancelled()
-                    if seg.text:
-                        new_segments.append((speaker, seg))
+                    if not seg.text:
+                        continue
+                    if clip_norm:
+                        seg = TranscribedSegment(
+                            seg.text,
+                            map_local_to_global(seg.start, clip_norm),
+                            map_local_to_global(seg.end, clip_norm),
+                        )
+                    new_segments.append((speaker, seg))
 
             if not new_segments:
                 raise ValueError("No se detectó voz clara en el video.")
@@ -1705,7 +1834,7 @@ class Api:
         recorder.on_progress = lambda frac, _mid=mid: self._job_event(_mid, progress=frac)
         self._enqueue_job(mid, m.title, m.initiative_id, recorder.transcribe)
 
-    def _enqueue_video_job(self, meeting_id, title, initiative_id, force):
+    def _enqueue_video_job(self, meeting_id, title, initiative_id, force, clip_segments=None):
         """Encola la transcripción del .mp4 de una reunión en segundo plano."""
         on_status = lambda text, _mid=meeting_id: self._job_event(_mid, stage=text)
         on_progress = lambda frac, _mid=meeting_id: self._job_event(_mid, progress=frac)
@@ -1713,7 +1842,8 @@ class Api:
         def run():
             s = get_session()   # sesión propia del worker (otro hilo)
             try:
-                self._transcribe_video(s, meeting_id, force, on_status, on_progress)
+                self._transcribe_video(s, meeting_id, force, on_status, on_progress,
+                                       clip_segments=clip_segments)
             finally:
                 s.close()
         self._enqueue_job(meeting_id, title, initiative_id, run)
@@ -2600,6 +2730,19 @@ def run():
         _log.debug("No se pudo verificar el modelo en caché", exc_info=True)
     _set_windows_app_identity()
     api = Api()
+    from helpmeet.media_server import MediaServer
+
+    def _resolve_video(mid):
+        s = get_session()   # sesión propia: el server corre en otro hilo
+        try:
+            mm = repo.get_meeting(s, int(mid))
+            return mm.audio_path if mm and mm.audio_path else None
+        finally:
+            s.close()
+
+    media_server = MediaServer(_resolve_video)
+    media_server.start()
+    api.set_media_server(media_server)
     web_dir = Path(__file__).parent / "web"
     icon_path = web_dir / "assets" / "helpmeet.ico"
     window = webview.create_window(
