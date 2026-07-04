@@ -2820,11 +2820,22 @@ function viewArchiveTrash(which) {
       const c = el('div', 'row-card'); c.style.cursor = 'default';
       c.innerHTML = `<span style="flex:none;font-size:10px;font-weight:700;letter-spacing:.4px;color:var(--text-secondary);border:1px solid var(--border-strong);border-radius:5px;padding:3px 7px">${type}</span>
         <div class="rc-body"><div class="rc-title">${esc(x.title)}</div><div class="rc-meta">${esc(sub)}${x.date ? ' · ' + esc(x.date) : ''}</div></div>
-        <div style="display:flex;gap:7px"><button class="btn" data-restore>Restaurar</button>${isTrash ? '<button class="btn btn-danger" data-del>Eliminar</button>' : ''}</div>`;
-      c.querySelector('[data-restore]').onclick = async () => { await api.restoreItem(x.kind, x.id); toast('ok', 'Restaurado'); reloadLibrary(which); refreshAll(); };
-      if (isTrash) {
-        c.querySelector('[data-del]').onclick = () => confirmModal('Eliminar permanentemente', 'Esta acción no se puede deshacer. Se borrará «' + x.title + '»' + (x.kind === 'initiative' ? ' y todas sus reuniones.' : '.'), 'Eliminar para siempre', async () => { await api.permanentlyDeleteItem(x.kind, x.id); toast('ok', 'Eliminado permanentemente'); reloadLibrary(which); });
-      }
+        <div style="display:flex;gap:7px"><button class="btn" data-restore>Restaurar</button><button class="btn btn-danger" data-del>Eliminar</button></div>`;
+      c.querySelector('[data-restore]').onclick = async () => {
+        const r = await api.restoreItem(x.kind, x.id);
+        if (r && r.ok === false) { toast('err', r.error || 'No se pudo restaurar'); return; }
+        toast('ok', 'Restaurado'); reloadLibrary(which); refreshAll(); updateLibraryCounts();
+      };
+      c.querySelector('[data-del]').onclick = () => confirmModal(
+        'Eliminar permanentemente',
+        'Esta acción no se puede deshacer. Se borrará «' + x.title + '»' + (x.kind === 'initiative' ? ' y toda su carpeta archivada.' : ' y su carpeta archivada.'),
+        'Eliminar para siempre',
+        async () => {
+          const r = await api.permanentlyDeleteItem(x.kind, x.id);
+          if (r && r.ok === false) { toast('err', r.error || 'No se pudo eliminar'); return; }
+          toast('ok', 'Eliminado permanentemente'); reloadLibrary(which); refreshAll(); updateLibraryCounts();
+        }
+      );
       list.appendChild(c);
     });
   });
@@ -4521,7 +4532,7 @@ async function stopScreenRecording() {
   STATE.screenMeetingId = null;
   if (res && res.ok) {
     // El muxeo va en segundo plano; no bloqueamos. Avisará onScreenVideoSaved.
-    toast('info', 'Guardando el vídeo en segundo plano… puedes seguir usando la app');
+    toast('info', 'Guardando video…');
     await refreshMeetings(STATE.selInit);
   } else {
     toast('err', (res && res.error) || 'No se pudo detener la grabación');
@@ -5043,34 +5054,57 @@ async function openRecordingPreflight(kind, proceed) {
 }
 
 async function openDiagnostics() {
-  const m = el('div', 'modal wide');
+  const m = el('div', 'modal wide diagnostics-modal');
   m.setAttribute('role', 'dialog'); m.setAttribute('aria-label', 'Diagnóstico del sistema');
   m.innerHTML = `
     <div class="modal-head"><h3>${svg('check', 16)} Diagnóstico</h3><button class="icon-btn sm" data-x aria-label="Cerrar">${svg('x', 14)}</button></div>
     <div class="modal-body">
+      <div class="diag-summary" id="diagSummary">
+        <span class="diag-summary-dot"></span>
+        <div><b>Comprobando equipo</b><span>Validando requisitos principales</span></div>
+      </div>
       <div id="diagList" class="diag-list"><p style="color:var(--text-muted);font-size:13px">Comprobando…</p></div>
-      <div class="row-inline" style="margin-top:14px"><div class="help" style="flex:1">Comprueba que tu equipo está listo para grabar y transcribir.</div><button class="btn" id="diagFolder">Cambiar carpeta de exportación</button><button class="btn" id="diagReload">Volver a comprobar</button></div>
+      <div class="diag-actions"><button class="btn" id="diagFolder">Cambiar carpeta</button><button class="btn" id="diagReload">Comprobar otra vez</button></div>
     </div>`;
   m.querySelector('[data-x]').onclick = closeModal;
   const listEl = m.querySelector('#diagList');
+  const summaryEl = m.querySelector('#diagSummary');
+  const compactDetail = (label, info) => {
+    const raw = String((info && (info.label || info.detail)) || 'No disponible');
+    if (/carpeta/i.test(label)) return raw.split(/[\\/]/).slice(-2).join('\\') || raw;
+    if (/procesamiento/i.test(label)) return raw.includes('local') ? 'Local, en este equipo' : raw.split('.')[0];
+    if (/modelo/i.test(label)) return raw.replace(/^Modelo\s*/i, '').replace(/descargado/i, 'listo').trim();
+    if (/micr[oó]fono|audio/i.test(label)) return raw.replace(/\s*\([^)]*\)/g, '').replace(/^Audio del sistema:\s*/i, '');
+    if (/ventana/i.test(label)) return raw.replace(/^WebView2\s*/i, '');
+    return raw;
+  };
   async function loadDiag() {
     listEl.innerHTML = '<p style="color:var(--text-muted);font-size:13px">Comprobando…</p>';
+    summaryEl.className = 'diag-summary';
+    summaryEl.innerHTML = '<span class="diag-summary-dot"></span><div><b>Comprobando equipo</b><span>Validando requisitos principales</span></div>';
     const d = await api.getDiagnostics() || {};
     const rows = [
-      ['Ventana (WebView2)', d.webview2],
+      ['WebView2', d.webview2],
       ['Espacio en disco', d.disk],
-      ['Modelo de transcripción', d.whisper],
+      ['Modelo', d.whisper],
       ['Micrófono', d.mic],
-      ['Audio del sistema', d.loopback],
-      ['Carpeta de exportación', d.export_dir],
-      ['Procesamiento del audio', d.processing],
+      ['Sistema', d.loopback],
+      ['Exportación', d.export_dir],
+      ['Procesamiento', d.processing],
     ];
     listEl.replaceChildren();
+    const okCount = rows.filter(([, info]) => (info && info.status) === 'ok').length;
+    const errorCount = rows.filter(([, info]) => (info && info.status) === 'error').length;
+    const warnCount = rows.length - okCount - errorCount;
+    summaryEl.classList.toggle('has-error', errorCount > 0);
+    summaryEl.classList.toggle('has-warn', !errorCount && warnCount > 0);
+    summaryEl.innerHTML = `<span class="diag-summary-dot"></span><div><b>${errorCount ? 'Revisa ' + errorCount + ' punto' + (errorCount > 1 ? 's' : '') : okCount + '/' + rows.length + ' listo'}</b><span>${errorCount ? 'Hay requisitos que necesitan atención' : warnCount ? 'Puedes grabar, con avisos menores' : 'Equipo listo para grabar y transcribir'}</span></div>`;
     rows.forEach(([label, info]) => {
       info = info || { status: 'warn', label: 'No disponible' };
       const ico = info.status === 'ok' ? svg('check', 14) : info.status === 'error' ? svg('x', 14) : svg('warn', 14);
       const row = el('div', 'diag-row ' + (info.status || 'warn'));
-      row.innerHTML = `<span class="diag-ico">${ico}</span><div class="diag-body"><div class="diag-label">${esc(label)}</div><div class="diag-detail">${esc(info.label || '')}${info.detail ? ' · ' + esc(info.detail) : ''}</div></div>`;
+      const full = `${info.label || ''}${info.detail ? ' · ' + info.detail : ''}`;
+      row.innerHTML = `<span class="diag-ico">${ico}</span><div class="diag-body"><div class="diag-label">${esc(label)}</div><div class="diag-detail" title="${esc(full)}">${esc(compactDetail(label, info))}</div></div>`;
       listEl.appendChild(row);
     });
   }

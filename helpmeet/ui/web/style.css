@@ -236,13 +236,16 @@ body[data-app-state="screen-recording"] .rec-rail { display: block; }
   display: flex; align-items: center; gap: 9px;
   height: 32px; cursor: default; user-select: none;
 }
+/* Logo como la versión del tema oscuro pero en claro: caja suave con
+   el símbolo verde menta bien visible (el degradado menta lo lavaba). */
 .brand-mark {
-  width: 32px; height: 32px; border-radius: 10px; border: none;
-  background: linear-gradient(140deg, #3ddc97 0%, var(--brand-green) 55%, #0a9268 100%);
-  box-shadow: 0 2px 6px rgba(16, 185, 129, .35), inset 0 1px 0 rgba(255, 255, 255, .28);
+  width: 32px; height: 32px; border-radius: 10px;
+  border: 1px solid var(--border-subtle);
+  background: #ffffff;
+  box-shadow: 0 1px 4px rgba(60, 64, 67, .16);
   display: flex; align-items: center; justify-content: center; flex: none;
 }
-.brand-mark img { display: block; width: 18px; height: 18px; filter: drop-shadow(0 1px 1px rgba(0, 0, 0, .18)); }
+.brand-mark img { display: block; width: 20px; height: 20px; }
 .brand-name {
   font-size: 15px; font-weight: 600; letter-spacing: -.2px;
   line-height: 1; color: var(--text-secondary);
@@ -928,6 +931,31 @@ body:has(#actionbar.actionbar--dock) .content { padding-bottom: 120px; }
 .diag-detail { font-size: 10.2px; color: var(--text-secondary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .diag-required { margin-left: 7px; padding: 1px 6px; border-radius: 999px; font-size: 7.6px; font-weight: 700; letter-spacing: .3px; text-transform: uppercase; color: var(--text-muted); border: 1px solid var(--border-strong); }
 .diag-opt { margin-left: 7px; padding: 1px 6px; border-radius: 999px; font-size: 7.6px; font-weight: 600; letter-spacing: .3px; text-transform: uppercase; color: var(--text-muted); background: var(--bg-input); }
+.diagnostics-modal { width: 560px; }
+.diagnostics-modal .modal-body { gap: 12px; }
+.diagnostics-modal .diag-list { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.diagnostics-modal .diag-row { min-width: 0; padding: 9px 10px; gap: 9px; border-radius: var(--r-md); }
+.diagnostics-modal .diag-ico { width: 22px; height: 22px; }
+.diagnostics-modal .diag-ico svg { width: 12px; height: 12px; }
+.diagnostics-modal .diag-label { font-size: 10.6px; }
+.diagnostics-modal .diag-detail { font-size: 9.8px; max-width: 100%; }
+.diag-summary {
+  display: flex; align-items: center; gap: 10px;
+  padding: 10px 12px; border: 1px solid var(--border-subtle);
+  border-radius: var(--r-lg); background: var(--bg-surface);
+}
+.diag-summary-dot {
+  width: 9px; height: 9px; border-radius: 50%; flex: none;
+  background: var(--success); box-shadow: 0 0 0 5px rgba(52,199,138,.12);
+}
+.diag-summary.has-warn .diag-summary-dot { background: var(--warning); box-shadow: 0 0 0 5px rgba(241,184,75,.12); }
+.diag-summary.has-error .diag-summary-dot { background: var(--danger); box-shadow: 0 0 0 5px rgba(239,91,98,.12); }
+.diag-summary b { display: block; font-size: 12px; color: var(--text-primary); }
+.diag-summary span { display: block; margin-top: 2px; font-size: 10.2px; color: var(--text-secondary); }
+.diag-actions {
+  display: flex; justify-content: flex-end; gap: 8px;
+  padding-top: 2px;
+}
 .preflight-foot { display: flex; align-items: center; gap: 9px; margin-top: 14px; flex-wrap: wrap; }
 .preflight-foot .help { flex: 1; min-width: 80px; }
 /* Configuración de transcripción (chips) dentro del preflight. */
