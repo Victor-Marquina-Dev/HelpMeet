@@ -2999,7 +2999,10 @@ body[data-sidebar="collapsed"] .actionbar--dock { left: 52px; }
    Al final del archivo para ganar la cascada a las reglas base.
    ============================================================ */
 /* Cabecera del proyecto: se funde con la tarjeta blanca */
-.mhead { background: transparent; }
+.mhead { background: transparent; padding-bottom: 4px; }
+/* Contenido pegado al título en todas las páginas (Ajustes, Archivados…) */
+.content { padding-top: 8px; }
+.sv-page > .sv-section:first-child { padding-top: 2px; }
 .init-av { width: 34px; height: 34px; font-size: 12.5px; }
 .init-title-group { display: flex; align-items: center; gap: 12px; min-width: 0; }
 .init-title-col { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
