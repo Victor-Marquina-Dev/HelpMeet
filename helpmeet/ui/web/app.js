@@ -5330,7 +5330,19 @@ const WC_SVG = {
 function wireTopbar() {
   $('#btnRefreshSidebar').innerHTML = svg('refresh', 14);
   $('#btnNewInitiative').innerHTML = svg('plus', 14);
-  $('#navInitiatives .nav-chev').innerHTML = svg('chevron', 17);
+  $('#navInitiatives .nav-chev').innerHTML = svg('chevron', 12);
+  // Cabecera "Accesos directos" colapsable (estilo secciones de Gmail)
+  const secHdr = $('#secShortcuts');
+  if (secHdr) {
+    const tri = secHdr.querySelector('.sec-tri');
+    if (tri) tri.innerHTML = svg('chevron', 12);
+    secHdr.onclick = () => {
+      const body = $('#shortcutsBody'); if (!body) return;
+      body.hidden = !body.hidden;
+      secHdr.classList.toggle('collapsed', body.hidden);
+      secHdr.setAttribute('aria-expanded', body.hidden ? 'false' : 'true');
+    };
+  }
   // Iconos de la sección "Accesos directos", botón "Nuevo proyecto" y pie
   const _si = (sel, icon) => { const e = $(sel); if (e) e.innerHTML = svg(icon, 20); };
   _si('#btnNewProjectTop .np-ico', 'plus');

@@ -245,10 +245,19 @@ body[data-app-state="screen-recording"] .rec-rail { display: block; }
 .brand-version.has-update { color: var(--accent); cursor: pointer; }
 .brand-version.has-update:hover { color: var(--accent-hover); text-decoration: underline; }
 
-/* Entradas de contexto consecutivas: la etiqueta "Contexto" solo en la primera,
-   y las siguientes pegadas — se leen como un único grupo. */
+/* Entradas de contexto consecutivas: se funden en UN solo bloque —
+   la etiqueta "Contexto" solo en la primera; entre ellas no hay borde
+   ni esquinas (se solapan el gap de 4px del contenedor + 1px de borde). */
 .ctx-entry + .ctx-entry .u-tag { visibility: hidden; }
-.ctx-entry + .ctx-entry { margin-top: -4px; }
+.utterance.turn.ctx-entry + .utterance.turn.ctx-entry {
+  margin-top: -5px;
+  border-top-left-radius: 0; border-top-right-radius: 0;
+  border-top-color: transparent;
+}
+.utterance.turn.ctx-entry:has(+ .ctx-entry) {
+  border-bottom-left-radius: 0; border-bottom-right-radius: 0;
+  border-bottom-color: transparent;
+}
 
 .topbar-sep { width: 1px; height: 24px; background: var(--border-subtle); flex: none; margin: 0 2px; }
 .brand .topbar-sep { display: none; }
@@ -601,20 +610,31 @@ body.rail-expanding .rail-resize-handle { background: var(--accent); }
 .new-project-btn .np-ico { display: inline-flex; }
 .new-project-btn svg { fill: var(--newbtn-text); stroke: none; width: 16px; height: 16px; }
 
-/* Cabeceras de sección ("Accesos directos", "Proyectos") */
+/* Cabeceras de sección estilo Gmail ("Work"): triángulo + texto,
+   sin barra gris ni iconos en reposo. */
 .sidebar-nav { padding: 0 0 2px; }
-.sb-section-title {
-  padding: 6px 12px 3px 15px;
-  font-size: 10.5px; font-weight: 600; color: var(--text-muted); letter-spacing: 0;
-  text-transform: none;
+.sb-sec-hdr {
+  display: flex; align-items: center; gap: 5px;
+  width: 100%; padding: 6px 8px 3px 8px; margin: 0;
+  border: none; background: transparent; cursor: pointer;
+  font-family: inherit; font-size: 10.5px; font-weight: 600; color: var(--text-secondary);
+  text-align: left;
 }
+.sb-sec-hdr:hover { color: var(--text-primary); }
+.sec-tri {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 14px; height: 14px; color: var(--text-faint); flex: none;
+  transform: rotate(90deg); transition: transform .18s;
+}
+.sb-sec-hdr.collapsed .sec-tri { transform: rotate(0deg); }
+.sec-body[hidden] { display: none; }
 
-/* Ítems tipo píldora de "Accesos directos" */
+/* Ítems tipo píldora de "Accesos directos" (redondeo completo, como Gmail) */
 .side-item {
   display: flex; align-items: center; gap: 10px;
-  width: calc(100% - 6px); margin: 0; padding: 0 10px 0 14px;
+  width: calc(100% - 12px); margin: 0 6px; padding: 0 10px 0 12px;
   height: 30px; border: none; background: transparent;
-  border-radius: 0 15px 15px 0; cursor: pointer;
+  border-radius: 999px; cursor: pointer;
   font-family: inherit; font-size: 12px; color: var(--text-secondary);
   transition: background .12s, color .12s;
 }
@@ -625,9 +645,19 @@ body.rail-expanding .rail-resize-handle { background: var(--accent); }
 .side-item .si-label { flex: 1; text-align: left; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .side-item .si-count { font-size: 10.5px; color: var(--text-muted); font-family: var(--font-mono); }
 
-/* Cabecera "Proyectos" (mantiene el toggle de colapsar) */
-.sb-projects-hdr { margin-top: 4px; padding: 0 8px 0 15px; min-height: 30px; }
-.sb-projects-hdr .nav-label { font-size: 10.5px; font-weight: 600; color: var(--text-muted); }
+/* Cabecera "Proyectos": triángulo + texto, sin barra; iconos solo al hover */
+.sb-projects-hdr {
+  display: flex; align-items: center; gap: 2px;
+  margin-top: 4px; padding: 0 8px; min-height: 28px;
+  background: transparent;
+}
+.sb-projects-hdr .nav-toggle { gap: 5px; min-height: 28px; }
+.sb-projects-hdr .nav-chev { margin-left: 0; margin-right: 0; }
+.sb-projects-hdr .nav-label { flex: none; font-size: 10.5px; font-weight: 600; color: var(--text-secondary); }
+.sb-projects-hdr:hover .nav-label { color: var(--text-primary); }
+#navInitiatives .sb-hdr-act { opacity: 0; transition: opacity .15s; }
+#navInitiatives:hover .sb-hdr-act { opacity: .8; }
+#navInitiatives .sb-hdr-act:hover { opacity: 1; }
 
 /* Avatar de iniciales del proyecto */
 .proj-av {
@@ -636,10 +666,10 @@ body.rail-expanding .rail-resize-handle { background: var(--accent); }
   color: #fff; font-size: 9px; font-weight: 600; letter-spacing: .02em;
 }
 
-/* Fila de proyecto como píldora Gmail */
+/* Fila de proyecto como píldora Gmail (redondeo completo) */
 .tree-initiative {
   gap: 9px; padding: 3px 10px 3px 9px; border-left: none; font-size: 11.5px;
-  border-radius: 0 15px 15px 0; margin: 0 6px 0 0;
+  border-radius: 999px; margin: 1px 6px;
 }
 .tree-initiative:hover { background: var(--hover-soft); }
 .tree-initiative.selected { background: var(--sel-bg); color: var(--sel-text); border-left: none; }
@@ -649,7 +679,7 @@ body.rail-expanding .rail-resize-handle { background: var(--accent); }
 /* Reuniones indentadas con línea guía vertical */
 .tree-meeting {
   gap: 8px; padding: 3px 10px 3px 28px; margin: 0 6px 0 24px;
-  border-radius: 0 13px 13px 0; position: relative; font-size: 11px;
+  border-radius: 999px; position: relative; font-size: 11px;
 }
 .tree-meeting::before {
   content: ''; position: absolute; left: 13px; top: 0; bottom: 0;
@@ -663,8 +693,8 @@ body.rail-expanding .rail-resize-handle { background: var(--accent); }
 /* "Mostrar todo" */
 .sb-show-more {
   display: flex; align-items: center; gap: 9px;
-  padding: 5px 12px; margin: 1px 6px 1px 0;
-  border-radius: 0 13px 13px 0; cursor: pointer;
+  padding: 5px 12px; margin: 1px 6px;
+  border-radius: 999px; cursor: pointer;
   font-size: 11.5px; color: var(--text-muted);
 }
 .sb-show-more:hover { background: var(--hover-soft); color: var(--text-primary); }
@@ -673,7 +703,7 @@ body.rail-expanding .rail-resize-handle { background: var(--accent); }
 
 /* Pie con iconos */
 .sidebar-foot { padding: 6px 0 5px; }
-.side-link { border-left: none; border-radius: 0 15px 15px 0; gap: 10px; padding: 0 10px 0 14px; min-height: 30px; font-size: 12px; }
+.side-link { border-left: none; border-radius: 999px; gap: 10px; margin: 0 6px; width: calc(100% - 12px); padding: 0 10px 0 12px; min-height: 30px; font-size: 12px; }
 .side-link:hover { background: var(--hover-soft); }
 .side-link.active { background: var(--sel-bg); color: var(--sel-text); }
 .side-link .sl-ico { display: inline-flex; width: 17px; height: 17px; flex: none; }
