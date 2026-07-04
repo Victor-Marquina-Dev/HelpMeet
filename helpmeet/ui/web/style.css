@@ -383,7 +383,7 @@ body[data-app-state="screen-recording"] .audio-chip:not(.muted) .eq.mini i:nth-c
 .sidebar {
   flex: none; width: var(--sidebar-w); display: flex; flex-direction: column;
   border-right: none; background: var(--bg-sidebar); min-height: 0;
-  overflow: hidden; transition: width .15s ease;
+  overflow: hidden; transition: width .32s var(--ease-standard), opacity .26s ease;
 }
 body.sidebar-dragging .sidebar { transition: none; }
 body[data-sidebar="collapsed"] .sidebar { display: none; }
@@ -1059,10 +1059,10 @@ body:has(#actionbar.actionbar--dock) .content { padding-bottom: 120px; }
 body[data-sidebar="collapsed"] .sidebar {
   display: flex; width: 0 !important; min-width: 0;
   opacity: 0; pointer-events: none;
-  transition: width .18s ease, opacity .14s ease;
+  transition: width .32s var(--ease-standard), opacity .26s ease;
 }
 body[data-sidebar="collapsed"] .sidebar-rail {
-  animation: railIn .2s ease .04s backwards;
+  animation: railIn .3s ease .08s backwards;
 }
 @keyframes railIn {
   from { opacity: 0; transform: translateX(-8px); }
@@ -1081,6 +1081,64 @@ body[data-sidebar="collapsed"] .sidebar-rail {
 .rail-btn { width: 34px; height: 31px; border-radius: 999px; }
 .rail-btn:hover { background: var(--hover-soft); color: var(--text-primary); }
 #railInitiatives { margin-top: 8px; }
+
+/* ── Inicio con actividad reciente (agrupada por día) ────────────── */
+.home-feed { max-width: 640px; display: flex; flex-direction: column; gap: 10px; }
+.home-day { text-align: center; font-size: 11px; font-weight: 600; color: var(--text-muted); padding: 8px 0 2px; }
+.home-card {
+  display: flex; align-items: center; gap: 14px;
+  border: 1px solid var(--border-strong); border-radius: 12px;
+  padding: 12px 16px; cursor: pointer; background: var(--bg-surface);
+  transition: box-shadow .15s;
+}
+.home-card:hover { box-shadow: 0 1px 6px rgba(60, 64, 67, .15); }
+.hc-ic {
+  width: 38px; height: 38px; border-radius: 50%; flex: none;
+  background: var(--accent-soft); color: var(--accent);
+  display: inline-flex; align-items: center; justify-content: center;
+}
+.hc-info { flex: 1; min-width: 0; }
+.hc-title { font-size: 13px; font-weight: 600; color: var(--text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.hc-sub { font-size: 11px; color: var(--text-muted); margin-top: 2px; }
+.hc-chip {
+  border: 1px solid var(--border-strong); border-radius: 16px;
+  padding: 6px 14px; font-size: 11.5px; font-weight: 600;
+  color: var(--accent); background: transparent; cursor: pointer;
+  white-space: nowrap; font-family: inherit;
+  transition: background .12s;
+}
+.hc-chip:hover { background: var(--accent-soft); }
+.hc-chip.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+.hc-chip.primary:hover { background: var(--accent-hover); }
+
+/* ── Ajustes · tarjeta de Actualizaciones ─────────────────────────── */
+.sv-upd-card {
+  display: flex; align-items: center; gap: 14px;
+  border: 1px solid var(--border-strong); border-radius: 12px;
+  padding: 14px 16px; background: var(--bg-surface); max-width: 560px;
+}
+.sv-upd-ico {
+  width: 38px; height: 38px; border-radius: 50%; flex: none;
+  background: var(--accent-soft); color: var(--accent);
+  display: inline-flex; align-items: center; justify-content: center;
+}
+.sv-upd-info { flex: 1; min-width: 0; }
+.sv-upd-ver { font-size: 12.5px; font-weight: 600; color: var(--text-primary); }
+.sv-upd-status { font-size: 11px; color: var(--text-muted); margin-top: 2px; }
+
+/* ── Tour de bienvenida en colores cálidos (crema) ────────────────── */
+.tour-card {
+  background: #fffaf2;
+  border: 1px solid #f0e2cc;
+  box-shadow: 0 24px 64px rgba(74, 58, 28, .35), 0 0 0 1px rgba(240, 226, 204, .6);
+}
+.tour-card h3 { color: #33291c; }
+.tour-card p { color: #7a6c58; }
+.tour-skip { color: #a8977f; }
+.tour-skip:hover { color: #7a6c58; }
+.tour-dot { background: #ecdfc9; }
+.tour-dot.is-on { background: var(--accent); }
+.tour-next { color: #fff; }
 
 /* Cabecera de mes ("JULIO 2026") en la vista de proyecto: pegada arriba
    y desplegable con chevron. */

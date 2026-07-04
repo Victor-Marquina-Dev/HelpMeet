@@ -610,6 +610,9 @@ function renderMain() {
 
 /* ---- Vistas ---- */
 function viewWelcome() {
+  // Con proyectos ya creados, Inicio muestra la actividad reciente
+  // (estilo Gmail); la bienvenida solo aparece recién instalado.
+  if ((STATE.initiatives || []).length) return viewHomeFeed();
   const w = el('div', 'empty');
   w.innerHTML = `
     <div class="empty-watermark" aria-hidden="true">
@@ -626,6 +629,74 @@ function viewWelcome() {
   w.querySelector('#wNew').onclick = promptNewInitiative;
   w.querySelector('#wDiag').onclick = openDiagnostics;
   return w;
+}
+
+// Inicio con actividad reciente: reuniones de todos los proyectos
+// agrupadas por día (Hoy / Ayer / fecha), con acción rápida.
+function viewHomeFeed() {
+  const wrap = el('div'); wrap.style.cssText = 'display:flex;flex-direction:column;flex:1;min-height:0';
+  const head = el('div', 'mhead');
+  head.style.cssText = 'border-bottom:none';
+  head.innerHTML = `<div class="mhead-row"><h1 class="page-title">Inicio</h1></div>`;
+  const content = el('div', 'content');
+
+  const items = [];
+  for (const [iid, ms] of Object.entries(STATE.meetingsByInit || {})) {
+    const it = (STATE.initiatives || []).find(x => x.id === Number(iid));
+    for (const m of (ms || [])) items.push({ m, it });
+  }
+  items.sort((a, b) => String(b.m.started_at || '').localeCompare(String(a.m.started_at || '')));
+  const recent = items.slice(0, 12);
+
+  if (!recent.length) {
+    content.appendChild(emptyState({
+      icon: 'calendar',
+      title: 'Sin actividad todavía',
+      text: 'Graba una reunión, graba la pantalla o importa un video desde la barra de abajo.',
+    }));
+  } else {
+    const feed = el('div', 'home-feed');
+    const today = new Date();
+    const yest = new Date(); yest.setDate(today.getDate() - 1);
+    const dayLabel = (iso) => {
+      const d = new Date(iso);
+      if (isNaN(d)) return 'Sin fecha';
+      if (d.toDateString() === today.toDateString()) return 'Hoy';
+      if (d.toDateString() === yest.toDateString()) return 'Ayer';
+      return `${d.getDate()} ${CAL_MONTHS_SHORT[d.getMonth()]}`;
+    };
+    let lastDay = null;
+    recent.forEach(({ m, it }) => {
+      const dl = dayLabel(m.started_at);
+      if (dl !== lastDay) { feed.appendChild(el('div', 'home-day', esc(dl))); lastDay = dl; }
+      const done = m.status === 'done';
+      const proc = m.status === 'processing';
+      const sub = proc ? 'Transcribiendo…'
+        : done ? `Transcripción lista${m.dur && m.dur !== '—' ? ' · ' + m.dur : ''}`
+        : m.has_video ? `Grabación${m.dur && m.dur !== '—' ? ' ' + m.dur : ''} · sin transcribir`
+        : 'Pendiente';
+      const icon = m.source === 'audio' ? 'mic' : m.source === 'import' ? 'upload' : m.source === 'screen' ? 'monitorDot' : 'calendar';
+      const card = el('div', 'home-card');
+      card.innerHTML = `
+        <span class="hc-ic">${svg(icon, 18)}</span>
+        <div class="hc-info">
+          <div class="hc-title">${esc(m.title)}</div>
+          <div class="hc-sub">${it ? esc(it.name) + ' · ' : ''}${esc(sub)}</div>
+        </div>
+        <button class="hc-chip${done || proc ? '' : ' primary'}">${done ? 'Ver notas' : proc ? 'Ver progreso' : 'Transcribir'}</button>`;
+      const go = (tab) => {
+        if (it) STATE.selInit = it.id;
+        if (tab) { STATE.activeTab = tab; openMeeting(m.id, true); }
+        else openMeeting(m.id);
+      };
+      card.onclick = () => go();
+      card.querySelector('.hc-chip').onclick = (e) => { e.stopPropagation(); go(done ? 'notas' : null); };
+      feed.appendChild(card);
+    });
+    content.appendChild(feed);
+  }
+  wrap.replaceChildren(head, content);
+  return wrap;
 }
 
 /* ============================================================
@@ -5190,12 +5261,12 @@ function viewSettings() {
 
       <div class="sv-section">
         <div class="sv-sec-title">${svg('download', 14)} Actualizaciones</div>
-        <div class="sv-row">
-          <span class="sv-lbl">Versión instalada</span>
-          <span class="mono" style="color:var(--text-primary)">v${esc(STATE.version || '')}</span>
-        </div>
-        <div class="sv-row" style="margin-top:8px">
-          <span id="svUpdStatus" style="color:var(--text-muted); font-size:11.5px"></span>
+        <div class="sv-upd-card">
+          <div class="sv-upd-ico">${svg('download', 17)}</div>
+          <div class="sv-upd-info">
+            <div class="sv-upd-ver">Helpmeet <span class="mono">v${esc(STATE.version || '')}</span></div>
+            <div class="sv-upd-status" id="svUpdStatus">Comprueba si hay una versión nueva disponible</div>
+          </div>
           <button class="btn" id="svUpdCheck">Buscar actualizaciones</button>
         </div>
       </div>
