@@ -1108,7 +1108,7 @@ body[data-sidebar="collapsed"] .sidebar-rail {
   transition: background .12s;
 }
 .hc-chip:hover { background: var(--accent-soft); }
-.hc-chip.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+.hc-chip.primary { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
 .hc-chip.primary:hover { background: var(--accent-hover); }
 
 /* ── Ajustes · tarjeta de Actualizaciones ─────────────────────────── */
@@ -3148,3 +3148,42 @@ body[data-sidebar="collapsed"] .actionbar--dock { left: 52px; }
 .pill-error { color: var(--danger); border-color: rgba(217, 48, 37, .3); background: rgba(217, 48, 37, .08); }
 .pill-error .pd { background: var(--danger); }
 .pill-proc { color: var(--accent); border-color: rgba(10, 146, 104, .3); background: var(--accent-soft); }
+
+/* ============================================================
+   MODO OSCURO CÁLIDO — body[data-theme="dark"]
+   (Ajustes → Apariencia). Redefine los tokens: todo lo que usa
+   variables cambia solo; debajo, los pocos literales que no.
+   ============================================================ */
+body[data-theme="dark"] {
+  --bg-app: #211d19;             /* marrón-gris cálido */
+  --bg-sidebar: #211d19;
+  --bg-surface: #2a2521;         /* tarjetas */
+  --bg-elevated: #342e28;        /* menús/modales */
+  --bg-input: #1b1815;
+  --border-subtle: #3b342c;
+  --border-strong: #4c443a;
+  --text-primary: #f3eee6;       /* marfil cálido */
+  --text-secondary: #d4ccc0;
+  --text-muted: #a89f91;
+  --text-faint: #82796c;
+  --accent: #3ddc97;             /* menta luminosa sobre oscuro */
+  --accent-hover: #6fe3b5;
+  --on-accent: #06281c;
+  --accent-soft: rgba(61, 220, 151, 0.13);
+  --hover-soft: rgba(255, 250, 240, 0.05);
+  --hover-med: rgba(255, 250, 240, 0.09);
+  --sel-bg: rgba(61, 220, 151, 0.17);
+  --sel-text: #b8ecd6;
+  --newbtn-bg: #31473c;
+  --newbtn-text: #b8ecd6;
+  --shadow-pop: 0 8px 28px rgba(0, 0, 0, .5);
+  --shadow-modal: 0 16px 48px rgba(0, 0, 0, .6);
+  --shadow-soft: 0 4px 16px rgba(0, 0, 0, .4);
+}
+body[data-theme="dark"] ::-webkit-scrollbar-thumb { background: #4c443a; }
+body[data-theme="dark"] ::selection { background: rgba(61, 220, 151, .3); }
+body[data-theme="dark"] .brand-version { background: #342e28; }
+body[data-theme="dark"] .brand-mark { background: #2a2521; border-color: #4c443a; }
+body[data-theme="dark"] .home-card:hover,
+body[data-theme="dark"] .row-card:hover,
+body[data-theme="dark"] .sv-upd-card { box-shadow: 0 1px 8px rgba(0, 0, 0, .35); }

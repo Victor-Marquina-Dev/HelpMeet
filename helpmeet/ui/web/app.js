@@ -483,6 +483,8 @@ function save(k, v) { try { localStorage.setItem(k, v); } catch (e) {} }
 
 // Migración única: sidebar abierto por defecto desde v74
 if (!load('hm.sidebar-default-v74', '')) { save('hm.sidebar', '1'); save('hm.sidebar-default-v74', '1'); }
+// Tema: claro por defecto; 'dark' activa el modo oscuro cálido (Ajustes → Apariencia)
+if (load('hm.theme', 'light') === 'dark') document.body.dataset.theme = 'dark';
 
 function setAppState(s) {
   STATE.appState = s;
@@ -5260,6 +5262,17 @@ function viewSettings() {
       </div>
 
       <div class="sv-section">
+        <div class="sv-sec-title">${svg('palette', 14)} Apariencia</div>
+        <div class="sv-row">
+          <span class="sv-lbl">Tema</span>
+          <div id="svThemeChips" style="display:flex;gap:8px">
+            <button class="cfg-chip" data-theme-opt="light">Claro</button>
+            <button class="cfg-chip" data-theme-opt="dark">Oscuro</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="sv-section">
         <div class="sv-sec-title">${svg('download', 14)} Actualizaciones</div>
         <div class="sv-upd-card">
           <div class="sv-upd-ico">${svg('download', 17)}</div>
@@ -5317,6 +5330,24 @@ function viewSettings() {
     inner.querySelector('#svAiReset').onclick = async () => { const r = await api.setAiInstructions(''); inner.querySelector('#svAiInstr').value = (r && r.text) || ''; toast('ok', 'Restablecido'); };
     inner.querySelector('#svDir').onclick = async () => { const r = await api.chooseExportDir(); if (r && r.ok) { toast('ok', 'Carpeta actualizada'); openSettings(); } };
     inner.querySelector('#svDiag').onclick = () => openDiagnostics();
+    // Apariencia: claro / oscuro cálido (persistido en hm.theme)
+    const themeBox = inner.querySelector('#svThemeChips');
+    if (themeBox) {
+      const renderTheme = () => {
+        const cur = load('hm.theme', 'light');
+        themeBox.querySelectorAll('[data-theme-opt]').forEach(b =>
+          b.classList.toggle('on', b.dataset.themeOpt === cur));
+      };
+      themeBox.querySelectorAll('[data-theme-opt]').forEach(b => b.onclick = () => {
+        const v = b.dataset.themeOpt;
+        save('hm.theme', v);
+        if (v === 'dark') document.body.dataset.theme = 'dark';
+        else delete document.body.dataset.theme;
+        renderTheme();
+        toast('ok', v === 'dark' ? 'Modo oscuro activado' : 'Modo claro activado');
+      });
+      renderTheme();
+    }
     // Actualizaciones: comprueba bajo demanda; si hay versión nueva, el botón
     // pasa a "Descargar" y abre el enlace en el navegador.
     const updBtn = inner.querySelector('#svUpdCheck');
