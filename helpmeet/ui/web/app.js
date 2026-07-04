@@ -1092,10 +1092,18 @@ function viewInitiative() {
     ? formatDateShort(it.created_at)
     : '';
 
+  const doneCount = ms.filter(m => m.status === 'done').length;
+  const initMeta = ms.length
+    ? `${ms.length} ${ms.length === 1 ? 'reunión' : 'reuniones'}${doneCount ? ' · ' + doneCount + (doneCount === 1 ? ' transcrita' : ' transcritas') : ''}`
+    : 'Sin reuniones todavía';
   head.innerHTML = `
     <div class="init-status-row">
       <div class="init-title-group">
-        <h1 class="mtitle-h title-lg">${esc(it ? it.name : '')}</h1>
+        <span class="proj-av init-av" style="background:${avatarColorFor(it ? it.name : '')}">${esc(initialsFor(it ? it.name : ''))}</span>
+        <div class="init-title-col">
+          <h1 class="mtitle-h title-lg">${esc(it ? it.name : '')}</h1>
+          <span class="init-meta">${esc(initMeta)}</span>
+        </div>
         ${initCreatedStr ? `<span class="init-created">${esc(initCreatedStr)}</span>` : ''}
       </div>
       <div class="init-actions" id="initActions">

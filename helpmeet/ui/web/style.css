@@ -205,7 +205,7 @@ body[data-app-state="screen-recording"] .rec-rail { display: block; }
 /* ============ TOPBAR ============ */
 .topbar {
   flex: none; height: 48px; display: flex; align-items: center; gap: 14px;
-  padding: 0 0 0 12px; border-bottom: 1px solid var(--border-subtle);
+  padding: 0 0 0 12px; border-bottom: none;
   background: var(--bg-app); z-index: 10000; position: relative;
 }
 
@@ -359,7 +359,7 @@ body[data-app-state="screen-recording"] .audio-chip:not(.muted) .eq.mini i:nth-c
 
 .sidebar {
   flex: none; width: var(--sidebar-w); display: flex; flex-direction: column;
-  border-right: 1px solid var(--border-subtle); background: var(--bg-sidebar); min-height: 0;
+  border-right: none; background: var(--bg-sidebar); min-height: 0;
   overflow: hidden; transition: width .15s ease;
 }
 body.sidebar-dragging .sidebar { transition: none; }
@@ -681,7 +681,15 @@ body.rail-expanding .rail-resize-handle { background: var(--accent); }
 .side-link .sl-label { flex: 1; text-align: left; }
 
 /* ============ MAIN ============ */
-.main { flex: 1; display: flex; flex-direction: column; min-width: 0; overflow: hidden; }
+/* Área principal como tarjeta blanca redondeada (patrón Gmail) */
+.main {
+  flex: 1; display: flex; flex-direction: column; min-width: 0; overflow: hidden;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: 16px;
+  margin: 0 12px 12px 4px;
+}
+
 
 /* Empty / welcome — réplica del dashboard de Stitch */
 .empty {
@@ -2945,3 +2953,38 @@ body[data-sidebar="collapsed"] .actionbar--dock { left: 52px; }
 .clip-total { font-size: 11.5px; color: var(--accent); }
 .clip-total b { color: var(--text-primary); }
 .clip-actions { display: flex; gap: 8px; }
+
+/* ============================================================
+   REDISEÑO GMAIL — Área principal (Fase 3)
+   Al final del archivo para ganar la cascada a las reglas base.
+   ============================================================ */
+/* Cabecera del proyecto: se funde con la tarjeta blanca */
+.mhead { background: transparent; }
+.init-av { width: 34px; height: 34px; font-size: 12.5px; }
+.init-title-group { display: flex; align-items: center; gap: 12px; min-width: 0; }
+.init-title-col { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.init-meta { font-size: 10.5px; color: var(--text-muted); }
+
+/* Tarjetas de reunión estilo Gmail: borde suave + sombra al pasar */
+.list { gap: 8px; max-width: 680px; }
+.row-card {
+  border: 1px solid var(--border-strong);
+  border-radius: 12px;
+  padding: 9px 14px;
+  background: var(--bg-surface);
+}
+.row-card:hover { background: var(--bg-surface); box-shadow: 0 1px 6px rgba(60,64,67,.18); }
+.row-card.done:hover, .row-card.warn:hover { background: var(--bg-surface); }
+.row-card.done .rc-mon { color: var(--accent); }
+.row-card.done .rc-date { background: var(--accent-soft); }
+.row-card.warn .rc-mon { color: var(--warning); }
+.row-card.warn .rc-date { background: rgba(227, 116, 0, 0.10); }
+
+/* Pastillas de estado retonificadas para el tema claro */
+.pill-done { color: var(--success); border-color: rgba(24, 128, 56, .3); background: rgba(24, 128, 56, .08); }
+.pill-done .pd { background: var(--success); }
+.pill-pending { color: var(--warning); border-color: rgba(227, 116, 0, .3); background: rgba(227, 116, 0, .08); }
+.pill-pending .pd { background: var(--warning); }
+.pill-error { color: var(--danger); border-color: rgba(217, 48, 37, .3); background: rgba(217, 48, 37, .08); }
+.pill-error .pd { background: var(--danger); }
+.pill-proc { color: var(--accent); border-color: rgba(10, 146, 104, .3); background: var(--accent-soft); }
