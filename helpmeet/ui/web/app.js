@@ -77,6 +77,8 @@ const ICONS = {
   clock: '<circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/>',
   arrowUp: '<path d="M12 19V5M5 12l7-7 7 7"/>',
   refresh: '<path d="M3 12a9 9 0 0 1 15-6.7L21 8M3 16l3-3 3 3M21 12a9 9 0 0 1-15 6.7L3 16"/>',
+  menu: '<path d="M4 6h16M4 12h16M4 18h16"/>',
+  home: '<path d="M3 10.5 12 3l9 7.5"/><path d="M5 9.5V20a1 1 0 0 0 1 1h4v-6h4v6h4a1 1 0 0 0 1-1V9.5"/>',
 };
 function svg(name, size) {
   size = size || 15;
@@ -84,6 +86,39 @@ function svg(name, size) {
   return `<svg width="${size}" height="${size}" viewBox="0 0 24 24"${stroke}>${ICONS[name] || ''}</svg>`;
 }
 function ico(name, size) { return `<span class="ico">${svg(name, size)}</span>`; }
+
+// Iniciales de 2 letras a partir del nombre del proyecto (para el avatar).
+// Dos palabras → primera letra de cada una; una palabra → sus 2 primeras;
+// vacío → "·".
+function initialsFor(name) {
+  const s = (name || '').trim();
+  if (!s) return '·';
+  const parts = s.split(/\s+/).filter(Boolean);
+  if (parts.length >= 2) return (parts[0][0] + parts[1][0]).toUpperCase();
+  return s.slice(0, 2).toUpperCase();
+}
+
+// Icono del origen de una reunión (audio grabado, pantalla grabada o
+// vídeo importado) para la línea de metadatos de su tarjeta.
+function _kindIcon(m) {
+  // Mismos iconos que la barra de acciones (Grabar reunión / Grabar
+  // pantalla / Importar video) para que se reconozcan al instante.
+  const k = m && m.source;
+  if (k === 'audio')  return `<span class="rc-kind" title="Audio de reunión">${svg('mic', 12)}</span>`;
+  if (k === 'screen') return `<span class="rc-kind" title="Grabación de pantalla">${svg('monitorDot', 12)}</span>`;
+  if (k === 'import') return `<span class="rc-kind" title="Vídeo importado">${svg('upload', 12)}</span>`;
+  return '';
+}
+
+// Color estable derivado del nombre (paleta tipo Google Material).
+// El mismo nombre da siempre el mismo color.
+function avatarColorFor(name) {
+  const palette = ['#1a73e8', '#188038', '#a142f4', '#e8710a', '#12a4af', '#d93025', '#9334e6', '#1e8e3e'];
+  const s = (name || '');
+  let h = 0;
+  for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) >>> 0;
+  return palette[h % palette.length];
+}
 
 /* ============================================================
    2. CAPA DE API
@@ -448,6 +483,8 @@ function save(k, v) { try { localStorage.setItem(k, v); } catch (e) {} }
 
 // Migración única: sidebar abierto por defecto desde v74
 if (!load('hm.sidebar-default-v74', '')) { save('hm.sidebar', '1'); save('hm.sidebar-default-v74', '1'); }
+// Tema: claro por defecto; 'dark' activa el modo oscuro cálido (Ajustes → Apariencia)
+if (load('hm.theme', 'light') === 'dark') document.body.dataset.theme = 'dark';
 
 function setAppState(s) {
   STATE.appState = s;
@@ -551,10 +588,12 @@ function renderMain() {
   const onMeetings  = STATE.screen === 'meetings';
   const onFavorites = STATE.screen === 'favorites';
   const onArchive = STATE.screen === 'archive';
+  const onHome = STATE.screen === 'welcome';
+  $('#navHome')?.classList.toggle('active', onHome);
   $('#navMeetings')?.classList.toggle('active', onMeetings);
   $('#navFavorites')?.classList.toggle('active', onFavorites);
   $('#btnArchive')?.classList.toggle('active', onArchive);
-  $('#navInitiatives')?.classList.toggle('active', !onMeetings && !onFavorites && !onArchive);
+  $('#navInitiatives')?.classList.toggle('active', !onMeetings && !onFavorites && !onArchive && !onHome);
   switch (STATE.screen) {
     case 'welcome': return main.replaceChildren(viewWelcome());
     case 'meetings': return main.replaceChildren(viewMeetings());
@@ -573,6 +612,9 @@ function renderMain() {
 
 /* ---- Vistas ---- */
 function viewWelcome() {
+  // Con proyectos ya creados, Inicio muestra la actividad reciente
+  // (estilo Gmail); la bienvenida solo aparece recién instalado.
+  if ((STATE.initiatives || []).length) return viewHomeFeed();
   const w = el('div', 'empty');
   w.innerHTML = `
     <div class="empty-watermark" aria-hidden="true">
@@ -589,6 +631,75 @@ function viewWelcome() {
   w.querySelector('#wNew').onclick = promptNewInitiative;
   w.querySelector('#wDiag').onclick = openDiagnostics;
   return w;
+}
+
+// Inicio con actividad reciente: reuniones de todos los proyectos
+// agrupadas por día (Hoy / Ayer / fecha), con acción rápida.
+function viewHomeFeed() {
+  const wrap = el('div'); wrap.style.cssText = 'display:flex;flex-direction:column;flex:1;min-height:0';
+  const head = el('div', 'mhead');
+  head.style.cssText = 'border-bottom:none';
+  head.innerHTML = `<div class="mhead-row"><h1 class="page-title">Inicio</h1></div>`;
+  const content = el('div', 'content');
+
+  const items = [];
+  for (const [iid, ms] of Object.entries(STATE.meetingsByInit || {})) {
+    const it = (STATE.initiatives || []).find(x => x.id === Number(iid));
+    for (const m of (ms || [])) items.push({ m, it });
+  }
+  items.sort((a, b) => String(b.m.started_at || '').localeCompare(String(a.m.started_at || '')));
+  const recent = items.slice(0, 12);
+
+  if (!recent.length) {
+    content.appendChild(emptyState({
+      icon: 'calendar',
+      title: 'Sin actividad todavía',
+      text: 'Graba una reunión, graba la pantalla o importa un video desde la barra de abajo.',
+    }));
+  } else {
+    const feed = el('div', 'home-feed');
+    const today = new Date();
+    const yest = new Date(); yest.setDate(today.getDate() - 1);
+    const dayLabel = (iso) => {
+      const d = new Date(iso);
+      if (isNaN(d)) return 'Sin fecha';
+      if (d.toDateString() === today.toDateString()) return 'Hoy';
+      if (d.toDateString() === yest.toDateString()) return 'Ayer';
+      return `${d.getDate()} ${CAL_MONTHS_SHORT[d.getMonth()]}`;
+    };
+    let lastDay = null;
+    recent.forEach(({ m, it }) => {
+      const dl = dayLabel(m.started_at);
+      if (dl !== lastDay) { feed.appendChild(el('div', 'home-day', esc(dl))); lastDay = dl; }
+      const done = m.status === 'done';
+      const proc = m.status === 'processing';
+      const sub = proc ? 'Transcribiendo…'
+        : done ? `Transcripción lista${m.dur && m.dur !== '—' ? ' · ' + m.dur : ''}`
+        : m.has_video ? `Grabación${m.dur && m.dur !== '—' ? ' ' + m.dur : ''} · sin transcribir`
+        : 'Pendiente';
+      const icon = m.source === 'audio' ? 'mic' : m.source === 'import' ? 'upload' : m.source === 'screen' ? 'monitorDot' : 'calendar';
+      const avColor = it ? (it.color || avatarColorFor(it.name)) : 'var(--text-faint)';
+      const card = el('div', 'home-card');
+      card.innerHTML = `
+        <span class="proj-av hc-av" style="background:${avColor}">${it ? esc(initialsFor(it.name)) : '·'}</span>
+        <div class="hc-info">
+          <div class="hc-title">${esc(m.title)}<span class="hc-kind" title="${m.source === 'audio' ? 'Audio de reunión' : m.source === 'import' ? 'Vídeo importado' : 'Grabación de pantalla'}">${svg(icon, 13)}</span></div>
+          <div class="hc-sub"><span class="hc-proj">${it ? esc(it.name) : 'Sin proyecto'}</span> · ${esc(sub)}</div>
+        </div>
+        <button class="hc-chip${done || proc ? '' : ' primary'}">${done ? 'Ver notas' : proc ? 'Ver progreso' : 'Transcribir'}</button>`;
+      const go = (tab) => {
+        if (it) STATE.selInit = it.id;
+        if (tab) { STATE.activeTab = tab; openMeeting(m.id, true); }
+        else openMeeting(m.id);
+      };
+      card.onclick = () => go();
+      card.querySelector('.hc-chip').onclick = (e) => { e.stopPropagation(); go(done ? 'notas' : null); };
+      feed.appendChild(card);
+    });
+    content.appendChild(feed);
+  }
+  wrap.replaceChildren(head, content);
+  return wrap;
 }
 
 /* ============================================================
@@ -694,7 +805,14 @@ function viewFavorites() {
 
   const head = el('div', 'mhead');
   head.style.cssText = 'border-bottom:none';
-  head.innerHTML = `<div class="mhead-row"><h1 class="page-title">Favoritos</h1></div>`;
+  head.innerHTML = `<div class="mhead-row"><h1 class="page-title">Favoritos</h1><span class="spacer"></span>${favList.length ? `<button class="btn sm" id="favClearAll" title="Quitar todas las reuniones de favoritos">${svg('star', 13)}<span>Quitar todos</span></button>` : ''}</div>`;
+  const clearBtn = head.querySelector('#favClearAll');
+  if (clearBtn) clearBtn.onclick = () => {
+    const n = favList.length;
+    localStorage.setItem('hm.favMeetings', '[]');
+    toast('ok', `Se quitaron ${n} de favoritos`);
+    renderSidebar(); renderMain();
+  };
   const content = el('div', 'content');
 
   if (!favList.length) {
@@ -724,10 +842,19 @@ function viewFavorites() {
       const isOpen = STATE._favOpen.has(key);
       // Cabecera de iniciativa (colapsable)
       const ihdr = el('div', 'fav-init-hdr' + (isOpen ? ' open' : ''));
-      ihdr.innerHTML = `<span class="fav-chev">${svg('chevron', 10)}</span><span class="fav-init-dot" style="background:${mColor}"></span><span class="fav-init-name">${esc(initName)}</span><span class="fav-init-cnt">${meetings.length}</span>`;
+      ihdr.innerHTML = `<span class="fav-chev">${svg('chevron', 10)}</span><span class="fav-init-dot" style="background:${mColor}"></span><span class="fav-init-name">${esc(initName)}</span><span class="fav-init-cnt">${meetings.length}</span><button class="icon-btn sm fav-grp-clear" title="Quitar este proyecto de favoritos">${svg('x', 12)}</button>`;
       ihdr.onclick = () => {
         STATE._favOpen.has(key) ? STATE._favOpen.delete(key) : STATE._favOpen.add(key);
         renderMain();
+      };
+      const grpClear = ihdr.querySelector('.fav-grp-clear');
+      if (grpClear) grpClear.onclick = (e) => {
+        e.stopPropagation();
+        const s = _getMeetingFavs();
+        meetings.forEach(m => s.delete(m.id));
+        localStorage.setItem('hm.favMeetings', JSON.stringify([...s]));
+        toast('ok', `Se quitaron ${meetings.length} de favoritos`);
+        renderSidebar(); renderMain();
       };
       list.appendChild(ihdr);
       if (!isOpen) return; // colapsado: no renderizar cards
@@ -1068,10 +1195,18 @@ function viewInitiative() {
     ? formatDateShort(it.created_at)
     : '';
 
+  const doneCount = ms.filter(m => m.status === 'done').length;
+  const initMeta = ms.length
+    ? `${ms.length} ${ms.length === 1 ? 'reunión' : 'reuniones'}${doneCount ? ' · ' + doneCount + (doneCount === 1 ? ' transcrita' : ' transcritas') : ''}`
+    : 'Sin reuniones todavía';
   head.innerHTML = `
     <div class="init-status-row">
       <div class="init-title-group">
-        <h1 class="mtitle-h title-lg">${esc(it ? it.name : '')}</h1>
+        <span class="proj-av init-av" style="background:${(it && it.color) || avatarColorFor(it ? it.name : '')}">${esc(initialsFor(it ? it.name : ''))}</span>
+        <div class="init-title-col">
+          <h1 class="mtitle-h title-lg">${esc(it ? it.name : '')}</h1>
+          <span class="init-meta">${esc(initMeta)}</span>
+        </div>
         ${initCreatedStr ? `<span class="init-created">${esc(initCreatedStr)}</span>` : ''}
       </div>
       <div class="init-actions" id="initActions">
@@ -1135,7 +1270,7 @@ function viewInitiative() {
       c.innerHTML = `
         <div class="rc-sel"><span class="rc-cb"></span></div>
         <div class="rc-date"><span class="rc-mon">${mon}</span><span class="rc-day">${day}</span></div>
-        <div class="rc-body"><div class="rc-title">${esc(m.title)}</div><div class="rc-meta">${m.dur ? esc(m.dur) : ''}${m.size ? '<span class="rc-size">' + esc(m.size) + '</span>' : ''}</div></div>
+        <div class="rc-body"><div class="rc-title">${esc(m.title)}</div><div class="rc-meta">${_kindIcon(m)}${m.dur ? esc(m.dur) : ''}${m.size ? '<span class="rc-size">' + esc(m.size) + '</span>' : ''}</div></div>
         <div class="rc-right">
           <div class="rc-actions">
             <button class="icon-btn sm rc-act-btn${isFav ? ' fav-on' : ''}" data-act="fav" title="${isFav ? 'Quitar de favoritas' : 'Marcar como favorita'}">${svg('star', 13)}</button>
@@ -1218,10 +1353,19 @@ function viewInitiative() {
     }
     const _ivOpen = STATE._ivWeeks[STATE.selInit];
 
+    // Meses desplegables (por defecto abiertos; se guarda lo cerrado)
+    if (!STATE._ivMonths) STATE._ivMonths = {};
+    if (!STATE._ivMonths[STATE.selInit]) STATE._ivMonths[STATE.selInit] = new Set();
+    const _ivClosed = STATE._ivMonths[STATE.selInit];
+
     _ivMOrder.forEach(mKey => {
       const {mLabel, wkKeys} = _ivMMap.get(mKey);
-      const mhdr = el('div', 'list-month-hdr', esc(mLabel));
+      const mOpen = !_ivClosed.has(mKey);
+      const mhdr = el('div', 'list-month-hdr' + (mOpen ? ' open' : ''));
+      mhdr.innerHTML = `<span class="tw-chev">${svg('chevron', 9)}</span><span>${esc(mLabel)}</span>`;
+      mhdr.onclick = () => { _ivClosed.has(mKey) ? _ivClosed.delete(mKey) : _ivClosed.add(mKey); renderMain(); };
       row.appendChild(mhdr);
+      if (!mOpen) return;
       wkKeys.forEach(mk => {
         const {wLabel, items} = _ivWMap.get(mk);
         const isOpen = _ivOpen.has(mk);
@@ -1577,15 +1721,16 @@ function refreshMeetingTitleJob() {
   } else if (!job && spin) {
     spin.remove();
   }
-  const copy = group.querySelector('.meeting-title-copy');
-  const old = group.querySelector('[data-meeting-job]');
-  if (!copy) return;
+  // La barra de progreso vive bajo los tabs (#meetingJobRow), no en el título.
+  const row = document.querySelector('#meetingJobRow');
+  if (!row) return;
+  const old = row.querySelector('[data-meeting-job]');
   if (job) {
     const tmp = el('div');
     tmp.innerHTML = meetingJobMarkup(job);
     const fresh = tmp.firstElementChild;
     _wireJobCancel(fresh);
-    if (old) old.replaceWith(fresh); else copy.appendChild(fresh);
+    if (old) old.replaceWith(fresh); else row.appendChild(fresh);
   } else if (old) old.remove();
 }
 
@@ -1631,7 +1776,6 @@ function viewMeeting() {
             ${meetingDateStr ? `<span class="init-created">${esc(meetingDateStr)}</span>` : ''}
             ${videoDur}
           </div>
-          ${meetingJobMarkup(meetingJob)}
         </div>
       </div>
       <div class="init-actions meeting-actions" id="meetingActions">
@@ -1654,7 +1798,8 @@ function viewMeeting() {
         const label = { transcript: 'Transcripción', notas: 'Notas', archivos: 'Archivos' }[tab];
         return `<button class="tab ${STATE.activeTab === tab ? 'active' : ''}" data-tab="${tab}" role="tab">${label}</button>`;
       }).join('')}
-    </div>`;
+    </div>
+    <div class="meeting-job-row" id="meetingJobRow">${meetingJobMarkup(meetingJob)}</div>`;
   const content = el('div', 'content');
   if (STATE.activeTab === 'notas') content.classList.add('notes-mode');
   content.appendChild(renderTab(STATE.activeTab, t));
@@ -1955,6 +2100,10 @@ function videoPanel(t) {
   const bt = el('button', hasTx ? 'btn' : 'btn btn-primary', hasTx ? 'Retranscribir' : 'Recortar y transcribir');
   bt.onclick = () => openClipEditor(wrap, t, hasTx);
   actions.appendChild(bt);
+  // Transcribir directo, sin pasar por el recortador (vídeo completo)
+  const btNow = el('button', 'btn', hasTx ? 'Retranscribir todo' : 'Transcribir ahora');
+  btNow.onclick = () => transcribeScreenVideo(t.id, hasTx, null);
+  actions.appendChild(btNow);
   wrap.querySelector('.rec-actions').replaceWith(actions);
   return wrap;
 }
@@ -2749,11 +2898,22 @@ function viewArchiveTrash(which) {
       const c = el('div', 'row-card'); c.style.cursor = 'default';
       c.innerHTML = `<span style="flex:none;font-size:10px;font-weight:700;letter-spacing:.4px;color:var(--text-secondary);border:1px solid var(--border-strong);border-radius:5px;padding:3px 7px">${type}</span>
         <div class="rc-body"><div class="rc-title">${esc(x.title)}</div><div class="rc-meta">${esc(sub)}${x.date ? ' · ' + esc(x.date) : ''}</div></div>
-        <div style="display:flex;gap:7px"><button class="btn" data-restore>Restaurar</button>${isTrash ? '<button class="btn btn-danger" data-del>Eliminar</button>' : ''}</div>`;
-      c.querySelector('[data-restore]').onclick = async () => { await api.restoreItem(x.kind, x.id); toast('ok', 'Restaurado'); reloadLibrary(which); refreshAll(); };
-      if (isTrash) {
-        c.querySelector('[data-del]').onclick = () => confirmModal('Eliminar permanentemente', 'Esta acción no se puede deshacer. Se borrará «' + x.title + '»' + (x.kind === 'initiative' ? ' y todas sus reuniones.' : '.'), 'Eliminar para siempre', async () => { await api.permanentlyDeleteItem(x.kind, x.id); toast('ok', 'Eliminado permanentemente'); reloadLibrary(which); });
-      }
+        <div style="display:flex;gap:7px"><button class="btn" data-restore>Restaurar</button><button class="btn btn-danger" data-del>Eliminar</button></div>`;
+      c.querySelector('[data-restore]').onclick = async () => {
+        const r = await api.restoreItem(x.kind, x.id);
+        if (r && r.ok === false) { toast('err', r.error || 'No se pudo restaurar'); return; }
+        toast('ok', 'Restaurado'); reloadLibrary(which); refreshAll(); updateLibraryCounts();
+      };
+      c.querySelector('[data-del]').onclick = () => confirmModal(
+        'Eliminar permanentemente',
+        'Esta acción no se puede deshacer. Se borrará «' + x.title + '»' + (x.kind === 'initiative' ? ' y toda su carpeta archivada.' : ' y su carpeta archivada.'),
+        'Eliminar para siempre',
+        async () => {
+          const r = await api.permanentlyDeleteItem(x.kind, x.id);
+          if (r && r.ok === false) { toast('err', r.error || 'No se pudo eliminar'); return; }
+          toast('ok', 'Eliminado permanentemente'); reloadLibrary(which); refreshAll(); updateLibraryCounts();
+        }
+      );
       list.appendChild(c);
     });
   });
@@ -3262,7 +3422,8 @@ function _renderInitRow(tree, it) {
   const row = el('div', 'tree-initiative' + (open ? ' open' : '') + (isSelected ? ' selected' : ''));
   row.dataset.iid = it.id;
   row.title = it.name || '';
-  row.innerHTML = `<span class="chev">${svg('chevron', 12)}</span><span class="init-dot" style="background:${_initColor(it)}"></span><span class="name">${esc(it.name)}</span>${it.pinned ? '<span class="pin-ind">' + svg('pin', 10) + '</span>' : ''}<span class="count">${ms.length || ''}</span>`;
+  const av = `<span class="proj-av" style="background:${it.color || avatarColorFor(it.name)}">${esc(initialsFor(it.name))}</span>`;
+  row.innerHTML = `<span class="chev">${svg('chevron', 14)}</span>${av}<span class="name">${esc(it.name)}</span>${it.pinned ? '<span class="pin-ind">' + svg('pin', 12) + '</span>' : ''}<span class="count">${ms.length || ''}</span>`;
   row.onclick = () => selectInitiative(it.id);
   row.oncontextmenu = (e) => { e.preventDefault(); openInitiativeMenu(e, it.id); };
   tree.appendChild(row);
@@ -3350,6 +3511,10 @@ function renderSidebar() {
   const tree = $('#sidebarTree');
   tree.replaceChildren();
 
+  // Contador de favoritos junto al acceso directo (vacío si no hay)
+  const favEl = $('#favCount');
+  if (favEl) { const n = _getMeetingFavs().size; favEl.textContent = n || ''; }
+
   const all = STATE.initiatives;
   const pinned = all.filter(it => it.pinned);
   const rest = all.filter(it => !it.pinned);
@@ -3362,9 +3527,22 @@ function renderSidebar() {
     pinned.forEach(it => _renderInitRow(tree, it));
   }
 
-  // ── Activas (no fijadas) ──────────────────────────────────
-  if (rest.length) {
-    rest.forEach(it => _renderInitRow(tree, it));
+  // ── Activas (no fijadas) — con corte "Mostrar todo" ───────
+  const VISIBLE_LIMIT = 8;
+  const showAll = !!STATE.showAllProjects;
+  const visible = showAll ? rest : rest.slice(0, VISIBLE_LIMIT);
+  // El proyecto seleccionado nunca debe quedar oculto por el corte
+  // (los nuevos se crean al final de la lista y se seleccionan al crearse).
+  if (!showAll) {
+    const sel = rest.find(it => it.id === STATE.selInit);
+    if (sel && !visible.includes(sel)) visible.push(sel);
+  }
+  visible.forEach(it => _renderInitRow(tree, it));
+  if (!showAll && rest.length > VISIBLE_LIMIT) {
+    const more = el('div', 'sb-show-more');
+    more.innerHTML = `<span class="sm-ico">${svg('chevronDown', 16)}</span><span>Mostrar todo</span>`;
+    more.onclick = () => { STATE.showAllProjects = true; renderSidebar(); };
+    tree.appendChild(more);
   }
 
   if (!all.length) tree.appendChild(el('div', 'tree-meeting', `<span style="color:var(--text-faint);font-size:11px">Sin proyectos</span>`));
@@ -4432,7 +4610,7 @@ async function stopScreenRecording() {
   STATE.screenMeetingId = null;
   if (res && res.ok) {
     // El muxeo va en segundo plano; no bloqueamos. Avisará onScreenVideoSaved.
-    toast('info', 'Guardando el vídeo en segundo plano… puedes seguir usando la app');
+    toast('info', 'Guardando video…');
     await refreshMeetings(STATE.selInit);
   } else {
     toast('err', (res && res.error) || 'No se pudo detener la grabación');
@@ -4954,34 +5132,57 @@ async function openRecordingPreflight(kind, proceed) {
 }
 
 async function openDiagnostics() {
-  const m = el('div', 'modal wide');
+  const m = el('div', 'modal wide diagnostics-modal');
   m.setAttribute('role', 'dialog'); m.setAttribute('aria-label', 'Diagnóstico del sistema');
   m.innerHTML = `
     <div class="modal-head"><h3>${svg('check', 16)} Diagnóstico</h3><button class="icon-btn sm" data-x aria-label="Cerrar">${svg('x', 14)}</button></div>
     <div class="modal-body">
+      <div class="diag-summary" id="diagSummary">
+        <span class="diag-summary-dot"></span>
+        <div><b>Comprobando equipo</b><span>Validando requisitos principales</span></div>
+      </div>
       <div id="diagList" class="diag-list"><p style="color:var(--text-muted);font-size:13px">Comprobando…</p></div>
-      <div class="row-inline" style="margin-top:14px"><div class="help" style="flex:1">Comprueba que tu equipo está listo para grabar y transcribir.</div><button class="btn" id="diagFolder">Cambiar carpeta de exportación</button><button class="btn" id="diagReload">Volver a comprobar</button></div>
+      <div class="diag-actions"><button class="btn" id="diagFolder">Cambiar carpeta</button><button class="btn" id="diagReload">Comprobar otra vez</button></div>
     </div>`;
   m.querySelector('[data-x]').onclick = closeModal;
   const listEl = m.querySelector('#diagList');
+  const summaryEl = m.querySelector('#diagSummary');
+  const compactDetail = (label, info) => {
+    const raw = String((info && (info.label || info.detail)) || 'No disponible');
+    if (/carpeta/i.test(label)) return raw.split(/[\\/]/).slice(-2).join('\\') || raw;
+    if (/procesamiento/i.test(label)) return raw.includes('local') ? 'Local, en este equipo' : raw.split('.')[0];
+    if (/modelo/i.test(label)) return raw.replace(/^Modelo\s*/i, '').replace(/descargado/i, 'listo').trim();
+    if (/micr[oó]fono|audio/i.test(label)) return raw.replace(/\s*\([^)]*\)/g, '').replace(/^Audio del sistema:\s*/i, '');
+    if (/ventana/i.test(label)) return raw.replace(/^WebView2\s*/i, '');
+    return raw;
+  };
   async function loadDiag() {
     listEl.innerHTML = '<p style="color:var(--text-muted);font-size:13px">Comprobando…</p>';
+    summaryEl.className = 'diag-summary';
+    summaryEl.innerHTML = '<span class="diag-summary-dot"></span><div><b>Comprobando equipo</b><span>Validando requisitos principales</span></div>';
     const d = await api.getDiagnostics() || {};
     const rows = [
-      ['Ventana (WebView2)', d.webview2],
+      ['WebView2', d.webview2],
       ['Espacio en disco', d.disk],
-      ['Modelo de transcripción', d.whisper],
+      ['Modelo', d.whisper],
       ['Micrófono', d.mic],
-      ['Audio del sistema', d.loopback],
-      ['Carpeta de exportación', d.export_dir],
-      ['Procesamiento del audio', d.processing],
+      ['Sistema', d.loopback],
+      ['Exportación', d.export_dir],
+      ['Procesamiento', d.processing],
     ];
     listEl.replaceChildren();
+    const okCount = rows.filter(([, info]) => (info && info.status) === 'ok').length;
+    const errorCount = rows.filter(([, info]) => (info && info.status) === 'error').length;
+    const warnCount = rows.length - okCount - errorCount;
+    summaryEl.classList.toggle('has-error', errorCount > 0);
+    summaryEl.classList.toggle('has-warn', !errorCount && warnCount > 0);
+    summaryEl.innerHTML = `<span class="diag-summary-dot"></span><div><b>${errorCount ? 'Revisa ' + errorCount + ' punto' + (errorCount > 1 ? 's' : '') : okCount + '/' + rows.length + ' listo'}</b><span>${errorCount ? 'Hay requisitos que necesitan atención' : warnCount ? 'Puedes grabar, con avisos menores' : 'Equipo listo para grabar y transcribir'}</span></div>`;
     rows.forEach(([label, info]) => {
       info = info || { status: 'warn', label: 'No disponible' };
       const ico = info.status === 'ok' ? svg('check', 14) : info.status === 'error' ? svg('x', 14) : svg('warn', 14);
       const row = el('div', 'diag-row ' + (info.status || 'warn'));
-      row.innerHTML = `<span class="diag-ico">${ico}</span><div class="diag-body"><div class="diag-label">${esc(label)}</div><div class="diag-detail">${esc(info.label || '')}${info.detail ? ' · ' + esc(info.detail) : ''}</div></div>`;
+      const full = `${info.label || ''}${info.detail ? ' · ' + info.detail : ''}`;
+      row.innerHTML = `<span class="diag-ico">${ico}</span><div class="diag-body"><div class="diag-label">${esc(label)}</div><div class="diag-detail" title="${esc(full)}">${esc(compactDetail(label, info))}</div></div>`;
       listEl.appendChild(row);
     });
   }
@@ -5021,6 +5222,17 @@ function viewSettings() {
           <input type="checkbox" id="svDefaultMute" ${s.default_mic_muted ? 'checked' : ''}>
           <span class="toggle-ui" aria-hidden="true"><i></i></span>
         </label>
+      </div>
+
+      <div class="sv-section">
+        <div class="sv-sec-title">${svg('palette', 14)} Apariencia</div>
+        <div class="sv-row">
+          <span class="sv-lbl">Tema</span>
+          <div id="svThemeChips" style="display:flex;gap:8px">
+            <button class="cfg-chip" data-theme-opt="light">Claro</button>
+            <button class="cfg-chip" data-theme-opt="dark">Oscuro</button>
+          </div>
+        </div>
       </div>
 
       <div class="sv-section">
@@ -5067,12 +5279,12 @@ function viewSettings() {
 
       <div class="sv-section">
         <div class="sv-sec-title">${svg('download', 14)} Actualizaciones</div>
-        <div class="sv-row">
-          <span class="sv-lbl">Versión instalada</span>
-          <span class="mono" style="color:var(--text-primary)">v${esc(STATE.version || '')}</span>
-        </div>
-        <div class="sv-row" style="margin-top:8px">
-          <span id="svUpdStatus" style="color:var(--text-muted); font-size:11.5px"></span>
+        <div class="sv-upd-card">
+          <div class="sv-upd-ico">${svg('download', 17)}</div>
+          <div class="sv-upd-info">
+            <div class="sv-upd-ver">Helpmeet <span class="mono">v${esc(STATE.version || '')}</span></div>
+            <div class="sv-upd-status" id="svUpdStatus">Comprueba si hay una versión nueva disponible</div>
+          </div>
           <button class="btn" id="svUpdCheck">Buscar actualizaciones</button>
         </div>
       </div>
@@ -5123,6 +5335,24 @@ function viewSettings() {
     inner.querySelector('#svAiReset').onclick = async () => { const r = await api.setAiInstructions(''); inner.querySelector('#svAiInstr').value = (r && r.text) || ''; toast('ok', 'Restablecido'); };
     inner.querySelector('#svDir').onclick = async () => { const r = await api.chooseExportDir(); if (r && r.ok) { toast('ok', 'Carpeta actualizada'); openSettings(); } };
     inner.querySelector('#svDiag').onclick = () => openDiagnostics();
+    // Apariencia: claro / oscuro cálido (persistido en hm.theme)
+    const themeBox = inner.querySelector('#svThemeChips');
+    if (themeBox) {
+      const renderTheme = () => {
+        const cur = load('hm.theme', 'light');
+        themeBox.querySelectorAll('[data-theme-opt]').forEach(b =>
+          b.classList.toggle('on', b.dataset.themeOpt === cur));
+      };
+      themeBox.querySelectorAll('[data-theme-opt]').forEach(b => b.onclick = () => {
+        const v = b.dataset.themeOpt;
+        save('hm.theme', v);
+        if (v === 'dark') document.body.dataset.theme = 'dark';
+        else delete document.body.dataset.theme;
+        renderTheme();
+        toast('ok', v === 'dark' ? 'Modo oscuro activado' : 'Modo claro activado');
+      });
+      renderTheme();
+    }
     // Actualizaciones: comprueba bajo demanda; si hay versión nueva, el botón
     // pasa a "Descargar" y abre el enlace en el navegador.
     const updBtn = inner.querySelector('#svUpdCheck');
@@ -5290,18 +5520,31 @@ const WC_SVG = {
 function wireTopbar() {
   $('#btnRefreshSidebar').innerHTML = svg('refresh', 14);
   $('#btnNewInitiative').innerHTML = svg('plus', 14);
-  $('#navInitiatives .nav-chev').innerHTML = svg('chevron', 17);
-  // Iconos del rail colapsado
+  $('#navInitiatives .nav-chev').innerHTML = svg('chevron', 12);
+  // Iconos del botón "Nuevo proyecto" y del pie (los accesos van sin iconos)
+  const _si = (sel, icon) => { const e = $(sel); if (e) e.innerHTML = svg(icon, 20); };
+  _si('#btnNewProjectTop .np-ico', 'plus');
+  _si('#btnArchive .sl-ico',   'archive');
+  _si('#btnSettingsSide .sl-ico', 'settings');
+  // Iconos del rail colapsado (mismo orden que el panel expandido)
   const _ri = (id, icon) => { const e = $(id); if (e) e.innerHTML = svg(icon, 17); };
-  _ri('#railMeetings',    'calendar');
+  _ri('#railNew',         'plus');
+  _ri('#railHome',        'home');
   _ri('#railFavorites',   'star');
+  _ri('#railMeetings',    'calendar');
   _ri('#railInitiatives', 'rocket');
   _ri('#railArchive',     'archive');
   _ri('#railSettings',    'settings');
 
-  // Clic en logo/marca → colapsar/expandir sidebar
+  // Botón hamburguesa (como Gmail) → colapsar/expandir sidebar
+  const menuBtn = $('#btnMenu');
+  if (menuBtn) {
+    menuBtn.innerHTML = svg('menu', 20);
+    menuBtn.onclick = () => { STATE.sidebarOpen = !STATE.sidebarOpen; applySidebar(); };
+  }
+  // El logo/marca ya no alterna el panel (lo hace la hamburguesa)
   const brandEl = document.querySelector('.brand');
-  if (brandEl) brandEl.onclick = () => { STATE.sidebarOpen = !STATE.sidebarOpen; applySidebar(); };
+  if (brandEl) brandEl.onclick = null;
 
   $('#btnRefreshSidebar').onclick = async () => {
     const btn = $('#btnRefreshSidebar');
@@ -5323,9 +5566,13 @@ function wireTopbar() {
     }
   };
   $('#btnNewInitiative').onclick = promptNewInitiative;
+  if ($('#btnNewProjectTop')) $('#btnNewProjectTop').onclick = promptNewInitiative;
+  if ($('#navHome')) $('#navHome').onclick = () => { STATE.screen = 'welcome'; STATE.selInit = null; STATE.selMeeting = null; renderSidebar(); renderMain(); renderTopStatus(); };
   if ($('#btnArchive')) $('#btnArchive').onclick = () => { STATE.screen = 'archive'; renderMain(); renderTopStatus(); };
   if ($('#btnTrash')) $('#btnTrash').onclick = () => { STATE.screen = 'trash'; renderMain(); };
   $('#btnSettingsSide').onclick = () => { STATE.screen = 'settings'; renderMain(); renderTopStatus(); };
+  $('#railNew')?.addEventListener('click', promptNewInitiative);
+  $('#railHome')?.addEventListener('click', () => { STATE.screen = 'welcome'; STATE.selInit = null; STATE.selMeeting = null; renderSidebar(); renderMain(); renderTopStatus(); });
   $('#railMeetings')?.addEventListener('click', () => { openMeetingsView(); });
   $('#railFavorites')?.addEventListener('click', () => { STATE.screen = 'favorites'; renderMain(); renderTopStatus(); });
   $('#railInitiatives')?.addEventListener('click', () => { STATE.screen = 'initiatives-list'; renderMain(); renderTopStatus(); });
