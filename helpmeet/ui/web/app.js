@@ -5220,6 +5220,17 @@ function viewSettings() {
       </div>
 
       <div class="sv-section">
+        <div class="sv-sec-title">${svg('palette', 14)} Apariencia</div>
+        <div class="sv-row">
+          <span class="sv-lbl">Tema</span>
+          <div id="svThemeChips" style="display:flex;gap:8px">
+            <button class="cfg-chip" data-theme-opt="light">Claro</button>
+            <button class="cfg-chip" data-theme-opt="dark">Oscuro</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="sv-section">
         <div class="sv-sec-title">${svg('monitor', 14)} Grabación de pantalla</div>
         <div class="sv-row"><span class="sv-lbl">Calidad</span><div class="cfg-chips" id="svVideoChips"></div></div>
       </div>
@@ -5258,17 +5269,6 @@ function viewSettings() {
           <button class="sv-act sv-lic-deactivate" id="svLicDeactivate" style="display:none">
             ${svg('x', 11)} Desactivar en este dispositivo
           </button>
-        </div>
-      </div>
-
-      <div class="sv-section">
-        <div class="sv-sec-title">${svg('palette', 14)} Apariencia</div>
-        <div class="sv-row">
-          <span class="sv-lbl">Tema</span>
-          <div id="svThemeChips" style="display:flex;gap:8px">
-            <button class="cfg-chip" data-theme-opt="light">Claro</button>
-            <button class="cfg-chip" data-theme-opt="dark">Oscuro</button>
-          </div>
         </div>
       </div>
 
@@ -5516,19 +5516,7 @@ function wireTopbar() {
   $('#btnRefreshSidebar').innerHTML = svg('refresh', 14);
   $('#btnNewInitiative').innerHTML = svg('plus', 14);
   $('#navInitiatives .nav-chev').innerHTML = svg('chevron', 12);
-  // Cabecera "Accesos directos" colapsable (estilo secciones de Gmail)
-  const secHdr = $('#secShortcuts');
-  if (secHdr) {
-    const tri = secHdr.querySelector('.sec-tri');
-    if (tri) tri.innerHTML = svg('chevron', 12);
-    secHdr.onclick = () => {
-      const body = $('#shortcutsBody'); if (!body) return;
-      body.hidden = !body.hidden;
-      secHdr.classList.toggle('collapsed', body.hidden);
-      secHdr.setAttribute('aria-expanded', body.hidden ? 'false' : 'true');
-    };
-  }
-  // Iconos del botón "Nuevo proyecto" y del pie (Accesos directos va sin iconos)
+  // Iconos del botón "Nuevo proyecto" y del pie (los accesos van sin iconos)
   const _si = (sel, icon) => { const e = $(sel); if (e) e.innerHTML = svg(icon, 20); };
   _si('#btnNewProjectTop .np-ico', 'plus');
   _si('#btnArchive .sl-ico',   'archive');

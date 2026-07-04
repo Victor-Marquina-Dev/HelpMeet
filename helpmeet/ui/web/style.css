@@ -600,24 +600,14 @@ body.rail-expanding .rail-resize-handle { background: var(--accent); }
 /* El icono "+" es de trazo: stroke, no fill (con fill era invisible) */
 .new-project-btn svg { stroke: var(--newbtn-text); fill: none; width: 16px; height: 16px; }
 
-/* Cabeceras de sección estilo Gmail ("Work"): triángulo + texto,
-   sin barra gris ni iconos en reposo. */
-.sidebar-nav { padding: 0 0 2px; }
-.sb-sec-hdr {
-  display: flex; align-items: center; gap: 5px;
-  width: 100%; padding: 6px 8px 3px 8px; margin: 0;
-  border: none; background: transparent; cursor: pointer;
-  font-family: inherit; font-size: 10.5px; font-weight: 600; color: var(--text-secondary);
-  text-align: left;
-}
-.sb-sec-hdr:hover { color: var(--text-primary); }
+/* Accesos directos sin cabecera: los ítems van directos bajo el botón
+   "Nuevo proyecto". El triángulo (.sec-tri) lo usa la cabecera Proyectos. */
+.sidebar-nav { padding: 2px 0 2px; }
 .sec-tri {
   display: inline-flex; align-items: center; justify-content: center;
   width: 14px; height: 14px; color: var(--text-faint); flex: none;
   transform: rotate(90deg); transition: transform .18s;
 }
-.sb-sec-hdr.collapsed .sec-tri { transform: rotate(0deg); }
-.sec-body[hidden] { display: none; }
 
 /* Ítems tipo píldora de "Accesos directos" — sin iconos, texto alineado
    con la etiqueta de la sección (redondeo completo, como Gmail) */
@@ -1044,10 +1034,7 @@ body:has(#actionbar.actionbar--dock) .content { padding-bottom: 120px; }
 /* Icono del origen (audio / pantalla / importado) en la línea de metadatos */
 .rc-kind { display: inline-flex; align-items: center; color: var(--text-muted); }
 
-/* Vista de reunión: tabs pegados al título; el progreso de transcripción
-   va DEBAJO de los tabs, no en la línea del título. */
-.meeting-head .tabs { margin-top: 0; }
-.meeting-head.init-head { padding-bottom: 0; }
+/* El progreso de transcripción va DEBAJO de los tabs (fila propia). */
 .meeting-job-row { padding: 0 2px; }
 .meeting-job-row:empty { display: none; }
 .meeting-job-row .meeting-title-job { margin: 8px 0 2px; max-width: 420px; }
@@ -1125,20 +1112,6 @@ body[data-sidebar="collapsed"] .sidebar-rail {
 .sv-upd-info { flex: 1; min-width: 0; }
 .sv-upd-ver { font-size: 12.5px; font-weight: 600; color: var(--text-primary); }
 .sv-upd-status { font-size: 11px; color: var(--text-muted); margin-top: 2px; }
-
-/* ── Tour de bienvenida en colores cálidos (crema) ────────────────── */
-.tour-card {
-  background: #fffaf2;
-  border: 1px solid #f0e2cc;
-  box-shadow: 0 24px 64px rgba(74, 58, 28, .35), 0 0 0 1px rgba(240, 226, 204, .6);
-}
-.tour-card h3 { color: #33291c; }
-.tour-card p { color: #7a6c58; }
-.tour-skip { color: #a8977f; }
-.tour-skip:hover { color: #7a6c58; }
-.tour-dot { background: #ecdfc9; }
-.tour-dot.is-on { background: var(--accent); }
-.tour-next { color: #fff; }
 
 /* Cabecera de mes ("JULIO 2026") en la vista de proyecto: pegada arriba
    y desplegable con chevron. */
@@ -1731,11 +1704,11 @@ body[data-sidebar="collapsed"] .actionbar--dock { left: 52px; }
 /* Tarjeta flotante */
 .tour-card {
   position: fixed; width: 308px; max-width: calc(100vw - 28px);
-  /* Tarjeta oscura a propósito (spotlight): borde blanco translúcido, no tokens claros */
-  background: #181b24; border: 1px solid rgba(255,255,255,.08);
+  /* Colores cálidos: crema en tema claro (variante oscura al final del archivo) */
+  background: #fffaf2; border: 1px solid #f0e2cc;
   border-radius: 16px; padding: 22px 20px 18px;
   pointer-events: auto; z-index: 12004;
-  box-shadow: 0 24px 64px rgba(0,0,0,.7), 0 0 0 1px rgba(255,255,255,.035);
+  box-shadow: 0 24px 64px rgba(74, 58, 28, .4), 0 0 0 1px rgba(240, 226, 204, .6);
   animation: tourCardIn .22s ease;
 }
 @keyframes tourCardIn {
@@ -1758,17 +1731,17 @@ body[data-sidebar="collapsed"] .actionbar--dock { left: 52px; }
 .tour-dots { display: flex; gap: 5px; margin-bottom: 14px; }
 .tour-dot {
   height: 5px; width: 5px; border-radius: 3px;
-  background: rgba(255,255,255,.18);
+  background: #ecdfc9;
   transition: width .22s ease, background .22s ease;
 }
 .tour-dot.is-on { width: 18px; background: var(--accent); }
 
 .tour-card h3 {
   margin: 0 0 7px; font-size: 15px; font-weight: 700;
-  color: #fff; letter-spacing: -.2px; line-height: 1.2;
+  color: #33291c; letter-spacing: -.2px; line-height: 1.2;
 }
 .tour-card p {
-  margin: 0; font-size: 11.8px; line-height: 1.6; color: rgba(255,255,255,.58);
+  margin: 0; font-size: 11.8px; line-height: 1.6; color: #7a6c58;
 }
 .tour-actions {
   display: flex; justify-content: space-between; align-items: center;
@@ -1776,11 +1749,11 @@ body[data-sidebar="collapsed"] .actionbar--dock { left: 52px; }
 }
 .tour-skip {
   background: none; border: none; padding: 0 4px; cursor: pointer;
-  font-size: 11px; font-family: inherit; color: rgba(255,255,255,.35);
+  font-size: 11px; font-family: inherit; color: #a8977f;
 }
-.tour-skip:hover { color: rgba(255,255,255,.6); }
+.tour-skip:hover { color: #7a6c58; }
 .tour-next {
-  background: var(--accent); color: #0c1913; border: none;
+  background: var(--accent); color: #fff; border: none;
   height: 34px; padding: 0 18px; border-radius: 8px;
   font-size: 12px; font-weight: 700; font-family: inherit; cursor: pointer;
   transition: background .12s;
@@ -1993,7 +1966,7 @@ body[data-sidebar="collapsed"] .actionbar--dock { left: 52px; }
 .init-actions-sep { width: 1px; height: 16px; background: var(--border-subtle); margin: 0 3px; align-self: center; }
 
 .meeting-head { padding-bottom: 0; }
-.meeting-head .tabs { margin-top: 18px; }
+.meeting-head .tabs { margin-top: 2px; }
 .meeting-status-row { align-items: flex-start; }
 .meeting-meta {
   margin: 8px 0 0;
@@ -3187,3 +3160,15 @@ body[data-theme="dark"] .brand-mark { background: #2a2521; border-color: #4c443a
 body[data-theme="dark"] .home-card:hover,
 body[data-theme="dark"] .row-card:hover,
 body[data-theme="dark"] .sv-upd-card { box-shadow: 0 1px 8px rgba(0, 0, 0, .35); }
+
+/* Tour en modo oscuro: marrón cálido oscuro (la base clara es crema) */
+body[data-theme="dark"] .tour-card {
+  background: #2e2823; border-color: #4c443a;
+  box-shadow: 0 24px 64px rgba(0, 0, 0, .7), 0 0 0 1px rgba(255, 250, 240, .06);
+}
+body[data-theme="dark"] .tour-card h3 { color: #f3eee6; }
+body[data-theme="dark"] .tour-card p { color: #bfb5a6; }
+body[data-theme="dark"] .tour-skip { color: #8d8375; }
+body[data-theme="dark"] .tour-skip:hover { color: #bfb5a6; }
+body[data-theme="dark"] .tour-dot { background: #4c443a; }
+body[data-theme="dark"] .tour-next { color: var(--on-accent); }
