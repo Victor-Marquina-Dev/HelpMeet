@@ -415,29 +415,8 @@ body.rail-expanding .rail-resize-handle { background: var(--accent); }
   flex: none; padding: 10px 0 6px;
   display: flex; flex-direction: column; gap: 0;
 }
-.nav-item {
-  display: flex; align-items: center; gap: 0;
-  width: 100%; text-align: left;
-  min-height: 34px; padding: 0 10px 0 16px;
-  border: none; border-left: 2px solid transparent;
-  border-radius: 0; background: transparent; cursor: pointer;
-  font-family: inherit; font-size: 12px; font-weight: 500;
-  color: var(--text-secondary);
-  transition: background .15s, color .15s, border-color .15s;
-}
-.nav-item:hover {
-  background: var(--hover-med);
-  color: var(--text-primary);
-}
-.nav-item.active {
-  background: var(--hover-med);
-  color: var(--text-primary);
-  border-left-color: var(--accent);
-  font-weight: 600;
-}
 .nav-label { flex: 1; }
-#navInitiatives .icon-btn { flex: none; opacity: .6; transition: opacity .15s; }
-#navInitiatives .icon-btn:hover { opacity: 1; }
+#navInitiatives .icon-btn { flex: none; }
 
 .nav-toggle {
   flex: 1; display: flex; align-items: center; gap: 0; min-width: 0; min-height: 34px;
@@ -491,23 +470,19 @@ body.rail-expanding .rail-resize-handle { background: var(--accent); }
 }
 .tree-initiative .chev { transition: transform .15s; flex: none; color: var(--text-faint); }
 .tree-initiative.open .chev { transform: rotate(90deg); }
-.tree-initiative .init-dot { width: 7px; height: 7px; border-radius: 50%; flex: none; }
-.tree-initiative .name { font-weight: 600; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tree-initiative .name { font-weight: 500; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .tree-initiative .count { font-size: 9px; color: var(--text-faint); font-family: var(--font-mono); }
 .tree-initiative .pin-ind { display: inline-flex; align-items: center; color: var(--accent); flex: none; }
-.tree-initiative.has-recording .init-dot,
-.tree-initiative.has-transcribing .init-dot {
-  width: 10px !important; height: 10px !important; margin: -1.5px !important;
-  border-radius: 50% !important; background: transparent !important;
+/* Actividad en vivo (grabando / transcribiendo): anillo girando alrededor
+   del avatar del proyecto. Las clases las pone refreshSidebarJobs(). */
+.tree-initiative.has-recording .proj-av::after,
+.tree-initiative.has-transcribing .proj-av::after {
+  content: ''; position: absolute; inset: -3px; border-radius: 50%;
+  border: 2px solid rgba(217, 48, 37, .25); border-top-color: var(--recording);
   animation: spin .7s linear infinite;
 }
-.tree-initiative.has-recording .init-dot {
-  border: 1.5px solid rgba(229,86,79,.3) !important;
-  border-top-color: var(--recording) !important;
-}
-.tree-initiative.has-transcribing .init-dot {
-  border: 1.5px solid rgba(10, 146, 104,.3) !important;
-  border-top-color: var(--accent) !important;
+.tree-initiative.has-transcribing .proj-av::after {
+  border-color: rgba(10, 146, 104, .25); border-top-color: var(--accent);
 }
 
 /* Árbol de reuniones dentro de una iniciativa */
@@ -658,10 +633,14 @@ body.rail-expanding .rail-resize-handle { background: var(--accent); }
 #navInitiatives .sb-hdr-act { opacity: 0; transition: opacity .15s; }
 #navInitiatives:hover .sb-hdr-act { opacity: .8; }
 #navInitiatives .sb-hdr-act:hover { opacity: 1; }
+/* Sección activa (renderMain pone .active cuando se navega un proyecto) */
+.sb-projects-hdr.active .nav-label { color: var(--sel-text); font-weight: 700; }
 
-/* Avatar de iniciales del proyecto */
+/* Avatar de iniciales del proyecto (position: relative para el anillo
+   de actividad ::after de grabación/transcripción) */
 .proj-av {
   width: 21px; height: 21px; border-radius: 50%; flex: none;
+  position: relative;
   display: inline-flex; align-items: center; justify-content: center;
   color: #fff; font-size: 9px; font-weight: 600; letter-spacing: .02em;
 }
@@ -673,8 +652,6 @@ body.rail-expanding .rail-resize-handle { background: var(--accent); }
 }
 .tree-initiative:hover { background: var(--hover-soft); }
 .tree-initiative.selected { background: var(--sel-bg); color: var(--sel-text); border-left: none; }
-.tree-initiative .chev { color: var(--text-faint); }
-.tree-initiative .name { font-weight: 500; }
 
 /* Reuniones indentadas con línea guía vertical */
 .tree-meeting {
@@ -1605,10 +1582,11 @@ body[data-sidebar="collapsed"] .actionbar--dock { left: 52px; }
 /* Tarjeta flotante */
 .tour-card {
   position: fixed; width: 308px; max-width: calc(100vw - 28px);
-  background: #181b24; border: 1px solid var(--hover-med);
+  /* Tarjeta oscura a propósito (spotlight): borde blanco translúcido, no tokens claros */
+  background: #181b24; border: 1px solid rgba(255,255,255,.08);
   border-radius: 16px; padding: 22px 20px 18px;
   pointer-events: auto; z-index: 12004;
-  box-shadow: 0 24px 64px rgba(0,0,0,.7), 0 0 0 1px var(--hover-med);
+  box-shadow: 0 24px 64px rgba(0,0,0,.7), 0 0 0 1px rgba(255,255,255,.035);
   animation: tourCardIn .22s ease;
 }
 @keyframes tourCardIn {

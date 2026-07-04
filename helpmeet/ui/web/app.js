@@ -77,7 +77,6 @@ const ICONS = {
   clock: '<circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/>',
   arrowUp: '<path d="M12 19V5M5 12l7-7 7 7"/>',
   refresh: '<path d="M3 12a9 9 0 0 1 15-6.7L21 8M3 16l3-3 3 3M21 12a9 9 0 0 1-15 6.7L3 16"/>',
-  home: '<path d="M3 10.5 12 3l9 7.5"/><path d="M5 9.5V20a1 1 0 0 0 1 1h4v-6h4v6h4a1 1 0 0 0 1-1V9.5"/>',
 };
 function svg(name, size) {
   size = size || 15;
@@ -1099,7 +1098,7 @@ function viewInitiative() {
   head.innerHTML = `
     <div class="init-status-row">
       <div class="init-title-group">
-        <span class="proj-av init-av" style="background:${avatarColorFor(it ? it.name : '')}">${esc(initialsFor(it ? it.name : ''))}</span>
+        <span class="proj-av init-av" style="background:${(it && it.color) || avatarColorFor(it ? it.name : '')}">${esc(initialsFor(it ? it.name : ''))}</span>
         <div class="init-title-col">
           <h1 class="mtitle-h title-lg">${esc(it ? it.name : '')}</h1>
           <span class="init-meta">${esc(initMeta)}</span>
@@ -3294,7 +3293,7 @@ function _renderInitRow(tree, it) {
   const row = el('div', 'tree-initiative' + (open ? ' open' : '') + (isSelected ? ' selected' : ''));
   row.dataset.iid = it.id;
   row.title = it.name || '';
-  const av = `<span class="proj-av" style="background:${avatarColorFor(it.name)}">${esc(initialsFor(it.name))}</span>`;
+  const av = `<span class="proj-av" style="background:${it.color || avatarColorFor(it.name)}">${esc(initialsFor(it.name))}</span>`;
   row.innerHTML = `<span class="chev">${svg('chevron', 14)}</span>${av}<span class="name">${esc(it.name)}</span>${it.pinned ? '<span class="pin-ind">' + svg('pin', 12) + '</span>' : ''}<span class="count">${ms.length || ''}</span>`;
   row.onclick = () => selectInitiative(it.id);
   row.oncontextmenu = (e) => { e.preventDefault(); openInitiativeMenu(e, it.id); };
@@ -3383,6 +3382,10 @@ function renderSidebar() {
   const tree = $('#sidebarTree');
   tree.replaceChildren();
 
+  // Contador de favoritos junto al acceso directo (vacío si no hay)
+  const favEl = $('#favCount');
+  if (favEl) { const n = _getMeetingFavs().size; favEl.textContent = n || ''; }
+
   const all = STATE.initiatives;
   const pinned = all.filter(it => it.pinned);
   const rest = all.filter(it => !it.pinned);
@@ -3399,6 +3402,12 @@ function renderSidebar() {
   const VISIBLE_LIMIT = 8;
   const showAll = !!STATE.showAllProjects;
   const visible = showAll ? rest : rest.slice(0, VISIBLE_LIMIT);
+  // El proyecto seleccionado nunca debe quedar oculto por el corte
+  // (los nuevos se crean al final de la lista y se seleccionan al crearse).
+  if (!showAll) {
+    const sel = rest.find(it => it.id === STATE.selInit);
+    if (sel && !visible.includes(sel)) visible.push(sel);
+  }
   visible.forEach(it => _renderInitRow(tree, it));
   if (!showAll && rest.length > VISIBLE_LIMIT) {
     const more = el('div', 'sb-show-more');
