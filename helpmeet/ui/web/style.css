@@ -594,7 +594,8 @@ body.rail-expanding .rail-resize-handle { background: var(--accent); }
 }
 .new-project-btn:hover { box-shadow: 0 1px 3px rgba(60,64,67,.3); filter: brightness(.98); }
 .new-project-btn .np-ico { display: inline-flex; }
-.new-project-btn svg { fill: var(--newbtn-text); stroke: none; width: 16px; height: 16px; }
+/* El icono "+" es de trazo: stroke, no fill (con fill era invisible) */
+.new-project-btn svg { stroke: var(--newbtn-text); fill: none; width: 16px; height: 16px; }
 
 /* Cabeceras de sección estilo Gmail ("Work"): triángulo + texto,
    sin barra gris ni iconos en reposo. */
@@ -1022,6 +1023,36 @@ body:has(#actionbar.actionbar--dock) .content { padding-bottom: 120px; }
 .meeting-job-row { padding: 0 2px; }
 .meeting-job-row:empty { display: none; }
 .meeting-job-row .meeting-title-job { margin: 8px 0 2px; max-width: 420px; }
+
+/* ── Colapso del sidebar con animación + rail alineado ──────────────
+   El sidebar ya no desaparece de golpe (display:none): se encoge a 0
+   con transición. El rail entra con un deslizamiento suave y sus
+   iconos siguen el mismo orden que los títulos del panel expandido. */
+body[data-sidebar="collapsed"] .sidebar {
+  display: flex; width: 0 !important; min-width: 0;
+  opacity: 0; pointer-events: none;
+  transition: width .18s ease, opacity .14s ease;
+}
+body[data-sidebar="collapsed"] .sidebar-rail {
+  animation: railIn .2s ease .04s backwards;
+}
+@keyframes railIn {
+  from { opacity: 0; transform: translateX(-8px); }
+  to   { opacity: 1; transform: none; }
+}
+.sidebar-rail { padding: 4px 0 10px; gap: 2px; background: var(--bg-app); border-right: none; }
+.rail-new {
+  width: 38px; height: 34px; border-radius: 11px; border: none; flex: none;
+  background: var(--newbtn-bg); cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  margin: 8px 0 30px;   /* deja el hueco de la cabecera "Accesos directos" */
+  transition: box-shadow .15s;
+}
+.rail-new:hover { box-shadow: 0 1px 3px rgba(60, 64, 67, .3); }
+.rail-new svg { stroke: var(--newbtn-text); fill: none; }
+.rail-btn { width: 34px; height: 31px; border-radius: 999px; }
+.rail-btn:hover { background: var(--hover-soft); color: var(--text-primary); }
+#railInitiatives { margin-top: 8px; }
 
 /* Cabecera de mes ("JULIO 2026") en la vista de proyecto: pegada arriba
    y desplegable con chevron. */

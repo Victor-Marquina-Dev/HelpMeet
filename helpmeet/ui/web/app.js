@@ -78,6 +78,7 @@ const ICONS = {
   arrowUp: '<path d="M12 19V5M5 12l7-7 7 7"/>',
   refresh: '<path d="M3 12a9 9 0 0 1 15-6.7L21 8M3 16l3-3 3 3M21 12a9 9 0 0 1-15 6.7L3 16"/>',
   menu: '<path d="M4 6h16M4 12h16M4 18h16"/>',
+  home: '<path d="M3 10.5 12 3l9 7.5"/><path d="M5 9.5V20a1 1 0 0 0 1 1h4v-6h4v6h4a1 1 0 0 0 1-1V9.5"/>',
 };
 function svg(name, size) {
   size = size || 15;
@@ -5396,10 +5397,12 @@ function wireTopbar() {
   _si('#btnNewProjectTop .np-ico', 'plus');
   _si('#btnArchive .sl-ico',   'archive');
   _si('#btnSettingsSide .sl-ico', 'settings');
-  // Iconos del rail colapsado
+  // Iconos del rail colapsado (mismo orden que el panel expandido)
   const _ri = (id, icon) => { const e = $(id); if (e) e.innerHTML = svg(icon, 17); };
-  _ri('#railMeetings',    'calendar');
+  _ri('#railNew',         'plus');
+  _ri('#railHome',        'home');
   _ri('#railFavorites',   'star');
+  _ri('#railMeetings',    'calendar');
   _ri('#railInitiatives', 'rocket');
   _ri('#railArchive',     'archive');
   _ri('#railSettings',    'settings');
@@ -5439,6 +5442,8 @@ function wireTopbar() {
   if ($('#btnArchive')) $('#btnArchive').onclick = () => { STATE.screen = 'archive'; renderMain(); renderTopStatus(); };
   if ($('#btnTrash')) $('#btnTrash').onclick = () => { STATE.screen = 'trash'; renderMain(); };
   $('#btnSettingsSide').onclick = () => { STATE.screen = 'settings'; renderMain(); renderTopStatus(); };
+  $('#railNew')?.addEventListener('click', promptNewInitiative);
+  $('#railHome')?.addEventListener('click', () => { STATE.screen = 'welcome'; STATE.selInit = null; STATE.selMeeting = null; renderSidebar(); renderMain(); renderTopStatus(); });
   $('#railMeetings')?.addEventListener('click', () => { openMeetingsView(); });
   $('#railFavorites')?.addEventListener('click', () => { STATE.screen = 'favorites'; renderMain(); renderTopStatus(); });
   $('#railInitiatives')?.addEventListener('click', () => { STATE.screen = 'initiatives-list'; renderMain(); renderTopStatus(); });
