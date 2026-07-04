@@ -653,7 +653,9 @@ class Api:
             source = ""
         elif not is_video:
             source = "audio"
-        elif _re.fullmatch(r"\d{2}-\d{2}-\d{2} \d{2}-\d{2}-\d{2}", stem):
+        elif (_re.fullmatch(r"\d{2}-\d{2}-\d{2} \d{2}-\d{2}-\d{2}", stem)
+              or stem.lower().startswith("grabacion")   # nombre legacy de grabaciones
+              or stem.lower().startswith("video_temp")):
             source = "screen"
         else:
             source = "import"

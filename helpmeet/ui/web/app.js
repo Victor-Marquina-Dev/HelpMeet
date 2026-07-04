@@ -100,9 +100,11 @@ function initialsFor(name) {
 // Icono del origen de una reunión (audio grabado, pantalla grabada o
 // vídeo importado) para la línea de metadatos de su tarjeta.
 function _kindIcon(m) {
+  // Mismos iconos que la barra de acciones (Grabar reunión / Grabar
+  // pantalla / Importar video) para que se reconozcan al instante.
   const k = m && m.source;
   if (k === 'audio')  return `<span class="rc-kind" title="Audio de reunión">${svg('mic', 12)}</span>`;
-  if (k === 'screen') return `<span class="rc-kind" title="Grabación de pantalla">${svg('monitor', 12)}</span>`;
+  if (k === 'screen') return `<span class="rc-kind" title="Grabación de pantalla">${svg('monitorDot', 12)}</span>`;
   if (k === 'import') return `<span class="rc-kind" title="Vídeo importado">${svg('upload', 12)}</span>`;
   return '';
 }
@@ -1276,10 +1278,19 @@ function viewInitiative() {
     }
     const _ivOpen = STATE._ivWeeks[STATE.selInit];
 
+    // Meses desplegables (por defecto abiertos; se guarda lo cerrado)
+    if (!STATE._ivMonths) STATE._ivMonths = {};
+    if (!STATE._ivMonths[STATE.selInit]) STATE._ivMonths[STATE.selInit] = new Set();
+    const _ivClosed = STATE._ivMonths[STATE.selInit];
+
     _ivMOrder.forEach(mKey => {
       const {mLabel, wkKeys} = _ivMMap.get(mKey);
-      const mhdr = el('div', 'list-month-hdr', esc(mLabel));
+      const mOpen = !_ivClosed.has(mKey);
+      const mhdr = el('div', 'list-month-hdr' + (mOpen ? ' open' : ''));
+      mhdr.innerHTML = `<span class="tw-chev">${svg('chevron', 9)}</span><span>${esc(mLabel)}</span>`;
+      mhdr.onclick = () => { _ivClosed.has(mKey) ? _ivClosed.delete(mKey) : _ivClosed.add(mKey); renderMain(); };
       row.appendChild(mhdr);
+      if (!mOpen) return;
       wkKeys.forEach(mk => {
         const {wLabel, items} = _ivWMap.get(mk);
         const isOpen = _ivOpen.has(mk);
