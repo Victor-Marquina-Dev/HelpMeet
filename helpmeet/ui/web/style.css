@@ -19,24 +19,24 @@
   --text-secondary: #444746;     /* texto secundario */
   --text-muted: #5f6368;         /* atenuado */
   --text-faint: #80868b;         /* muy atenuado */
-  /* Acentos — azul Gmail para lo interactivo, verde menta solo en el logo */
-  --accent: #0b57d0;             /* azul acción/selección */
-  --accent-hover: #0842a0;       /* azul hover */
-  --on-accent: #ffffff;          /* texto sobre azul */
-  --accent-soft: rgba(11, 87, 208, 0.10);
+  /* Acentos — verde menta Helpmeet para lo interactivo */
+  --accent: #0a9268;             /* verde menta acción/selección (contraste AA sobre blanco) */
+  --accent-hover: #077a56;       /* verde hover */
+  --on-accent: #ffffff;          /* texto sobre verde */
+  --accent-soft: rgba(16, 185, 129, 0.12);
   --success: #188038;            /* verde ok */
   --warning: #e37400;            /* ámbar */
   --danger: #d93025;             /* rojo */
   --recording: #d93025;
   --pending: #b06000;            /* tertiary · V2 pendiente de backend */
-  --focus: #0b57d0;
+  --focus: #0a9268;
   /* Estilo Gmail: hovers, selección, avatares, botón nuevo */
   --hover-soft: rgba(60, 64, 67, 0.06);   /* hover muy sutil */
   --hover-med:  rgba(60, 64, 67, 0.09);   /* hover normal */
-  --sel-bg:     #d3e3fd;                    /* píldora de selección azul */
-  --sel-text:   #041e49;                    /* texto sobre píldora */
-  --newbtn-bg:  #c2e7ff;                    /* botón "Nuevo proyecto" */
-  --newbtn-text:#001d35;
+  --sel-bg:     #cdeede;                    /* píldora de selección verde menta */
+  --sel-text:   #0a4a35;                    /* texto sobre píldora */
+  --newbtn-bg:  #b8ecd6;                    /* botón "Nuevo proyecto" */
+  --newbtn-text:#00382a;
   --brand-green:#10b981;                    /* logo Helpmeet */
   --brand-green-2:#34d399;
   /* Forma / sombra — Soft-Technical (radios más rectos) */
