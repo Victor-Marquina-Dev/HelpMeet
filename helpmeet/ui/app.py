@@ -27,6 +27,7 @@ from helpmeet.export.exporter import (
 )
 from helpmeet import config
 from helpmeet import settings
+from helpmeet import documents
 from helpmeet.version import __version__
 
 # Log de errores en %LOCALAPPDATA%\Helpmeet\helpmeet.log
@@ -438,6 +439,100 @@ class Api:
 
     def list_initiatives(self):
         return [_initiative_payload(i) for i in repo.list_initiatives(self._session)]
+
+    # ---------- Documentos → Markdown ----------
+    def _documents_dir(self, initiative_id):
+        """Carpeta `documentos/` del proyecto, dentro de la carpeta de exportación."""
+        ini = self._session.get(repo.Initiative, int(initiative_id))
+        if ini is None:
+            return None
+        base = settings.get_export_dir()
+        return initiative_export_dir(ini, base) / "documentos"
+
+    def list_document_initiatives(self):
+        """Proyectos para el desplegable de la pantalla Documentos."""
+        return [
+            {"id": i.id, "name": i.name, "color": i.color or ""}
+            for i in repo.list_initiatives(self._session)
+        ]
+
+    def pick_and_convert_documents(self, initiative_id):
+        """Abre el diálogo, convierte cada archivo y guarda original + .md.
+
+        Corre en el hilo de la llamada JS (no bloquea la ventana). Es tolerante:
+        si un archivo falla, sigue con el resto y lo reporta en `failed`.
+        """
+        docs_dir = self._documents_dir(initiative_id)
+        if docs_dir is None:
+            return {"ok": False, "error": "El proyecto ya no existe."}
+        types = (
+            "Documentos (*.pdf;*.docx;*.pptx;*.txt;*.md;*.html;*.htm;*.csv;*.json;*.xml)",
+            "Todos los archivos (*.*)",
+        )
+        result = self._window.create_file_dialog(
+            webview.OPEN_DIALOG, allow_multiple=True, file_types=types
+        )
+        files = list(result) if result else []
+        if not files:
+            return {"ok": False, "cancelled": True, "converted": [], "failed": []}
+        converted, failed = [], []
+        for src in files:
+            name = Path(src).name
+            try:
+                info = documents.save_and_convert(Path(src), docs_dir)
+                converted.append(info)
+            except documents.EmptyDocumentError:
+                failed.append({"name": name, "reason": "Sin texto (¿escaneado?)"})
+            except documents.UnsupportedDocumentError:
+                failed.append({"name": name, "reason": "Formato no soportado"})
+            except Exception as exc:  # noqa: BLE001
+                _log.exception("Fallo al convertir %s", src)
+                failed.append({"name": name, "reason": str(exc)})
+        _log.info("Documentos: %d convertidos, %d fallidos", len(converted), len(failed))
+        return {"ok": True, "converted": converted, "failed": failed}
+
+    def list_documents(self, initiative_id):
+        """Documentos ya convertidos de un proyecto."""
+        docs_dir = self._documents_dir(initiative_id)
+        if docs_dir is None:
+            return []
+        return documents.list_documents(docs_dir)
+
+    def open_document(self, initiative_id, md_name):
+        """Abre el .md con la app asociada del sistema."""
+        docs_dir = self._documents_dir(initiative_id)
+        if docs_dir is None:
+            return {"ok": False}
+        _open_in_explorer(str(docs_dir / md_name))
+        return {"ok": True}
+
+    def open_document_original(self, initiative_id, md_name):
+        """Muestra el archivo original en el Explorador (seleccionado)."""
+        docs_dir = self._documents_dir(initiative_id)
+        if docs_dir is None:
+            return {"ok": False}
+        for doc in documents.list_documents(docs_dir):
+            if doc["name"] == md_name and doc["original_path"]:
+                _reveal_in_explorer(doc["original_path"])
+                return {"ok": True}
+        return {"ok": False, "error": "No se encontró el original."}
+
+    def open_documents_folder(self, initiative_id):
+        """Abre la carpeta `documentos/` del proyecto."""
+        docs_dir = self._documents_dir(initiative_id)
+        if docs_dir is None:
+            return {"ok": False}
+        docs_dir.mkdir(parents=True, exist_ok=True)
+        _open_in_explorer(str(docs_dir))
+        return {"ok": True}
+
+    def delete_document(self, initiative_id, md_name):
+        """Borra un documento convertido (el .md y su original)."""
+        docs_dir = self._documents_dir(initiative_id)
+        if docs_dir is None:
+            return {"ok": False}
+        documents.delete_document(docs_dir, md_name)
+        return {"ok": True}
 
     def toggle_initiative_pin(self, initiative_id):
         """Ancla/desancla una iniciativa (las ancladas salen arriba en la lista)."""
