@@ -7,3 +7,4 @@ SQLAlchemy==2.0.30
 pywebview==5.1
 numpy==2.4.6
 av==12.3.0
+markitdown[pdf,docx,pptx]==0.1.6
