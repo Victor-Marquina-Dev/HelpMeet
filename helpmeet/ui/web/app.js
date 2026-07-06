@@ -208,6 +208,9 @@ const api = {
   openDocumentOriginal: (iid, name) => call('open_document_original', iid, name),
   openDocumentsFolder: (iid) => call('open_documents_folder', iid),
   deleteDocument: (iid, name) => call('delete_document', iid, name),
+  listAllDocuments: () => call('list_all_documents'),
+  readDocument: (iid, name) => call('read_document', iid, name),
+  saveUploadedDocument: (iid, name, b64) => call('save_uploaded_document', iid, name, b64),
 
   // ---- Grabación de pantalla + biblioteca (backend REAL, ya implementado) ----
   startScreenRecording: (iid, idx) => call('start_screen_recording', iid, idx),
@@ -459,7 +462,9 @@ const STATE = {
   screen: 'welcome',    // welcome | initiative | meeting | search | glossary | archive | trash | meetings | docs
   sidebarOpen: load('hm.sidebar', '1') === '1',
   cal: { y: null, m: null, view: 'week', filter: 'all', weekStart: null },  // estado del calendario de Reuniones
-  docsInit: null,        // iniciativa seleccionada en la pantalla Documentos → Markdown
+  docsDest: null,        // iniciativa destino para subir/convertir documentos (rediseño v2)
+  docsFilter: 'all',     // filtro de proyecto en la lista global ('all' o id de iniciativa)
+  docsQuery: '',         // texto de búsqueda en la lista global de documentos
   initiatives: [],
   meetingsByInit: {},    // cache
   openInits: {},         // id -> bool expandido
@@ -3025,121 +3030,297 @@ function monitorSelectEl() {
 /* ============================================================
    4a-bis. VISTA: DOCUMENTOS → MARKDOWN
    ============================================================ */
-function viewDocs() {
-  const wrap = el('div'); wrap.style.cssText = 'display:flex;flex-direction:column;flex:1;min-height:0';
-  const head = el('div', 'mhead');
-  head.style.cssText = 'border-bottom:none';
-  head.innerHTML = `
-    <div class="mhead-row"><h1 class="page-title">Documentos → Markdown</h1></div>
-    <p class="docs-sub">Convierte PDF, Word, PowerPoint o texto a un .md ligero para pasárselo a la IA. Se guarda el original y el .md en la carpeta del proyecto.</p>
-    <div class="docs-controls">
-      <span id="docsInitMount"></span>
-      <button class="btn btn-primary" id="docsPick" disabled>${svg('upload', 13)} Elegir archivos…</button>
+// Icono + etiqueta de tipo de archivo a partir del nombre original.
+function fileKind(name) {
+  const e = (name || '').toLowerCase().split('.').pop();
+  if (e === 'pdf') return { cls: 'pdf', lbl: 'PDF' };
+  if (e === 'docx' || e === 'doc') return { cls: 'doc', lbl: 'DOCX' };
+  if (e === 'pptx' || e === 'ppt') return { cls: 'ppt', lbl: 'PPTX' };
+  if (e === 'html' || e === 'htm') return { cls: 'html', lbl: 'HTML' };
+  return { cls: 'txt', lbl: (e || 'TXT').toUpperCase().slice(0, 4) };
+}
+
+// Tamaño en bytes → texto corto (B / KB / MB) para las tarjetas de documento.
+function fmtKB(bytes) {
+  const n = Number(bytes) || 0;
+  if (n < 1024) return n + ' B';
+  const kb = n / 1024;
+  if (kb < 1024) return Math.round(kb) + ' KB';
+  return (kb / 1024).toFixed(1) + ' MB';
+}
+
+// Copia el Markdown CRUDO (sin renderizar) de un documento al portapapeles.
+async function copyDocMd(d) {
+  const res = await api.readDocument(d.initiative_id, d.name);
+  if (res && res.ok) { await copyText(res.text); toast('ok', 'Markdown copiado'); }
+  else toast('err', 'No se pudo leer el documento');
+}
+
+// Conversor Markdown → HTML minimalista para el modal "Ver" (encabezados #/##/###,
+// listas -/*, **negrita**, *cursiva*, `código`, --- y párrafos). Escapa SIEMPRE el
+// texto de origen antes de aplicar el formato, así que el resultado es seguro para innerHTML.
+function mdToHtml(src) {
+  const esc2 = s => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  const lines = esc2(src).split(/\r?\n/); let html = ''; let inList = false;
+  const inline = s => s.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>').replace(/\*([^*]+)\*/g, '<em>$1</em>').replace(/`([^`]+)`/g, '<code>$1</code>');
+  for (let ln of lines) {
+    if (/^\s*---\s*$/.test(ln)) { if (inList) { html += '</ul>'; inList = false; } html += '<hr>'; continue; }
+    const h = ln.match(/^(#{1,3})\s+(.*)$/);
+    if (h) { if (inList) { html += '</ul>'; inList = false; } const n = h[1].length; html += '<h' + n + '>' + inline(h[2]) + '</h' + n + '>'; continue; }
+    const li = ln.match(/^\s*[-*]\s+(.*)$/);
+    if (li) { if (!inList) { html += '<ul>'; inList = true; } html += '<li>' + inline(li[1]) + '</li>'; continue; }
+    if (inList) { html += '</ul>'; inList = false; }
+    if (ln.trim() === '') continue;
+    html += '<p>' + inline(ln) + '</p>';
+  }
+  if (inList) html += '</ul>';
+  return html;
+}
+
+// Modal "Ver": trae el .md del backend y lo pinta ya convertido a HTML.
+async function openDocModal(d) {
+  const res = await api.readDocument(d.initiative_id, d.name);
+  const text = (res && res.ok) ? res.text : '';
+  const k = fileKind(d.original_name);
+  const m = el('div', 'modal docs-modal');
+  m.setAttribute('role', 'dialog'); m.setAttribute('aria-label', d.name);
+  m.innerHTML = `
+    <div class="docs-mhead">
+      <span class="docs-mftype ${k.cls}">${k.lbl}</span>
+      <span class="docs-mtitle">${esc(d.name)}</span>
+      <button class="btn sm" data-copy>📋 Copiar .md</button>
+      <button class="btn sm" data-open>↗ Abrir .md</button>
+      <button class="icon-btn sm" data-x aria-label="Cerrar">${svg('x', 14)}</button>
+    </div>
+    <div class="docs-mbody"><div class="md"></div></div>
+    <div class="docs-mfoot">Original: ${esc(d.original_name || '')} · ${formatDateShort(d.created_at)} · ${fmtKB(d.size)}</div>`;
+  m.querySelector('.md').innerHTML = (res && res.ok) ? mdToHtml(text) : 'No se pudo leer el documento.';
+  m.querySelector('[data-copy]').onclick = async () => {
+    if (!(res && res.ok)) { toast('err', 'No se pudo leer el documento'); return; }
+    await copyText(text); toast('ok', 'Markdown copiado');
+  };
+  m.querySelector('[data-open]').onclick = () => api.openDocument(d.initiative_id, d.name);
+  m.querySelector('[data-x]').onclick = closeModal;
+  openModal(m);
+}
+
+// Tarjeta de un documento en la lista global de "Documentos → .md".
+function buildDocCard(d, onChanged) {
+  const k = fileKind(d.original_name);
+  const card = el('div', 'docs-card');
+  card.innerHTML = `
+    <span class="docs-ftype ${k.cls}">${k.lbl}</span>
+    <div class="docs-cbody">
+      <div class="docs-cname">${esc(d.name)}</div>
+      <div class="docs-cmeta">
+        <span class="docs-badge"><span class="dot" style="background:${esc(d.color || '#aacfbf')}"></span>${esc(d.initiative_name || '')}</span>
+        <span>${esc(d.original_name || '')}</span>
+        <span>${formatDateShort(d.created_at)}</span>
+        <span>${fmtKB(d.size)}</span>
+      </div>
+    </div>
+    <div class="docs-cactions">
+      <button class="docs-view" data-act="view">👁 Ver</button>
+      <button class="docs-ico" data-act="copy" aria-label="Copiar .md" title="Copiar .md">📋</button>
+      <button class="docs-ico" data-act="orig" aria-label="Original" title="Original">📂</button>
+      <button class="docs-ico danger" data-act="del" aria-label="Eliminar" title="Eliminar">🗑</button>
     </div>`;
-  const content = el('div', 'content');
-  const status = el('div', 'docs-status');
-  status.setAttribute('aria-live', 'polite');
-  const list = el('div', 'docs-list');
-  content.append(status, list);
-  wrap.replaceChildren(head, content);
+  card.querySelector('[data-act="view"]').onclick = () => openDocModal(d);
+  card.querySelector('[data-act="copy"]').onclick = () => copyDocMd(d);
+  card.querySelector('[data-act="orig"]').onclick = () => api.openDocumentOriginal(d.initiative_id, d.name);
+  card.querySelector('[data-act="del"]').onclick = () => confirmModal(
+    'Eliminar documento',
+    `Se borrarán el .md y el original de "${d.name}". ¿Seguro?`,
+    'Eliminar',
+    async () => {
+      const r = await api.deleteDocument(d.initiative_id, d.name);
+      if (r && r.ok === false) { toast('err', r.error || 'No se pudo eliminar'); return; }
+      toast('ok', 'Documento eliminado');
+      await onChanged();
+    },
+    true
+  );
+  return card;
+}
 
-  const pickBtn = head.querySelector('#docsPick');
-  list.appendChild(el('div', 'docs-loading', 'Cargando proyectos…'));
+// Lee un File del navegador como base64 puro (sin el prefijo data:...;base64,).
+function _readFileAsBase64(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const result = String(reader.result || '');
+      const i = result.indexOf(',');
+      resolve(i >= 0 ? result.slice(i + 1) : result);
+    };
+    reader.onerror = () => reject(reader.error || new Error('No se pudo leer el archivo'));
+    reader.readAsDataURL(file);
+  });
+}
 
-  api.listDocumentInitiatives().then(inits => {
-    inits = inits || [];
-    if (STATE.docsInit == null && inits.length) STATE.docsInit = inits[0].id;
-    if (!inits.length) {
-      list.replaceChildren(emptyState({
+// Recarga en curso de la lista global (la fija viewDocs para que handleDrop pueda refrescar tras soltar archivos).
+let _docsRefreshList = null;
+
+// Maneja el drop de archivos sobre la zona de arrastre: sube y convierte cada uno al proyecto destino.
+async function handleDrop(ev) {
+  const files = Array.from((ev.dataTransfer && ev.dataTransfer.files) || []);
+  if (!files.length) return;
+  if (STATE.docsDest == null) { toast('err', 'Elige antes un proyecto de destino'); return; }
+  const dz = $('#docsDz');
+  const statusEl = dz && dz.querySelector('.dz-status');
+  if (statusEl) statusEl.textContent = 'Convirtiendo…';
+  let okN = 0; const failedNames = [];
+  try {
+    for (const file of files) {
+      try {
+        const b64 = await _readFileAsBase64(file);
+        const r = await api.saveUploadedDocument(STATE.docsDest, file.name, b64);
+        if (r && r.ok) okN++; else failedNames.push((r && r.name) || file.name);
+      } catch (e) {
+        failedNames.push(file.name);
+      }
+    }
+  } catch (e) {
+    toast('err', 'Hubo un error al convertir.');
+  } finally {
+    if (statusEl) statusEl.textContent = '';
+  }
+  let msg = `${okN} convertido${okN === 1 ? '' : 's'}`;
+  if (failedNames.length) msg += ` · ${failedNames.length} sin convertir (${failedNames.join(', ')})`;
+  toast(failedNames.length && !okN ? 'err' : 'ok', msg);
+  if (_docsRefreshList) await _docsRefreshList();
+}
+
+function viewDocs() {
+  const wrap = el('div', 'docs-screen');
+  wrap.style.cssText = 'flex:1;min-height:0;overflow-y:auto';
+
+  const head = el('div', 'docs-head');
+  head.innerHTML = `
+    <h1>Documentos <span class="arrow">→</span> .md</h1>
+    <p class="docs-sub">Convierte PDF, Word, PowerPoint o texto a un .md ligero para pasárselo a la IA. Se guarda el original y el .md en la carpeta del proyecto.</p>`;
+
+  const convert = el('div', 'docs-convert');
+  convert.innerHTML = `
+    <div class="docs-convert-top">
+      <span>Convertir a:</span>
+      <span id="docsDestMount"></span>
+      <span class="docs-hint">Se guardan el original y el .md en la carpeta de ese proyecto.</span>
+    </div>
+    <div class="docs-dz" id="docsDz">
+      <div class="dz-title">Arrastra aquí tus archivos</div>
+      <div class="dz-sub">PDF · Word · PowerPoint · texto · HTML · CSV</div>
+      <button class="btn btn-primary" id="docsPickBtn" disabled>${svg('upload', 13)} Elegir archivos…</button>
+      <div class="dz-status" aria-live="polite"></div>
+    </div>`;
+
+  const listbar = el('div', 'docs-listbar');
+  listbar.innerHTML = `
+    <div class="docs-listtitle">Todos los documentos <span class="count">(0)</span></div>
+    <div class="docs-spacer"></div>
+    <div class="docs-search">${svg('search', 13)}<input type="text" placeholder="Buscar documento…" id="docsSearchInput"></div>
+    <span id="docsFilterMount"></span>`;
+
+  const rows = el('div', 'docs-rows');
+  rows.appendChild(el('div', 'docs-empty', 'Cargando documentos…'));
+
+  wrap.replaceChildren(head, convert, listbar, rows);
+
+  const dz = convert.querySelector('#docsDz');
+  const pickBtn = convert.querySelector('#docsPickBtn');
+  const searchInput = listbar.querySelector('#docsSearchInput');
+  const countEl = listbar.querySelector('.docs-listtitle .count');
+
+  searchInput.value = STATE.docsQuery || '';
+  searchInput.addEventListener('input', (e) => { STATE.docsQuery = e.target.value; renderRows(); });
+
+  dz.addEventListener('dragenter', (e) => { e.preventDefault(); dz.classList.add('drag'); });
+  dz.addEventListener('dragover', (e) => { e.preventDefault(); dz.classList.add('drag'); });
+  dz.addEventListener('dragleave', () => dz.classList.remove('drag'));
+  dz.addEventListener('drop', (e) => { e.preventDefault(); dz.classList.remove('drag'); handleDrop(e); });
+
+  let _inits = [];
+  let _docs = [];
+
+  function renderRows() {
+    let list = _docs;
+    if (STATE.docsFilter && STATE.docsFilter !== 'all') list = list.filter(d => d.initiative_id === STATE.docsFilter);
+    const q = (STATE.docsQuery || '').trim().toLowerCase();
+    if (q) list = list.filter(d => (d.name || '').toLowerCase().includes(q));
+    if (countEl) countEl.textContent = `(${list.length})`;
+    if (!_inits.length) {
+      rows.replaceChildren(emptyState({
         icon: 'folder',
-        title: 'Crea primero un proyecto',
-        text: 'Necesitas un proyecto para guardar sus documentos convertidos.',
+        title: 'Crea un proyecto para guardar sus documentos',
+        text: '',
       }));
       return;
     }
-    pickBtn.disabled = false;
-    const items = inits.map(i => ({ value: i.id, label: i.name, color: _initColor(i) }));
-    const selEl = customSelect({
-      value: STATE.docsInit, items, icon: 'folder', className: 'cdrop-block', minWidth: 220,
-      onChange: (v) => { STATE.docsInit = v; refreshDocsList(list); },
-    });
-    head.querySelector('#docsInitMount').replaceWith(selEl);
-    pickBtn.onclick = () => onDocsPick(status, pickBtn, list);
-    refreshDocsList(list);
-  }).catch(() => {
-    list.replaceChildren(emptyState({ icon: 'warn', title: 'No se pudieron cargar los proyectos', text: '' }));
-  });
+    if (!list.length) {
+      rows.replaceChildren(emptyState({
+        icon: 'folder',
+        title: 'Aún no hay documentos convertidos',
+        text: '',
+      }));
+      return;
+    }
+    rows.replaceChildren();
+    list.forEach(d => rows.appendChild(buildDocCard(d, refreshAll)));
+  }
+
+  async function refreshAll() {
+    try { _docs = await api.listAllDocuments() || []; } catch (e) { _docs = []; }
+    renderRows();
+  }
+  _docsRefreshList = refreshAll;
+
+  (async () => {
+    try { _inits = await api.listDocumentInitiatives() || []; } catch (e) { _inits = []; }
+
+    if (!_inits.length) {
+      pickBtn.disabled = true;
+      dz.classList.add('is-disabled');
+      convert.querySelector('#docsDestMount').replaceWith(el('span', 'docs-hint', 'Crea un proyecto primero'));
+    } else {
+      if (STATE.docsDest == null || !_inits.some(i => i.id === STATE.docsDest)) STATE.docsDest = _inits[0].id;
+      if (STATE.docsFilter !== 'all' && !_inits.some(i => i.id === STATE.docsFilter)) STATE.docsFilter = 'all';
+
+      const destItems = _inits.map(i => ({ value: i.id, label: i.name, color: _initColor(i) }));
+      const destSel = customSelect({
+        value: STATE.docsDest, items: destItems, icon: 'folder', className: 'cdrop-block', minWidth: 200,
+        onChange: (v) => { STATE.docsDest = v; },
+      });
+      convert.querySelector('#docsDestMount').replaceWith(destSel);
+      pickBtn.disabled = false;
+      pickBtn.onclick = async () => {
+        pickBtn.disabled = true;
+        try {
+          const res = await api.pickAndConvertDocuments(STATE.docsDest);
+          if (res && res.cancelled) return;
+          const okN = (res.converted || []).length;
+          const failN = (res.failed || []).length;
+          let msg = `${okN} convertido${okN === 1 ? '' : 's'}`;
+          if (failN) msg += ` · ${failN} sin convertir (${res.failed.map(f => f.name).join(', ')})`;
+          toast(failN && !okN ? 'err' : 'ok', msg);
+          await refreshAll();
+        } catch (e) {
+          toast('err', 'Hubo un error al convertir.');
+        } finally {
+          pickBtn.disabled = false;
+        }
+      };
+
+      const filterItems = [{ value: 'all', label: 'Todas' }].concat(destItems);
+      const filterSel = customSelect({
+        value: STATE.docsFilter, items: filterItems, icon: 'filter', minWidth: 180,
+        onChange: (v) => { STATE.docsFilter = v; renderRows(); },
+      });
+      listbar.querySelector('#docsFilterMount').replaceWith(filterSel);
+    }
+
+    await refreshAll();
+  })();
 
   return wrap;
-}
-
-// Recarga la lista de documentos convertidos del proyecto seleccionado.
-async function refreshDocsList(list) {
-  list.replaceChildren(el('div', 'docs-loading', 'Cargando documentos…'));
-  let docs;
-  try { docs = await api.listDocuments(STATE.docsInit); } catch (e) { docs = null; }
-  docs = docs || [];
-  if (!docs.length) {
-    list.replaceChildren(emptyState({
-      icon: 'folder',
-      title: 'Aún no hay documentos',
-      text: 'Usa «Elegir archivos…» para convertir tu primer documento en este proyecto.',
-    }));
-    return;
-  }
-  list.replaceChildren();
-  docs.forEach(d => {
-    const row = el('div', 'row-card docs-row');
-    row.style.cursor = 'default';
-    row.innerHTML = `
-      <div class="rc-body">
-        <div class="rc-title">${esc(d.name)}</div>
-        <div class="rc-meta">${esc(d.original_name || '')}</div>
-      </div>
-      <div class="docs-row-actions">
-        <button class="btn sm" data-act="md">Abrir .md</button>
-        <button class="btn sm" data-act="orig">Original</button>
-        <button class="btn sm" data-act="folder" aria-label="Abrir carpeta" title="Abrir carpeta">${svg('folder', 12)}</button>
-        <button class="btn sm btn-danger" data-act="del" aria-label="Eliminar" title="Eliminar">${svg('trash', 12)}</button>
-      </div>`;
-    row.querySelector('[data-act="md"]').onclick = () => api.openDocument(STATE.docsInit, d.name);
-    row.querySelector('[data-act="orig"]').onclick = () => api.openDocumentOriginal(STATE.docsInit, d.name);
-    row.querySelector('[data-act="folder"]').onclick = () => api.openDocumentsFolder(STATE.docsInit);
-    row.querySelector('[data-act="del"]').onclick = () => confirmModal(
-      'Eliminar documento',
-      `Se borrará «${d.name}» y su archivo original. Esta acción no se puede deshacer.`,
-      'Eliminar',
-      async () => {
-        const r = await api.deleteDocument(STATE.docsInit, d.name);
-        if (r && r.ok === false) { toast('err', r.error || 'No se pudo eliminar'); return; }
-        toast('ok', 'Documento eliminado');
-        refreshDocsList(list);
-      }
-    );
-    list.appendChild(row);
-  });
-}
-
-// Abre el selector de archivos y convierte lo elegido a Markdown.
-async function onDocsPick(status, btn, list) {
-  btn.disabled = true;
-  status.textContent = 'Convirtiendo…';
-  try {
-    const res = await api.pickAndConvertDocuments(STATE.docsInit);
-    if (res && res.cancelled) { status.textContent = ''; return; }
-    const okN = (res.converted || []).length;
-    const failN = (res.failed || []).length;
-    let msg = `${okN} convertido${okN === 1 ? '' : 's'}`;
-    if (failN) msg += ` · ${failN} sin convertir (${res.failed.map(f => f.name).join(', ')})`;
-    status.textContent = msg;
-    toast(failN && !okN ? 'err' : 'ok', msg);
-    await refreshDocsList(list);
-  } catch (e) {
-    status.textContent = '';
-    toast('err', 'Hubo un error al convertir.');
-  } finally {
-    btn.disabled = false;
-  }
 }
 
 /* ============================================================
