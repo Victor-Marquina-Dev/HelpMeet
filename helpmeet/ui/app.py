@@ -534,6 +534,58 @@ class Api:
         documents.delete_document(docs_dir, md_name)
         return {"ok": True}
 
+    def list_all_documents(self):
+        """Todos los documentos convertidos de TODAS las iniciativas, con su proyecto."""
+        out = []
+        for ini in repo.list_initiatives(self._session):
+            docs_dir = initiative_export_dir(ini, settings.get_export_dir()) / "documentos"
+            for doc in documents.list_documents(docs_dir):
+                doc = dict(doc)
+                doc["initiative_id"] = ini.id
+                doc["initiative_name"] = ini.name
+                doc["color"] = ini.color or ""
+                out.append(doc)
+        out.sort(key=lambda d: d.get("created_at", ""), reverse=True)
+        return out
+
+    def read_document(self, initiative_id, md_name):
+        """Texto del .md (para el modal 'Ver' y para copiar)."""
+        docs_dir = self._documents_dir(initiative_id)
+        if docs_dir is None:
+            return {"ok": False, "error": "El proyecto ya no existe."}
+        try:
+            return {"ok": True, "text": documents.read_markdown(docs_dir, md_name)}
+        except FileNotFoundError:
+            return {"ok": False, "error": "No se pudo leer el documento."}
+
+    def save_uploaded_document(self, initiative_id, name, data_b64):
+        """Guarda un archivo arrastrado (base64) y lo convierte a .md."""
+        docs_dir = self._documents_dir(initiative_id)
+        if docs_dir is None:
+            return {"ok": False, "reason": "El proyecto ya no existe.", "name": name}
+        safe = Path(name).name or "documento"
+        try:
+            raw = base64.b64decode(data_b64)
+        except Exception:
+            return {"ok": False, "reason": "Archivo ilegible.", "name": safe}
+        tmp = Path(tempfile.gettempdir()) / f"helpmeet_up_{safe}"
+        try:
+            tmp.write_bytes(raw)
+            info = documents.save_and_convert(tmp, docs_dir)
+            return {"ok": True, "converted": info}
+        except documents.EmptyDocumentError:
+            return {"ok": False, "reason": "Sin texto (¿escaneado?)", "name": safe}
+        except documents.UnsupportedDocumentError:
+            return {"ok": False, "reason": "Formato no soportado", "name": safe}
+        except Exception as exc:  # noqa: BLE001
+            _log.exception("Fallo al convertir archivo arrastrado %s", safe)
+            return {"ok": False, "reason": str(exc), "name": safe}
+        finally:
+            try:
+                tmp.unlink(missing_ok=True)
+            except Exception:
+                pass
+
     def toggle_initiative_pin(self, initiative_id):
         """Ancla/desancla una iniciativa (las ancladas salen arriba en la lista)."""
         state = repo.toggle_initiative_pin(self._session, int(initiative_id))
