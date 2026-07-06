@@ -200,6 +200,15 @@ const api = {
   setApiToken: (t) => call('set_api_token', t),
   chooseExportDir: () => call('choose_export_dir'),
 
+  // ---- Documentos → Markdown ----
+  listDocumentInitiatives: () => call('list_document_initiatives'),
+  pickAndConvertDocuments: (iid) => call('pick_and_convert_documents', iid),
+  listDocuments: (iid) => call('list_documents', iid),
+  openDocument: (iid, name) => call('open_document', iid, name),
+  openDocumentOriginal: (iid, name) => call('open_document_original', iid, name),
+  openDocumentsFolder: (iid) => call('open_documents_folder', iid),
+  deleteDocument: (iid, name) => call('delete_document', iid, name),
+
   // ---- Grabación de pantalla + biblioteca (backend REAL, ya implementado) ----
   startScreenRecording: (iid, idx) => call('start_screen_recording', iid, idx),
   stopScreenRecording: () => call('stop_screen_recording'),
@@ -447,9 +456,10 @@ const TIER_LABEL = { fast: 'Mínimo', balanced: 'Pequeño', accurate: 'Mediano',
    ============================================================ */
 const STATE = {
   appState: 'idle',     // idle | recording | recording-local | recording-cloud | screen-recording | processing
-  screen: 'welcome',    // welcome | initiative | meeting | search | glossary | archive | trash | meetings
+  screen: 'welcome',    // welcome | initiative | meeting | search | glossary | archive | trash | meetings | docs
   sidebarOpen: load('hm.sidebar', '1') === '1',
   cal: { y: null, m: null, view: 'week', filter: 'all', weekStart: null },  // estado del calendario de Reuniones
+  docsInit: null,        // iniciativa seleccionada en la pantalla Documentos → Markdown
   initiatives: [],
   meetingsByInit: {},    // cache
   openInits: {},         // id -> bool expandido
@@ -589,15 +599,18 @@ function renderMain() {
   const onFavorites = STATE.screen === 'favorites';
   const onArchive = STATE.screen === 'archive';
   const onHome = STATE.screen === 'welcome';
+  const onDocs = STATE.screen === 'docs';
   $('#navHome')?.classList.toggle('active', onHome);
   $('#navMeetings')?.classList.toggle('active', onMeetings);
   $('#navFavorites')?.classList.toggle('active', onFavorites);
+  $('#navDocs')?.classList.toggle('active', onDocs);
   $('#btnArchive')?.classList.toggle('active', onArchive);
-  $('#navInitiatives')?.classList.toggle('active', !onMeetings && !onFavorites && !onArchive && !onHome);
+  $('#navInitiatives')?.classList.toggle('active', !onMeetings && !onFavorites && !onArchive && !onHome && !onDocs);
   switch (STATE.screen) {
     case 'welcome': return main.replaceChildren(viewWelcome());
     case 'meetings': return main.replaceChildren(viewMeetings());
     case 'favorites': return main.replaceChildren(viewFavorites());
+    case 'docs': return main.replaceChildren(viewDocs());
     case 'initiatives-list': return main.replaceChildren(viewAllInitiatives());
     case 'initiative': return main.replaceChildren(viewInitiative());
     case 'meeting': return main.replaceChildren(viewMeeting());
@@ -733,6 +746,12 @@ function openMeetingsView() {
   STATE.screen = 'meetings';
   STATE.selInit = null; STATE.selMeeting = null;
   renderSidebar(); renderMain();
+}
+
+function openDocsView() {
+  STATE.screen = 'docs';
+  STATE.selInit = null; STATE.selMeeting = null;
+  renderSidebar(); renderMain(); renderTopStatus();
 }
 
 // Todas las reuniones (de todas las iniciativas) como lista plana, aplicando el filtro activo.
@@ -3001,6 +3020,126 @@ function monitorSelectEl() {
     value: STATE.monitorIdx, items, icon: 'monitor', className: 'cdrop-mon', minWidth: 210,
     onChange: (v) => { STATE.monitorIdx = +v; },
   });
+}
+
+/* ============================================================
+   4a-bis. VISTA: DOCUMENTOS → MARKDOWN
+   ============================================================ */
+function viewDocs() {
+  const wrap = el('div'); wrap.style.cssText = 'display:flex;flex-direction:column;flex:1;min-height:0';
+  const head = el('div', 'mhead');
+  head.style.cssText = 'border-bottom:none';
+  head.innerHTML = `
+    <div class="mhead-row"><h1 class="page-title">Documentos → Markdown</h1></div>
+    <p class="docs-sub">Convierte PDF, Word, PowerPoint o texto a un .md ligero para pasárselo a la IA. Se guarda el original y el .md en la carpeta del proyecto.</p>
+    <div class="docs-controls">
+      <span id="docsInitMount"></span>
+      <button class="btn btn-primary" id="docsPick" disabled>${svg('upload', 13)} Elegir archivos…</button>
+    </div>`;
+  const content = el('div', 'content');
+  const status = el('div', 'docs-status');
+  status.setAttribute('aria-live', 'polite');
+  const list = el('div', 'docs-list');
+  content.append(status, list);
+  wrap.replaceChildren(head, content);
+
+  const pickBtn = head.querySelector('#docsPick');
+  list.appendChild(el('div', 'docs-loading', 'Cargando proyectos…'));
+
+  api.listDocumentInitiatives().then(inits => {
+    inits = inits || [];
+    if (STATE.docsInit == null && inits.length) STATE.docsInit = inits[0].id;
+    if (!inits.length) {
+      list.replaceChildren(emptyState({
+        icon: 'folder',
+        title: 'Crea primero un proyecto',
+        text: 'Necesitas un proyecto para guardar sus documentos convertidos.',
+      }));
+      return;
+    }
+    pickBtn.disabled = false;
+    const items = inits.map(i => ({ value: i.id, label: i.name, color: _initColor(i) }));
+    const selEl = customSelect({
+      value: STATE.docsInit, items, icon: 'folder', className: 'cdrop-block', minWidth: 220,
+      onChange: (v) => { STATE.docsInit = v; refreshDocsList(list); },
+    });
+    head.querySelector('#docsInitMount').replaceWith(selEl);
+    pickBtn.onclick = () => onDocsPick(status, pickBtn, list);
+    refreshDocsList(list);
+  }).catch(() => {
+    list.replaceChildren(emptyState({ icon: 'warn', title: 'No se pudieron cargar los proyectos', text: '' }));
+  });
+
+  return wrap;
+}
+
+// Recarga la lista de documentos convertidos del proyecto seleccionado.
+async function refreshDocsList(list) {
+  list.replaceChildren(el('div', 'docs-loading', 'Cargando documentos…'));
+  let docs;
+  try { docs = await api.listDocuments(STATE.docsInit); } catch (e) { docs = null; }
+  docs = docs || [];
+  if (!docs.length) {
+    list.replaceChildren(emptyState({
+      icon: 'folder',
+      title: 'Aún no hay documentos',
+      text: 'Usa «Elegir archivos…» para convertir tu primer documento en este proyecto.',
+    }));
+    return;
+  }
+  list.replaceChildren();
+  docs.forEach(d => {
+    const row = el('div', 'row-card docs-row');
+    row.style.cursor = 'default';
+    row.innerHTML = `
+      <div class="rc-body">
+        <div class="rc-title">${esc(d.name)}</div>
+        <div class="rc-meta">${esc(d.original_name || '')}</div>
+      </div>
+      <div class="docs-row-actions">
+        <button class="btn sm" data-act="md">Abrir .md</button>
+        <button class="btn sm" data-act="orig">Original</button>
+        <button class="btn sm" data-act="folder" aria-label="Abrir carpeta" title="Abrir carpeta">${svg('folder', 12)}</button>
+        <button class="btn sm btn-danger" data-act="del" aria-label="Eliminar" title="Eliminar">${svg('trash', 12)}</button>
+      </div>`;
+    row.querySelector('[data-act="md"]').onclick = () => api.openDocument(STATE.docsInit, d.name);
+    row.querySelector('[data-act="orig"]').onclick = () => api.openDocumentOriginal(STATE.docsInit, d.name);
+    row.querySelector('[data-act="folder"]').onclick = () => api.openDocumentsFolder(STATE.docsInit);
+    row.querySelector('[data-act="del"]').onclick = () => confirmModal(
+      'Eliminar documento',
+      `Se borrará «${d.name}» y su archivo original. Esta acción no se puede deshacer.`,
+      'Eliminar',
+      async () => {
+        const r = await api.deleteDocument(STATE.docsInit, d.name);
+        if (r && r.ok === false) { toast('err', r.error || 'No se pudo eliminar'); return; }
+        toast('ok', 'Documento eliminado');
+        refreshDocsList(list);
+      }
+    );
+    list.appendChild(row);
+  });
+}
+
+// Abre el selector de archivos y convierte lo elegido a Markdown.
+async function onDocsPick(status, btn, list) {
+  btn.disabled = true;
+  status.textContent = 'Convirtiendo…';
+  try {
+    const res = await api.pickAndConvertDocuments(STATE.docsInit);
+    if (res && res.cancelled) { status.textContent = ''; return; }
+    const okN = (res.converted || []).length;
+    const failN = (res.failed || []).length;
+    let msg = `${okN} convertido${okN === 1 ? '' : 's'}`;
+    if (failN) msg += ` · ${failN} sin convertir (${res.failed.map(f => f.name).join(', ')})`;
+    status.textContent = msg;
+    toast(failN && !okN ? 'err' : 'ok', msg);
+    await refreshDocsList(list);
+  } catch (e) {
+    status.textContent = '';
+    toast('err', 'Hubo un error al convertir.');
+  } finally {
+    btn.disabled = false;
+  }
 }
 
 /* ============================================================
@@ -5532,6 +5671,7 @@ function wireTopbar() {
   _ri('#railHome',        'home');
   _ri('#railFavorites',   'star');
   _ri('#railMeetings',    'calendar');
+  _ri('#railDocs',        'folder');
   _ri('#railInitiatives', 'rocket');
   _ri('#railArchive',     'archive');
   _ri('#railSettings',    'settings');
@@ -5574,6 +5714,7 @@ function wireTopbar() {
   $('#railNew')?.addEventListener('click', promptNewInitiative);
   $('#railHome')?.addEventListener('click', () => { STATE.screen = 'welcome'; STATE.selInit = null; STATE.selMeeting = null; renderSidebar(); renderMain(); renderTopStatus(); });
   $('#railMeetings')?.addEventListener('click', () => { openMeetingsView(); });
+  $('#railDocs')?.addEventListener('click', openDocsView);
   $('#railFavorites')?.addEventListener('click', () => { STATE.screen = 'favorites'; renderMain(); renderTopStatus(); });
   $('#railInitiatives')?.addEventListener('click', () => { STATE.screen = 'initiatives-list'; renderMain(); renderTopStatus(); });
   $('#railArchive')?.addEventListener('click', () => { STATE.screen = 'archive'; renderMain(); renderTopStatus(); });
@@ -5599,6 +5740,7 @@ function wireTopbar() {
   };
   $('#navMeetings').onclick = openMeetingsView;
   if ($('#navFavorites')) $('#navFavorites').onclick = () => { STATE.screen = 'favorites'; renderMain(); renderTopStatus(); };
+  if ($('#navDocs')) $('#navDocs').onclick = openDocsView;
 
   // Controles de ventana frameless — iconos SVG estilo Win11
   const wcMin = $('#wcMin'), wcMax = $('#wcMax'), wcClose = $('#wcClose');
