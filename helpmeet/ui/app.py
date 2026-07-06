@@ -456,7 +456,7 @@ class Api:
             for i in repo.list_initiatives(self._session)
         ]
 
-    def pick_and_convert_documents(self, initiative_id):
+    def pick_and_convert_documents(self, initiative_id, ocr="auto", extract_images=False):
         """Abre el diálogo, convierte cada archivo y guarda original + .md.
 
         Corre en el hilo de la llamada JS (no bloquea la ventana). Es tolerante:
@@ -479,7 +479,9 @@ class Api:
         for src in files:
             name = Path(src).name
             try:
-                info = documents.save_and_convert(Path(src), docs_dir)
+                info = documents.save_and_convert(
+                    Path(src), docs_dir, ocr=ocr, extract_images=extract_images
+                )
                 converted.append(info)
             except documents.EmptyDocumentError:
                 failed.append({"name": name, "reason": "Sin texto (¿escaneado?)"})
@@ -496,6 +498,7 @@ class Api:
         docs_dir = self._documents_dir(initiative_id)
         if docs_dir is None:
             return []
+        documents.migrate_flat_to_folders(docs_dir)
         return documents.list_documents(docs_dir)
 
     def open_document(self, initiative_id, md_name):
@@ -503,7 +506,8 @@ class Api:
         docs_dir = self._documents_dir(initiative_id)
         if docs_dir is None:
             return {"ok": False}
-        _open_in_explorer(str(docs_dir / md_name))
+        folder = documents.doc_folder(docs_dir, Path(md_name).stem)
+        _open_in_explorer(str(folder / md_name))
         return {"ok": True}
 
     def open_document_original(self, initiative_id, md_name):
@@ -511,6 +515,7 @@ class Api:
         docs_dir = self._documents_dir(initiative_id)
         if docs_dir is None:
             return {"ok": False}
+        documents.migrate_flat_to_folders(docs_dir)
         for doc in documents.list_documents(docs_dir):
             if doc["name"] == md_name and doc["original_path"]:
                 _reveal_in_explorer(doc["original_path"])
@@ -526,6 +531,18 @@ class Api:
         _open_in_explorer(str(docs_dir))
         return {"ok": True}
 
+    def open_document_images(self, initiative_id, md_name):
+        """Abre la subcarpeta `imagenes/` del documento indicado."""
+        docs_dir = self._documents_dir(initiative_id)
+        if docs_dir is None:
+            return {"ok": False}
+        folder = documents.doc_folder(docs_dir, Path(md_name).stem)
+        imgs = documents.images_dir(folder)
+        if not imgs.exists():
+            return {"ok": False, "error": "Este documento no tiene imágenes."}
+        _open_in_explorer(str(imgs))
+        return {"ok": True}
+
     def delete_document(self, initiative_id, md_name):
         """Borra un documento convertido (el .md y su original)."""
         docs_dir = self._documents_dir(initiative_id)
@@ -539,6 +556,7 @@ class Api:
         out = []
         for ini in repo.list_initiatives(self._session):
             docs_dir = initiative_export_dir(ini, settings.get_export_dir()) / "documentos"
+            documents.migrate_flat_to_folders(docs_dir)
             for doc in documents.list_documents(docs_dir):
                 doc = dict(doc)
                 doc["initiative_id"] = ini.id
@@ -558,7 +576,7 @@ class Api:
         except FileNotFoundError:
             return {"ok": False, "error": "No se pudo leer el documento."}
 
-    def save_uploaded_document(self, initiative_id, name, data_b64):
+    def save_uploaded_document(self, initiative_id, name, data_b64, ocr="auto", extract_images=False):
         """Guarda un archivo arrastrado (base64) y lo convierte a .md."""
         docs_dir = self._documents_dir(initiative_id)
         if docs_dir is None:
@@ -571,7 +589,9 @@ class Api:
         tmp = Path(tempfile.gettempdir()) / f"helpmeet_up_{safe}"
         try:
             tmp.write_bytes(raw)
-            info = documents.save_and_convert(tmp, docs_dir)
+            info = documents.save_and_convert(
+                tmp, docs_dir, ocr=ocr, extract_images=extract_images
+            )
             return {"ok": True, "converted": info}
         except documents.EmptyDocumentError:
             return {"ok": False, "reason": "Sin texto (¿escaneado?)", "name": safe}
