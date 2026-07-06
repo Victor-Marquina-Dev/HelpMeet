@@ -7,6 +7,8 @@ archivo, calcular la carpeta del proyecto) vive en la capa `Api` de la app.
 
 from __future__ import annotations
 
+import shutil
+from datetime import datetime
 from pathlib import Path
 
 # Formatos de v1. Excel (.xlsx) queda fuera a propósito: arrastra pandas.
@@ -60,3 +62,52 @@ def convert_to_markdown(source: Path) -> str:
     if not text:
         raise EmptyDocumentError(source.name)
     return text
+
+
+def _unique_stem(docs_dir: Path, stem: str) -> str:
+    """Devuelve un nombre base libre: `informe`, `informe (2)`, `informe (3)`…
+
+    Comprueba tanto el `.md` como el original para no pisar ninguno de los dos.
+    """
+    candidate = stem
+    index = 2
+    while (docs_dir / f"{candidate}.md").exists() or _original_exists(docs_dir, candidate):
+        candidate = f"{stem} ({index})"
+        index += 1
+    return candidate
+
+
+def _original_exists(docs_dir: Path, stem: str) -> bool:
+    folder = originals_dir(docs_dir)
+    return folder.exists() and any(p.stem == stem for p in folder.iterdir())
+
+
+def save_and_convert(source: Path, docs_dir: Path) -> dict:
+    """Copia el original a `originales/` y genera el `.md` hermano en `docs_dir`.
+
+    Devuelve un dict con los datos del documento resultante. Propaga
+    `EmptyDocumentError` / `UnsupportedDocumentError` si la conversión falla
+    (en ese caso NO deja archivos a medias).
+    """
+    source = Path(source)
+    docs_dir = Path(docs_dir)
+    # Convertir primero: si falla, no copiamos nada.
+    markdown = convert_to_markdown(source)
+
+    originals_dir(docs_dir).mkdir(parents=True, exist_ok=True)
+    stem = _unique_stem(docs_dir, source.stem)
+    original_dest = originals_dir(docs_dir) / f"{stem}{source.suffix}"
+    md_dest = docs_dir / f"{stem}.md"
+
+    shutil.copy2(source, original_dest)
+    md_dest.write_text(markdown, encoding="utf-8")
+
+    stat = md_dest.stat()
+    return {
+        "name": md_dest.name,
+        "original_name": original_dest.name,
+        "md_path": str(md_dest),
+        "original_path": str(original_dest),
+        "size": stat.st_size,
+        "created_at": datetime.fromtimestamp(stat.st_mtime).isoformat(),
+    }

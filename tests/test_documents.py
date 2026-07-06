@@ -34,3 +34,33 @@ def test_convert_to_markdown_archivo_vacio_lanza_sin_texto(tmp_path):
     import pytest
     with pytest.raises(documents.EmptyDocumentError):
         documents.convert_to_markdown(src)
+
+
+def test_save_and_convert_guarda_original_y_md(tmp_path):
+    src = tmp_path / "origen" / "contrato.txt"
+    src.parent.mkdir()
+    src.write_text("Cláusula primera: prueba", encoding="utf-8")
+    docs = tmp_path / "proyecto" / "documentos"
+
+    info = documents.save_and_convert(src, docs)
+
+    assert (docs / "originales" / "contrato.txt").exists()
+    md_path = docs / "contrato.md"
+    assert md_path.exists()
+    assert "Cláusula primera" in md_path.read_text(encoding="utf-8")
+    assert info["name"] == "contrato.md"
+    assert info["original_name"] == "contrato.txt"
+
+
+def test_save_and_convert_no_pisa_nombres_repetidos(tmp_path):
+    src = tmp_path / "informe.txt"
+    src.write_text("contenido de prueba", encoding="utf-8")
+    docs = tmp_path / "documentos"
+
+    first = documents.save_and_convert(src, docs)
+    second = documents.save_and_convert(src, docs)
+
+    assert first["name"] == "informe.md"
+    assert second["name"] == "informe (2).md"
+    assert (docs / "originales" / "informe.txt").exists()
+    assert (docs / "originales" / "informe (2).txt").exists()
