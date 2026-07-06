@@ -45,6 +45,21 @@ hiddenimports += [
     "clr",
 ]
 
+# markitdown (conversión de documentos a Markdown) y las dependencias de sus
+# conversores docx/pptx/pdf/html que PyInstaller no descubre por estático.
+hiddenimports += collect_submodules("markitdown")
+hiddenimports += collect_submodules("pdfminer")
+hiddenimports += ["pptx", "mammoth", "markdownify", "bs4", "magika", "charset_normalizer"]
+
+datas += collect_data_files("magika", excludes=["**/__pycache__/**", "**/*.pyc"])
+datas += collect_data_files("pptx", excludes=["**/__pycache__/**", "**/*.pyc"])
+datas += collect_data_files("markitdown", excludes=["**/__pycache__/**", "**/*.pyc"])
+
+# magika (usado por markitdown para detectar el tipo de archivo) hace
+# `import dotenv` incondicional en su nivel superior, así que ya no podemos
+# excluir "dotenv" como paquete de nube/dev no usado: sin él, `import magika`
+# (y por tanto `import markitdown`) fallaría en el .exe compilado.
+
 def _is_noise(entry):
     """Filtra archivos que no hacen falta en la app compilada."""
     source = str(entry[0]).replace("\\", "/").lower()
@@ -56,9 +71,12 @@ def _is_noise(entry):
         "/converters/", "/commands/",
     )
     if any(part in haystack for part in noise_parts):
+        # No descartar los conversores propios de markitdown.
+        if "/converters/" in haystack and "markitdown" in haystack:
+            return False
         return True
     # Paquetes de nube/dev que no se usan en runtime.
-    if any(part in haystack for part in ("/replicate/", "/dotenv/", "/hf_xet/")):
+    if any(part in haystack for part in ("/replicate/", "/hf_xet/")):
         return True
     return False
 
@@ -72,7 +90,6 @@ hiddenimports = sorted({
         or name.startswith("huggingface_hub.inference._mcp")
         or name.startswith("onnxruntime.tools")
         or name.startswith("replicate")
-        or name.startswith("dotenv")
         or name.startswith("hf_xet")
     )
 })
@@ -87,7 +104,7 @@ a = Analysis(
     runtime_hooks=[],
     excludes=[
         "pytest", "unittest", "doctest", "pdb",
-        "replicate", "dotenv",
+        "replicate",
         "hf_xet",
         "matplotlib", "PIL", "pandas", "scipy",
         "torch", "tensorflow",
