@@ -60,6 +60,14 @@ datas += collect_data_files("markitdown", excludes=["**/__pycache__/**", "**/*.p
 # excluir "dotenv" como paquete de nube/dev no usado: sin él, `import magika`
 # (y por tanto `import markitdown`) fallaría en el .exe compilado.
 
+# OCR (RapidOCR + pypdfium2) y extracción de imágenes (pypdf).
+hiddenimports += collect_submodules("rapidocr_onnxruntime")
+hiddenimports += collect_submodules("pypdfium2")
+hiddenimports += ["pypdf", "cv2", "shapely", "pyclipper", "PIL"]
+datas += collect_data_files("rapidocr_onnxruntime", excludes=["**/__pycache__/**", "**/*.pyc"])  # modelos ONNX + config
+binaries += collect_dynamic_libs("pypdfium2")
+binaries += collect_dynamic_libs("cv2")
+
 def _is_noise(entry):
     """Filtra archivos que no hacen falta en la app compilada."""
     source = str(entry[0]).replace("\\", "/").lower()
@@ -73,6 +81,9 @@ def _is_noise(entry):
     if any(part in haystack for part in noise_parts):
         # No descartar los conversores propios de markitdown.
         if "/converters/" in haystack and "markitdown" in haystack:
+            return False
+        # No descartar los modelos ONNX ni la config de RapidOCR.
+        if "rapidocr_onnxruntime" in haystack:
             return False
         return True
     # Paquetes de nube/dev que no se usan en runtime.
@@ -106,7 +117,7 @@ a = Analysis(
         "pytest", "unittest", "doctest", "pdb",
         "replicate",
         "hf_xet",
-        "matplotlib", "PIL", "pandas", "scipy",
+        "matplotlib", "pandas", "scipy",
         "torch", "tensorflow",
         "onnxruntime.tools", "huggingface_hub.commands",
     ],
