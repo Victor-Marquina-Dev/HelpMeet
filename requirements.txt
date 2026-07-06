@@ -9,3 +9,5 @@ numpy==2.4.6
 av==12.3.0
 markitdown[pdf,docx,pptx]==0.1.6
 pypdf==6.14.2
+rapidocr-onnxruntime==1.4.4
+pypdfium2==5.11.0
