@@ -79,6 +79,11 @@ const ICONS = {
   refresh: '<path d="M3 12a9 9 0 0 1 15-6.7L21 8M3 16l3-3 3 3M21 12a9 9 0 0 1-15 6.7L3 16"/>',
   menu: '<path d="M4 6h16M4 12h16M4 18h16"/>',
   home: '<path d="M3 10.5 12 3l9 7.5"/><path d="M5 9.5V20a1 1 0 0 0 1 1h4v-6h4v6h4a1 1 0 0 0 1-1V9.5"/>',
+  eye: '<circle cx="12" cy="12" r="3"/><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7z"/>',
+  image: '<rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.6-3.6a2 2 0 0 0-2.8 0L6 21"/>',
+  scan: '<path d="M3 7V5a2 2 0 0 1 2-2h2M17 3h2a2 2 0 0 1 2 2v2M21 17v2a2 2 0 0 1-2 2h-2M7 21H5a2 2 0 0 1-2-2v-2M7 12h10"/>',
+  file: '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/>',
+  md: '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M8 17v-4l2 2.5 2-2.5v4"/>',
 };
 function svg(name, size) {
   size = size || 15;
@@ -202,15 +207,16 @@ const api = {
 
   // ---- Documentos → Markdown ----
   listDocumentInitiatives: () => call('list_document_initiatives'),
-  pickAndConvertDocuments: (iid) => call('pick_and_convert_documents', iid),
+  pickAndConvertDocuments: (iid, ocr, imgs) => call('pick_and_convert_documents', iid, ocr, !!imgs),
   listDocuments: (iid) => call('list_documents', iid),
   openDocument: (iid, name) => call('open_document', iid, name),
   openDocumentOriginal: (iid, name) => call('open_document_original', iid, name),
   openDocumentsFolder: (iid) => call('open_documents_folder', iid),
+  openDocumentImages: (iid, name) => call('open_document_images', iid, name),
   deleteDocument: (iid, name) => call('delete_document', iid, name),
   listAllDocuments: () => call('list_all_documents'),
   readDocument: (iid, name) => call('read_document', iid, name),
-  saveUploadedDocument: (iid, name, b64) => call('save_uploaded_document', iid, name, b64),
+  saveUploadedDocument: (iid, name, b64, ocr, imgs) => call('save_uploaded_document', iid, name, b64, ocr, !!imgs),
 
   // ---- Grabación de pantalla + biblioteca (backend REAL, ya implementado) ----
   startScreenRecording: (iid, idx) => call('start_screen_recording', iid, idx),
@@ -465,6 +471,8 @@ const STATE = {
   docsDest: null,        // iniciativa destino para subir/convertir documentos (rediseño v2)
   docsFilter: 'all',     // filtro de proyecto en la lista global ('all' o id de iniciativa)
   docsQuery: '',         // texto de búsqueda en la lista global de documentos
+  docsOcr: 'auto',       // modo OCR al convertir: 'auto' | 'force' | 'off'
+  docsExtractImages: false, // extraer imágenes embebidas al convertir documentos
   initiatives: [],
   meetingsByInit: {},    // cache
   openInits: {},         // id -> bool expandido
@@ -3077,11 +3085,12 @@ function mdToHtml(src) {
   return html;
 }
 
-// Modal "Ver": trae el .md del backend y lo pinta ya convertido a HTML.
+// Modal "Ver": primero la carpeta del documento (original/.md/imágenes), luego el .md ya convertido a HTML.
 async function openDocModal(d) {
   const res = await api.readDocument(d.initiative_id, d.name);
   const text = (res && res.ok) ? res.text : '';
   const k = fileKind(d.original_name);
+  const hasImages = (d.images || 0) > 0;
   const m = el('div', 'modal docs-modal');
   m.setAttribute('role', 'dialog'); m.setAttribute('aria-label', d.name);
   m.innerHTML = `
@@ -3092,7 +3101,15 @@ async function openDocModal(d) {
       <button class="btn sm" data-open>↗ Abrir .md</button>
       <button class="icon-btn sm" data-x aria-label="Cerrar">${svg('x', 14)}</button>
     </div>
-    <div class="docs-mbody"><div class="md"></div></div>
+    <div class="docs-mbody">
+      <div class="docs-files">
+        <div class="docs-files-h">Carpeta del documento</div>
+        <div class="docs-frow">${svg('file', 15)}<span>${esc(d.original_name || '')}</span><span class="fsub">· original</span></div>
+        <div class="docs-frow">${svg('md', 15)}<span>${esc(d.name)}</span><span class="fsub">· texto para la IA${d.ocr ? ' (OCR)' : ''}</span></div>
+        ${hasImages ? `<div class="docs-frow">${svg('folder', 15)}<span>imagenes/</span><span class="fsub">· ${d.images} imagen${d.images === 1 ? '' : 'es'}</span><button type="button" class="fopen" data-open-imgs>Abrir</button></div>` : ''}
+      </div>
+      <div class="md"></div>
+    </div>
     <div class="docs-mfoot">Original: ${esc(d.original_name || '')} · ${formatDateShort(d.created_at)} · ${fmtKB(d.size)}</div>`;
   m.querySelector('.md').innerHTML = (res && res.ok) ? mdToHtml(text) : 'No se pudo leer el documento.';
   m.querySelector('[data-copy]').onclick = async () => {
@@ -3100,6 +3117,8 @@ async function openDocModal(d) {
     await copyText(text); toast('ok', 'Markdown copiado');
   };
   m.querySelector('[data-open]').onclick = () => api.openDocument(d.initiative_id, d.name);
+  const openImgsBtn = m.querySelector('[data-open-imgs]');
+  if (openImgsBtn) openImgsBtn.onclick = () => api.openDocumentImages(d.initiative_id, d.name);
   m.querySelector('[data-x]').onclick = closeModal;
   openModal(m);
 }
@@ -3108,29 +3127,33 @@ async function openDocModal(d) {
 function buildDocCard(d, onChanged) {
   const k = fileKind(d.original_name);
   const card = el('div', 'docs-card');
+  const tags = [];
+  if (d.ocr) tags.push(`<span class="docs-tag ocr">${svg('scan', 12)}OCR</span>`);
+  if ((d.images || 0) > 0) tags.push(`<span class="docs-tag img">${svg('image', 12)}${d.images}</span>`);
   card.innerHTML = `
     <span class="docs-ftype ${k.cls}">${k.lbl}</span>
     <div class="docs-cbody">
       <div class="docs-cname">${esc(d.name)}</div>
       <div class="docs-cmeta">
         <span class="docs-badge"><span class="dot" style="background:${esc(d.color || '#aacfbf')}"></span>${esc(d.initiative_name || '')}</span>
+        ${tags.join('')}
         <span>${esc(d.original_name || '')}</span>
         <span>${formatDateShort(d.created_at)}</span>
         <span>${fmtKB(d.size)}</span>
       </div>
     </div>
     <div class="docs-cactions">
-      <button class="docs-view" data-act="view">👁 Ver</button>
-      <button class="docs-ico" data-act="copy" aria-label="Copiar .md" title="Copiar .md">📋</button>
-      <button class="docs-ico" data-act="orig" aria-label="Original" title="Original">📂</button>
-      <button class="docs-ico danger" data-act="del" aria-label="Eliminar" title="Eliminar">🗑</button>
+      <button class="docs-view" data-act="view">${svg('eye', 14)} Ver</button>
+      <button class="docs-ico" data-act="copy" aria-label="Copiar .md" title="Copiar .md">${svg('copy', 15)}</button>
+      <button class="docs-ico" data-act="orig" aria-label="Original" title="Original">${svg('folder', 15)}</button>
+      <button class="docs-ico danger" data-act="del" aria-label="Eliminar" title="Eliminar">${svg('trash', 15)}</button>
     </div>`;
   card.querySelector('[data-act="view"]').onclick = () => openDocModal(d);
   card.querySelector('[data-act="copy"]').onclick = () => copyDocMd(d);
   card.querySelector('[data-act="orig"]').onclick = () => api.openDocumentOriginal(d.initiative_id, d.name);
   card.querySelector('[data-act="del"]').onclick = () => confirmModal(
     'Eliminar documento',
-    `Se borrarán el .md y el original de "${d.name}". ¿Seguro?`,
+    `Se borrarán el .md, el original y las imágenes de "${d.name}". ¿Seguro?`,
     'Eliminar',
     async () => {
       const r = await api.deleteDocument(d.initiative_id, d.name);
@@ -3160,29 +3183,20 @@ function _readFileAsBase64(file) {
 // Recarga en curso de la lista global (la fija viewDocs para que handleDrop pueda refrescar tras soltar archivos).
 let _docsRefreshList = null;
 
-// Maneja el drop de archivos sobre la zona de arrastre: sube y convierte cada uno al proyecto destino.
+// Maneja el drop de archivos sobre la lista (zona de arrastre): sube y convierte cada uno al proyecto destino.
 async function handleDrop(ev) {
   const files = Array.from((ev.dataTransfer && ev.dataTransfer.files) || []);
   if (!files.length) return;
   if (STATE.docsDest == null) { toast('err', 'Elige antes un proyecto de destino'); return; }
-  const dz = $('#docsDz');
-  const statusEl = dz && dz.querySelector('.dz-status');
-  if (statusEl) statusEl.textContent = 'Convirtiendo…';
   let okN = 0; const failedNames = [];
-  try {
-    for (const file of files) {
-      try {
-        const b64 = await _readFileAsBase64(file);
-        const r = await api.saveUploadedDocument(STATE.docsDest, file.name, b64);
-        if (r && r.ok) okN++; else failedNames.push((r && r.name) || file.name);
-      } catch (e) {
-        failedNames.push(file.name);
-      }
+  for (const file of files) {
+    try {
+      const b64 = await _readFileAsBase64(file);
+      const r = await api.saveUploadedDocument(STATE.docsDest, file.name, b64, STATE.docsOcr, STATE.docsExtractImages);
+      if (r && r.ok) okN++; else failedNames.push((r && r.name) || file.name);
+    } catch (e) {
+      failedNames.push(file.name);
     }
-  } catch (e) {
-    toast('err', 'Hubo un error al convertir.');
-  } finally {
-    if (statusEl) statusEl.textContent = '';
   }
   let msg = `${okN} convertido${okN === 1 ? '' : 's'}`;
   if (failedNames.length) msg += ` · ${failedNames.length} sin convertir (${failedNames.join(', ')})`;
@@ -3197,21 +3211,16 @@ function viewDocs() {
   const head = el('div', 'docs-head');
   head.innerHTML = `
     <h1>Documentos <span class="arrow">→</span> .md</h1>
-    <p class="docs-sub">Convierte PDF, Word, PowerPoint o texto a un .md ligero para pasárselo a la IA. Se guarda el original y el .md en la carpeta del proyecto.</p>`;
+    <p class="docs-sub">Convierte PDF, Word, PowerPoint o texto a un .md ligero para pasárselo a la IA. Cada documento se guarda en su propia carpeta (original, .md e imágenes).</p>`;
 
-  const convert = el('div', 'docs-convert');
-  convert.innerHTML = `
-    <div class="docs-convert-top">
-      <span>Convertir a:</span>
-      <span id="docsDestMount"></span>
-      <span class="docs-hint">Se guardan el original y el .md en la carpeta de ese proyecto.</span>
-    </div>
-    <div class="docs-dz" id="docsDz">
-      <div class="dz-title">Arrastra aquí tus archivos</div>
-      <div class="dz-sub">PDF · Word · PowerPoint · texto · HTML · CSV</div>
-      <button class="btn btn-primary" id="docsPickBtn" disabled>${svg('upload', 13)} Elegir archivos…</button>
-      <div class="dz-status" aria-live="polite"></div>
-    </div>`;
+  const toolbar = el('div', 'docs-toolbar');
+  toolbar.innerHTML = `
+    <span id="docsDestMount"></span>
+    <button class="btn btn-primary" id="docsPickBtn" disabled>${svg('upload', 13)} Elegir archivos</button>
+    <span class="docs-div"></span>
+    <button type="button" class="docs-chip" id="docsOcrChip"></button>
+    <button type="button" class="docs-chip" id="docsImgChip"></button>
+    <span class="docs-help" tabindex="0" title="El OCR reconstruye el texto de documentos escaneados. En Automático solo actúa cuando el documento no tiene texto copiable.">?<span class="docs-tip">El OCR reconstruye el texto de documentos escaneados. En Automático solo actúa cuando el documento no tiene texto copiable.</span></span>`;
 
   const listbar = el('div', 'docs-listbar');
   listbar.innerHTML = `
@@ -3223,20 +3232,42 @@ function viewDocs() {
   const rows = el('div', 'docs-rows');
   rows.appendChild(el('div', 'docs-empty', 'Cargando documentos…'));
 
-  wrap.replaceChildren(head, convert, listbar, rows);
+  wrap.replaceChildren(head, toolbar, listbar, rows);
 
-  const dz = convert.querySelector('#docsDz');
-  const pickBtn = convert.querySelector('#docsPickBtn');
+  const pickBtn = toolbar.querySelector('#docsPickBtn');
+  const ocrChip = toolbar.querySelector('#docsOcrChip');
+  const imgChip = toolbar.querySelector('#docsImgChip');
   const searchInput = listbar.querySelector('#docsSearchInput');
   const countEl = listbar.querySelector('.docs-listtitle .count');
 
   searchInput.value = STATE.docsQuery || '';
   searchInput.addEventListener('input', (e) => { STATE.docsQuery = e.target.value; renderRows(); });
 
-  dz.addEventListener('dragenter', (e) => { e.preventDefault(); dz.classList.add('drag'); });
-  dz.addEventListener('dragover', (e) => { e.preventDefault(); dz.classList.add('drag'); });
-  dz.addEventListener('dragleave', () => dz.classList.remove('drag'));
-  dz.addEventListener('drop', (e) => { e.preventDefault(); dz.classList.remove('drag'); handleDrop(e); });
+  // Chip OCR: ciclo auto → force → off, guardado en STATE.docsOcr.
+  const OCR_LABELS = { auto: 'Automático', force: 'Forzar', off: 'Desactivado' };
+  function paintOcrChip() {
+    ocrChip.classList.toggle('on', STATE.docsOcr !== 'off');
+    ocrChip.innerHTML = `${svg('scan', 14)}<span>OCR: ${OCR_LABELS[STATE.docsOcr] || 'Automático'}</span>`;
+  }
+  ocrChip.onclick = () => {
+    STATE.docsOcr = STATE.docsOcr === 'auto' ? 'force' : (STATE.docsOcr === 'force' ? 'off' : 'auto');
+    paintOcrChip();
+  };
+  paintOcrChip();
+
+  // Chip "Extraer imágenes": checkbox simple guardado en STATE.docsExtractImages.
+  function paintImgChip() {
+    imgChip.classList.toggle('on', !!STATE.docsExtractImages);
+    imgChip.innerHTML = `<span class="cbx">${STATE.docsExtractImages ? svg('check', 12) : ''}</span>${svg('image', 14)}<span>Extraer imágenes</span>`;
+  }
+  imgChip.onclick = () => { STATE.docsExtractImages = !STATE.docsExtractImages; paintImgChip(); };
+  paintImgChip();
+
+  // La propia lista es la zona de arrastre (solo resalta mientras se arrastra encima).
+  rows.addEventListener('dragenter', (e) => { e.preventDefault(); rows.classList.add('drag'); });
+  rows.addEventListener('dragover', (e) => { e.preventDefault(); rows.classList.add('drag'); });
+  rows.addEventListener('dragleave', () => rows.classList.remove('drag'));
+  rows.addEventListener('drop', (e) => { e.preventDefault(); rows.classList.remove('drag'); handleDrop(e); });
 
   let _inits = [];
   let _docs = [];
@@ -3278,23 +3309,22 @@ function viewDocs() {
 
     if (!_inits.length) {
       pickBtn.disabled = true;
-      dz.classList.add('is-disabled');
-      convert.querySelector('#docsDestMount').replaceWith(el('span', 'docs-hint', 'Crea un proyecto primero'));
+      toolbar.querySelector('#docsDestMount').replaceWith(el('span', 'docs-hint', 'Crea un proyecto primero'));
     } else {
       if (STATE.docsDest == null || !_inits.some(i => i.id === STATE.docsDest)) STATE.docsDest = _inits[0].id;
       if (STATE.docsFilter !== 'all' && !_inits.some(i => i.id === STATE.docsFilter)) STATE.docsFilter = 'all';
 
       const destItems = _inits.map(i => ({ value: i.id, label: i.name, color: _initColor(i) }));
       const destSel = customSelect({
-        value: STATE.docsDest, items: destItems, icon: 'folder', className: 'cdrop-block', minWidth: 200,
+        value: STATE.docsDest, items: destItems, icon: 'folder', minWidth: 200,
         onChange: (v) => { STATE.docsDest = v; },
       });
-      convert.querySelector('#docsDestMount').replaceWith(destSel);
+      toolbar.querySelector('#docsDestMount').replaceWith(destSel);
       pickBtn.disabled = false;
       pickBtn.onclick = async () => {
         pickBtn.disabled = true;
         try {
-          const res = await api.pickAndConvertDocuments(STATE.docsDest);
+          const res = await api.pickAndConvertDocuments(STATE.docsDest, STATE.docsOcr, STATE.docsExtractImages);
           if (res && res.cancelled) return;
           const okN = (res.converted || []).length;
           const failN = (res.failed || []).length;
