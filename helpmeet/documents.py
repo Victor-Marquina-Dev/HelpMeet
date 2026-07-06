@@ -111,3 +111,53 @@ def save_and_convert(source: Path, docs_dir: Path) -> dict:
         "size": stat.st_size,
         "created_at": datetime.fromtimestamp(stat.st_mtime).isoformat(),
     }
+
+
+def _find_original(docs_dir: Path, stem: str) -> Path | None:
+    folder = originals_dir(docs_dir)
+    if not folder.exists():
+        return None
+    for p in folder.iterdir():
+        if p.is_file() and p.stem == stem:
+            return p
+    return None
+
+
+def list_documents(docs_dir: Path) -> list[dict]:
+    """Lista los `.md` de la carpeta, emparejados con su original.
+
+    Ordenados por fecha de modificación descendente (lo último, arriba).
+    """
+    docs_dir = Path(docs_dir)
+    if not docs_dir.exists():
+        return []
+    items = []
+    for md in docs_dir.glob("*.md"):
+        if not md.is_file():
+            continue
+        original = _find_original(docs_dir, md.stem)
+        stat = md.stat()
+        items.append({
+            "name": md.name,
+            "md_path": str(md),
+            "original_name": original.name if original else "",
+            "original_path": str(original) if original else "",
+            "size": stat.st_size,
+            "created_at": datetime.fromtimestamp(stat.st_mtime).isoformat(),
+            "_mtime": stat.st_mtime,
+        })
+    items.sort(key=lambda d: d["_mtime"], reverse=True)
+    for d in items:
+        d.pop("_mtime", None)
+    return items
+
+
+def delete_document(docs_dir: Path, md_name: str) -> None:
+    """Borra el `.md` indicado y su original emparejado (si existe)."""
+    docs_dir = Path(docs_dir)
+    md_path = docs_dir / md_name
+    stem = Path(md_name).stem
+    original = _find_original(docs_dir, stem)
+    md_path.unlink(missing_ok=True)
+    if original is not None:
+        original.unlink(missing_ok=True)

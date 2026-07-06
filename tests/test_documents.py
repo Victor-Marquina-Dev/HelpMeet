@@ -64,3 +64,31 @@ def test_save_and_convert_no_pisa_nombres_repetidos(tmp_path):
     assert second["name"] == "informe (2).md"
     assert (docs / "originales" / "informe.txt").exists()
     assert (docs / "originales" / "informe (2).txt").exists()
+
+
+def test_list_documents_empareja_md_con_original(tmp_path):
+    src = tmp_path / "acta.txt"
+    src.write_text("orden del día de prueba", encoding="utf-8")
+    docs = tmp_path / "documentos"
+    documents.save_and_convert(src, docs)
+
+    listed = documents.list_documents(docs)
+    assert len(listed) == 1
+    assert listed[0]["name"] == "acta.md"
+    assert listed[0]["original_name"] == "acta.txt"
+
+
+def test_list_documents_carpeta_inexistente_devuelve_vacio(tmp_path):
+    assert documents.list_documents(tmp_path / "no-existe") == []
+
+
+def test_delete_document_borra_md_y_original(tmp_path):
+    src = tmp_path / "borrame.txt"
+    src.write_text("texto de prueba", encoding="utf-8")
+    docs = tmp_path / "documentos"
+    documents.save_and_convert(src, docs)
+
+    documents.delete_document(docs, "borrame.md")
+
+    assert not (docs / "borrame.md").exists()
+    assert not (docs / "originales" / "borrame.txt").exists()
