@@ -48,43 +48,70 @@ def _get_converter():
     return _converter
 
 
-def convert_to_markdown(source: Path) -> str:
+def doc_folder(docs_dir: Path, stem: str) -> Path:
+    """Carpeta propia de un documento dentro de `docs_dir`."""
+    return Path(docs_dir) / stem
+
+
+def images_dir(doc_dir: Path) -> Path:
+    """Subcarpeta donde se guardan las imágenes extraídas de un documento."""
+    return Path(doc_dir) / "imagenes"
+
+
+def _unique_stem(docs_dir: Path, stem: str) -> str:
+    """Devuelve un nombre base libre: `informe`, `informe (2)`, `informe (3)`…
+
+    Comprueba que no exista ya una carpeta de documento con ese nombre.
+    """
+    candidate = stem
+    index = 2
+    while (Path(docs_dir) / candidate).exists():
+        candidate = f"{stem} ({index})"
+        index += 1
+    return candidate
+
+
+def convert_to_markdown(source: Path, *, ocr: str = "auto") -> tuple[str, bool]:
     """Convierte un archivo a texto Markdown.
 
+    Devuelve una tupla `(texto, uso_ocr)`. `uso_ocr` indica si el texto se
+    obtuvo mediante reconocimiento óptico (solo aplica a PDF escaneados).
+    `ocr` controla la estrategia: `"auto"` (solo si el PDF no tiene texto),
+    `"force"` (siempre OCR para PDF) o cualquier otro valor para desactivarlo.
+
     Lanza `UnsupportedDocumentError` si el formato no está soportado y
-    `EmptyDocumentError` si no se pudo extraer texto (típico de PDF escaneado).
+    `EmptyDocumentError` si no se pudo extraer texto (típico de PDF escaneado
+    sin OCR disponible).
     """
     source = Path(source)
     if not is_supported(source):
         raise UnsupportedDocumentError(source.suffix or source.name)
     result = _get_converter().convert(str(source))
     text = (getattr(result, "text_content", "") or "").strip()
+    used_ocr = False
+    if source.suffix.lower() == ".pdf":
+        need_ocr = (ocr == "force") or (not text and ocr == "auto")
+        if need_ocr:
+            from helpmeet import ocr as ocr_mod
+            recognized = (ocr_mod.ocr_pdf(source) or "").strip()
+            if recognized:
+                text, used_ocr = recognized, True
     if not text:
         raise EmptyDocumentError(source.name)
-    return text
+    return text, used_ocr
 
 
-def _unique_stem(docs_dir: Path, stem: str) -> str:
-    """Devuelve un nombre base libre: `informe`, `informe (2)`, `informe (3)`…
+def save_and_convert(
+    source: Path,
+    docs_dir: Path,
+    *,
+    ocr: str = "auto",
+    extract_images: bool = False,
+) -> dict:
+    """Convierte `source` y lo guarda en su propia carpeta dentro de `docs_dir`.
 
-    Comprueba tanto el `.md` como el original para no pisar ninguno de los dos.
-    """
-    candidate = stem
-    index = 2
-    while (docs_dir / f"{candidate}.md").exists() or _original_exists(docs_dir, candidate):
-        candidate = f"{stem} ({index})"
-        index += 1
-    return candidate
-
-
-def _original_exists(docs_dir: Path, stem: str) -> bool:
-    folder = originals_dir(docs_dir)
-    return folder.exists() and any(p.stem == stem for p in folder.iterdir())
-
-
-def save_and_convert(source: Path, docs_dir: Path) -> dict:
-    """Copia el original a `originales/` y genera el `.md` hermano en `docs_dir`.
-
+    La carpeta resultante (`docs_dir/<stem>/`) contiene el original, el
+    `.md` y, opcionalmente, un marcador `.ocr` y una subcarpeta `imagenes/`.
     Devuelve un dict con los datos del documento resultante. Propaga
     `EmptyDocumentError` / `UnsupportedDocumentError` si la conversión falla
     (en ese caso NO deja archivos a medias).
@@ -92,15 +119,23 @@ def save_and_convert(source: Path, docs_dir: Path) -> dict:
     source = Path(source)
     docs_dir = Path(docs_dir)
     # Convertir primero: si falla, no copiamos nada.
-    markdown = convert_to_markdown(source)
+    markdown, used_ocr = convert_to_markdown(source, ocr=ocr)
 
-    originals_dir(docs_dir).mkdir(parents=True, exist_ok=True)
     stem = _unique_stem(docs_dir, source.stem)
-    original_dest = originals_dir(docs_dir) / f"{stem}{source.suffix}"
-    md_dest = docs_dir / f"{stem}.md"
+    folder = doc_folder(docs_dir, stem)
+    folder.mkdir(parents=True, exist_ok=True)
+    original_dest = folder / f"{stem}{source.suffix}"
+    md_dest = folder / f"{stem}.md"
 
     shutil.copy2(source, original_dest)
     md_dest.write_text(markdown, encoding="utf-8")
+    if used_ocr:
+        (folder / ".ocr").touch()
+
+    images = 0
+    if extract_images:
+        from helpmeet import doc_images
+        images = doc_images.extract_images(source, images_dir(folder))
 
     stat = md_dest.stat()
     return {
@@ -108,23 +143,23 @@ def save_and_convert(source: Path, docs_dir: Path) -> dict:
         "original_name": original_dest.name,
         "md_path": str(md_dest),
         "original_path": str(original_dest),
+        "folder_path": str(folder),
         "size": stat.st_size,
         "created_at": datetime.fromtimestamp(stat.st_mtime).isoformat(),
+        "ocr": used_ocr,
+        "images": images,
     }
 
 
-def _find_original(docs_dir: Path, stem: str) -> Path | None:
-    folder = originals_dir(docs_dir)
-    if not folder.exists():
-        return None
+def _doc_original(folder: Path) -> Path | None:
     for p in folder.iterdir():
-        if p.is_file() and p.stem == stem:
+        if p.is_file() and p.suffix.lower() != ".md" and p.name != ".ocr":
             return p
     return None
 
 
 def list_documents(docs_dir: Path) -> list[dict]:
-    """Lista los `.md` de la carpeta, emparejados con su original.
+    """Lista las carpetas de documentos dentro de `docs_dir`.
 
     Ordenados por fecha de modificación descendente (lo último, arriba).
     """
@@ -132,18 +167,26 @@ def list_documents(docs_dir: Path) -> list[dict]:
     if not docs_dir.exists():
         return []
     items = []
-    for md in docs_dir.glob("*.md"):
+    for folder in docs_dir.iterdir():
+        if not folder.is_dir() or folder.name in ("originales", "imagenes"):
+            continue
+        md = folder / f"{folder.name}.md"
         if not md.is_file():
             continue
-        original = _find_original(docs_dir, md.stem)
+        original = _doc_original(folder)
+        imgs = images_dir(folder)
+        n_imgs = len([p for p in imgs.iterdir() if p.is_file()]) if imgs.exists() else 0
         stat = md.stat()
         items.append({
             "name": md.name,
-            "md_path": str(md),
             "original_name": original.name if original else "",
+            "md_path": str(md),
             "original_path": str(original) if original else "",
+            "folder_path": str(folder),
             "size": stat.st_size,
             "created_at": datetime.fromtimestamp(stat.st_mtime).isoformat(),
+            "ocr": (folder / ".ocr").exists(),
+            "images": n_imgs,
             "_mtime": stat.st_mtime,
         })
     items.sort(key=lambda d: d["_mtime"], reverse=True)
@@ -152,18 +195,36 @@ def list_documents(docs_dir: Path) -> list[dict]:
     return items
 
 
-def delete_document(docs_dir: Path, md_name: str) -> None:
-    """Borra el `.md` indicado y su original emparejado (si existe)."""
-    docs_dir = Path(docs_dir)
-    md_path = docs_dir / md_name
-    stem = Path(md_name).stem
-    original = _find_original(docs_dir, stem)
-    md_path.unlink(missing_ok=True)
-    if original is not None:
-        original.unlink(missing_ok=True)
-
-
 def read_markdown(docs_dir: Path, md_name: str) -> str:
     """Devuelve el texto del .md indicado (para el modal y para copiar)."""
-    md_path = Path(docs_dir) / md_name
-    return md_path.read_text(encoding="utf-8")
+    stem = Path(md_name).stem
+    return (Path(docs_dir) / stem / f"{stem}.md").read_text(encoding="utf-8")
+
+
+def delete_document(docs_dir: Path, md_name: str) -> None:
+    """Borra la carpeta completa del documento indicado."""
+    stem = Path(md_name).stem
+    shutil.rmtree(Path(docs_dir) / stem, ignore_errors=True)
+
+
+def migrate_flat_to_folders(docs_dir: Path) -> None:
+    """Migra un `docs_dir` con la estructura plana v2 (`originales/` + `*.md`
+    sueltos) a la estructura v3 de una carpeta por documento. Idempotente:
+    si ya no quedan `.md` sueltos, no hace nada.
+    """
+    docs_dir = Path(docs_dir)
+    if not docs_dir.exists():
+        return
+    originales = originals_dir(docs_dir)
+    for md in list(docs_dir.glob("*.md")):
+        stem = md.stem
+        folder = docs_dir / stem
+        folder.mkdir(exist_ok=True)
+        md.replace(folder / f"{stem}.md")
+        if originales.exists():
+            for orig in originales.iterdir():
+                if orig.is_file() and orig.stem == stem:
+                    orig.replace(folder / orig.name)
+                    break
+    if originales.exists() and not any(originales.iterdir()):
+        originales.rmdir()
