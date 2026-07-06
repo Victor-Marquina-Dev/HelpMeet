@@ -161,3 +161,9 @@ def delete_document(docs_dir: Path, md_name: str) -> None:
     md_path.unlink(missing_ok=True)
     if original is not None:
         original.unlink(missing_ok=True)
+
+
+def read_markdown(docs_dir: Path, md_name: str) -> str:
+    """Devuelve el texto del .md indicado (para el modal y para copiar)."""
+    md_path = Path(docs_dir) / md_name
+    return md_path.read_text(encoding="utf-8")

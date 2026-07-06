@@ -92,3 +92,18 @@ def test_delete_document_borra_md_y_original(tmp_path):
 
     assert not (docs / "borrame.md").exists()
     assert not (docs / "originales" / "borrame.txt").exists()
+
+
+def test_read_markdown_devuelve_el_contenido(tmp_path):
+    src = tmp_path / "nota.txt"
+    src.write_text("contenido de prueba para leer", encoding="utf-8")
+    docs = tmp_path / "documentos"
+    info = documents.save_and_convert(src, docs)
+    texto = documents.read_markdown(docs, info["name"])
+    assert "contenido de prueba" in texto
+
+
+def test_read_markdown_inexistente_lanza(tmp_path):
+    import pytest
+    with pytest.raises(FileNotFoundError):
+        documents.read_markdown(tmp_path, "no-existe.md")
