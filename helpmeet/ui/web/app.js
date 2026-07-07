@@ -1367,9 +1367,14 @@ function viewInitiative() {
       const d = new Date(iso); if (isNaN(d)) return null;
       const day = d.getDay();
       const mon2 = new Date(d); mon2.setDate(d.getDate() - (day === 0 ? 6 : day - 1));
+      mon2.setHours(0, 0, 0, 0);
       const sun2 = new Date(mon2); sun2.setDate(mon2.getDate() + 6);
+      // La semana pertenece al mes de su JUEVES (convención ISO): así una
+      // semana a caballo entre dos meses no se duplica en ambos.
+      const thu = new Date(mon2); thu.setDate(mon2.getDate() + 3);
       const fmt = dt => `${dt.getDate()} ${_IV_MS[dt.getMonth()]}`;
-      return { mKey:`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`, wKey:mon2.toISOString().slice(0,10), wLabel:`${fmt(mon2)} – ${fmt(sun2)}`, mLabel:`${_IV_MES[d.getMonth()]} ${d.getFullYear()}` };
+      const wKey = `${mon2.getFullYear()}-${String(mon2.getMonth()+1).padStart(2,'0')}-${String(mon2.getDate()).padStart(2,'0')}`;
+      return { mKey:`${thu.getFullYear()}-${String(thu.getMonth()+1).padStart(2,'0')}`, wKey, wLabel:`${fmt(mon2)} – ${fmt(sun2)}`, mLabel:`${_IV_MES[thu.getMonth()]} ${thu.getFullYear()}` };
     };
     const _ivMOrder=[], _ivMMap=new Map(), _ivWMap=new Map();
     ms.forEach(m => {
@@ -3608,13 +3613,15 @@ function viewAllInitiatives() {
           const d = new Date(iso); if (isNaN(d)) return { mKey: 'none', wKey: 'none', wLabel: '—', mLabel: 'Sin fecha' };
           const day = d.getDay();
           const mon = new Date(d); mon.setDate(d.getDate() - (day === 0 ? 6 : day - 1));
+          mon.setHours(0, 0, 0, 0);
           const sun = new Date(mon); sun.setDate(mon.getDate() + 6);
+          const thu = new Date(mon); thu.setDate(mon.getDate() + 3); // mes = jueves de la semana (ISO)
           const fmt = dt => `${dt.getDate()} ${MS2[dt.getMonth()]}`;
           return {
-            mKey:   `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`,
-            wKey:   mon.toISOString().slice(0,10),
+            mKey:   `${thu.getFullYear()}-${String(thu.getMonth()+1).padStart(2,'0')}`,
+            wKey:   `${mon.getFullYear()}-${String(mon.getMonth()+1).padStart(2,'0')}-${String(mon.getDate()).padStart(2,'0')}`,
             wLabel: `${fmt(mon)} – ${fmt(sun)}`,
-            mLabel: `${MES[d.getMonth()]} ${d.getFullYear()}`,
+            mLabel: `${MES[thu.getMonth()]} ${thu.getFullYear()}`,
           };
         };
 
@@ -3782,25 +3789,26 @@ function _renderInitRow(tree, it) {
     const sub = el('div', 'tree-meetings');
     const MS = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
 
+    const MESF = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
     const _monKey = (iso) => {
       const d = new Date(iso); if (isNaN(d)) return null;
       const day = d.getDay();
       const mon = new Date(d); mon.setDate(d.getDate() - (day === 0 ? 6 : day - 1));
       mon.setHours(0, 0, 0, 0); // normaliza al lunes 00:00 local
       const sun = new Date(mon); sun.setDate(mon.getDate() + 6);
+      const thu = new Date(mon); thu.setDate(mon.getDate() + 3); // mes de la semana = su jueves (ISO)
       const fmt = dt => `${dt.getDate()} ${MS[dt.getMonth()]}`;
-      // Clave con fecha LOCAL (no UTC): así la clave coincide con la etiqueta y
-      // no se duplican semanas por reuniones de madrugada.
+      // Clave con fecha LOCAL (no UTC): coincide con la etiqueta y no duplica semanas.
       const key = `${mon.getFullYear()}-${String(mon.getMonth()+1).padStart(2,'0')}-${String(mon.getDate()).padStart(2,'0')}`;
-      return { key, label: `${fmt(mon)} – ${fmt(sun)}` };
+      return { key, label: `${fmt(mon)} – ${fmt(sun)}`, monthLabel: `${MESF[thu.getMonth()]} ${thu.getFullYear()}` };
     };
 
     // Pre-agrupar: mes → semana → reuniones (sin duplicados)
     const monthMap = new Map();   // month_label → [{weekKey,weekLabel,ms:[]}]
     const weekMap  = new Map();   // month|weekKey → weekGroup
     ms.forEach(m => {
-      const month = m.month_label || 'Sin fecha';
       const wk = m.started_at ? _monKey(m.started_at) : null;
+      const month = wk ? wk.monthLabel : (m.month_label || 'Sin fecha');
       const wkKey = wk ? wk.key : 'none';
       const wkLabel = wk ? wk.label : '—';
       if (!monthMap.has(month)) monthMap.set(month, []);
@@ -4307,7 +4315,7 @@ async function doImportVideoForMeeting(mid) {
 function promptNewInitiative() {
   // Color aleatorio por defecto; se puede cambiar en el selector emergente.
   let color = INIT_COLORS[Math.floor(Math.random() * INIT_COLORS.length)];
-  const m = el('div', 'modal');
+  const m = el('div', 'modal np-modal');
   m.setAttribute('role', 'dialog'); m.setAttribute('aria-label', 'Nuevo proyecto');
   m.innerHTML = `
     <div class="modal-head"><h3>Nuevo proyecto</h3><button class="icon-btn sm" data-x aria-label="Cerrar">${svg('x', 14)}</button></div>
