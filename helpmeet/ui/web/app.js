@@ -2135,7 +2135,7 @@ function videoPanel(t) {
   actions.appendChild(bt);
   // Transcribir directo, sin pasar por el recortador (vídeo completo)
   const btNow = el('button', 'btn', hasTx ? 'Retranscribir todo' : 'Transcribir ahora');
-  btNow.onclick = () => transcribeScreenVideo(t.id, hasTx, null);
+  btNow.onclick = () => transcribeScreenVideo(t.meeting_id || STATE.selMeeting, hasTx, null);
   actions.appendChild(btNow);
   wrap.querySelector('.rec-actions').replaceWith(actions);
   return wrap;
@@ -3210,9 +3210,7 @@ function viewDocs() {
   wrap.style.cssText = 'flex:1;min-height:0;overflow-y:auto';
 
   const head = el('div', 'docs-head');
-  head.innerHTML = `
-    <h1>Documentos <span class="arrow">→</span> .md</h1>
-    <p class="docs-sub">Convierte PDF, Word, PowerPoint o texto a un .md ligero para pasárselo a la IA. Cada documento se guarda en su propia carpeta (original, .md e imágenes).</p>`;
+  head.innerHTML = `<h1>Documentos <span class="arrow">→</span> .md</h1>`;
 
   const toolbar = el('div', 'docs-toolbar');
   toolbar.innerHTML = `
@@ -3233,7 +3231,13 @@ function viewDocs() {
   const rows = el('div', 'docs-rows');
   rows.appendChild(el('div', 'docs-empty', 'Cargando documentos…'));
 
-  wrap.replaceChildren(head, toolbar, listbar, rows);
+  // Cada bloque en su recuadro (como la vista Proyectos)
+  const toolbarBox = el('div', 'docs-box docs-box--tools');
+  toolbarBox.appendChild(toolbar);
+  const listBox = el('div', 'docs-box');
+  listBox.appendChild(listbar);
+  listBox.appendChild(rows);
+  wrap.replaceChildren(head, toolbarBox, listBox);
 
   const pickBtn = toolbar.querySelector('#docsPickBtn');
   const ocrChip = toolbar.querySelector('#docsOcrChip');
@@ -3389,7 +3393,6 @@ function viewAllInitiatives() {
     { fixed: true,  w: 20,  min: 20  },  // chevron
     { fixed: true,  w: 22,  min: 22  },  // pin
     { fixed: false, w: 200, min: 110 },  // nombre
-    { fixed: false, w: 72,  min: 60  },  // estado
     { fixed: false, w: 110, min: 80  },  // actividad
     { fixed: false, w: 62,  min: 50  },  // reuniones
     { fixed: false, w: 115, min: 80  },  // pendientes
@@ -3407,8 +3410,8 @@ function viewAllInitiatives() {
   const tableWrap = el('div', 'init-hub-table');
   const thead = el('div', 'init-hub-thead');
 
-  const colLabels = ['', '', 'Proyecto', 'Estado', 'Última actividad', 'Reuniones', 'Pendientes', 'Notas', ''];
-  const _centeredCols = new Set([3, 4, 5, 6, 7]); // Estado, Actividad, Reuniones, Pendientes, Notas
+  const colLabels = ['', '', 'Proyecto', 'Actividad', 'Reuniones', 'Pendientes', 'Notas', ''];
+  const _centeredCols = new Set([3, 4, 5, 6]); // Actividad, Reuniones, Pendientes, Notas
   _cols.forEach((col, i) => {
     const cell = el('div', 'iht' + (_centeredCols.has(i) ? ' iht--center' : ''));
     cell.textContent = colLabels[i];
@@ -3533,7 +3536,6 @@ function viewAllInitiatives() {
           ${it.description ? `<span class="ihr-desc">${esc(it.description.slice(0,55))}${it.description.length > 55 ? '…' : ''}</span>` : ''}
         </div>
       </div>
-      <span class="ihr-status"><span class="init-status-chip active">Activa</span></span>
       <span class="ihr-activity">${_fmtActivity(it)}</span>
       <span class="ihr-meetings">${ms === undefined ? '…' : ms.length}</span>
       <span class="ihr-pending${pending > 0 ? ' has-pending' : ''}">${pending === null ? '…' : pending > 0 ? `${pending} por transcribir` : ''}</span>`;

@@ -2711,7 +2711,7 @@ body[data-sidebar="collapsed"] .actionbar--dock { left: 52px; }
 .init-hub-thead,
 .init-hub-row {
   display: grid;
-  grid-template-columns: 20px 22px 1fr 76px 130px 68px 126px 34px;
+  grid-template-columns: 20px 22px 1fr 110px 62px 115px 160px 34px;
   align-items: center;
 }
 .init-hub-thead {
@@ -3248,6 +3248,12 @@ body[data-theme="dark"] .tour-next { color: var(--on-accent); }
 .docs-head h1{margin:0 0 3px;font-size:22px;font-weight:800;letter-spacing:-.01em}
 .docs-head h1 .arrow{color:var(--accent)}
 .docs-sub{color:var(--text-muted);margin:0 0 18px;font-size:13px;max-width:560px;text-align:justify}
+/* Recuadros que contienen la barra de convertir y la lista */
+.docs-box{background:var(--bg-surface);border:1px solid var(--border-subtle);border-radius:var(--r-xl);margin-bottom:16px;overflow:hidden}
+.docs-box--tools{padding:12px 14px}
+.docs-box--tools > .docs-toolbar{padding:0;border-bottom:none;margin:0}
+.docs-box > .docs-listbar{padding:11px 14px;border-bottom:1px solid var(--border-subtle);margin:0}
+.docs-box > .docs-rows{padding:10px 12px}
 .docs-toolbar{display:flex;align-items:center;gap:9px;flex-wrap:wrap;padding-bottom:16px;border-bottom:1px solid var(--border-subtle);margin-bottom:16px}
 .docs-hint{font-weight:400;color:var(--text-faint)}
 .docs-div{width:1px;height:22px;background:var(--border-subtle);margin:0 3px}
