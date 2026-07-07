@@ -2654,10 +2654,54 @@ body[data-sidebar="collapsed"] .actionbar--dock { left: 52px; }
 }
 .init-hub-import-btn { flex: none; font-size: 10.5px; height: 28px; padding: 0 11px; }
 
-/* Body: tabla + panel */
+/* Título: "Proyectos  N activos" + subtítulo */
+.init-hub-toolbar { border-bottom: none; padding: 20px 28px 6px; }
+.init-hub-top-row { justify-content: flex-start; align-items: baseline; gap: 10px; }
+.init-hub-count { font-size: 13px; font-weight: 600; color: var(--text-faint); font-variant-numeric: tabular-nums; }
+.init-hub-subtext { margin: 0; font-size: 12.5px; color: var(--text-muted); }
+
+/* Body: recuadro (tabla) + panel */
 .init-hub-body {
   display: flex; flex: 1; min-height: 0; overflow: hidden;
+  padding: 12px 24px 20px; gap: 16px;
 }
+.init-hub-box {
+  flex: 1; min-width: 0; display: flex; flex-direction: column;
+  border: 1px solid var(--border-subtle); border-radius: 12px;
+  overflow: hidden; background: var(--bg-surface);
+}
+.init-hub-box-tools {
+  flex: none; display: flex; align-items: center; gap: 10px;
+  padding: 10px 14px; border-bottom: 1px solid var(--border-subtle);
+}
+.init-hub-search {
+  display: flex; align-items: center; gap: 7px;
+  background: var(--bg-input); border: 1px solid var(--border-strong);
+  border-radius: 999px; padding: 6px 12px; min-width: 200px; color: var(--text-muted);
+}
+.init-hub-search svg { flex: none; }
+.init-hub-search input {
+  flex: 1; min-width: 0; background: transparent; border: none; outline: none;
+  color: var(--text-primary); font: inherit; font-size: 12px;
+}
+.init-hub-search input::placeholder { color: var(--text-faint); }
+.init-hub-search input::-webkit-search-cancel-button { -webkit-appearance: none; }
+.init-hub-box-hint { margin-left: auto; font-size: 11.5px; color: var(--text-faint); }
+
+/* Fila "Nuevo proyecto" al final de la tabla */
+.init-hub-addrow {
+  display: flex; align-items: center; gap: 10px; width: 100%;
+  padding: 10px 20px; border: none; background: transparent; cursor: pointer;
+  font: inherit; font-size: 11.5px; font-weight: 600; color: var(--text-muted);
+  text-align: left; transition: color .12s, background .12s;
+}
+.init-hub-addrow:hover { color: var(--accent); background: var(--hover-soft); }
+.init-hub-addrow .iha-plus {
+  width: 22px; height: 22px; border-radius: 6px; flex: none;
+  border: 1.5px dashed var(--border-strong);
+  display: flex; align-items: center; justify-content: center;
+}
+.init-hub-addrow:hover .iha-plus { border-color: var(--accent); }
 
 /* Tabla */
 .init-hub-table { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
@@ -2810,8 +2854,8 @@ body[data-sidebar="collapsed"] .actionbar--dock { left: 52px; }
 .init-hub-panel {
   flex: none; width: 0; min-width: 0; overflow: hidden;
   display: flex; flex-direction: column;
-  background: var(--bg-sidebar);
-  border-left: 0px solid rgba(86,93,89,.2);
+  background: var(--bg-surface);
+  border: none;
   opacity: 0;
   transform: translateX(24px);
   transition: width .24s cubic-bezier(.4,0,.2,1),
@@ -2820,8 +2864,8 @@ body[data-sidebar="collapsed"] .actionbar--dock { left: 52px; }
               border-left-width .24s ease;
 }
 .init-hub-panel.is-visible {
-  width: 240px; min-width: 240px; overflow-y: auto;
-  border-left-width: 1px;
+  width: 250px; min-width: 250px; overflow-y: auto;
+  border: 1px solid var(--border-subtle); border-radius: 12px;
   opacity: 1;
   transform: translateX(0);
 }

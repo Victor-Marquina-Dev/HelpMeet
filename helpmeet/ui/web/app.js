@@ -3373,29 +3373,14 @@ function viewAllInitiatives() {
   // ── Toolbar ───────────────────────────────────────────────
   const toolbar = el('div', 'init-hub-toolbar');
 
-  // Fila 1: título (el botón "Nuevo proyecto" vive en el sidebar)
+  // Fila 1: título + nº de activos (el botón "Nuevo proyecto" vive en el sidebar)
   const topRow = el('div', 'init-hub-top-row');
-  topRow.innerHTML = `<h1 class="page-title">Proyectos</h1>`;
+  const _nAct = STATE.initiatives.length;
+  topRow.innerHTML = `<h1 class="page-title">Proyectos</h1>`
+    + `<span class="init-hub-count">${_nAct} activo${_nAct === 1 ? '' : 's'}</span>`;
   toolbar.appendChild(topRow);
-
-  // Fila 2: chips simplificados
-  const filtersRow = el('div', 'init-hub-filters-row');
-  const chips = el('div', 'init-hub-chips');
-  const chipDefs = [
-    { key: 'all', label: 'Todas' },
-    { key: 'pinned', label: 'Fijadas' },
-  ];
-  const renderChips = () => {
-    chips.replaceChildren();
-    chipDefs.forEach(c => {
-      const chip = el('button', 'init-hub-chip' + (_filter === c.key ? ' is-active' : ''), c.label);
-      chip.onclick = () => { _filter = c.key; renderChips(); redrawList(); };
-      chips.appendChild(chip);
-    });
-  };
-  renderChips();
-  filtersRow.appendChild(chips);
-  toolbar.appendChild(filtersRow);
+  toolbar.appendChild(el('p', 'init-hub-subtext',
+    'Clic en un proyecto para desplegar sus reuniones y ver sus acciones a la derecha.'));
   wrap.appendChild(toolbar);
 
   // ── Cuerpo: tabla + panel ─────────────────────────────────
@@ -3455,7 +3440,22 @@ function viewAllInitiatives() {
 
   const tbody = el('div', 'init-hub-tbody');
   tableWrap.appendChild(tbody);
-  body.appendChild(tableWrap);
+
+  // Recuadro que contiene el buscador + la tabla (como el mockup)
+  const box = el('div', 'init-hub-box');
+  const boxTools = el('div', 'init-hub-box-tools');
+  const searchWrap = el('label', 'init-hub-search');
+  searchWrap.innerHTML = svg('search', 15);
+  const searchInput = el('input');
+  searchInput.type = 'search';
+  searchInput.placeholder = 'Buscar proyecto…';
+  searchInput.oninput = () => { _search = searchInput.value.trim().toLowerCase(); redrawList(); };
+  searchWrap.appendChild(searchInput);
+  boxTools.appendChild(searchWrap);
+  boxTools.appendChild(el('span', 'init-hub-box-hint', 'Ancladas arriba'));
+  box.appendChild(boxTools);
+  box.appendChild(tableWrap);
+  body.appendChild(box);
 
   const panel = el('div', 'init-hub-panel');
   panel.hidden = true;
@@ -3509,6 +3509,12 @@ function viewAllInitiatives() {
       tbody.appendChild(el('p', 'files-empty', _search ? 'Sin proyectos que coincidan.' : 'Aún no hay proyectos.'));
     } else {
       list.forEach(it => tbody.appendChild(renderRow(it)));
+    }
+    if (!_search) {
+      const addRow = el('button', 'init-hub-addrow');
+      addRow.innerHTML = `<span class="iha-plus">${svg('plus', 13)}</span><span>Nuevo proyecto</span>`;
+      addRow.onclick = promptNewInitiative;
+      tbody.appendChild(addRow);
     }
     _applyWidths();
   }
