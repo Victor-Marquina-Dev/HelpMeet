@@ -2719,16 +2719,17 @@ body[data-sidebar="collapsed"] .actionbar--dock { left: 52px; }
 .ihr-name-cell { display: flex; align-items: center; gap: 9px; padding: 9px 6px; min-width: 0; }
 .ihr-dot { width: 9px; height: 9px; border-radius: 50%; flex: none; }
 .ihr-info { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
-.ihr-name { font-size: 12.5px; font-weight: 600; color: var(--text-primary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* Una sola medida de letra para toda la fila (uniforme y compacta). */
+.ihr-name { font-size: 11.5px; font-weight: 700; color: var(--text-primary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .ihr-desc { font-size: 9.5px; color: var(--text-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .ihr-status, .ihr-activity, .ihr-meetings, .ihr-pending {
-  padding: 0 6px; font-size: 12.5px; color: var(--text-secondary);
+  padding: 0 6px; font-size: 11.5px; color: var(--text-secondary);
   display: flex; align-items: center; justify-content: center; text-align: center;
 }
-.ihr-activity { font-size: 11.5px; color: var(--text-muted); }
-.ihr-meetings { font-size: 12px; gap: 4px; color: var(--text-muted); }
-.ihr-pending { font-size: 10.5px; color: var(--text-faint); }
-.ihr-pending.has-pending { color: var(--warning); font-weight: 500; }
+.ihr-activity { color: var(--text-muted); }
+.ihr-meetings { gap: 4px; color: var(--text-muted); }
+.ihr-pending { color: var(--text-faint); }
+.ihr-pending.has-pending { color: var(--warning); font-weight: 600; }
 .ihr-menu-btn { justify-self: end; opacity: 0; transition: opacity .12s; }
 .init-hub-row:hover .ihr-menu-btn { opacity: 1; }
 
@@ -2775,7 +2776,7 @@ body[data-sidebar="collapsed"] .actionbar--dock { left: 52px; }
 .ihm-week-hdr:hover { background: var(--hover-med); color: var(--text-primary); }
 .ihm-week-hdr .tw-chev { flex: none; color: var(--text-faint); transition: transform .15s; }
 .ihm-week-hdr.open .tw-chev { transform: rotate(90deg); }
-.ihm-week-label { flex: 1; font-size: 10px; font-weight: 600; color: var(--text-secondary); }
+.ihm-week-label { flex: 1; font-size: 10.5px; font-weight: 600; color: var(--text-secondary); }
 .ihm-week-cnt { font-size: 9px; color: var(--text-faint); font-family: var(--font-mono); background: var(--bg-elevated); padding: 1px 6px; border-radius: 10px; }
 /* Fila de reunión dentro de la tabla */
 .init-hub-meeting-row {
