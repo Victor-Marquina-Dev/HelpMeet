@@ -3442,18 +3442,8 @@ function viewAllInitiatives() {
   const tbody = el('div', 'init-hub-tbody');
   tableWrap.appendChild(tbody);
 
-  // Recuadro que contiene el buscador + la tabla (como el mockup)
+  // Recuadro que contiene la tabla (el encabezado va arriba, sin buscador)
   const box = el('div', 'init-hub-box');
-  const boxTools = el('div', 'init-hub-box-tools');
-  const searchWrap = el('label', 'init-hub-search');
-  searchWrap.innerHTML = svg('search', 15);
-  const searchInput = el('input');
-  searchInput.type = 'search';
-  searchInput.placeholder = 'Buscar proyecto…';
-  searchInput.oninput = () => { _search = searchInput.value.trim().toLowerCase(); redrawList(); };
-  searchWrap.appendChild(searchInput);
-  boxTools.appendChild(searchWrap);
-  box.appendChild(boxTools);
   box.appendChild(tableWrap);
   body.appendChild(box);
 
@@ -4315,23 +4305,42 @@ async function doImportVideoForMeeting(mid) {
    7. ACCIONES (contrato actual)
    ============================================================ */
 function promptNewInitiative() {
-  let color = INIT_COLORS[0];
+  // Color aleatorio por defecto; se puede cambiar en el selector emergente.
+  let color = INIT_COLORS[Math.floor(Math.random() * INIT_COLORS.length)];
   const m = el('div', 'modal');
   m.setAttribute('role', 'dialog'); m.setAttribute('aria-label', 'Nuevo proyecto');
   m.innerHTML = `
     <div class="modal-head"><h3>Nuevo proyecto</h3><button class="icon-btn sm" data-x aria-label="Cerrar">${svg('x', 14)}</button></div>
     <div class="modal-body">
       <div><label>Nombre del proyecto</label><input class="field" type="text"><div class="field-error"></div></div>
-      <div><label>Color</label>
-        <div class="color-swatches">${INIT_COLORS.map((c, i) => `<button type="button" class="color-sw${i === 0 ? ' on' : ''}" data-color="${c}" style="--sw:${c}" aria-label="Color ${i + 1}"></button>`).join('')}</div>
+      <div class="np-color-row">
+        <label>Color</label>
+        <div class="np-color-wrap">
+          <button type="button" class="np-color-btn" id="npColorBtn">
+            <span class="np-color-dot" style="background:${color}"></span>
+            <span class="np-color-txt">Aleatorio</span>
+            <span class="np-color-chev">${svg('chevronDown', 12)}</span>
+          </button>
+          <div class="np-color-pop" id="npColorPop" hidden>
+            ${INIT_COLORS.map(c => `<button type="button" class="color-sw${c === color ? ' on' : ''}" data-color="${c}" style="--sw:${c}" aria-label="Color"></button>`).join('')}
+          </div>
+        </div>
       </div>
     </div>
     <div class="modal-foot"><button class="btn" data-c>Cancelar (Esc)</button><button class="btn btn-primary" data-ok>Crear (⏎)</button></div>`;
   const input = m.querySelector('.field'); const err = m.querySelector('.field-error');
-  m.querySelectorAll('.color-sw').forEach(sw => sw.onclick = () => {
+  const colorBtn = m.querySelector('#npColorBtn');
+  const pop = m.querySelector('#npColorPop');
+  const dot = m.querySelector('.np-color-dot');
+  const txt = m.querySelector('.np-color-txt');
+  colorBtn.onclick = (e) => { e.stopPropagation(); pop.hidden = !pop.hidden; };
+  m.addEventListener('click', (e) => { if (!e.target.closest('.np-color-wrap')) pop.hidden = true; });
+  pop.querySelectorAll('.color-sw').forEach(sw => sw.onclick = () => {
     color = sw.dataset.color;
-    m.querySelectorAll('.color-sw').forEach(x => x.classList.remove('on'));
-    sw.classList.add('on');
+    dot.style.background = color;
+    txt.textContent = 'Personalizado';
+    pop.querySelectorAll('.color-sw').forEach(x => x.classList.toggle('on', x === sw));
+    pop.hidden = true;
   });
   const submit = async () => {
     const name = input.value.trim();
