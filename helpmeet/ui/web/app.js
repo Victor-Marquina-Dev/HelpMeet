@@ -3767,6 +3767,15 @@ function viewAllInitiatives() {
    ============================================================ */
 let _sidebarSearch = '';
 
+// Etiqueta de reunión estilo "vie 04 Jul" (día en minúscula, mes con mayúscula inicial).
+function _fmtMeetingLabel(m) {
+  const d = m && m.started_at ? new Date(m.started_at) : null;
+  if (!d || isNaN(d)) return (m && m.title) || '';
+  const WD = ['dom', 'lun', 'mar', 'mié', 'jue', 'vie', 'sáb'];
+  const MO = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
+  return `${WD[d.getDay()]} ${String(d.getDate()).padStart(2, '0')} ${MO[d.getMonth()]}`;
+}
+
 function _renderInitRow(tree, it) {
   const open = !!STATE.openInits[it.id];
   const ms = STATE.meetingsByInit[it.id] || [];
@@ -3787,9 +3796,13 @@ function _renderInitRow(tree, it) {
       const d = new Date(iso); if (isNaN(d)) return null;
       const day = d.getDay();
       const mon = new Date(d); mon.setDate(d.getDate() - (day === 0 ? 6 : day - 1));
+      mon.setHours(0, 0, 0, 0); // normaliza al lunes 00:00 local
       const sun = new Date(mon); sun.setDate(mon.getDate() + 6);
       const fmt = dt => `${dt.getDate()} ${MS[dt.getMonth()]}`;
-      return { key: mon.toISOString().slice(0,10), label: `${fmt(mon)} – ${fmt(sun)}` };
+      // Clave con fecha LOCAL (no UTC): así la clave coincide con la etiqueta y
+      // no se duplican semanas por reuniones de madrugada.
+      const key = `${mon.getFullYear()}-${String(mon.getMonth()+1).padStart(2,'0')}-${String(mon.getDate()).padStart(2,'0')}`;
+      return { key, label: `${fmt(mon)} – ${fmt(sun)}` };
     };
 
     // Pre-agrupar: mes → semana → reuniones (sin duplicados)
@@ -3846,7 +3859,7 @@ function _renderInitRow(tree, it) {
             mr.dataset.mid = m.id;
             mr.title = m.title || '';
             const dotStyle = st === 'pending' ? ` style="border:1.5px solid ${mColor};background:transparent"` : st === 'done' ? ` style="background:${mColor}"` : '';
-            mr.innerHTML = `<span class="stat ${st}"${dotStyle}></span><span class="mtitle">${esc(m.title)}</span>${m.time ? '<span class="mtime">' + esc(m.time) + '</span>' : ''}`;
+            mr.innerHTML = `<span class="stat ${st}"${dotStyle}></span><span class="mtitle">${esc(_fmtMeetingLabel(m))}</span>${m.time ? '<span class="mtime">' + esc(m.time) + '</span>' : ''}`;
             mr.onclick = (e) => { e.stopPropagation(); openMeeting(m.id); };
             mr.oncontextmenu = (e) => { e.preventDefault(); e.stopPropagation(); openMeetingMenu(e, m.id); };
             sub.appendChild(mr);
@@ -3909,6 +3922,8 @@ async function selectInitiative(id) {
   const wasOpen = !!STATE.openInits[id];
   STATE.openInits = {};
   STATE.openInits[id] = !wasOpen;
+  // Al abrir una iniciativa: enrollar sus semanas y dejar solo la más reciente.
+  if (STATE._openWeeks) delete STATE._openWeeks[id];
   STATE.screen = 'initiative';
   if (!STATE.meetingsByInit[id]) STATE.meetingsByInit[id] = await api.listMeetings(id) || [];
   renderSidebar(); renderMain(); renderActionBar(); renderTopStatus();

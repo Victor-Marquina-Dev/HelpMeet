@@ -33,10 +33,10 @@
   /* Estilo Gmail: hovers, selección, avatares, botón nuevo */
   --hover-soft: rgba(60, 64, 67, 0.06);   /* hover muy sutil */
   --hover-med:  rgba(60, 64, 67, 0.09);   /* hover normal */
-  --sel-bg:     #cdeede;                    /* píldora de selección verde menta */
-  --sel-text:   #0a4a35;                    /* texto sobre píldora */
-  --newbtn-bg:  #b8ecd6;                    /* botón "Nuevo proyecto" */
-  --newbtn-text:#00382a;
+  --sel-bg:     #d3e8e1;                    /* píldora de selección (tono verde pastel nuevo) */
+  --sel-text:   #235243;                    /* texto sobre píldora */
+  --newbtn-bg:  #c6e6da;                    /* botón "Nuevo proyecto" (mismo tono pastel) */
+  --newbtn-text:#1c4b3b;
   --brand-green:#10b981;                    /* logo Helpmeet */
   --brand-green-2:#34d399;
   /* Forma / sombra — Soft-Technical (radios más rectos) */
