@@ -5871,7 +5871,6 @@ const WC_SVG = {
 function wireTopbar() {
   $('#btnRefreshSidebar').innerHTML = svg('refresh', 14);
   $('#btnNewInitiative').innerHTML = svg('plus', 14);
-  $('#navInitiatives .nav-chev').innerHTML = svg('chevron', 12);
   $('#navInitiatives .nav-ico').innerHTML = svg('folder', 14);
   // Iconos del botón "Nuevo proyecto" y del pie (los accesos van sin iconos)
   const _si = (sel, icon) => { const e = $(sel); if (e) e.innerHTML = svg(icon, 20); };
@@ -5933,23 +5932,11 @@ function wireTopbar() {
   $('#railArchive')?.addEventListener('click', () => { STATE.screen = 'archive'; renderMain(); renderTopStatus(); });
   $('#railTrash')?.addEventListener('click', () => { STATE.screen = 'trash'; renderMain(); });
   $('#railSettings')?.addEventListener('click', () => { STATE.screen = 'settings'; renderMain(); renderTopStatus(); });
-  // Clic en cualquier parte de la fila: navega + colapsa/expande árbol
+  // "Proyectos" es un acceso más (como Inicio/Documentos): solo navega.
+  // El árbol de iniciativas queda siempre visible debajo.
   $('#navInitiativesToggle').onclick = () => {
-    const tree = $('#sidebarTree');
-    const wasCollapsed = tree.classList.contains('is-collapsed');
-    if (wasCollapsed) {
-      tree.classList.remove('is-collapsed');
-      $('#navInitiatives').classList.remove('collapsed');
-      $('#navInitiativesToggle').setAttribute('aria-expanded', 'true');
-    } else {
-      tree.classList.add('is-collapsed');
-      $('#navInitiatives').classList.add('collapsed');
-      $('#navInitiativesToggle').setAttribute('aria-expanded', 'false');
-    }
-    STATE.openInits = {};
-    STATE.selInit = null; STATE.selMeeting = null;
     STATE.screen = 'initiatives-list';
-    renderSidebar(); renderMain(); renderTopStatus();
+    renderMain(); renderTopStatus();
   };
   $('#navMeetings').onclick = openMeetingsView;
   if ($('#navFavorites')) $('#navFavorites').onclick = () => { STATE.screen = 'favorites'; renderMain(); renderTopStatus(); };
