@@ -5871,7 +5871,6 @@ const WC_SVG = {
 function wireTopbar() {
   $('#btnRefreshSidebar').innerHTML = svg('refresh', 14);
   $('#btnNewInitiative').innerHTML = svg('plus', 14);
-  $('#navInitiatives .nav-ico').innerHTML = svg('folder', 14);
   // Iconos del botón "Nuevo proyecto" y del pie (los accesos van sin iconos)
   const _si = (sel, icon) => { const e = $(sel); if (e) e.innerHTML = svg(icon, 20); };
   _si('#btnNewProjectTop .np-ico', 'plus');

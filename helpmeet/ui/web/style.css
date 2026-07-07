@@ -632,7 +632,7 @@ body.rail-expanding .rail-resize-handle { background: var(--accent); }
    (refrescar/nuevo) quedan sutiles y solo aparecen al hover. */
 .sb-projects-hdr {
   display: flex; align-items: center; gap: 2px;
-  width: calc(100% - 12px); margin: 5px 6px 1px; padding: 0 6px 0 9px;
+  width: calc(100% - 12px); margin: 5px 6px 1px; padding: 0 6px 0 21px;
   min-height: 29px; border-radius: 999px;
   background: transparent;
   transition: background .12s;
