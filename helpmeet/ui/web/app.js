@@ -570,7 +570,7 @@ function renderTopStatus() {
     const it = STATE.initiatives.find(x => x.id === STATE.selInit);
     let ctx;
     if (STATE.screen === 'meeting' && STATE.transcript) {
-      ctx = `<span class="ctx-init">${esc(it ? it.name : '')}</span>${svg('chevron', 12)}<span class="ctx-meet">${esc(STATE.transcript.title)}</span>`;
+      ctx = `<span class="ctx-init">${esc(it ? it.name : '')}</span>${svg('chevron', 12)}<span class="ctx-meet">${esc(_fmtMeetingLabel(STATE.transcript))}</span>`;
     } else if (it) {
       ctx = `<span class="ctx-meet">${esc(it.name)}</span>`;
     } else {
@@ -710,7 +710,7 @@ function viewHomeFeed() {
       card.innerHTML = `
         <span class="proj-av hc-av" style="background:${avColor}">${it ? esc(initialsFor(it.name)) : '·'}</span>
         <div class="hc-info">
-          <div class="hc-title">${esc(m.title)}<span class="hc-kind" title="${m.source === 'audio' ? 'Audio de reunión' : m.source === 'import' ? 'Vídeo importado' : 'Grabación de pantalla'}">${svg(icon, 13)}</span></div>
+          <div class="hc-title">${esc(_fmtMeetingLabel(m))}<span class="hc-kind" title="${m.source === 'audio' ? 'Audio de reunión' : m.source === 'import' ? 'Vídeo importado' : 'Grabación de pantalla'}">${svg(icon, 13)}</span></div>
           <div class="hc-sub"><span class="hc-proj">${it ? esc(it.name) : 'Sin proyecto'}</span> · ${esc(sub)}</div>
         </div>
         <button class="hc-chip${done || proc ? '' : ' primary'}">${done ? 'Ver notas' : proc ? 'Ver progreso' : 'Transcribir'}</button>`;
@@ -898,7 +898,7 @@ function viewFavorites() {
         c.innerHTML = `
           <div class="rc-date"><span class="rc-mon">${mon}</span><span class="rc-day">${day}</span></div>
           <div class="rc-body">
-            <div class="rc-title">${esc(m.title)}</div>
+            <div class="rc-title">${esc(_fmtMeetingLabel(m))}</div>
             <div class="rc-meta">${m.dur ? esc(m.dur) : ''}${m.time ? '<span class="rc-size">' + esc(m.time) + '</span>' : ''}</div>
           </div>
           <div class="rc-right">
@@ -1303,7 +1303,7 @@ function viewInitiative() {
       c.innerHTML = `
         <div class="rc-sel"><span class="rc-cb"></span></div>
         <div class="rc-date"><span class="rc-mon">${mon}</span><span class="rc-day">${day}</span></div>
-        <div class="rc-body"><div class="rc-title">${esc(m.title)}</div><div class="rc-meta">${_kindIcon(m)}${m.dur ? esc(m.dur) : ''}${m.size ? '<span class="rc-size">' + esc(m.size) + '</span>' : ''}</div></div>
+        <div class="rc-body"><div class="rc-title">${esc(_fmtMeetingLabel(m))}</div><div class="rc-meta">${_kindIcon(m)}${m.dur ? esc(m.dur) : ''}${m.size ? '<span class="rc-size">' + esc(m.size) + '</span>' : ''}</div></div>
         <div class="rc-right">
           <div class="rc-actions">
             <button class="icon-btn sm rc-act-btn${isFav ? ' fav-on' : ''}" data-act="fav" title="${isFav ? 'Quitar de favoritas' : 'Marcar como favorita'}">${svg('star', 13)}</button>
@@ -1810,7 +1810,7 @@ function viewMeeting() {
         ${meetingJob ? '<span class="spinner sm meeting-title-spinner"></span>' : ''}
         <div class="meeting-title-copy">
           <div class="meeting-title-line">
-            <h1 class="mtitle-h title-lg">${esc(t ? t.title : 'Reunión')}</h1>
+            <h1 class="mtitle-h title-lg">${esc(t ? _fmtMeetingLabel(t) : 'Reunión')}</h1>
             ${meetingDateStr ? `<span class="init-created">${esc(meetingDateStr)}</span>` : ''}
             ${videoDur}
           </div>
@@ -3667,7 +3667,7 @@ function viewAllInitiatives() {
                 const st = m.status || 'done';
                 const ds = st === 'pending' ? `border:1.5px solid ${mc};background:transparent` : `background:${mc}`;
                 const isFav = _isMeetingFav(m.id);
-                mr.innerHTML = `<div class="ihm-info"><span class="stat ${st}" style="${ds}"></span><span class="ihm-title">${esc(m.title)}</span></div>
+                mr.innerHTML = `<div class="ihm-info"><span class="stat ${st}" style="${ds}"></span><span class="ihm-title">${esc(_fmtMeetingLabel(m))}</span></div>
                   <span class="ihm-date">${m.time || ''}</span>
                   <button class="icon-btn sm ihm-fav-btn${isFav ? ' fav-on' : ''}" title="${isFav ? 'Quitar de favoritos' : 'Marcar como favorito'}">${svg('star', 12)}</button>`;
                 mr.querySelector('.ihm-fav-btn').onclick = (e) => {
@@ -3765,9 +3765,12 @@ function viewAllInitiatives() {
 let _sidebarSearch = '';
 
 // Etiqueta de reunión estilo "vie 04 Jul" (día en minúscula, mes con mayúscula inicial).
+// Solo reformatea los títulos autogenerados por fecha (empiezan por DD/MM/YY);
+// respeta los nombres que el usuario haya puesto a mano.
 function _fmtMeetingLabel(m) {
+  const t = (m && m.title) || '';
   const d = m && m.started_at ? new Date(m.started_at) : null;
-  if (!d || isNaN(d)) return (m && m.title) || '';
+  if (!/^\d{2}\/\d{2}\/\d{2}/.test(t.trim()) || !d || isNaN(d)) return t;
   const WD = ['dom', 'lun', 'mar', 'mié', 'jue', 'vie', 'sáb'];
   const MO = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
   return `${WD[d.getDay()]} ${String(d.getDate()).padStart(2, '0')} ${MO[d.getMonth()]}`;
