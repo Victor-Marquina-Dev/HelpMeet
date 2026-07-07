@@ -2403,12 +2403,12 @@ body[data-sidebar="collapsed"] .actionbar--dock { left: 52px; }
 }
 .cal-dow {
   display: flex; align-items: center; justify-content: flex-start; padding: 8px 10px;
-  border-bottom: 1px solid var(--hover-med);
+  border-bottom: 1px solid var(--border-subtle);
   color: var(--text-muted); font-size: 10px; font-weight: 500;
 }
 .cal-dow.today { color: var(--text-primary); font-weight: 700; }
 .cal-cell {
-  border-right: 1px solid var(--hover-med); border-bottom: 1px solid var(--hover-med);
+  border-right: 1px solid var(--border-subtle); border-bottom: 1px solid var(--border-subtle);
   padding: 6px 8px; min-height: 0; overflow: hidden; position: relative;
   transition: background .12s;
 }
@@ -2438,7 +2438,7 @@ body[data-sidebar="collapsed"] .actionbar--dock { left: 52px; }
   flex: 1; min-height: 0; display: flex; flex-direction: column;
   background: var(--bg-app);
 }
-.cal-tg-head { display: grid; grid-template-columns: 56px repeat(7, 1fr); border-bottom: 1px solid var(--hover-med); }
+.cal-tg-head { display: grid; grid-template-columns: 56px repeat(7, 1fr); border-bottom: 1px solid var(--border-subtle); }
 .cal-tg-corner { display: flex; align-items: flex-end; justify-content: center; padding: 6px 4px; }
 .cal-tg-tz { font-size: 8.5px; color: var(--text-faint); }
 .cal-tg-dh { display: flex; align-items: center; justify-content: center; gap: 6px; padding: 9px 4px; font-size: 11px; }
@@ -2452,9 +2452,9 @@ body[data-sidebar="collapsed"] .actionbar--dock { left: 52px; }
 .cal-tg-times { position: relative; }
 .cal-tg-hl { position: absolute; right: 8px; transform: translateY(-6px); font-size: 9px; color: var(--text-faint); font-variant-numeric: tabular-nums; }
 .cal-tg-col {
-  position: relative; border-left: 1px solid var(--hover-med);
+  position: relative; border-left: 1px solid var(--border-subtle);
   background-image:
-    repeating-linear-gradient(to bottom, var(--hover-med) 0, var(--hover-med) 1px, transparent 1px, transparent 48px),
+    repeating-linear-gradient(to bottom, var(--border-subtle) 0, var(--border-subtle) 1px, transparent 1px, transparent 48px),
     repeating-linear-gradient(to bottom, var(--hover-med) 0, var(--hover-med) 1px, transparent 1px, transparent 24px);
 }
 .cal-tg-col.weekend { background-color: var(--hover-med); }
