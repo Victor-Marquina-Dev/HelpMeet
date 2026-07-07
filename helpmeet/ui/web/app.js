@@ -3373,13 +3373,9 @@ function viewAllInitiatives() {
   // ── Toolbar ───────────────────────────────────────────────
   const toolbar = el('div', 'init-hub-toolbar');
 
-  // Fila 1: título + botón nuevo
+  // Fila 1: título (el botón "Nuevo proyecto" vive en el sidebar)
   const topRow = el('div', 'init-hub-top-row');
   topRow.innerHTML = `<h1 class="page-title">Proyectos</h1>`;
-  const newBtn = el('button', 'btn btn-primary');
-  newBtn.innerHTML = `${svg('plus', 13)} Nuevo proyecto`;
-  newBtn.onclick = promptNewInitiative;
-  topRow.appendChild(newBtn);
   toolbar.appendChild(topRow);
 
   // Fila 2: chips simplificados
@@ -3865,6 +3861,10 @@ function renderSidebar() {
   // Contador de favoritos junto al acceso directo (vacío si no hay)
   const favEl = $('#favCount');
   if (favEl) { const n = _getMeetingFavs().size; favEl.textContent = n || ''; }
+
+  // Contador de proyectos junto a la cabecera "Proyectos"
+  const initCountEl = $('#initCount');
+  if (initCountEl) initCountEl.textContent = STATE.initiatives.length || '';
 
   const all = STATE.initiatives;
   const pinned = all.filter(it => it.pinned);
@@ -5872,6 +5872,7 @@ function wireTopbar() {
   $('#btnRefreshSidebar').innerHTML = svg('refresh', 14);
   $('#btnNewInitiative').innerHTML = svg('plus', 14);
   $('#navInitiatives .nav-chev').innerHTML = svg('chevron', 12);
+  $('#navInitiatives .nav-ico').innerHTML = svg('folder', 14);
   // Iconos del botón "Nuevo proyecto" y del pie (los accesos van sin iconos)
   const _si = (sel, icon) => { const e = $(sel); if (e) e.innerHTML = svg(icon, 20); };
   _si('#btnNewProjectTop .np-ico', 'plus');

@@ -625,21 +625,42 @@ body.rail-expanding .rail-resize-handle { background: var(--accent); }
 .side-item .si-label { flex: 1; text-align: left; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .side-item .si-count { font-size: 10.5px; color: var(--text-muted); font-family: var(--font-mono); }
 
-/* Cabecera "Proyectos": triángulo + texto, sin barra; iconos solo al hover */
+/* Cabecera "Proyectos": ahora se ve como un ítem de nav más (misma
+   píldora que Inicio/Calendario/Documentos), con icono de carpeta +
+   contador de proyectos a la derecha. El triángulo de despliegue del
+   árbol se conserva, pequeño, a la izquierda. Los botones de acción
+   (refrescar/nuevo) quedan sutiles y solo aparecen al hover. */
 .sb-projects-hdr {
   display: flex; align-items: center; gap: 2px;
-  margin-top: 4px; padding: 0 8px; min-height: 28px;
+  width: calc(100% - 12px); margin: 5px 6px 1px; padding: 0 6px 0 9px;
+  min-height: 29px; border-radius: 999px;
   background: transparent;
+  transition: background .12s;
 }
-.sb-projects-hdr .nav-toggle { gap: 5px; min-height: 28px; }
-.sb-projects-hdr .nav-chev { margin-left: 0; margin-right: 0; }
-.sb-projects-hdr .nav-label { flex: none; font-size: 10.5px; font-weight: 600; color: var(--text-secondary); }
+.sb-projects-hdr:hover { background: var(--hover-soft); }
+.sb-projects-hdr .nav-toggle { gap: 8px; min-height: 29px; }
+.sb-projects-hdr .nav-chev {
+  width: 14px; height: 14px; margin: 0; flex: none; color: var(--text-faint);
+}
+.sb-projects-hdr .nav-ico { display: inline-flex; flex: none; color: var(--text-faint); }
+.sb-projects-hdr .nav-label {
+  flex: 1; min-width: 0; text-align: left;
+  font-size: 12px; font-weight: 500; color: var(--text-secondary);
+  letter-spacing: .01em;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
 .sb-projects-hdr:hover .nav-label { color: var(--text-primary); }
+.sb-projects-hdr .nav-count {
+  flex: none; margin-right: 2px;
+  font-size: 10.5px; color: var(--text-muted); font-family: var(--font-mono);
+}
 #navInitiatives .sb-hdr-act { opacity: 0; transition: opacity .15s; }
 #navInitiatives:hover .sb-hdr-act { opacity: .8; }
 #navInitiatives .sb-hdr-act:hover { opacity: 1; }
 /* Sección activa (renderMain pone .active cuando se navega un proyecto) */
-.sb-projects-hdr.active .nav-label { color: var(--sel-text); font-weight: 700; }
+.sb-projects-hdr.active { background: var(--sel-bg); }
+.sb-projects-hdr.active .nav-label { color: var(--sel-text); font-weight: 600; }
+.sb-projects-hdr.active .nav-ico { color: var(--sel-text); }
 
 /* Avatar de iniciales del proyecto (position: relative para el anillo
    de actividad ::after de grabación/transcripción) */
@@ -2652,13 +2673,13 @@ body[data-sidebar="collapsed"] .actionbar--dock { left: 52px; }
 .init-hub-thead {
   flex: none; padding: 0 20px;
   border-bottom: 1px solid rgba(86,93,89,.18);
-  background: rgba(0,0,0,.08);
+  background: var(--bg-input);
 }
 .iht {
   position: relative;
-  padding: 10px 8px;
-  font-size: 8px; font-weight: 700; letter-spacing: 1px;
-  color: var(--text-faint); text-transform: uppercase; user-select: none;
+  padding: 9px 8px;
+  font-size: 10px; font-weight: 700; letter-spacing: .8px;
+  color: var(--text-muted); text-transform: uppercase; user-select: none;
 }
 .iht--center { text-align: center; }
 
@@ -2680,7 +2701,7 @@ body[data-sidebar="collapsed"] .actionbar--dock { left: 52px; }
   cursor: pointer; transition: background .12s;
 }
 .init-hub-row:hover { background: var(--hover-med); }
-.init-hub-row.is-selected { background: rgba(10, 146, 104,.07); border-left: 2px solid var(--accent); }
+.init-hub-row.is-selected { background: var(--accent-soft); box-shadow: inset 3px 0 0 var(--accent); }
 
 /* Celdas de fila */
 .ihr-chev {
@@ -2695,19 +2716,19 @@ body[data-sidebar="collapsed"] .actionbar--dock { left: 52px; }
   transition: opacity .12s, color .12s;
 }
 .ihr-pin.is-pinned, .ihr-pin:hover { opacity: 1; color: var(--accent); }
-.ihr-name-cell { display: flex; align-items: center; gap: 9px; padding: 11px 6px; min-width: 0; }
-.ihr-dot { width: 8px; height: 8px; border-radius: 50%; flex: none; }
+.ihr-name-cell { display: flex; align-items: center; gap: 9px; padding: 9px 6px; min-width: 0; }
+.ihr-dot { width: 9px; height: 9px; border-radius: 50%; flex: none; }
 .ihr-info { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
-.ihr-name { font-size: 11.5px; font-weight: 500; color: var(--text-primary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ihr-name { font-size: 12.5px; font-weight: 600; color: var(--text-primary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .ihr-desc { font-size: 9.5px; color: var(--text-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .ihr-status, .ihr-activity, .ihr-meetings, .ihr-pending {
-  padding: 0 6px; font-size: 10.5px; color: var(--text-secondary);
+  padding: 0 6px; font-size: 12.5px; color: var(--text-secondary);
   display: flex; align-items: center; justify-content: center; text-align: center;
 }
-.ihr-activity { font-size: 10px; color: var(--text-muted); }
-.ihr-meetings { font-size: 10.5px; gap: 4px; color: var(--text-muted); }
-.ihr-pending { font-size: 9.5px; color: var(--text-faint); }
-.ihr-pending.has-pending { color: var(--danger); font-weight: 500; }
+.ihr-activity { font-size: 11.5px; color: var(--text-muted); }
+.ihr-meetings { font-size: 12px; gap: 4px; color: var(--text-muted); }
+.ihr-pending { font-size: 10.5px; color: var(--text-faint); }
+.ihr-pending.has-pending { color: var(--warning); font-weight: 500; }
 .ihr-menu-btn { justify-self: end; opacity: 0; transition: opacity .12s; }
 .init-hub-row:hover .ihr-menu-btn { opacity: 1; }
 
@@ -2727,11 +2748,11 @@ body[data-sidebar="collapsed"] .actionbar--dock { left: 52px; }
 
 /* Acordeón de reuniones */
 .init-hub-sub {
-  background: rgba(0,0,0,.15);
+  background: var(--bg-surface);
   border-bottom: 1px solid rgba(86,93,89,.15);
 }
 .ihm-info { display: flex; align-items: center; gap: 8px; padding: 9px 6px; min-width: 0; }
-.ihm-title { font-size: 10.5px; color: var(--text-secondary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ihm-title { font-size: 10.5px; color: var(--text-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .ihm-date { font-size: 9.5px; color: var(--text-faint); padding: 0 6px; font-family: var(--font-mono); }
 /* ── Encabezados mes/semana en la tabla de iniciativas ── */
 .ihm-month-hdr {
@@ -2776,10 +2797,11 @@ body[data-sidebar="collapsed"] .actionbar--dock { left: 52px; }
 /* Status chips */
 .init-status-chip {
   display: inline-flex; align-items: center;
-  height: 18px; padding: 0 7px; border-radius: 4px;
-  font-size: 9px; font-weight: 600; letter-spacing: .3px;
+  height: 18px; padding: 0 7px; border-radius: 20px;
+  border: 1px solid transparent;
+  font-size: 10px; font-weight: 600; letter-spacing: .3px;
 }
-.init-status-chip.active { background: rgba(10, 146, 104,.15); color: var(--accent); }
+.init-status-chip.active { background: transparent; border-color: var(--accent); color: var(--accent); }
 .init-status-chip.paused { background: rgba(241,184,75,.12); color: var(--warning); }
 .init-status-chip.closed { background: var(--hover-med); color: var(--text-faint); }
 
@@ -2816,8 +2838,8 @@ body[data-sidebar="collapsed"] .actionbar--dock { left: 52px; }
   font-size: 10.5px; color: var(--text-secondary);
 }
 .ihp-stat svg { color: var(--text-faint); flex: none; }
-.ihp-stat.is-pending { color: var(--danger); }
-.ihp-stat.is-pending svg { color: var(--danger); }
+.ihp-stat.is-pending { color: var(--warning); }
+.ihp-stat.is-pending svg { color: var(--warning); }
 .ihp-actions-title {
   font-size: 8.5px; font-weight: 700; letter-spacing: .8px;
   color: var(--text-faint); text-transform: uppercase;
