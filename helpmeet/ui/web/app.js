@@ -3379,8 +3379,6 @@ function viewAllInitiatives() {
   topRow.innerHTML = `<h1 class="page-title">Proyectos</h1>`
     + `<span class="init-hub-count">${_nAct} activo${_nAct === 1 ? '' : 's'}</span>`;
   toolbar.appendChild(topRow);
-  toolbar.appendChild(el('p', 'init-hub-subtext',
-    'Clic en un proyecto para desplegar sus reuniones y ver sus acciones a la derecha.'));
   wrap.appendChild(toolbar);
 
   // ── Cuerpo: tabla + panel ─────────────────────────────────
@@ -3452,7 +3450,6 @@ function viewAllInitiatives() {
   searchInput.oninput = () => { _search = searchInput.value.trim().toLowerCase(); redrawList(); };
   searchWrap.appendChild(searchInput);
   boxTools.appendChild(searchWrap);
-  boxTools.appendChild(el('span', 'init-hub-box-hint', 'Ancladas arriba'));
   box.appendChild(boxTools);
   box.appendChild(tableWrap);
   body.appendChild(box);
