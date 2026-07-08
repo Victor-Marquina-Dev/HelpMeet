@@ -3391,3 +3391,13 @@ body[data-theme="dark"] .tour-next { color: var(--on-accent); }
 .docs-card .docs-ico { opacity: 0; transition: opacity .12s; }
 .docs-card:hover .docs-ico, .docs-card .docs-ico:focus-visible { opacity: 1; }
 .docs-view { padding: 6px 12px; font-size: 11.5px; }
+
+/* Avatares de proyecto: color por variable --av.
+   Claro: relleno de color con iniciales blancas (como siempre).
+   Oscuro: tinte suave del color + iniciales del color (sin apagarlos). */
+.proj-av { background: var(--av, var(--text-faint)); }
+body[data-theme="dark"] .proj-av {
+  filter: none;
+  background: color-mix(in srgb, var(--av, var(--text-faint)) 26%, transparent);
+  color: var(--av, var(--text-secondary));
+}

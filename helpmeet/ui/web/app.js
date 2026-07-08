@@ -708,7 +708,7 @@ function viewHomeFeed() {
       const avColor = it ? (it.color || avatarColorFor(it.name)) : 'var(--text-faint)';
       const card = el('div', 'home-card');
       card.innerHTML = `
-        <span class="proj-av hc-av" style="background:${avColor}">${it ? esc(initialsFor(it.name)) : '·'}</span>
+        <span class="proj-av hc-av" style="--av:${avColor}">${it ? esc(initialsFor(it.name)) : '·'}</span>
         <div class="hc-info">
           <div class="hc-title">${esc(_fmtMeetingLabel(m))}<span class="hc-kind" title="${m.source === 'audio' ? 'Audio de reunión' : m.source === 'import' ? 'Vídeo importado' : 'Grabación de pantalla'}">${svg(icon, 13)}</span></div>
           <div class="hc-sub"><span class="hc-proj">${it ? esc(it.name) : 'Sin proyecto'}</span> · ${esc(sub)}</div>
@@ -1235,7 +1235,7 @@ function viewInitiative() {
   head.innerHTML = `
     <div class="init-status-row">
       <div class="init-title-group">
-        <span class="proj-av init-av" style="background:${(it && it.color) || avatarColorFor(it ? it.name : '')}">${esc(initialsFor(it ? it.name : ''))}</span>
+        <span class="proj-av init-av" style="--av:${(it && it.color) || avatarColorFor(it ? it.name : '')}">${esc(initialsFor(it ? it.name : ''))}</span>
         <div class="init-title-col">
           <h1 class="mtitle-h title-lg">${esc(it ? it.name : '')}</h1>
           <span class="init-meta">${esc(initMeta)}</span>
@@ -1308,12 +1308,12 @@ function viewInitiative() {
         <div class="rc-date"><span class="rc-mon">${mon}</span><span class="rc-day">${day}</span></div>
         <div class="rc-body"><div class="rc-title">${esc(_fmtMeetingLabel(m))}</div><div class="rc-meta">${_kindIcon(m)}${m.dur ? esc(m.dur) : ''}${m.size ? '<span class="rc-size">' + esc(m.size) + '</span>' : ''}${stTag}</div></div>
         <div class="rc-right">
-          <button class="hm-view" data-act="open">${viewLabel}</button>
           <div class="rc-actions">
             <button class="icon-btn sm rc-act-btn${isFav ? ' fav-on' : ''}" data-act="fav" title="${isFav ? 'Quitar de favoritas' : 'Marcar como favorita'}">${svg('star', 13)}</button>
             <button class="icon-btn sm rc-act-btn" data-act="rename" title="Renombrar">${svg('edit', 13)}</button>
             <button class="icon-btn sm rc-act-btn" data-act="archive" title="Archivar reunión">${svg('archive', 13)}</button>
           </div>
+          <button class="hm-view" data-act="open">${viewLabel}</button>
         </div>`;
       // Botón principal: mismo comportamiento que las tarjetas de Inicio
       c.querySelector('.hm-view').onclick = (e) => {
@@ -3792,7 +3792,7 @@ function _renderInitRow(tree, it) {
   const row = el('div', 'tree-initiative' + (open ? ' open' : '') + (isSelected ? ' selected' : ''));
   row.dataset.iid = it.id;
   row.title = it.name || '';
-  const av = `<span class="proj-av" style="background:${it.color || avatarColorFor(it.name)}">${esc(initialsFor(it.name))}</span>`;
+  const av = `<span class="proj-av" style="--av:${it.color || avatarColorFor(it.name)}">${esc(initialsFor(it.name))}</span>`;
   row.innerHTML = `<span class="chev">${svg('chevron', 14)}</span>${av}<span class="name">${esc(it.name)}</span>${it.pinned ? '<span class="pin-ind">' + svg('pin', 12) + '</span>' : ''}<span class="count">${ms.length || ''}</span>`;
   row.onclick = () => selectInitiative(it.id);
   row.oncontextmenu = (e) => { e.preventDefault(); openInitiativeMenu(e, it.id); };
@@ -4080,7 +4080,7 @@ function formModal(title, fieldLabel, value, okLabel, onOk, opts) {
       <div><label>${esc(fieldLabel)}</label>${opts.textarea ? `<textarea class="field" style="height:auto;min-height:70px;padding:9px"></textarea>` : `<input class="field" type="text" value="${esc(value || '')}">`}
       <div class="field-error"></div></div>
     </div>
-    <div class="modal-foot"><button class="btn" data-c>Cancelar<kbd>Esc</kbd></button><button class="btn btn-primary" data-ok>${esc(okLabel)}<kbd>⏎</kbd></button></div>`;
+    <div class="modal-foot"><button class="btn" data-c>Cancelar</button><button class="btn btn-primary" data-ok>${esc(okLabel)}</button></div>`;
   const input = m.querySelector('.field'); const err = m.querySelector('.field-error');
   const submit = async () => {
     const v = input.value.trim();
@@ -4347,7 +4347,7 @@ function promptNewInitiative() {
         </div>
       </div>
     </div>
-    <div class="modal-foot"><button class="btn" data-c>Cancelar (Esc)</button><button class="btn btn-primary" data-ok>Crear (⏎)</button></div>`;
+    <div class="modal-foot"><button class="btn" data-c>Cancelar</button><button class="btn btn-primary" data-ok>Crear</button></div>`;
   const input = m.querySelector('.field'); const err = m.querySelector('.field-error');
   const colorBtn = m.querySelector('#npColorBtn');
   const pop = m.querySelector('#npColorPop');
