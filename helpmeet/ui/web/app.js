@@ -2510,7 +2510,7 @@ async function transcribeScreenVideo(mid, force, clipSegments) {
     if (STATE.screen === 'meeting' && STATE.selMeeting === mid) await openMeeting(mid, true);
     toast('ok', 'Se transcribe en segundo plano · puedes seguir grabando');
   } else {
-    toast('err', (f && f.error) || 'No se pudo transcribir el vídeo');
+    toast('err', errMsg(f && f.error, 'No se pudo transcribir el vídeo'));
   }
 }
 
@@ -2948,7 +2948,7 @@ function viewArchiveTrash(which) {
         <div style="display:flex;gap:7px"><button class="btn" data-restore>Restaurar</button><button class="btn btn-danger" data-del>Eliminar</button></div>`;
       c.querySelector('[data-restore]').onclick = async () => {
         const r = await api.restoreItem(x.kind, x.id);
-        if (r && r.ok === false) { toast('err', r.error || 'No se pudo restaurar'); return; }
+        if (r && r.ok === false) { toast('err', errMsg(r.error, 'No se pudo restaurar')); return; }
         toast('ok', 'Restaurado'); reloadLibrary(which); refreshAll(); updateLibraryCounts();
       };
       c.querySelector('[data-del]').onclick = () => confirmModal(
@@ -2957,7 +2957,7 @@ function viewArchiveTrash(which) {
         'Eliminar para siempre',
         async () => {
           const r = await api.permanentlyDeleteItem(x.kind, x.id);
-          if (r && r.ok === false) { toast('err', r.error || 'No se pudo eliminar'); return; }
+          if (r && r.ok === false) { toast('err', errMsg(r.error, 'No se pudo eliminar')); return; }
           toast('ok', 'Eliminado permanentemente'); reloadLibrary(which); refreshAll(); updateLibraryCounts();
         }
       );
@@ -3172,7 +3172,7 @@ function buildDocCard(d, onChanged) {
     'Eliminar',
     async () => {
       const r = await api.deleteDocument(d.initiative_id, d.name);
-      if (r && r.ok === false) { toast('err', r.error || 'No se pudo eliminar'); return; }
+      if (r && r.ok === false) { toast('err', errMsg(r.error, 'No se pudo eliminar')); return; }
       toast('ok', 'Documento eliminado');
       await onChanged();
     },
@@ -3948,7 +3948,7 @@ async function openMeeting(mid, keepTab) {
     renderSidebar(); renderMain(); renderTopStatus();
   } catch (err) {
     STATE.screen = STATE.selInit ? 'initiative' : 'welcome';
-    toast('err', 'Error al abrir la reunión: ' + (err && err.message ? err.message : String(err)));
+    toast('err', errMsg(err, 'No se pudo abrir la reunión'));
     renderSidebar(); renderMain();
   }
 }
@@ -4107,6 +4107,36 @@ function confirmModal(title, body, okLabel, onOk, danger) {
   openModal(m);
 }
 
+// Traduce errores del backend a mensajes cortos en español.
+// Códigos conocidos → texto fijo; frases ya en español → tal cual;
+// tecnicismos (códigos snake_case, excepciones en inglés) → el mensaje genérico.
+const ERR_ES = {
+  'no_license':                    'No hay licencia activa.',
+  'license_not_found':             'Key no encontrada. Revísala e inténtalo de nuevo.',
+  'invalid_key':                   'Key inválida. Revísala e inténtalo de nuevo.',
+  'license_already_activated':     'Esta key ya está en uso en otro equipo.',
+  'already_activated_this_device': 'Este equipo ya está activado con esta licencia.',
+  'license_revoked':               'Esta licencia fue revocada.',
+  'license_expired':               'Esta licencia expiró.',
+  'license_device_limit':          'Esta licencia ya no admite más equipos.',
+  'device_limit_reached':          'Esta licencia ya no admite más equipos.',
+  'license_server_requires_https': 'No se pudo conectar de forma segura al servidor.',
+  'offline_expired':               'Sin conexión con el servidor de licencias.',
+  'new_version':                   'Nueva versión instalada: vuelve a activar tu licencia.',
+};
+function errMsg(raw, fallback) {
+  let s = String(raw == null ? '' : (raw.message || raw)).trim();
+  s = s.replace(/^error[:\s]+/i, '').trim();
+  if (!s) return fallback;
+  const code = s.toLowerCase();
+  if (ERR_ES[code]) return ERR_ES[code];
+  // Un código técnico o una excepción en inglés no se enseñan tal cual
+  if (/^[a-z0-9_.\-]+$/i.test(s)) return fallback;
+  if (/(traceback|exception|errno|winerror|timed? ?out|failed|cannot|unable|refused|denied|argument|nonetype|keyerror|typeerror)/i.test(s)) return fallback;
+  if (s.length > 140) return fallback;
+  return s;
+}
+
 function toast(kind, msg, action, onAction) {
   const t = el('div', 'toast ' + (kind || 'info'));
   const i = kind === 'err' ? svg('x', 12) : svg('check', 12);
@@ -4218,7 +4248,7 @@ async function _importVideosToInit(iid) {
   const name = it ? it.name : 'el proyecto';
   const r = await api.importMediaMultiple(iid).catch(() => null);
   if (!r || r.cancelled) return;
-  if (r.error) { toast('err', r.error); return; }
+  if (r.error) { toast('err', errMsg(r.error, 'No se pudieron importar los vídeos')); return; }
   if (r.ok) {
     toast('info', `Registrando ${r.count} video${r.count !== 1 ? 's' : ''}…`);
     await refreshMeetings(iid);
@@ -4312,7 +4342,7 @@ function openMeetingMenu(e, mid) {
 async function doImportVideoForMeeting(mid) {
   const r = await api.importVideoForMeeting(mid);
   if (!r || r.cancelled) return;
-  if (r.error) { toast('err', 'No se pudo importar: ' + r.error); return; }
+  if (r.error) { toast('err', errMsg(r.error, 'No se pudo importar el archivo')); return; }
   if (r.ok) {
     toast('ok', `«${r.filename || 'video'}» importado · transcribiendo en segundo plano`);
     try { renderBgJobs(await api.getBackgroundJobs()); } catch (e) {}
@@ -4436,7 +4466,7 @@ function promptChangeMeetingDate(mid) {
       closeModal(); toast('ok', 'Fecha actualizada');
       await refreshMeetings(STATE.selInit); renderMain();
     } else {
-      toast('err', (r && r.error) || 'No se pudo cambiar la fecha');
+      toast('err', errMsg(r && r.error, 'No se pudo cambiar la fecha'));
     }
   };
   openModal(wrap);
@@ -4568,7 +4598,7 @@ async function doImport(btn) {
       btn.classList.add('is-loading');
     }
     const r = await api.importMediaMultiple(initId);
-    if (r && r.error) { toast('err', 'No se pudo importar: ' + r.error); }
+    if (r && r.error) { toast('err', errMsg(r.error, 'No se pudo importar el archivo')); }
     else if (r && r.cancelled) { /* usuario cerró el diálogo */ }
     else if (r && r.ok) {
       toast('info', `Registrando ${r.count} video${r.count !== 1 ? 's' : ''}…`);
@@ -4627,7 +4657,7 @@ async function beginMeetingRecording(title) {
 async function toggleMeetingMic() {
   const next = !STATE.meetingMicMuted;
   const r = await api.toggleMeetingMicMute(next);
-  if (!r || r.ok === false) { toast('err', (r && r.error) || 'No se pudo cambiar el micrófono'); return; }
+  if (!r || r.ok === false) { toast('err', errMsg(r && r.error, 'No se pudo cambiar el micrófono')); return; }
   STATE.meetingMicMuted = next;
   renderActionBar();
   toast('info', next ? 'Tu micrófono está silenciado' : 'Tu micrófono está activo');
@@ -4660,7 +4690,7 @@ async function stopMeetingRecording() {
         });
       }
     } else {
-      toast('err', (r && r.error) || 'No se pudo finalizar la reunión');
+      toast('err', errMsg(r && r.error, 'No se pudo finalizar la reunión'));
     }
   } catch (e) {
     setAppState('idle');
@@ -4698,7 +4728,7 @@ async function openScreenPanel() {
     }
   } catch (_) {}
   const r = await api.startScreenPreview(STATE.monitorIdx);
-  if (!r || r.ok === false) { toast('err', (r && r.error) || 'No se pudo abrir la vista previa'); return; }
+  if (!r || r.ok === false) { toast('err', errMsg(r && r.error, 'No se pudo abrir la vista previa')); return; }
   if (r.recording) {
     STATE.screenMeetingId = r.meeting_id || null;
     STATE.screenRecording = true;
@@ -4977,7 +5007,7 @@ async function startScreenFromPanel() {
   const t = STATE.screenTransform;
   await api.setScreenTransform(t.x, t.y, t.w, t.h);  // colocación elegida
   const r = await api.startScreenRecording(STATE.selInit, STATE.monitorIdx);
-  if (!r || r.ok === false) { toast('err', (r && r.error) || 'No se pudo iniciar la grabación'); return; }
+  if (!r || r.ok === false) { toast('err', errMsg(r && r.error, 'No se pudo iniciar la grabación')); return; }
   STATE.screenMeetingId = r.meeting_id || null;
   STATE.micMuted = !!r.mic_muted;
   STATE.screenRecording = true;
@@ -5013,7 +5043,7 @@ async function stopScreenRecording() {
     toast('info', 'Guardando video…');
     await refreshMeetings(STATE.selInit);
   } else {
-    toast('err', (res && res.error) || 'No se pudo detener la grabación');
+    toast('err', errMsg(res && res.error, 'No se pudo detener la grabación'));
   }
 }
 // El vídeo terminó de guardarse/mezclarse en segundo plano.
@@ -5122,7 +5152,7 @@ async function toggleInitiativePin(iid) {
 function archiveInitiative(iid) {
   confirmModal('Archivar proyecto', 'Se moverá al Archivo. Podrás restaurarla cuando quieras.', 'Archivar', async () => {
     const r = await api.archiveItem('initiative', iid);
-    if (r && r.ok === false) { toast('err', r.error || 'No se pudo archivar'); return; }
+    if (r && r.ok === false) { toast('err', errMsg(r.error, 'No se pudo archivar')); return; }
     toast('ok', 'Proyecto archivado'); _afterRemoveFromTree(iid); STATE.initiatives = await api.listInitiatives() || []; renderSidebar(); renderMain(); updateLibraryCounts();
   }, false);
 }
@@ -5261,7 +5291,7 @@ function showInitialTourIfNeeded(force) {
 function archiveMeeting(mid) {
   confirmModal('Archivar reunión', 'Se moverá al Archivo. Podrás restaurarla.', 'Archivar', async () => {
     const r = await api.archiveItem('meeting', mid);
-    if (r && r.ok === false) { toast('err', r.error || 'No se pudo archivar'); return; }
+    if (r && r.ok === false) { toast('err', errMsg(r.error, 'No se pudo archivar')); return; }
     toast('ok', 'Reunión archivada'); if (STATE.selMeeting === mid) backToTree(); refreshAll(); updateLibraryCounts();
   }, false);
 }
@@ -5417,7 +5447,7 @@ function showRecoveryBanner(rec) {
     closeModal();
     if (!v2Available('recover_recording')) { toast('err', 'Recuperación no disponible'); return; }
     const r = await api.v2.recoverRecording(rec.id);
-    if (!r || !r.ok) { toast('err', r && r.error ? r.error : 'No se pudo recuperar la grabación'); return; }
+    if (!r || !r.ok) { toast('err', errMsg(r && r.error, 'No se pudo recuperar la grabación')); return; }
     try { renderBgJobs(await api.getBackgroundJobs()); } catch (e) {}
     if (r.meeting_id) {
       // Reunión conocida: navegar directo a ella (ya tiene video_path)
@@ -6184,7 +6214,7 @@ function showSetupOverlay(cfg) {
     } else if (e.stage === 'error') {
       if (errEl) {
         errEl.hidden = false;
-        const msg = e.error || 'Error durante la instalación.';
+        const msg = errMsg(e.error, 'Error durante la instalación.');
         errEl.innerHTML =
           `<span class="setup-error-text">${esc(msg)}</span>` +
           `<a class="setup-clear-cache" href="#">Limpiar caché y reintentar</a>`;
@@ -6242,16 +6272,7 @@ window.doLicenseActivate = async function() {
       await _finishInit();
     } else {
       if (errEl) {
-        const _licErr = {
-          'license_not_found':           'Key no encontrada. Revisa que la escribiste correctamente.',
-          'license_already_activated':   'Esta key ya está en uso en otro equipo.',
-          'license_revoked':             'Esta licencia ha sido revocada.',
-          'license_expired':             'Esta licencia ha expirado.',
-          'already_activated_this_device': 'Este equipo ya está activado con esta licencia.',
-          'license_device_limit':        'Se alcanzó el límite de dispositivos para esta licencia.',
-        };
-        const raw = (result && result.error) || '';
-        errEl.textContent = _licErr[raw] || raw || 'Key inválida. Inténtalo de nuevo.';
+        errEl.textContent = errMsg(result && result.error, 'No se pudo activar. Revisa la key e inténtalo de nuevo.');
         errEl.hidden = false;
       }
       input.classList.add('lic-shake');
