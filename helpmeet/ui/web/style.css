@@ -3398,6 +3398,6 @@ body[data-theme="dark"] .tour-next { color: var(--on-accent); }
 .proj-av { background: var(--av, var(--text-faint)); }
 body[data-theme="dark"] .proj-av {
   filter: none;
-  background: color-mix(in srgb, var(--av, var(--text-faint)) 26%, transparent);
-  color: var(--av, var(--text-secondary));
+  background: color-mix(in srgb, var(--av, var(--text-faint)) 15%, transparent);
+  color: color-mix(in srgb, var(--av, var(--text-secondary)) 80%, var(--text-secondary));
 }
