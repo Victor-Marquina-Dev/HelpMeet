@@ -3008,12 +3008,21 @@ body[data-theme="dark"] .cal-tg-ev:hover { filter: brightness(1.18) saturate(1.1
 }
 
 .license-gate {
-  position: fixed; top: 52px; left: 0; right: 0; bottom: 0; z-index: 9999;
+  /* Cubre toda la ventana; la topbar (z 10000) queda encima y comparte
+     el mismo fondo, así arriba no asoma nada de la app (main, sidebar…) */
+  position: fixed; inset: 0; z-index: 9999;
   background: var(--bg-app);
   display: flex; align-items: center; justify-content: center;
-  padding: 24px;
+  padding: 60px 24px 24px;
 }
 .license-gate[hidden] { display: none !important; }
+
+/* Mientras la licencia está activa como pantalla, la app de detrás se oculta
+   y la topbar queda mínima (marca + controles de ventana, sin hamburguesa) */
+body.licensing .body,
+body.licensing .actionbar { visibility: hidden; }
+body.licensing .topbar-menu,
+body.licensing .topbar-status { visibility: hidden; }
 
 /* Animaciones de la pantalla de licencia */
 @keyframes lic-fade-in  { from { opacity:0; transform:scale(.97) translateY(6px); } to { opacity:1; transform:none; } }

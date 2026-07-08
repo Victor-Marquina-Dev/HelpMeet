@@ -5135,6 +5135,7 @@ const TOUR_KEY = 'hm.tour.v2';
 function showInitialTourIfNeeded(force) {
   if (!force && load(TOUR_KEY, '') === '1') return;
   if (document.querySelector('.setup-overlay') || document.getElementById('initialTour')) return;
+  if (document.body.classList.contains('licensing')) return;   // nunca sobre la pantalla de licencia
   STATE.sidebarOpen = true;
   applySidebar();
   renderActionBar();
@@ -6237,6 +6238,7 @@ window.doLicenseActivate = async function() {
       await new Promise(r => setTimeout(r, 400));
       gate.hidden = true;
       gate.classList.remove('lic-fade-out');
+      document.body.classList.remove('licensing');
       await _finishInit();
     } else {
       if (errEl) {
@@ -6266,6 +6268,13 @@ window.doLicenseActivate = async function() {
 
 function showLicenseGate() {
   const gate = document.getElementById('licenseGate');
+  // Pantalla completa: oculta la app de detrás y cierra modales abiertos
+  // (p. ej. si se llega aquí desde Configuración → Desactivar licencia).
+  document.body.classList.add('licensing');
+  try { closeModal(); } catch (e) {}
+  // El tour (z 12000) quedaría por encima del gate: fuera también.
+  document.getElementById('initialTour')?.remove();
+  document.querySelectorAll('.tour-target').forEach(n => n.classList.remove('tour-target'));
   gate.hidden = false;
   gate.classList.add('lic-fade-in');
   setTimeout(() => gate.classList.remove('lic-fade-in'), 400);
