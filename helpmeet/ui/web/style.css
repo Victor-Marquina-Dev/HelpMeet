@@ -2465,7 +2465,8 @@ body[data-sidebar="collapsed"] .actionbar--dock { left: 52px; }
   display: flex; flex-direction: column; justify-content: flex-start; gap: 1px;
   transition: filter .12s, transform .08s;
 }
-.cal-tg-ev:hover { filter: brightness(1.3); transform: translateX(1px); }
+.cal-tg-ev:hover { filter: brightness(0.94) saturate(1.15); transform: translateX(1px); }
+body[data-theme="dark"] .cal-tg-ev:hover { filter: brightness(1.18) saturate(1.1); }
 .cal-tg-ev-title { font-size: 10px; font-weight: 600; color: var(--text-secondary); line-height: 1.25; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .cal-tg-ev-time { font-size: 8.5px; font-family: var(--font-mono); line-height: 1.2; }
 
