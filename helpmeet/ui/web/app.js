@@ -1292,26 +1292,35 @@ function viewInitiative() {
     const _appendCard = (m, container) => {
       const c = el('div', 'row-card' + (m.status === 'pending' ? ' warn' : m.status === 'done' ? ' done' : ''));
       const { day, mon } = parseMeetingDate(m.date || m.started_at);
-      const pill = m.status === 'done'
-        ? '<span class="pill pill-done"><span class="pd"></span>Finalizada</span>'
+      // Estado como etiqueta pequeña en la meta (modelo de fila unificado)
+      const stTag = m.status === 'done'
+        ? '<span class="hm-tag ok"><span class="dt"></span>Finalizada</span>'
         : m.status === 'processing'
-        ? '<span class="pill pill-proc"><span class="spinner sm"></span>Transcribiendo…</span>'
+        ? '<span class="hm-tag proc"><span class="spinner sm"></span>Transcribiendo…</span>'
         : m.status === 'error'
-        ? '<span class="pill pill-error"><span class="pd"></span>Error</span>'
-        : '<span class="pill pill-pending"><span class="pd"></span>Pendiente</span>';
+        ? '<span class="hm-tag err"><span class="dt"></span>Error</span>'
+        : '<span class="hm-tag warn"><span class="dt"></span>Pendiente</span>';
+      const viewLabel = m.status === 'done' ? 'Ver notas'
+        : m.status === 'processing' ? 'Ver progreso' : 'Transcribir';
       const isFav = _isMeetingFav(m.id);
       c.innerHTML = `
         <div class="rc-sel"><span class="rc-cb"></span></div>
         <div class="rc-date"><span class="rc-mon">${mon}</span><span class="rc-day">${day}</span></div>
-        <div class="rc-body"><div class="rc-title">${esc(_fmtMeetingLabel(m))}</div><div class="rc-meta">${_kindIcon(m)}${m.dur ? esc(m.dur) : ''}${m.size ? '<span class="rc-size">' + esc(m.size) + '</span>' : ''}</div></div>
+        <div class="rc-body"><div class="rc-title">${esc(_fmtMeetingLabel(m))}</div><div class="rc-meta">${_kindIcon(m)}${m.dur ? esc(m.dur) : ''}${m.size ? '<span class="rc-size">' + esc(m.size) + '</span>' : ''}${stTag}</div></div>
         <div class="rc-right">
+          <button class="hm-view" data-act="open">${viewLabel}</button>
           <div class="rc-actions">
             <button class="icon-btn sm rc-act-btn${isFav ? ' fav-on' : ''}" data-act="fav" title="${isFav ? 'Quitar de favoritas' : 'Marcar como favorita'}">${svg('star', 13)}</button>
             <button class="icon-btn sm rc-act-btn" data-act="rename" title="Renombrar">${svg('edit', 13)}</button>
             <button class="icon-btn sm rc-act-btn" data-act="archive" title="Archivar reunión">${svg('archive', 13)}</button>
           </div>
-          ${pill}
         </div>`;
+      // Botón principal: mismo comportamiento que las tarjetas de Inicio
+      c.querySelector('.hm-view').onclick = (e) => {
+        e.stopPropagation();
+        if (m.status === 'done') { STATE.activeTab = 'notas'; openMeeting(m.id, true); }
+        else openMeeting(m.id);
+      };
       c.onclick = () => {
         if (selectMode) {
           if (selected.has(m.id)) { selected.delete(m.id); c.classList.remove('sel'); }

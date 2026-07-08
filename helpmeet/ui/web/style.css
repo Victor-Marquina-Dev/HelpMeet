@@ -3340,3 +3340,54 @@ body[data-theme="dark"] .tour-next { color: var(--on-accent); }
 .docs-mbody .md hr{border:none;border-top:1px solid var(--border-subtle);margin:14px 0}
 .docs-mfoot{padding:10px 16px;border-top:1px solid var(--border-subtle);color:var(--text-faint);font-size:11.5px}
 .docs-empty{color:var(--text-faint);font-size:13px}
+
+/* ============================================================
+   Componentes base — FILA UNIFICADA (guía de diseño)
+   Un solo modelo para reuniones, documentos y archivados:
+   [bloque 38px] [título 12.5 + meta 11 con etiquetas] [acciones]
+   Este bloque va al final a propósito: gana la cascada.
+   ============================================================ */
+.row-card, .docs-card {
+  display: flex; align-items: center; gap: 12px;
+  background: var(--bg-surface); border: 1px solid var(--border-subtle);
+  border-radius: var(--r-lg); padding: 10px 12px;
+  transition: border-color .12s, box-shadow .12s, background .12s;
+}
+.row-card:hover, .docs-card:hover,
+.row-card.done:hover, .row-card.warn:hover {
+  background: var(--bg-surface);
+  border-color: var(--border-strong); box-shadow: var(--shadow-soft);
+}
+.row-card.warn { background: var(--bg-surface); }
+
+/* Bloque inicial: insignia de fecha coloreada por estado */
+.rc-date { width: 38px; height: 38px; border-radius: var(--r-md); }
+.row-card.warn .rc-date { background: var(--warning-soft); }
+.row-card.warn .rc-mon, .row-card.warn .rc-day { color: var(--warning); }
+.row-card.done .rc-date { background: var(--accent-soft); }
+.row-card.done .rc-mon, .row-card.done .rc-day { color: var(--accent); }
+.docs-ftype { width: 38px; height: 38px; }
+
+/* Cuerpo: mismas medidas de letra en todas las listas */
+.rc-title, .docs-cname { font-size: 12.5px; font-weight: 700; }
+.rc-meta, .docs-cmeta { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-size: 11px; color: var(--text-muted); }
+
+/* Etiquetas de estado pequeñas (en la meta, como en Documentos) */
+.hm-tag { display: inline-flex; align-items: center; gap: 5px; font-size: 10.5px; font-weight: 700; padding: 2px 8px; border-radius: var(--r-pill); }
+.hm-tag .dt { width: 7px; height: 7px; border-radius: 50%; background: currentColor; flex: none; }
+.hm-tag.ok, .hm-tag.proc { background: var(--accent-soft); color: var(--accent); }
+.hm-tag.warn { background: var(--warning-soft); color: var(--warning); }
+.hm-tag.err { background: var(--danger-soft); color: var(--danger); }
+.hm-tag.proc .spinner.sm { width: 11px; height: 11px; border-width: 2px; }
+
+/* Acciones: botón principal suave + iconos que aparecen al pasar el ratón */
+.hm-view { display: inline-flex; align-items: center; gap: 6px; background: var(--accent-soft); color: var(--accent); border: 1px solid transparent; border-radius: var(--r-md); padding: 6px 12px; font-size: 11.5px; font-weight: 700; cursor: pointer; font-family: inherit; white-space: nowrap; }
+.hm-view:hover { background: var(--accent); color: var(--on-accent); }
+.rc-right { display: flex; align-items: center; gap: 6px; flex: 0 0 auto; }
+.rc-actions .rc-act-btn { opacity: 0; transition: opacity .12s; }
+.row-card:hover .rc-actions .rc-act-btn,
+.rc-actions .rc-act-btn.fav-on,
+.rc-actions .rc-act-btn:focus-visible { opacity: 1; }
+.docs-card .docs-ico { opacity: 0; transition: opacity .12s; }
+.docs-card:hover .docs-ico, .docs-card .docs-ico:focus-visible { opacity: 1; }
+.docs-view { padding: 6px 12px; font-size: 11.5px; }
