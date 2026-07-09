@@ -697,6 +697,21 @@ body.rail-expanding .rail-resize-handle { background: var(--accent); }
 .tree-meeting.selected { background: var(--sel-bg); color: var(--sel-text); }
 .tree-week { padding-left: 28px; }
 
+/* Subcarpetas del proyecto en el árbol: filas finas con línea guía,
+   deliberadamente distintas de las filas de proyecto (sin avatar). */
+.tree-folder {
+  display: flex; align-items: center; gap: 6px;
+  margin-left: 30px; padding: 4.5px 8px;
+  border-left: 1.5px solid var(--border-subtle); border-radius: 0 8px 8px 0;
+  color: var(--text-muted); font-size: 10.5px; cursor: pointer;
+}
+.tree-folder svg { opacity: .75; flex: none; }
+.tree-folder .tf-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tree-folder .tf-cnt { margin-left: auto; font-size: 9.5px; color: var(--text-faint); width: 20px; text-align: right; flex: none; font-variant-numeric: tabular-nums; }
+.tree-folder:hover { background: var(--hover-soft); color: var(--text-primary); }
+.tree-folder.on { color: var(--accent); border-left-color: var(--accent); background: color-mix(in srgb, var(--accent) 8%, transparent); }
+.tree-folder.on .tf-cnt { color: var(--accent); opacity: .7; }
+
 /* "Mostrar todo" */
 .sb-show-more {
   display: flex; align-items: center; gap: 9px;
@@ -1507,19 +1522,25 @@ body[data-sidebar="collapsed"] .actionbar--dock { left: 52px; }
 .pick-init-new { margin-top: 10px; width: 100%; display: flex; align-items: center; justify-content: center; gap: 6px; }
 .pick-init-row.on { background: var(--accent-soft); color: var(--accent); }
 
-/* Carpetas dentro de un proyecto (filtro arriba de la lista de reuniones) */
-.init-folder-row { display: flex; align-items: center; gap: 6px; margin-top: 10px; }
-.init-folder-trig { font-weight: 600; }
-.folder-filter-opt { justify-content: flex-start; position: relative; }
-.folder-filter-opt.on { color: var(--accent); font-weight: 700; }
-.cdrop-count { color: var(--text-faint); font-size: 9.5px; margin-left: 6px; flex: none; }
-.folder-del-btn {
-  display: none; align-items: center; justify-content: center; margin-left: 6px;
-  width: 20px; height: 20px; border-radius: 6px; border: none; background: none;
-  color: var(--text-faint); cursor: pointer; flex: none;
+/* Carpetas dentro de un proyecto: pestañas horizontales sobre la lista */
+.init-folder-tabs { display: flex; align-items: flex-end; gap: 16px; margin-top: 8px; border-bottom: 1px solid var(--border-subtle); }
+.ftab {
+  display: inline-flex; align-items: center; gap: 6px;
+  background: none; border: none; font-family: inherit; cursor: pointer;
+  font-size: 10.8px; font-weight: 600; color: var(--text-muted);
+  padding: 7px 2px 8px; border-bottom: 2px solid transparent; margin-bottom: -1px;
+  transition: color .12s, border-color .12s;
 }
-.folder-filter-opt:hover .folder-del-btn { display: inline-flex; }
-.folder-del-btn:hover { background: var(--danger-soft); color: var(--danger); }
+.ftab:hover { color: var(--text-primary); }
+.ftab.on { color: var(--accent); border-bottom-color: var(--accent); }
+.ftab-n { font-size: 9.3px; color: var(--text-faint); font-variant-numeric: tabular-nums; }
+.ftab.on .ftab-n { color: var(--accent); opacity: .75; }
+.ftab-add { padding-left: 6px; padding-right: 6px; color: var(--text-faint); }
+.ftab-add:hover { color: var(--accent); }
+/* Mientras se arrastra una tarjeta, las pestañas se marcan como destino */
+body.folder-dragging .ftab[data-droppable] { border-bottom-style: dashed; border-bottom-color: color-mix(in srgb, var(--accent) 45%, transparent); }
+.ftab.drop-over { color: var(--accent); border-bottom-color: var(--accent); border-bottom-style: solid; background: var(--accent-soft); border-radius: 8px 8px 0 0; }
+.row-card.dragging { opacity: .45; }
 .rc-folder-chip {
   display: inline-flex; align-items: center; gap: 3px; color: var(--text-faint);
 }
@@ -3483,5 +3504,6 @@ body[data-theme="dark"] .proj-av {
 .sv-page { margin-left: auto; margin-right: auto; }
 .init-hub-wrap { max-width: 1200px; width: 100%; margin-left: auto; margin-right: auto; }
 .init-head .init-status-row,
+.init-head .init-folder-tabs,
 .init-head .obj-box { max-width: 1120px; width: 100%; margin-left: auto; margin-right: auto; }
 .mhead-row--mid { width: 100%; margin-left: auto; margin-right: auto; }

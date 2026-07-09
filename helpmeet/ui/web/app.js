@@ -1285,9 +1285,9 @@ function _calTzAbbr() {
 function viewInitiative() {
   const it = STATE.initiatives.find(x => x.id === STATE.selInit);
   const allMs = STATE.meetingsByInit[STATE.selInit] || [];
-  // Carpetas: filtro por carpeta seleccionada (null = "Todas").
-  if (!STATE._ivFolder) STATE._ivFolder = {};
-  const curFid = STATE._ivFolder[STATE.selInit] ?? null;
+  // Carpetas: filtro por carpeta seleccionada (null = "Todas");
+  // la elección queda guardada por proyecto y se restaura al volver.
+  const curFid = _getSelFolder(STATE.selInit);
   const ms = curFid == null ? allMs : allMs.filter(m => _getMeetingFolder(m.id) === curFid);
   const wrap = el('div');
   wrap.style.cssText = 'display:flex;flex-direction:column;flex:1;min-height:0';
@@ -1351,35 +1351,58 @@ function viewInitiative() {
   };
   head.appendChild(objBox);
 
-  // Carpetas: filtro "Todas ▾" + crear carpeta (agrupan reuniones dentro
-  // del proyecto; solo se muestra si ya hay reuniones o carpetas creadas).
+  // Carpetas: pestañas horizontales ("Todas" + una por carpeta + "+").
+  // Clic filtra; arrastrar una tarjeta hasta una pestaña mueve la reunión
+  // a esa carpeta (soltarla en "Todas" se la quita). Clic derecho en una
+  // pestaña: renombrar / eliminar la carpeta.
   if (allMs.length || _getFolders(STATE.selInit).length) {
-    const folderBar = el('div', 'init-folder-row');
     const folders = _getFolders(STATE.selInit);
-    const curFolder = folders.find(f => f.id === curFid);
-    const trig = el('button', 'cdrop init-folder-trig');
-    trig.type = 'button';
-    trig.setAttribute('aria-haspopup', 'true');
-    trig.setAttribute('aria-expanded', 'false');
-    trig.innerHTML = `<span class="cdrop-ico">${svg('folder', 13)}</span>`
-      + `<span class="cdrop-label">${esc(curFolder ? curFolder.name : 'Todas')}</span>`
-      + `<span class="cdrop-chev">${svg('chevronDown', 14)}</span>`;
-    trig.onclick = (e) => {
-      e.stopPropagation();
-      if (_ctxOpen && _ctxOpen._owner === trig) { closeMenu(); return; }
-      _openFolderFilterPanel(trig, STATE.selInit, curFid, (fid) => {
-        STATE._ivFolder[STATE.selInit] = fid;
-        renderMain();
+    const tabs = el('div', 'init-folder-tabs');
+    const cntOf = (fid) => fid == null ? allMs.length : allMs.filter(m => _getMeetingFolder(m.id) === fid).length;
+    const mkTab = (fid, name) => {
+      const t = el('button', 'ftab' + (fid === curFid ? ' on' : ''));
+      t.type = 'button';
+      t.innerHTML = `${esc(name)}<span class="ftab-n">${cntOf(fid)}</span>`;
+      t.onclick = () => { _setSelFolder(STATE.selInit, fid); renderMain(); renderSidebar(); };
+      t.setAttribute('data-droppable', '');
+      t.addEventListener('dragover', (e) => { if (_dragMeetingId == null) return; e.preventDefault(); t.classList.add('drop-over'); });
+      t.addEventListener('dragleave', () => t.classList.remove('drop-over'));
+      t.addEventListener('drop', (e) => {
+        e.preventDefault(); t.classList.remove('drop-over');
+        if (_dragMeetingId == null) return;
+        _setMeetingFolder(_dragMeetingId, fid);
+        toast('ok', fid == null ? 'Reunión sin carpeta' : `Movida a «${name}»`);
+        _dragMeetingId = null;
+        renderMain(); renderSidebar();
       });
+      if (fid != null) t.oncontextmenu = (e) => {
+        e.preventDefault();
+        openMenu(e, [
+          { label: 'Renombrar carpeta', icon: 'edit', onClick: () => formModal('Renombrar carpeta', 'Nombre de la carpeta', name, 'Guardar', (nv) => {
+              if (!nv.trim()) return;
+              _saveFolders(STATE.selInit, _getFolders(STATE.selInit).map(f => f.id === fid ? { ...f, name: nv.trim() } : f));
+              renderMain(); renderSidebar();
+            }) },
+          { label: 'Eliminar carpeta', icon: 'trash', danger: true, onClick: () => confirmModal('Eliminar carpeta',
+              `Se elimina la carpeta «${name}». Las reuniones que tenía no se borran, solo quedan sin carpeta.`, 'Eliminar', () => {
+                _deleteFolder(STATE.selInit, fid);
+                if (_getSelFolder(STATE.selInit) === fid) _setSelFolder(STATE.selInit, null);
+                toast('ok', 'Carpeta eliminada');
+                renderMain(); renderSidebar();
+              }) },
+        ]);
+      };
+      return t;
     };
-    folderBar.appendChild(trig);
-    const addBtn = el('button', 'icon-btn sm init-folder-add');
-    addBtn.type = 'button';
-    addBtn.title = 'Nueva carpeta';
-    addBtn.innerHTML = svg('plus', 13);
-    addBtn.onclick = () => promptCreateFolder(STATE.selInit);
-    folderBar.appendChild(addBtn);
-    head.appendChild(folderBar);
+    tabs.appendChild(mkTab(null, 'Todas'));
+    folders.forEach(f => tabs.appendChild(mkTab(f.id, f.name)));
+    const addTab = el('button', 'ftab ftab-add');
+    addTab.type = 'button';
+    addTab.title = 'Nueva carpeta';
+    addTab.innerHTML = svg('plus', 12);
+    addTab.onclick = () => promptCreateFolder(STATE.selInit);
+    tabs.appendChild(addTab);
+    head.appendChild(tabs);
   }
 
   const scroll = el('div', 'content');
@@ -1433,6 +1456,20 @@ function viewInitiative() {
         else openMeeting(m.id);
       };
       c.oncontextmenu = (e) => { e.preventDefault(); openMeetingMenu(e, m.id); };
+      // Arrastrar la tarjeta hasta una pestaña de carpeta para moverla
+      c.draggable = true;
+      c.addEventListener('dragstart', (e) => {
+        _dragMeetingId = m.id;
+        c.classList.add('dragging');
+        document.body.classList.add('folder-dragging');
+        e.dataTransfer.effectAllowed = 'move';
+        try { e.dataTransfer.setData('text/plain', ''); } catch (err) {}
+      });
+      c.addEventListener('dragend', () => {
+        _dragMeetingId = null;
+        c.classList.remove('dragging');
+        document.body.classList.remove('folder-dragging');
+      });
       c.onclick = () => {
         if (selectMode) {
           if (selected.has(m.id)) { selected.delete(m.id); c.classList.remove('sel'); }
@@ -1447,6 +1484,9 @@ function viewInitiative() {
             const titleEl = c.querySelector('.rc-title');
             const input = document.createElement('input');
             input.type = 'text'; input.value = m.title; input.className = 'rc-title-input';
+            // Sin arrastre mientras se edita: seleccionar texto con el
+            // mouse dispararía el drag de la tarjeta.
+            c.draggable = false;
             titleEl.replaceWith(input); input.focus(); input.select();
             input.addEventListener('click', ev => ev.stopPropagation());
             let done = false;
@@ -1461,6 +1501,7 @@ function viewInitiative() {
                 toast('ok', 'Reunión renombrada');
               }
               input.replaceWith(el('div', 'rc-title', esc(m.title) + (hhmm ? `<span class="rc-hour">${hhmm}</span>` : '')));
+              c.draggable = true;
             };
             input.addEventListener('keydown', e => {
               if (e.key === 'Enter') { e.preventDefault(); commit(true); }
@@ -3912,6 +3953,29 @@ function _renderInitRow(tree, it) {
   tree.appendChild(row);
   if (open) {
     const sub = el('div', 'tree-meetings');
+
+    // Subcarpetas del proyecto: filas finas con línea guía, deliberadamente
+    // distintas de las filas de proyecto (sin avatar ni pastilla). Clic:
+    // abre el proyecto ya filtrado por esa carpeta.
+    const _sbFolders = _getFolders(it.id);
+    if (_sbFolders.length) {
+      const selF = _getSelFolder(it.id);
+      _sbFolders.forEach(f => {
+        const n = ms.filter(m => _getMeetingFolder(m.id) === f.id).length;
+        const fr = el('div', 'tree-folder' + (selF === f.id ? ' on' : ''));
+        fr.title = f.name;
+        fr.innerHTML = `${svg('folder', 11)}<span class="tf-name">${esc(f.name)}</span><span class="tf-cnt">${n || ''}</span>`;
+        fr.onclick = async (e) => {
+          e.stopPropagation();
+          _setSelFolder(it.id, f.id);
+          STATE.selInit = it.id; STATE.screen = 'initiative';
+          if (!STATE.meetingsByInit[it.id]) STATE.meetingsByInit[it.id] = await api.listMeetings(it.id) || [];
+          renderSidebar(); renderMain(); renderTopStatus();
+        };
+        sub.appendChild(fr);
+      });
+    }
+
     // Agrupación por semanas: única fuente de verdad en weekInfoOf()
     const _monKey = (iso) => {
       const g = weekInfoOf(iso);
@@ -4358,6 +4422,20 @@ function openCustomSelectPanel(anchor, items, curVal, minWidth, onPick) {
 // ── Carpetas de proyecto (agrupan reuniones; guardadas localmente) ──
 function _getFolders(iid) { try { return JSON.parse(localStorage.getItem('hm.folders.' + iid) || '[]'); } catch { return []; } }
 function _saveFolders(iid, folders) { localStorage.setItem('hm.folders.' + iid, JSON.stringify(folders)); }
+// Reunión que se está arrastrando hacia una pestaña de carpeta (o null)
+let _dragMeetingId = null;
+// Carpeta seleccionada por proyecto: persiste entre sesiones. Si la
+// carpeta guardada ya no existe (se eliminó), vuelve a "Todas".
+function _getSelFolder(iid) {
+  const v = localStorage.getItem('hm.fsel.' + iid);
+  if (!v) return null;
+  const fid = +v;
+  return _getFolders(iid).some(f => f.id === fid) ? fid : null;
+}
+function _setSelFolder(iid, fid) {
+  if (fid == null) localStorage.removeItem('hm.fsel.' + iid);
+  else localStorage.setItem('hm.fsel.' + iid, String(fid));
+}
 function _createFolder(iid, name) {
   const folders = _getFolders(iid);
   const f = { id: Date.now(), name: name.trim() };
@@ -4383,46 +4461,6 @@ function promptCreateFolder(iid) {
     toast('ok', `Carpeta «${name.trim()}» creada`);
     if (STATE.screen === 'initiative' && STATE.selInit === iid) renderMain();
   });
-}
-// Panel del filtro de carpetas en la vista de proyecto: "Todas" + cada
-// carpeta con su conteo; el icono de borrar aparece al pasar el mouse.
-function _openFolderFilterPanel(anchor, iid, curFid, onPick) {
-  closeMenu();
-  const allMs = STATE.meetingsByInit[iid] || [];
-  const folders = _getFolders(iid);
-  const panel = el('div', 'cdrop-panel folder-filter-panel');
-  panel._owner = anchor;
-  anchor.setAttribute('aria-expanded', 'true');
-  const mkRow = (fid, label, count) => {
-    const o = el('div', 'cdrop-opt folder-filter-opt' + (fid === curFid ? ' on' : ''));
-    o.innerHTML = `<span class="cdrop-opt-label">${esc(label)}</span><span class="cdrop-count">${count}</span>`
-      + (fid !== null ? `<button type="button" class="folder-del-btn" title="Eliminar carpeta">${svg('trash', 12)}</button>` : '');
-    o.onclick = (e) => { e.stopPropagation(); closeMenu(); onPick(fid); };
-    if (fid !== null) {
-      o.querySelector('.folder-del-btn').onclick = (e) => {
-        e.stopPropagation(); closeMenu();
-        confirmModal('Eliminar carpeta', `Se elimina la carpeta «${label}». Las reuniones que tenía no se borran, solo quedan sin carpeta.`, 'Eliminar', () => {
-          _deleteFolder(iid, fid);
-          if (STATE._ivFolder[iid] === fid) STATE._ivFolder[iid] = null;
-          toast('ok', 'Carpeta eliminada');
-          renderMain();
-        });
-      };
-    }
-    panel.appendChild(o);
-  };
-  mkRow(null, 'Todas', allMs.length);
-  folders.forEach(f => mkRow(f.id, f.name, allMs.filter(m => _getMeetingFolder(m.id) === f.id).length));
-  document.body.appendChild(panel);
-  const r = anchor.getBoundingClientRect();
-  panel.style.minWidth = Math.max(r.width, 220) + 'px';
-  let left = r.left, top = r.bottom + 6;
-  if (left + panel.offsetWidth > window.innerWidth - 10) left = window.innerWidth - panel.offsetWidth - 10;
-  if (top + panel.offsetHeight > window.innerHeight - 10) top = r.top - panel.offsetHeight - 6;
-  panel.style.left = Math.max(10, left) + 'px';
-  panel.style.top = Math.max(10, top) + 'px';
-  _ctxOpen = panel;
-  setTimeout(() => document.addEventListener('click', closeMenu, { once: true }), 0);
 }
 // Modal "Mover a carpeta": lista las carpetas del proyecto de la reunión
 // (con "Sin carpeta" y "+ Nueva carpeta"), igual patrón que pickInitiativeModal.
