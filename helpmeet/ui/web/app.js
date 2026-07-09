@@ -4732,11 +4732,25 @@ function _nowDateShort() {
   const d = new Date();
   return `${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}/${String(d.getFullYear()).slice(-2)}`;
 }
+// Fecha de hoy como en las listas: "mié 08 Jul"
+function _prettyToday() {
+  const d = new Date();
+  const WD = ['dom', 'lun', 'mar', 'mié', 'jue', 'vie', 'sáb'];
+  const MO = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
+  return `${WD[d.getDay()]} ${String(d.getDate()).padStart(2, '0')} ${MO[d.getMonth()]}`;
+}
 function startMeetingRecording() {
   if (STATE.appState !== 'idle') return;
   // Sin proyecto: modal para elegir/crear uno y volver a intentar la grabación
   if (!STATE.selInit) { pickInitiativeModal((iid) => { selectInitiative(iid); startMeetingRecording(); }); return; }
-  formModal('Nueva reunión', 'Título de la reunión', _nowDateShort(), 'Empezar a grabar', beginMeetingRecording);
+  // Se muestra "mié 08 Jul" (formato de las listas); si no se toca, por dentro
+  // se guarda el formato interno de siempre (dd/mm/aa) que marca "nombre por defecto".
+  const shownDefault = _prettyToday();
+  formModal('Nueva reunión', 'Título de la reunión', shownDefault, 'Empezar a grabar', (title) => {
+    title = (title || '').trim();
+    if (title === shownDefault) title = _nowDateShort();
+    return beginMeetingRecording(title);
+  });
 }
 async function beginMeetingRecording(title) {
   if (!STATE.selInit) { toast('err', 'Selecciona un proyecto antes de grabar'); return; }
