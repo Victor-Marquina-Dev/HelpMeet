@@ -706,11 +706,14 @@ function viewHomeFeed() {
         : 'Pendiente';
       const icon = m.source === 'audio' ? 'mic' : m.source === 'import' ? 'upload' : m.source === 'screen' ? 'monitorDot' : 'calendar';
       const avColor = it ? (it.color || avatarColorFor(it.name)) : 'var(--text-faint)';
+      // Hora de la reunión junto al título, igual que en las listas por proyecto
+      const _hd = new Date(m.started_at);
+      const hhmm = isNaN(_hd) ? '' : `${String(_hd.getHours()).padStart(2, '0')}:${String(_hd.getMinutes()).padStart(2, '0')}`;
       const card = el('div', 'home-card');
       card.innerHTML = `
         <span class="proj-av hc-av" style="--av:${avColor}">${it ? esc(initialsFor(it.name)) : '·'}</span>
         <div class="hc-info">
-          <div class="hc-title">${esc(_fmtMeetingLabel(m))}<span class="hc-kind" title="${m.source === 'audio' ? 'Audio de reunión' : m.source === 'import' ? 'Vídeo importado' : 'Grabación de pantalla'}">${svg(icon, 13)}</span></div>
+          <div class="hc-title">${esc(_fmtMeetingLabel(m))}${hhmm ? `<span class="rc-hour">${hhmm}</span>` : ''}<span class="hc-kind" title="${m.source === 'audio' ? 'Audio de reunión' : m.source === 'import' ? 'Vídeo importado' : 'Grabación de pantalla'}">${svg(icon, 13)}</span></div>
           <div class="hc-sub"><span class="hc-proj">${it ? esc(it.name) : 'Sin proyecto'}</span> · ${esc(sub)}</div>
         </div>
         <button class="hc-chip${done || proc ? '' : ' primary'}">${done ? 'Ver notas' : proc ? 'Ver progreso' : 'Transcribir'}</button>`;
@@ -894,11 +897,13 @@ function viewFavorites() {
       // Cards de reunión
       meetings.forEach(m => {
         const { day, mon } = parseMeetingDate(m.date || m.started_at);
+        const _hd = new Date(m.date || m.started_at);
+        const hhmm = isNaN(_hd) ? '' : `${String(_hd.getHours()).padStart(2, '0')}:${String(_hd.getMinutes()).padStart(2, '0')}`;
         const c = el('div', 'row-card done fav-card');
         c.innerHTML = `
           <div class="rc-date"><span class="rc-mon">${mon}</span><span class="rc-day">${day}</span></div>
           <div class="rc-body">
-            <div class="rc-title">${esc(_fmtMeetingLabel(m))}</div>
+            <div class="rc-title">${esc(_fmtMeetingLabel(m))}${hhmm ? `<span class="rc-hour">${hhmm}</span>` : ''}</div>
             <div class="rc-meta">${m.dur ? esc(m.dur) : ''}${m.time ? '<span class="rc-size">' + esc(m.time) + '</span>' : ''}</div>
           </div>
           <div class="rc-right">
