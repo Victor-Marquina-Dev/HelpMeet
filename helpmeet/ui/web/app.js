@@ -555,6 +555,41 @@ function emptyState({ icon = 'info', title = '', text = '', action } = {}) {
 }
 function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
 
+/* ── Fechas: una sola fuente para toda la app ──────────────────
+   Antes estos arrays y la lógica de semanas estaban copiados en varios
+   sitios y los bugs (semanas duplicadas) había que arreglarlos copia
+   por copia. Cualquier cambio de formato de fechas se hace AQUÍ. */
+const DIAS_CORTOS  = ['dom', 'lun', 'mar', 'mié', 'jue', 'vie', 'sáb'];
+const MESES_CORTOS = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
+const MESES_LARGOS = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
+
+// Hora local "HH:MM" de una fecha ISO ('' si no es válida).
+function hhmmOf(iso) {
+  const d = new Date(iso);
+  return isNaN(d) ? '' : `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+}
+
+// Semana (lunes–domingo) a la que pertenece una fecha: claves con fecha
+// LOCAL (no UTC) y el mes tomado del JUEVES de la semana (convención ISO),
+// para que una semana a caballo entre dos meses no se duplique.
+// La usan el árbol lateral, la vista de proyecto y la tabla de Proyectos.
+function weekInfoOf(iso) {
+  if (!iso) return null;
+  const d = new Date(iso); if (isNaN(d)) return null;
+  const day = d.getDay();
+  const mon = new Date(d); mon.setDate(d.getDate() - (day === 0 ? 6 : day - 1));
+  mon.setHours(0, 0, 0, 0);
+  const sun = new Date(mon); sun.setDate(mon.getDate() + 6);
+  const thu = new Date(mon); thu.setDate(mon.getDate() + 3);
+  const fmt = dt => `${dt.getDate()} ${MESES_CORTOS[dt.getMonth()]}`;
+  return {
+    wKey: `${mon.getFullYear()}-${String(mon.getMonth() + 1).padStart(2, '0')}-${String(mon.getDate()).padStart(2, '0')}`,
+    mKey: `${thu.getFullYear()}-${String(thu.getMonth() + 1).padStart(2, '0')}`,
+    wLabel: `${fmt(mon)} – ${fmt(sun)}`,
+    mLabel: `${MESES_LARGOS[thu.getMonth()]} ${thu.getFullYear()}`,
+  };
+}
+
 function renderTopStatus() {
   const root = $('#topbarStatus');
   const s = STATE.appState;
@@ -709,8 +744,7 @@ function viewHomeFeed() {
       const icon = m.source === 'audio' ? 'mic' : m.source === 'import' ? 'upload' : m.source === 'screen' ? 'monitorDot' : 'calendar';
       const avColor = it ? (it.color || avatarColorFor(it.name)) : 'var(--text-faint)';
       // Hora de la reunión junto al título, igual que en las listas por proyecto
-      const _hd = new Date(m.started_at);
-      const hhmm = isNaN(_hd) ? '' : `${String(_hd.getHours()).padStart(2, '0')}:${String(_hd.getMinutes()).padStart(2, '0')}`;
+      const hhmm = hhmmOf(m.started_at);
       const card = el('div', 'home-card');
       card.innerHTML = `
         <span class="proj-av hc-av" style="--av:${avColor}">${it ? esc(initialsFor(it.name)) : '·'}</span>
@@ -737,7 +771,7 @@ function viewHomeFeed() {
 /* ============================================================
    Vista de Calendario (estilo Stitch)
    ============================================================ */
-const CAL_MONTHS = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
+const CAL_MONTHS = MESES_LARGOS;
 const CAL_MONTHS_SHORT = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
 const CAL_DOW = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
 
@@ -899,8 +933,7 @@ function viewFavorites() {
       // Cards de reunión
       meetings.forEach(m => {
         const { day, mon } = parseMeetingDate(m.date || m.started_at);
-        const _hd = new Date(m.date || m.started_at);
-        const hhmm = isNaN(_hd) ? '' : `${String(_hd.getHours()).padStart(2, '0')}:${String(_hd.getMinutes()).padStart(2, '0')}`;
+        const hhmm = hhmmOf(m.date || m.started_at);
         const c = el('div', 'row-card done fav-card');
         c.innerHTML = `
           <div class="rc-date"><span class="rc-mon">${mon}</span><span class="rc-day">${day}</span></div>
@@ -1331,8 +1364,7 @@ function viewInitiative() {
       const c = el('div', 'row-card' + (m.status === 'pending' ? ' warn' : m.status === 'done' ? ' done' : ''));
       const { day, mon } = parseMeetingDate(m.date || m.started_at);
       // Hora de la reunión (p. ej. "18:32") para distinguir varias del mismo día
-      const _hd = new Date(m.date || m.started_at);
-      const hhmm = isNaN(_hd) ? '' : `${String(_hd.getHours()).padStart(2, '0')}:${String(_hd.getMinutes()).padStart(2, '0')}`;
+      const hhmm = hhmmOf(m.date || m.started_at);
       // Estado como etiqueta pequeña en la meta (modelo de fila unificado)
       const stTag = m.status === 'done'
         ? '<span class="hm-tag ok"><span class="dt"></span>Finalizada</span>'
@@ -1409,23 +1441,9 @@ function viewInitiative() {
       container.appendChild(c);
     };
 
-    // Agrupar por mes → semana y renderizar con headers colapsables
-    const _IV_MS  = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
-    const _IV_MES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
-    const _ivWeekOf = (iso) => {
-      if (!iso) return null;
-      const d = new Date(iso); if (isNaN(d)) return null;
-      const day = d.getDay();
-      const mon2 = new Date(d); mon2.setDate(d.getDate() - (day === 0 ? 6 : day - 1));
-      mon2.setHours(0, 0, 0, 0);
-      const sun2 = new Date(mon2); sun2.setDate(mon2.getDate() + 6);
-      // La semana pertenece al mes de su JUEVES (convención ISO): así una
-      // semana a caballo entre dos meses no se duplica en ambos.
-      const thu = new Date(mon2); thu.setDate(mon2.getDate() + 3);
-      const fmt = dt => `${dt.getDate()} ${_IV_MS[dt.getMonth()]}`;
-      const wKey = `${mon2.getFullYear()}-${String(mon2.getMonth()+1).padStart(2,'0')}-${String(mon2.getDate()).padStart(2,'0')}`;
-      return { mKey:`${thu.getFullYear()}-${String(thu.getMonth()+1).padStart(2,'0')}`, wKey, wLabel:`${fmt(mon2)} – ${fmt(sun2)}`, mLabel:`${_IV_MES[thu.getMonth()]} ${thu.getFullYear()}` };
-    };
+    // Agrupar por mes → semana y renderizar con headers colapsables.
+    // Agrupación por semanas: única fuente de verdad en weekInfoOf()
+    const _ivWeekOf = weekInfoOf;
     const _ivMOrder=[], _ivMMap=new Map(), _ivWMap=new Map();
     ms.forEach(m => {
       const g = _ivWeekOf(m.started_at) || {mKey:'none',wKey:'none',wLabel:'—',mLabel:'Sin fecha'};
@@ -3028,8 +3046,8 @@ function renderActionBar() {
   const canRecord = !!STATE.selInit;
   bar.classList.toggle('actionbar--dock', s === 'idle');
   if (s === 'idle') {
-    const dis = canRecord ? '' : 'is-disabled';
-    const recTitle = canRecord ? 'Grabar reunión' : 'Selecciona un proyecto';
+    // Siempre habilitados: sin proyecto elegido, el clic abre el modal
+    // "¿En qué proyecto?" y la acción continúa sola al elegir/crear uno.
     bar.innerHTML = `
       <div class="dock">
         <button class="audio-chip dock-mic${STATE.micMuted ? ' muted' : ''}" id="btnMic" aria-pressed="${STATE.micMuted}" aria-label="${STATE.micMuted ? 'Activar micrófono' : 'Silenciar micrófono'}" title="${STATE.micMuted ? 'Activar micrófono' : 'Silenciar micrófono'}">
@@ -3037,11 +3055,11 @@ function renderActionBar() {
           <span class="eq mini" aria-hidden="true"><i></i><i></i><i></i></span>
         </button>
         <span class="dock-sep"></span>
-        <button class="dock-btn ${dis}" id="abRecord" title="${recTitle}"><span class="dock-ico dock-ico--rec">${svg('mic', 18)}</span>Grabar reunión</button>
+        <button class="dock-btn" id="abRecord" title="Grabar reunión"><span class="dock-ico dock-ico--rec">${svg('mic', 18)}</span>Grabar reunión</button>
         <span class="dock-sep"></span>
-        <button class="dock-btn ${dis}" id="abScreen" title="${canRecord ? 'Grabar pantalla' : 'Selecciona un proyecto'}"><span class="dock-ico dock-ico--screen">${svg('monitorDot', 18)}</span>Grabar pantalla</button>
+        <button class="dock-btn" id="abScreen" title="Grabar pantalla"><span class="dock-ico dock-ico--screen">${svg('monitorDot', 18)}</span>Grabar pantalla</button>
         <span class="dock-sep"></span>
-        <button class="dock-btn ${dis}" id="abUpload" title="${canRecord ? 'Importar video' : 'Selecciona un proyecto'}"><span class="dock-ico">${svg('upload', 18)}</span>Importar video</button>
+        <button class="dock-btn" id="abUpload" title="Importar video"><span class="dock-ico">${svg('upload', 18)}</span>Importar video</button>
       </div>`;
     // Sin proyecto seleccionado: modal para elegir/crear uno y seguir con la acción
     const needProject = (cont) => pickInitiativeModal((iid) => { selectInitiative(iid); cont(); });
@@ -3676,25 +3694,8 @@ function viewAllInitiatives() {
       if (!msList.length) {
         sub.appendChild(el('p', 'files-empty', STATE.meetingsByInit[it.id] ? 'Sin reuniones aún.' : 'Cargando…'));
       } else {
-        const MS2 = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
-        const MES  = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
-        // Calcula lunes de la semana a partir de una fecha ISO (fuente de verdad = started_at)
-        const _weekOf = (iso) => {
-          if (!iso) return { mKey: 'none', wKey: 'none', wLabel: '—', mLabel: 'Sin fecha' };
-          const d = new Date(iso); if (isNaN(d)) return { mKey: 'none', wKey: 'none', wLabel: '—', mLabel: 'Sin fecha' };
-          const day = d.getDay();
-          const mon = new Date(d); mon.setDate(d.getDate() - (day === 0 ? 6 : day - 1));
-          mon.setHours(0, 0, 0, 0);
-          const sun = new Date(mon); sun.setDate(mon.getDate() + 6);
-          const thu = new Date(mon); thu.setDate(mon.getDate() + 3); // mes = jueves de la semana (ISO)
-          const fmt = dt => `${dt.getDate()} ${MS2[dt.getMonth()]}`;
-          return {
-            mKey:   `${thu.getFullYear()}-${String(thu.getMonth()+1).padStart(2,'0')}`,
-            wKey:   `${mon.getFullYear()}-${String(mon.getMonth()+1).padStart(2,'0')}-${String(mon.getDate()).padStart(2,'0')}`,
-            wLabel: `${fmt(mon)} – ${fmt(sun)}`,
-            mLabel: `${MES[thu.getMonth()]} ${thu.getFullYear()}`,
-          };
-        };
+        // Agrupación por semanas: única fuente de verdad en weekInfoOf()
+        const _weekOf = (iso) => weekInfoOf(iso) || { mKey: 'none', wKey: 'none', wLabel: '—', mLabel: 'Sin fecha' };
 
         // Pre-agrupar por mes → semana usando started_at como única fuente de verdad
         const monthOrder = []; // mantiene orden de inserción
@@ -3847,9 +3848,7 @@ function _fmtMeetingLabel(m) {
   const t = (m && m.title) || '';
   const d = m && m.started_at ? new Date(m.started_at) : null;
   if (!/^\d{2}\/\d{2}\/\d{2}/.test(t.trim()) || !d || isNaN(d)) return t;
-  const WD = ['dom', 'lun', 'mar', 'mié', 'jue', 'vie', 'sáb'];
-  const MO = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
-  return `${WD[d.getDay()]} ${String(d.getDate()).padStart(2, '0')} ${MO[d.getMonth()]}`;
+  return `${DIAS_CORTOS[d.getDay()]} ${String(d.getDate()).padStart(2, '0')} ${MESES_CORTOS[d.getMonth()]}`;
 }
 
 function _renderInitRow(tree, it) {
@@ -3873,20 +3872,10 @@ function _renderInitRow(tree, it) {
   tree.appendChild(row);
   if (open) {
     const sub = el('div', 'tree-meetings');
-    const MS = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
-
-    const MESF = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+    // Agrupación por semanas: única fuente de verdad en weekInfoOf()
     const _monKey = (iso) => {
-      const d = new Date(iso); if (isNaN(d)) return null;
-      const day = d.getDay();
-      const mon = new Date(d); mon.setDate(d.getDate() - (day === 0 ? 6 : day - 1));
-      mon.setHours(0, 0, 0, 0); // normaliza al lunes 00:00 local
-      const sun = new Date(mon); sun.setDate(mon.getDate() + 6);
-      const thu = new Date(mon); thu.setDate(mon.getDate() + 3); // mes de la semana = su jueves (ISO)
-      const fmt = dt => `${dt.getDate()} ${MS[dt.getMonth()]}`;
-      // Clave con fecha LOCAL (no UTC): coincide con la etiqueta y no duplica semanas.
-      const key = `${mon.getFullYear()}-${String(mon.getMonth()+1).padStart(2,'0')}-${String(mon.getDate()).padStart(2,'0')}`;
-      return { key, label: `${fmt(mon)} – ${fmt(sun)}`, monthLabel: `${MESF[thu.getMonth()]} ${thu.getFullYear()}` };
+      const g = weekInfoOf(iso);
+      return g && { key: g.wKey, label: g.wLabel, monthLabel: g.mLabel };
     };
 
     // Pre-agrupar: mes → semana → reuniones (sin duplicados)
@@ -4735,9 +4724,7 @@ function _nowDateShort() {
 // Fecha de hoy como en las listas: "mié 08 Jul"
 function _prettyToday() {
   const d = new Date();
-  const WD = ['dom', 'lun', 'mar', 'mié', 'jue', 'vie', 'sáb'];
-  const MO = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
-  return `${WD[d.getDay()]} ${String(d.getDate()).padStart(2, '0')} ${MO[d.getMonth()]}`;
+  return `${DIAS_CORTOS[d.getDay()]} ${String(d.getDate()).padStart(2, '0')} ${MESES_CORTOS[d.getMonth()]}`;
 }
 function startMeetingRecording() {
   if (STATE.appState !== 'idle') return;
