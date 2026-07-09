@@ -1364,7 +1364,9 @@ body[data-sidebar="collapsed"] .actionbar--dock { left: 52px; }
 .dock-btn .dock-ico { display: inline-flex; transition: color .12s; }
 .dock-btn:hover .dock-ico--rec { color: var(--recording); }
 .dock-btn:hover .dock-ico--screen { color: var(--accent); }
-.dock-btn.is-disabled { opacity: .5; pointer-events: none; cursor: not-allowed; }
+/* Atenuado pero clicable: el clic explica por qué no se puede grabar
+   (antes pointer-events:none se tragaba el clic sin dar ninguna pista) */
+.dock-btn.is-disabled { opacity: .5; cursor: not-allowed; }
 .dock-sep { width: 1px; height: 16px; background: var(--border-subtle); flex: none; }
 .audio-chip.dock-mic { height: 38px; border: none; border-radius: var(--r-sm); padding: 0 12px; }
 .ab-divider { width: 1px; height: 28px; background: var(--border-subtle); }
@@ -1480,6 +1482,9 @@ body[data-sidebar="collapsed"] .actionbar--dock { left: 52px; }
 /* Modal "Nuevo proyecto" más compacto */
 .np-modal .modal-body { gap: 10px; padding-top: 14px; }
 .np-modal .modal-body label { margin-bottom: 4px; }
+/* El desplegable de color debe sobresalir del modal, no cortarse
+   (.modal recorta con overflow-y:auto; este modal es corto y no lo necesita) */
+.np-modal { overflow: visible; }
 
 /* ——— Ajustes como pantalla plana (sv = settings view) ——— */
 .sv-page { display: flex; flex-direction: column; gap: 0; }
@@ -3379,6 +3384,9 @@ body[data-theme="dark"] .tour-next { color: var(--on-accent); }
 
 /* Cuerpo: mismas medidas de letra en todas las listas */
 .rc-title, .docs-cname { font-size: 12.5px; font-weight: 700; }
+/* Hora de la reunión junto al título ("mié 08 Jul · 18:32") */
+.rc-hour { margin-left: 7px; font-size: 11px; font-weight: 500; color: var(--text-faint); }
+.rc-hour::before { content: '· '; }
 .rc-meta, .docs-cmeta { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-size: 11px; color: var(--text-muted); }
 
 /* Etiquetas de estado pequeñas (en la meta, como en Documentos) */

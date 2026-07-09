@@ -1292,6 +1292,9 @@ function viewInitiative() {
     const _appendCard = (m, container) => {
       const c = el('div', 'row-card' + (m.status === 'pending' ? ' warn' : m.status === 'done' ? ' done' : ''));
       const { day, mon } = parseMeetingDate(m.date || m.started_at);
+      // Hora de la reunión (p. ej. "18:32") para distinguir varias del mismo día
+      const _hd = new Date(m.date || m.started_at);
+      const hhmm = isNaN(_hd) ? '' : `${String(_hd.getHours()).padStart(2, '0')}:${String(_hd.getMinutes()).padStart(2, '0')}`;
       // Estado como etiqueta pequeña en la meta (modelo de fila unificado)
       const stTag = m.status === 'done'
         ? '<span class="hm-tag ok"><span class="dt"></span>Finalizada</span>'
@@ -1306,7 +1309,7 @@ function viewInitiative() {
       c.innerHTML = `
         <div class="rc-sel"><span class="rc-cb"></span></div>
         <div class="rc-date"><span class="rc-mon">${mon}</span><span class="rc-day">${day}</span></div>
-        <div class="rc-body"><div class="rc-title">${esc(_fmtMeetingLabel(m))}</div><div class="rc-meta">${_kindIcon(m)}${m.dur ? esc(m.dur) : ''}${m.size ? '<span class="rc-size">' + esc(m.size) + '</span>' : ''}${stTag}</div></div>
+        <div class="rc-body"><div class="rc-title">${esc(_fmtMeetingLabel(m))}${hhmm ? `<span class="rc-hour">${hhmm}</span>` : ''}</div><div class="rc-meta">${_kindIcon(m)}${m.dur ? esc(m.dur) : ''}${m.size ? '<span class="rc-size">' + esc(m.size) + '</span>' : ''}${stTag}</div></div>
         <div class="rc-right">
           <div class="rc-actions">
             <button class="icon-btn sm rc-act-btn${isFav ? ' fav-on' : ''}" data-act="fav" title="${isFav ? 'Quitar de favoritas' : 'Marcar como favorita'}">${svg('star', 13)}</button>
@@ -1348,7 +1351,7 @@ function viewInitiative() {
                 if (STATE.transcript && STATE.transcript.id === m.id) STATE.transcript.title = val;
                 toast('ok', 'Reunión renombrada');
               }
-              input.replaceWith(el('div', 'rc-title', esc(m.title)));
+              input.replaceWith(el('div', 'rc-title', esc(m.title) + (hhmm ? `<span class="rc-hour">${hhmm}</span>` : '')));
             };
             input.addEventListener('keydown', e => {
               if (e.key === 'Enter') { e.preventDefault(); commit(true); }
@@ -2998,14 +3001,16 @@ function renderActionBar() {
         <span class="dock-sep"></span>
         <button class="dock-btn ${dis}" id="abRecord" title="${recTitle}"><span class="dock-ico dock-ico--rec">${svg('mic', 18)}</span>Grabar reunión</button>
         <span class="dock-sep"></span>
-        <button class="dock-btn ${dis}" id="abScreen"><span class="dock-ico dock-ico--screen">${svg('monitorDot', 18)}</span>Grabar pantalla</button>
+        <button class="dock-btn ${dis}" id="abScreen" title="${canRecord ? 'Grabar pantalla' : 'Selecciona un proyecto'}"><span class="dock-ico dock-ico--screen">${svg('monitorDot', 18)}</span>Grabar pantalla</button>
         <span class="dock-sep"></span>
-        <button class="dock-btn ${dis}" id="abUpload"><span class="dock-ico">${svg('upload', 18)}</span>Importar video</button>
+        <button class="dock-btn ${dis}" id="abUpload" title="${canRecord ? 'Importar video' : 'Selecciona un proyecto'}"><span class="dock-ico">${svg('upload', 18)}</span>Importar video</button>
       </div>`;
+    // Sin proyecto seleccionado: el clic explica el porqué y ofrece crearlo
+    const needProject = () => toast('info', 'Selecciona o crea un proyecto para poder grabar', 'Crear proyecto', promptNewInitiative);
     bar.querySelector('#btnMic').onclick = toggleMic;
-    bar.querySelector('#abRecord').onclick = () => canRecord && withRecordingConsent(() => startMeetingRecording());
-    bar.querySelector('#abScreen').onclick = () => canRecord && withRecordingConsent(() => openScreenPanel());
-    bar.querySelector('#abUpload').onclick = () => canRecord && doImport(bar.querySelector('#abUpload'));
+    bar.querySelector('#abRecord').onclick = () => canRecord ? withRecordingConsent(() => startMeetingRecording()) : needProject();
+    bar.querySelector('#abScreen').onclick = () => canRecord ? withRecordingConsent(() => openScreenPanel()) : needProject();
+    bar.querySelector('#abUpload').onclick = () => canRecord ? doImport(bar.querySelector('#abUpload')) : needProject();
   } else if (s === 'recording' || s === 'recording-local' || s === 'recording-cloud') {
     bar.innerHTML = `
       <button class="btn btn-stop" id="abStop"><span class="sq"></span>Detener grabación</button>
