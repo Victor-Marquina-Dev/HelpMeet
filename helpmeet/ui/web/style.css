@@ -1486,6 +1486,19 @@ body[data-sidebar="collapsed"] .actionbar--dock { left: 52px; }
    (.modal recorta con overflow-y:auto; este modal es corto y no lo necesita) */
 .np-modal { overflow: visible; }
 
+/* Modal "¿En qué proyecto?" (aparece al grabar sin proyecto elegido) */
+.pick-init-list { display: flex; flex-direction: column; gap: 2px; max-height: 300px; overflow-y: auto; }
+.pick-init-row {
+  display: flex; align-items: center; gap: 10px; width: 100%;
+  padding: 8px 10px; border: none; border-radius: var(--r-md);
+  background: transparent; font: inherit; color: var(--text-primary);
+  text-align: left; cursor: pointer;
+}
+.pick-init-row:hover { background: var(--accent-soft); }
+.pick-init-row .proj-av { width: 26px; height: 26px; font-size: 10px; flex: none; }
+.pick-init-name { font-size: 12px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pick-init-new { margin-top: 10px; width: 100%; display: flex; align-items: center; justify-content: center; gap: 6px; }
+
 /* ——— Ajustes como pantalla plana (sv = settings view) ——— */
 .sv-page { display: flex; flex-direction: column; gap: 0; }
 .sv-section {

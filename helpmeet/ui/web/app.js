@@ -3010,12 +3010,15 @@ function renderActionBar() {
         <span class="dock-sep"></span>
         <button class="dock-btn ${dis}" id="abUpload" title="${canRecord ? 'Importar video' : 'Selecciona un proyecto'}"><span class="dock-ico">${svg('upload', 18)}</span>Importar video</button>
       </div>`;
-    // Sin proyecto seleccionado: el clic explica el porqué y ofrece crearlo
-    const needProject = () => toast('info', 'Selecciona o crea un proyecto para poder grabar', 'Crear proyecto', promptNewInitiative);
+    // Sin proyecto seleccionado: modal para elegir/crear uno y seguir con la acción
+    const needProject = (cont) => pickInitiativeModal((iid) => { selectInitiative(iid); cont(); });
+    const _rec = () => withRecordingConsent(() => startMeetingRecording());
+    const _scr = () => withRecordingConsent(() => openScreenPanel());
+    const _imp = () => doImport(document.getElementById('abUpload'));
     bar.querySelector('#btnMic').onclick = toggleMic;
-    bar.querySelector('#abRecord').onclick = () => canRecord ? withRecordingConsent(() => startMeetingRecording()) : needProject();
-    bar.querySelector('#abScreen').onclick = () => canRecord ? withRecordingConsent(() => openScreenPanel()) : needProject();
-    bar.querySelector('#abUpload').onclick = () => canRecord ? doImport(bar.querySelector('#abUpload')) : needProject();
+    bar.querySelector('#abRecord').onclick = () => canRecord ? _rec() : needProject(_rec);
+    bar.querySelector('#abScreen').onclick = () => canRecord ? _scr() : needProject(_scr);
+    bar.querySelector('#abUpload').onclick = () => canRecord ? _imp() : needProject(_imp);
   } else if (s === 'recording' || s === 'recording-local' || s === 'recording-cloud') {
     bar.innerHTML = `
       <button class="btn btn-stop" id="abStop"><span class="sq"></span>Detener grabación</button>
@@ -4385,7 +4388,34 @@ async function doImportVideoForMeeting(mid) {
 /* ============================================================
    7. ACCIONES (contrato actual)
    ============================================================ */
-function promptNewInitiative() {
+// Modal "Elige un proyecto": lista los existentes y permite crear uno nuevo.
+// Al elegir o crear, llama a onPick(iid) para continuar la acción pendiente
+// (p. ej. iniciar una grabación). El modal ya se cierra solo antes de onPick.
+function pickInitiativeModal(onPick) {
+  const items = STATE.initiatives || [];
+  const m = el('div', 'modal pick-init-modal');
+  m.setAttribute('role', 'dialog'); m.setAttribute('aria-label', 'Elegir proyecto');
+  m.innerHTML = `
+    <div class="modal-head"><h3>¿En qué proyecto?</h3><button class="icon-btn sm" data-x aria-label="Cerrar">${svg('x', 14)}</button></div>
+    <div class="modal-body">
+      ${items.length ? `<div class="pick-init-list">${items.map(it => `
+        <button type="button" class="pick-init-row" data-iid="${it.id}">
+          <span class="proj-av" style="--av:${it.color || avatarColorFor(it.name)}">${esc(initialsFor(it.name))}</span>
+          <span class="pick-init-name">${esc(it.name)}</span>
+        </button>`).join('')}</div>` : ''}
+      <button type="button" class="btn pick-init-new">${svg('plus', 13)} Nuevo proyecto</button>
+    </div>`;
+  m.querySelectorAll('.pick-init-row').forEach(b => b.onclick = () => {
+    const iid = Number(b.dataset.iid);
+    closeModal();
+    onPick(iid);
+  });
+  m.querySelector('.pick-init-new').onclick = () => { closeModal(); promptNewInitiative(onPick); };
+  m.querySelector('[data-x]').onclick = closeModal;
+  openModal(m);
+}
+
+function promptNewInitiative(onCreated) {
   // Color aleatorio por defecto; se puede cambiar en el selector emergente.
   let color = INIT_COLORS[Math.floor(Math.random() * INIT_COLORS.length)];
   const m = el('div', 'modal np-modal');
@@ -4433,6 +4463,8 @@ function promptNewInitiative() {
         if (!it.color) it.color = color;
         STATE.initiatives.push(it); STATE.meetingsByInit[it.id] = [];
         renderSidebar(); toast('ok', 'Proyecto creado'); closeModal(); selectInitiative(it.id);
+        // Si venimos de "elige un proyecto" (p. ej. al grabar), continuar la acción
+        if (typeof onCreated === 'function') onCreated(it.id);
       }
     } catch (e) { okBtn.classList.remove('is-loading'); err.textContent = 'No se pudo crear. ' + (e && e.message || ''); }
   };
@@ -4667,7 +4699,8 @@ function _nowDateShort() {
 }
 function startMeetingRecording() {
   if (STATE.appState !== 'idle') return;
-  if (!STATE.selInit) { toast('err', 'Selecciona un proyecto antes de grabar'); return; }
+  // Sin proyecto: modal para elegir/crear uno y volver a intentar la grabación
+  if (!STATE.selInit) { pickInitiativeModal((iid) => { selectInitiative(iid); startMeetingRecording(); }); return; }
   formModal('Nueva reunión', 'Título de la reunión', _nowDateShort(), 'Empezar a grabar', beginMeetingRecording);
 }
 async function beginMeetingRecording(title) {
@@ -5034,7 +5067,20 @@ function wireObsCanvas(canvas) {
 }
 
 async function startScreenFromPanel() {
-  const name = (document.getElementById('scName')?.value || '').trim();
+  // Sin proyecto elegido: modal para seleccionar o crear uno y, al hacerlo,
+  // la grabación arranca sola (el modal reemplaza al panel; closeModal lo restaura).
+  if (!STATE.selInit) {
+    STATE.screenPanelName = (document.getElementById('scName')?.value || '').trim();
+    pickInitiativeModal((iid) => {
+      STATE.selInit = iid;
+      renderSidebar();
+      const nm = document.getElementById('scName');
+      if (nm && STATE.screenPanelName) nm.value = STATE.screenPanelName;
+      startScreenFromPanel();
+    });
+    return;
+  }
+  const name = (document.getElementById('scName')?.value || '').trim() || STATE.screenPanelName || '';
   const t = STATE.screenTransform;
   await api.setScreenTransform(t.x, t.y, t.w, t.h);  // colocación elegida
   const r = await api.startScreenRecording(STATE.selInit, STATE.monitorIdx);
@@ -5206,7 +5252,7 @@ function showInitialTourIfNeeded(force) {
     {
       sel: '#navInitiatives', icon: 'folder', color: '#aacfbf',
       title: 'Proyectos',
-      text: 'Organiza cada cliente o iniciativa aquí. Todo su historial de reuniones queda en un solo lugar.',
+      text: 'Organiza aquí cada cliente o proyecto. Todo su historial de reuniones queda en un solo lugar.',
     },
     {
       sel: '#abRecord', icon: 'mic', color: '#ff7a82',
