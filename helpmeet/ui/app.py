@@ -1344,12 +1344,14 @@ class Api:
         import numpy as np
         import mss
         from helpmeet.video.preview import _encode_jpeg
+        from helpmeet.screenshot.capture import make_thread_dpi_aware
         import av
 
         THUMB_H = 80
         monitors = self.list_monitors()
         result = []
         try:
+            make_thread_dpi_aware()  # sin esto, monitores con escala salen recortados
             with mss.mss() as sct:
                 for mon in monitors:
                     region = {

@@ -7,6 +7,7 @@ import av
 from helpmeet import config
 from helpmeet.audio.capture import DualAudioRecorder
 from helpmeet.audio.mixing import mix_wavs
+from helpmeet.screenshot.capture import make_thread_dpi_aware
 
 MIC_WAV = "me.wav"        # pista del micrófono (la que escribe DualAudioRecorder)
 SYS_WAV = "others.wav"    # pista del audio del sistema
@@ -190,6 +191,9 @@ class ScreenVideoRecorder:
                 ("others", self._tmp_dir / SYS_WAV)]
 
     def _record_video(self):
+        # Píxeles físicos en este hilo: gdigrab usa GDI y en monitores con
+        # escala de Windows grabaría recortado (igual que la vista previa).
+        make_thread_dpi_aware()
         # MP4 fragmentado: escribe cabeceras reproducibles desde el inicio. Así
         # el archivo temporal sigue siendo recuperable aunque el proceso no
         # alcance `out.close()` por un apagado o cierre forzado.
