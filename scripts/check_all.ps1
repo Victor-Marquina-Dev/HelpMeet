@@ -14,9 +14,8 @@ function Fail($msg) { Write-Host "  FAIL $msg" -ForegroundColor Red; $script:ok 
 Step "Tests app principal"
 try {
     Push-Location $root
-    # Excluir: test_whisper_model_status_not_downloaded (env: modelo ya descargado)
     # Excluir: test_force_video_transcription_replaces_old_text_using_sidecar (bug SQLAlchemy session refresh)
-    $skip = "not test_whisper_model_status_not_downloaded and not test_force_video_transcription_replaces_old_text_using_sidecar"
+    $skip = "not test_force_video_transcription_replaces_old_text_using_sidecar"
     & ".\.venv\Scripts\python.exe" -m pytest tests -q --tb=short -k $skip 2>&1 | Tee-Object -Variable out
     if ($LASTEXITCODE -eq 0) { Pass "App tests pasaron" } else { Fail "App tests fallaron" }
 } catch { Fail "No se pudo ejecutar app tests: $_" }

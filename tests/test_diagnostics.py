@@ -18,6 +18,9 @@ def test_disk_space_on_missing_path_uses_existing_parent(tmp_path):
 
 def test_whisper_model_status_not_downloaded(tmp_path, monkeypatch):
     # Forzamos una caché vacía: el modelo aparece como "se descargará".
+    # También aislamos la carpeta local de Helpmeet (DATA_DIR/models/...) para
+    # que el resultado no dependa de si ESTE equipo ya tiene el modelo real.
+    monkeypatch.setattr("helpmeet.config.DATA_DIR", str(tmp_path / "sin_datos"))
     fake_cache = tmp_path / "hub"
     fake_cache.mkdir()
     monkeypatch.setattr("huggingface_hub.constants.HF_HUB_CACHE", str(fake_cache))
@@ -27,10 +30,15 @@ def test_whisper_model_status_not_downloaded(tmp_path, monkeypatch):
 
 
 def test_whisper_model_status_downloaded(tmp_path, monkeypatch):
+    # Igual que arriba: aislamos DATA_DIR para no leer el modelo real del equipo.
+    monkeypatch.setattr("helpmeet.config.DATA_DIR", str(tmp_path / "sin_datos"))
     fake_cache = tmp_path / "hub"
     snap = fake_cache / "models--Systran--faster-whisper-small" / "snapshots" / "abc"
     snap.mkdir(parents=True)
-    (snap / "model.bin").write_bytes(b"x" * 2048)
+    # El chequeo real exige >= _MODEL_MIN_BYTES (50 MB) para descartar blobs rotos.
+    with (snap / "model.bin").open("wb") as f:
+        f.seek(diagnostics._MODEL_MIN_BYTES)
+        f.write(b"x")
     monkeypatch.setattr("huggingface_hub.constants.HF_HUB_CACHE", str(fake_cache))
     res = diagnostics.whisper_model_status("small")
     assert res["downloaded"] is True
