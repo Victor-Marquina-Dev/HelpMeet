@@ -1498,6 +1498,8 @@ body[data-sidebar="collapsed"] .actionbar--dock { left: 52px; }
 .tree-initiative:hover .tree-pin { opacity: 1; }
 .tree-pin:hover { color: var(--accent); background: var(--hover-med); }
 .tree-pin.on { opacity: 1; color: var(--accent); }
+/* Contador con ancho fijo: así los pines quedan alineados en columna */
+.tree-initiative .count { width: 20px; text-align: right; flex: none; }
 
 /* Modal "¿En qué proyecto?" (aparece al grabar sin proyecto elegido) */
 .pick-init-list { display: flex; flex-direction: column; gap: 2px; max-height: 300px; overflow-y: auto; }
