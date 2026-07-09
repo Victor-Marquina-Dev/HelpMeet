@@ -93,6 +93,34 @@ def _set_windows_app_identity() -> None:
         pass
 
 
+_SINGLE_INSTANCE_MUTEX_NAME = "HelpmeetApp_SingleInstance_9F3A2E1B"
+_ERROR_ALREADY_EXISTS = 183
+
+
+def _acquire_single_instance():
+    """Evita abrir varias ventanas: si ya hay una Helpmeet corriendo, la
+    trae al frente y devuelve None (para no crear otra). Si no había
+    ninguna, devuelve el handle del mutex (hay que mantenerlo vivo mientras
+    corre la app, si se libera antes de tiempo el bloqueo deja de aplicar)."""
+    if not sys.platform.startswith("win"):
+        return True
+    try:
+        import ctypes
+        handle = ctypes.windll.kernel32.CreateMutexW(
+            None, False, _SINGLE_INSTANCE_MUTEX_NAME
+        )
+        if ctypes.windll.kernel32.GetLastError() == _ERROR_ALREADY_EXISTS:
+            hwnd = ctypes.windll.user32.FindWindowW(None, "Helpmeet")
+            if hwnd:
+                if ctypes.windll.user32.IsIconic(hwnd):
+                    ctypes.windll.user32.ShowWindow(hwnd, 9)  # SW_RESTORE
+                ctypes.windll.user32.SetForegroundWindow(hwnd)
+            return None
+        return handle
+    except Exception:
+        return True
+
+
 def _apply_dark_titlebar(hwnd: int) -> None:
     """Pinta la barra de título oscura y con el color de la app (Win11 DWM API)."""
     try:
@@ -2891,6 +2919,10 @@ class Api:
 
 def run():
     import platform
+    _instance_lock = _acquire_single_instance()
+    if _instance_lock is None:
+        _log.info("Helpmeet ya estaba abierto — se activó esa ventana en vez de abrir otra")
+        return
     _log.info("=" * 60)
     _log.info("Helpmeet %s — iniciando", __version__)
     _log.info("Python %s | %s", sys.version.split()[0], platform.platform())

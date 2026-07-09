@@ -1363,7 +1363,6 @@ body[data-sidebar="collapsed"] .actionbar--dock { left: 52px; }
 .dock-btn:hover { background: var(--bg-elevated); color: var(--text-primary); }
 .dock-btn .dock-ico { display: inline-flex; transition: color .12s; }
 .dock-btn:hover .dock-ico--rec { color: var(--recording); }
-.dock-btn:hover .dock-ico--screen { color: var(--accent); }
 /* Atenuado pero clicable: el clic explica por qué no se puede grabar
    (antes pointer-events:none se tragaba el clic sin dar ninguna pista) */
 .dock-btn.is-disabled { opacity: .5; cursor: not-allowed; }

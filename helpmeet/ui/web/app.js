@@ -1354,7 +1354,7 @@ function viewInitiative() {
   const listWrapper = el('div');
   if (!ms.length) {
     const p = el('p');
-    p.innerHTML = '<span style="color:var(--text-muted);font-size:13px">Aún no hay reuniones. Pulsa <b>Grabar reunión</b> o <b>Importar video</b> para empezar.</span>';
+    p.innerHTML = '<span style="color:var(--text-muted);font-size:13px">Aún no hay reuniones. Pulsa <b>Grabar</b> o <b>Importar video</b> para empezar.</span>';
     listWrapper.appendChild(p);
   } else {
     row = el('div', 'list');
@@ -3055,9 +3055,7 @@ function renderActionBar() {
           <span class="eq mini" aria-hidden="true"><i></i><i></i><i></i></span>
         </button>
         <span class="dock-sep"></span>
-        <button class="dock-btn" id="abRecord" title="Grabar reunión"><span class="dock-ico dock-ico--rec">${svg('mic', 18)}</span>Grabar reunión</button>
-        <span class="dock-sep"></span>
-        <button class="dock-btn" id="abScreen" title="Grabar pantalla"><span class="dock-ico dock-ico--screen">${svg('monitorDot', 18)}</span>Grabar pantalla</button>
+        <button class="dock-btn" id="abRecord" aria-haspopup="true" aria-expanded="false" title="Grabar reunión o pantalla"><span class="dock-ico dock-ico--rec">${svg('mic', 18)}</span>Grabar<span class="cdrop-chev">${svg('chevronDown', 14)}</span></button>
         <span class="dock-sep"></span>
         <button class="dock-btn" id="abUpload" title="Importar video"><span class="dock-ico">${svg('upload', 18)}</span>Importar video</button>
       </div>`;
@@ -3067,8 +3065,10 @@ function renderActionBar() {
     const _scr = () => withRecordingConsent(() => openScreenPanel());
     const _imp = () => doImport(document.getElementById('abUpload'));
     bar.querySelector('#btnMic').onclick = toggleMic;
-    bar.querySelector('#abRecord').onclick = () => canRecord ? _rec() : needProject(_rec);
-    bar.querySelector('#abScreen').onclick = () => canRecord ? _scr() : needProject(_scr);
+    bar.querySelector('#abRecord').onclick = (e) => _openRecordPicker(e.currentTarget, [
+      { icon: 'mic', label: 'Grabar reunión (audio)', run: () => canRecord ? _rec() : needProject(_rec) },
+      { icon: 'monitorDot', label: 'Grabar pantalla', run: () => canRecord ? _scr() : needProject(_scr) },
+    ]);
     bar.querySelector('#abUpload').onclick = () => canRecord ? _imp() : needProject(_imp);
   } else if (s === 'recording' || s === 'recording-local' || s === 'recording-cloud') {
     // Grabación de solo audio: sin botón "Captura" (capturar pantalla
@@ -4232,6 +4232,34 @@ function openMenu(e, items) {
 }
 function closeMenu() { if (_ctxOpen) { if (_ctxOpen._owner) _ctxOpen._owner.setAttribute('aria-expanded', 'false'); _ctxOpen.remove(); _ctxOpen = null; } }
 
+// Popover del botón "Grabar" del dock: audio o pantalla. Se abre hacia arriba
+// (el dock vive pegado abajo) igual que openCustomSelectPanel, pero sin
+// marcar ninguna opción como "seleccionada" — siempre vuelve a preguntar.
+function _openRecordPicker(anchor, options) {
+  if (_ctxOpen && _ctxOpen._owner === anchor) { closeMenu(); return; }
+  closeMenu();
+  const panel = el('div', 'cdrop-panel');
+  panel._owner = anchor;
+  anchor.setAttribute('aria-expanded', 'true');
+  options.forEach(opt => {
+    const o = el('div', 'cdrop-opt');
+    o.innerHTML = `<span class="cdrop-ico">${svg(opt.icon, 15)}</span><span class="cdrop-opt-label">${esc(opt.label)}</span>`;
+    o.onclick = (e) => { e.stopPropagation(); closeMenu(); opt.run(); };
+    panel.appendChild(o);
+  });
+  document.body.appendChild(panel);
+  const r = anchor.getBoundingClientRect();
+  panel.style.minWidth = Math.max(r.width, 200) + 'px';
+  let left = r.left;
+  let top = r.top - panel.offsetHeight - 6;
+  if (top < 10) top = r.bottom + 6;
+  if (left + panel.offsetWidth > window.innerWidth - 10) left = window.innerWidth - panel.offsetWidth - 10;
+  panel.style.left = Math.max(10, left) + 'px';
+  panel.style.top = Math.max(10, top) + 'px';
+  _ctxOpen = panel;
+  setTimeout(() => document.addEventListener('click', closeMenu, { once: true }), 0);
+}
+
 /* ---- Dropdown personalizado (reemplaza <select> nativos para respetar el tema) ----
    opts: { value, items:[{value,label,color?}], onChange, icon?, className?, minWidth? } */
 function customSelect(opts) {
@@ -5297,13 +5325,8 @@ function showInitialTourIfNeeded(force) {
     },
     {
       sel: '#abRecord', icon: 'mic', color: '#ff7a82',
-      title: 'Graba reuniones',
-      text: 'Un clic y Helpmeet escucha, transcribe en tiempo real y genera un resumen automático al terminar.',
-    },
-    {
-      sel: '#abScreen', icon: 'monitorDot', color: '#7eb8ff',
-      title: 'Captura videollamadas',
-      text: 'Graba lo que ocurre en tu pantalla: Meet, Zoom, Teams. Helpmeet transcribe y archiva todo.',
+      title: 'Graba reuniones o pantalla',
+      text: 'Pulsa "Grabar" y elige audio o pantalla (Meet, Zoom, Teams). Helpmeet escucha, transcribe en tiempo real y genera un resumen automático al terminar.',
     },
     {
       sel: null, icon: 'rocket', color: '#aacfbf',
