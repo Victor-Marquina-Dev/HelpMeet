@@ -3432,3 +3432,13 @@ body[data-theme="dark"] .proj-av {
   background: color-mix(in srgb, var(--av, var(--text-faint)) 15%, transparent);
   color: color-mix(in srgb, var(--av, var(--text-secondary)) 80%, var(--text-secondary));
 }
+
+/* ── Pantallas anchas: la columna de contenido va centrada ──
+   Inicio, Favoritos, Archivados, vista de proyecto, Proyectos y Ajustes
+   dejaban todo pegado a la izquierda con el resto de la ventana vacío. */
+.list, .home-feed, .fav-list { margin-left: auto; margin-right: auto; }
+.sv-page { margin-left: auto; margin-right: auto; }
+.init-hub-wrap { max-width: 1200px; width: 100%; margin-left: auto; margin-right: auto; }
+.init-head .init-status-row,
+.init-head .obj-box { max-width: 1120px; width: 100%; margin-left: auto; margin-right: auto; }
+.mhead-row--mid { width: 100%; margin-left: auto; margin-right: auto; }

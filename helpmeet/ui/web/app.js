@@ -666,7 +666,7 @@ function viewHomeFeed() {
   const wrap = el('div'); wrap.style.cssText = 'display:flex;flex-direction:column;flex:1;min-height:0';
   const head = el('div', 'mhead');
   head.style.cssText = 'border-bottom:none';
-  head.innerHTML = `<div class="mhead-row"><h1 class="page-title">Inicio</h1></div>`;
+  head.innerHTML = `<div class="mhead-row mhead-row--mid" style="max-width:640px"><h1 class="page-title">Inicio</h1></div>`;
   const content = el('div', 'content');
 
   const items = [];
@@ -2928,7 +2928,7 @@ function viewArchiveTrash(which) {
   const wrap = el('div'); wrap.style.cssText = 'display:flex;flex-direction:column;flex:1;min-height:0';
   const head = el('div', 'mhead');
   head.style.cssText = 'border-bottom:none';
-  head.innerHTML = `<div class="mhead-row"><h1 class="page-title">Archivados</h1></div>`;
+  head.innerHTML = `<div class="mhead-row mhead-row--mid" style="max-width:640px"><h1 class="page-title">Archivados</h1></div>`;
   if (isTrash) {
     const emptyBtn = el('button', 'btn btn-danger sm');
     emptyBtn.id = 'emptyTrash';
@@ -2937,7 +2937,7 @@ function viewArchiveTrash(which) {
     head.querySelector('.mhead-row').appendChild(emptyBtn);
   }
   const content = el('div', 'content');
-  const list = el('div'); list.style.maxWidth = '640px';
+  const list = el('div'); list.style.cssText = 'max-width:640px;margin:0 auto';
   content.appendChild(list);
 
   api.listLibrary(isTrash ? 'trash' : 'archive').then(items => {
@@ -5639,7 +5639,7 @@ function viewSettings() {
   const wrap = el('div'); wrap.style.cssText = 'display:flex;flex-direction:column;flex:1;min-height:0';
   const head = el('div', 'mhead');
   head.style.cssText = 'border-bottom:none';
-  head.innerHTML = `<div class="mhead-row"><h1 class="page-title">Ajustes</h1></div>`;
+  head.innerHTML = `<div class="mhead-row mhead-row--mid" style="max-width:1100px"><h1 class="page-title">Ajustes</h1></div>`;
   const content = el('div', 'content');
   const inner = el('div', 'sv-page');
   inner.style.maxWidth = '1100px';
