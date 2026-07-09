@@ -4823,7 +4823,9 @@ function doCapture() {
 async function openScreenPanel() {
   if (STATE.appState !== 'idle') return;
   STATE.recElapsed = 0; STATE.screenPanelCollapsed = false;
-  STATE.screenRecording = false; STATE.screenMeetingId = null; STATE.screenPanelName = '';
+  // Nombre por defecto visible como en las listas ("mié 08 Jul"); si el usuario
+  // no lo cambia, no se renombra y el backend conserva su nombre por defecto.
+  STATE.screenRecording = false; STATE.screenMeetingId = null; STATE.screenPanelName = _prettyToday();
   // Inicia como OBS: fuente a pantalla completa, con tiradores sobre el borde.
   STATE.screenTransform = { x: 0, y: 0, w: 1, h: 1 };
   // Asegurar que monitorIdx apunte a un monitor real (mss.monitors[0] = pantalla virtual)
@@ -4990,7 +4992,7 @@ function showScreenPanel() {
   m.querySelector('#scName').oninput = (e) => { STATE.screenPanelName = e.target.value; };
   m.querySelector('#scName').onblur = (e) => {
     const v = e.target.value.trim();
-    if (v && recording && STATE.screenMeetingId) api.renameMeeting(STATE.screenMeetingId, v);
+    if (v && v !== _prettyToday() && recording && STATE.screenMeetingId) api.renameMeeting(STATE.screenMeetingId, v);
   };
   m.querySelector('#scMic').onclick = () => {
     STATE.micMuted = !STATE.micMuted;
@@ -5139,7 +5141,7 @@ async function startScreenFromPanel() {
   STATE.screenMeetingId = r.meeting_id || null;
   STATE.micMuted = !!r.mic_muted;
   STATE.screenRecording = true;
-  if (name && STATE.screenMeetingId) api.renameMeeting(STATE.screenMeetingId, name);
+  if (name && name !== _prettyToday() && STATE.screenMeetingId) api.renameMeeting(STATE.screenMeetingId, name);
   startTimer();
   setAppState('screen-recording');
   showScreenPanel();  // re-render en modo grabación
@@ -5155,10 +5157,11 @@ async function cancelScreenPanel() {
 }
 async function stopScreenRecording() {
   STATE.screenPanelOpen = false;   // evitar que closeModal re-muestre el panel
-  // Aplica el nombre escrito en el panel (si lo hay) antes de cerrar.
+  // Aplica el nombre escrito en el panel (si lo hay y no es el de por defecto).
   const nameField = document.getElementById('scName');
-  if (nameField && nameField.value.trim() && STATE.screenMeetingId) {
-    api.renameMeeting(STATE.screenMeetingId, nameField.value.trim());
+  const _nfv = nameField ? nameField.value.trim() : '';
+  if (_nfv && _nfv !== _prettyToday() && STATE.screenMeetingId) {
+    api.renameMeeting(STATE.screenMeetingId, _nfv);
   }
   stopTimer();
   closeModal();
