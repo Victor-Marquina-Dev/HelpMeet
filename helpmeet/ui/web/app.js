@@ -5642,7 +5642,7 @@ function viewSettings() {
   head.innerHTML = `<div class="mhead-row"><h1 class="page-title">Ajustes</h1></div>`;
   const content = el('div', 'content');
   const inner = el('div', 'sv-page');
-  inner.style.maxWidth = '640px';
+  inner.style.maxWidth = '1100px';
   content.appendChild(inner);
   wrap.replaceChildren(head, content);
 
@@ -5654,7 +5654,8 @@ function viewSettings() {
     const sByLang = scfg.models_by_lang || {};
 
     inner.innerHTML = `
-      <div class="sv-section">
+      <div class="sv-cards">
+      <div class="sv-section sv-card">
         <div class="sv-sec-title">${svg('mic', 14)} Transcripción ${hasTx ? '<span class="privacy-badge"><i></i>Local</span>' : ''}</div>
         <div class="sv-row"><span class="sv-lbl">Idioma</span><div class="cfg-chips" id="svLangChips"></div></div>
         <div class="sv-row"><span class="sv-lbl">Modelo</span><div class="cfg-chips" id="svModelChips"></div></div>
@@ -5665,23 +5666,25 @@ function viewSettings() {
         </label>
       </div>
 
-      <div class="sv-section">
-        <div class="sv-sec-title">${svg('palette', 14)} Apariencia</div>
-        <div class="sv-row">
-          <span class="sv-lbl">Tema</span>
-          <div id="svThemeChips" style="display:flex;gap:8px">
-            <button class="cfg-chip" data-theme-opt="light">Claro</button>
-            <button class="cfg-chip" data-theme-opt="dark">Oscuro</button>
+      <div class="sv-col">
+        <div class="sv-section sv-card">
+          <div class="sv-sec-title">${svg('palette', 14)} Apariencia</div>
+          <div class="sv-row">
+            <span class="sv-lbl">Tema</span>
+            <div id="svThemeChips" style="display:flex;gap:8px">
+              <button class="cfg-chip" data-theme-opt="light">Claro</button>
+              <button class="cfg-chip" data-theme-opt="dark">Oscuro</button>
+            </div>
           </div>
+        </div>
+
+        <div class="sv-section sv-card">
+          <div class="sv-sec-title">${svg('monitor', 14)} Grabación de pantalla</div>
+          <div class="sv-row"><span class="sv-lbl">Calidad</span><div class="cfg-chips" id="svVideoChips"></div></div>
         </div>
       </div>
 
-      <div class="sv-section">
-        <div class="sv-sec-title">${svg('monitor', 14)} Grabación de pantalla</div>
-        <div class="sv-row"><span class="sv-lbl">Calidad</span><div class="cfg-chips" id="svVideoChips"></div></div>
-      </div>
-
-      <div class="sv-section">
+      <div class="sv-section sv-card sv-card--full">
         <div class="sv-sec-title">${svg('edit', 14)} Instrucciones para la IA</div>
         <textarea id="svAiInstr" class="obj-text sv-textarea" rows="8"
           placeholder="Instrucciones al inicio de cada exportación a Claude…">${esc(s.ai_instructions || '')}</textarea>
@@ -5691,7 +5694,7 @@ function viewSettings() {
         </div>
       </div>
 
-      <div class="sv-section">
+      <div class="sv-section sv-card">
         <div class="sv-sec-title">${svg('folder', 14)} Carpeta de exportación</div>
         <div class="sv-row">
           <span class="sv-path mono">${esc(s.export_dir || '—')}</span>
@@ -5699,7 +5702,7 @@ function viewSettings() {
         </div>
       </div>
 
-      <div class="sv-section" id="svLicSection">
+      <div class="sv-section sv-card" id="svLicSection">
         <div class="sv-sec-title">${svg('checkSquare', 14)} Licencia</div>
         <div class="sv-lic-rows">
           <div class="sv-row">
@@ -5718,7 +5721,7 @@ function viewSettings() {
         </div>
       </div>
 
-      <div class="sv-section">
+      <div class="sv-section sv-card sv-card--full">
         <div class="sv-sec-title">${svg('download', 14)} Actualizaciones</div>
         <div class="sv-upd-card">
           <div class="sv-upd-ico">${svg('download', 17)}</div>
@@ -5730,9 +5733,10 @@ function viewSettings() {
         </div>
       </div>
 
-      <div class="sv-section sv-section--actions">
+      <div class="sv-section sv-section--actions sv-card--full">
         <button class="sv-act" id="svDiag">${svg('check', 13)} Diagnóstico</button>
         <button class="sv-act sv-act--danger" id="svWipe">${svg('trash', 13)} Borrar datos</button>
+      </div>
       </div>`;
 
     function renderChips() {
