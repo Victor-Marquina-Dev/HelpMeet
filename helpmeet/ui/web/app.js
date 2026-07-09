@@ -559,9 +559,11 @@ function renderTopStatus() {
   const root = $('#topbarStatus');
   const s = STATE.appState;
   if (s === 'recording' || s === 'recording-local' || s === 'recording-cloud') {
-    root.innerHTML = `<div class="status-rec"><span class="rdot"></span>Grabando reunión · <span class="mono">${fmt(STATE.recElapsed)}</span></div>`;
+    // Icono de origen: micrófono = solo audio
+    root.innerHTML = `<div class="status-rec"><span class="rdot"></span><span class="rec-kind">${svg('mic', 12)}</span>Grabando reunión · <span class="mono">${fmt(STATE.recElapsed)}</span></div>`;
   } else if (s === 'screen-recording') {
-    root.innerHTML = `<div class="status-rec"><span class="rdot"></span>REC pantalla · <span class="mono">${fmt(STATE.recElapsed)}</span></div>`;
+    // Icono de origen: pantalla
+    root.innerHTML = `<div class="status-rec"><span class="rdot"></span><span class="rec-kind">${svg('monitorDot', 12)}</span>REC pantalla · <span class="mono">${fmt(STATE.recElapsed)}</span></div>`;
   } else if (s === 'processing') {
     const progressText = STATE.jobDeterminate ? Math.round(STATE.jobProgress) + '%' : processingElapsed();
     root.innerHTML = `<div class="status-proc"><span class="spinner"></span>${esc(STATE.jobStage)} · ${progressText}</div>`;
@@ -1177,7 +1179,12 @@ function _calRenderColEvents(col, evs) {
     const extra = n - 2;
     show.forEach((ev, idx) => {
       const node = _calTgEvent(ev.m, ev.it);
-      if (n > 1) { node.style.left = idx === 0 ? '4px' : '51%'; node.style.right = idx === 0 ? '51%' : '4px'; }
+      if (n > 1) {
+        node.style.left = idx === 0 ? '4px' : '51%';
+        node.style.right = idx === 0 ? '51%' : '4px';
+        // Apiladas: el clic muestra el panel pequeño con todas las del grupo
+        node.onclick = (e) => { e.stopPropagation(); _calShowGroupPicker(e, g.items); };
+      }
       col.appendChild(node);
     });
     if (extra > 0) {
@@ -1185,10 +1192,36 @@ function _calRenderColEvents(col, evs) {
       const badge = el('div', 'cal-tg-more');
       badge.style.top = `${topPx}px`;
       badge.textContent = `+${extra}`;
-      badge.title = g.items.slice(2).map(ev => ev.m.title).join(', ');
+      badge.title = 'Ver las ' + n + ' reuniones';
+      // Clic: mini-panel con TODAS las reuniones del grupo para elegir cuál abrir
+      badge.onclick = (e) => { e.stopPropagation(); _calShowGroupPicker(e, g.items); };
       col.appendChild(badge);
     }
   }
+}
+
+// Panel flotante con las reuniones solapadas de un grupo del calendario:
+// se elige una y se abre (antes el "+N" no dejaba llegar a las ocultas).
+function _calShowGroupPicker(e, items) {
+  closeMenu();
+  const panel = el('div', 'cdrop-panel cal-pick-panel');
+  items.forEach(({ m, it }) => {
+    const hhmm = (m.started_at || '').substring(11, 16);
+    const o = el('div', 'cdrop-opt');
+    o.innerHTML = `<span class="cdrop-dot" style="background:${_initColor(it)}"></span>`
+      + `<span class="cdrop-opt-label">${esc(_fmtMeetingLabel(m))}</span>`
+      + `<span class="cal-pick-time">${esc(_calFmtTime(hhmm))}</span>`;
+    o.onclick = (ev2) => { ev2.stopPropagation(); closeMenu(); _calOpenMeeting(m, it); };
+    panel.appendChild(o);
+  });
+  document.body.appendChild(panel);
+  let left = e.clientX + 4, top = e.clientY + 4;
+  if (left + panel.offsetWidth > window.innerWidth - 10) left = window.innerWidth - panel.offsetWidth - 10;
+  if (top + panel.offsetHeight > window.innerHeight - 10) top = e.clientY - panel.offsetHeight - 4;
+  panel.style.left = Math.max(10, left) + 'px';
+  panel.style.top = Math.max(10, top) + 'px';
+  _ctxOpen = panel;
+  setTimeout(() => document.addEventListener('click', closeMenu, { once: true }), 0);
 }
 
 // Bloque de evento en la rejilla horaria (posicionado por hora de inicio y duración).
@@ -3020,13 +3053,13 @@ function renderActionBar() {
     bar.querySelector('#abScreen').onclick = () => canRecord ? _scr() : needProject(_scr);
     bar.querySelector('#abUpload').onclick = () => canRecord ? _imp() : needProject(_imp);
   } else if (s === 'recording' || s === 'recording-local' || s === 'recording-cloud') {
+    // Grabación de solo audio: sin botón "Captura" (capturar pantalla
+    // solo tiene sentido cuando se está grabando la pantalla).
     bar.innerHTML = `
       <button class="btn btn-stop" id="abStop"><span class="sq"></span>Detener grabación</button>
-      <button class="btn btn-lg ab-appear" id="abCapture" style="animation-delay:.04s">${svg('camera', 15)}Captura</button>
-      <button class="btn btn-lg ab-appear" id="abNote" style="animation-delay:.08s">${svg('note', 15)}Añadir nota</button>
+      <button class="btn btn-lg ab-appear" id="abNote" style="animation-delay:.04s">${svg('note', 15)}Añadir nota</button>
       <button class="btn btn-lg ${STATE.meetingMicMuted ? 'btn-danger' : ''}" id="abMic">${STATE.meetingMicMuted ? 'Activar mi audio' : 'Silenciar mi audio'}</button>`;
     bar.querySelector('#abStop').onclick = stopMeetingRecording;
-    bar.querySelector('#abCapture').onclick = doCapture;
     bar.querySelector('#abNote').onclick = promptNote;
     bar.querySelector('#abMic').onclick = toggleMeetingMic;
   } else if (s === 'processing') {
@@ -3827,7 +3860,14 @@ function _renderInitRow(tree, it) {
   row.dataset.iid = it.id;
   row.title = it.name || '';
   const av = `<span class="proj-av" style="--av:${it.color || avatarColorFor(it.name)}">${esc(initialsFor(it.name))}</span>`;
-  row.innerHTML = `<span class="chev">${svg('chevron', 14)}</span>${av}<span class="name">${esc(it.name)}</span>${it.pinned ? '<span class="pin-ind">' + svg('pin', 12) + '</span>' : ''}<span class="count">${ms.length || ''}</span>`;
+  // Pin al pasar el mouse (fijados: siempre visible); reemplaza al indicador fijo
+  row.innerHTML = `<span class="chev">${svg('chevron', 14)}</span>${av}<span class="name">${esc(it.name)}</span><button class="tree-pin${it.pinned ? ' on' : ''}" title="${it.pinned ? 'Desfijar' : 'Fijar arriba'}" aria-label="${it.pinned ? 'Desfijar proyecto' : 'Fijar proyecto arriba'}">${svg('pin', 12)}</button><span class="count">${ms.length || ''}</span>`;
+  row.querySelector('.tree-pin').onclick = async (e) => {
+    e.stopPropagation();
+    await api.toggleInitiativePin(it.id).catch(() => {});
+    it.pinned = !it.pinned;
+    renderSidebar();
+  };
   row.onclick = () => selectInitiative(it.id);
   row.oncontextmenu = (e) => { e.preventDefault(); openInitiativeMenu(e, it.id); };
   tree.appendChild(row);
@@ -3932,13 +3972,8 @@ function renderSidebar() {
   const pinned = all.filter(it => it.pinned);
   const rest = all.filter(it => !it.pinned);
 
-  // ── Fijadas ───────────────────────────────────────────────
-  if (pinned.length) {
-    const grpLabel = el('div', 'sidebar-group-label');
-    grpLabel.innerHTML = `<span>${svg('pin', 10)} Fijadas</span><span class="sgr-count">${pinned.length}</span>`;
-    tree.appendChild(grpLabel);
-    pinned.forEach(it => _renderInitRow(tree, it));
-  }
+  // ── Fijados primero, sin encabezado (el pin de cada fila ya lo indica) ──
+  pinned.forEach(it => _renderInitRow(tree, it));
 
   // ── Activas (no fijadas) — con corte "Mostrar todo" ───────
   const VISIBLE_LIMIT = 8;
@@ -4741,9 +4776,11 @@ async function stopMeetingRecording() {
         const ts = _nowDateShort();
         const mtg = (STATE.meetingsByInit[STATE.selInit] || []).find(m => m.id === stoppedId);
         const curTitle = (mtg && mtg.title) || ts;
-        formModal('Nombrar la reunión', 'Título (opcional)', curTitle, 'Guardar nombre', async (title) => {
+        // Se muestra como en las listas ("mié 08 Jul"); si no se toca, no se renombra
+        const shown = mtg ? _fmtMeetingLabel(mtg) : curTitle;
+        formModal('Nombrar la reunión', 'Título (opcional)', shown, 'Guardar nombre', async (title) => {
           title = (title || '').trim();
-          if (!title || title === curTitle) return;
+          if (!title || title === shown || title === curTitle) return;
           await api.renameMeeting(stoppedId, title);
           for (const k in STATE.meetingsByInit) {
             const m = STATE.meetingsByInit[k].find(x => x.id === stoppedId);

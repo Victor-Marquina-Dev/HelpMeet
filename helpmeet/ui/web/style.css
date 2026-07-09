@@ -384,6 +384,7 @@ body[data-app-state="screen-recording"] .audio-chip:not(.muted) .eq.mini i:nth-c
   font-size: 10.6px; font-weight: 700; color: #ff7a82;
 }
 .status-rec .rdot { width: 9px; height: 9px; border-radius: 50%; background: var(--recording); animation: pulse 1.3s infinite; }
+.status-rec .rec-kind { display: inline-flex; flex: none; opacity: .85; }
 .status-proc { display: flex; align-items: center; gap: 9px; font-size: 10.6px; color: var(--accent); font-weight: 600; }
 .spinner { width: 14px; height: 14px; border-radius: 50%; border: 2px solid color-mix(in srgb, var(--accent) 30%, transparent); border-top-color: var(--accent); animation: spin .8s linear infinite; flex: none; }
 
@@ -1486,6 +1487,18 @@ body[data-sidebar="collapsed"] .actionbar--dock { left: 52px; }
    (.modal recorta con overflow-y:auto; este modal es corto y no lo necesita) */
 .np-modal { overflow: visible; }
 
+/* Pin del árbol de proyectos: aparece al pasar el mouse; fijado = siempre visible */
+.tree-pin {
+  display: inline-flex; align-items: center; justify-content: center;
+  flex: none; width: 20px; height: 20px; padding: 0;
+  border: none; border-radius: 5px; background: transparent;
+  color: var(--text-faint); cursor: pointer;
+  opacity: 0; transition: opacity .12s, color .12s, background .12s;
+}
+.tree-initiative:hover .tree-pin { opacity: 1; }
+.tree-pin:hover { color: var(--accent); background: var(--hover-med); }
+.tree-pin.on { opacity: 1; color: var(--accent); }
+
 /* Modal "¿En qué proyecto?" (aparece al grabar sin proyecto elegido) */
 .pick-init-list { display: flex; flex-direction: column; gap: 2px; max-height: 300px; overflow-y: auto; }
 .pick-init-row {
@@ -2517,7 +2530,11 @@ body[data-theme="dark"] .cal-tg-ev:hover { filter: brightness(1.18) saturate(1.1
 .cal-tg-now::before { content: ''; position: absolute; left: -4px; top: -4.5px; width: 8px; height: 8px; border-radius: 50%; background: var(--recording); box-shadow: 0 0 0 3px color-mix(in srgb, var(--recording) 18%, transparent); }
 .cal-tg-now-badge { position: absolute; left: 7px; transform: translateY(-50%); z-index: 6; background: var(--recording); color: #fff; font-size: 8.5px; font-weight: 700; padding: 1.5px 5px; border-radius: 4px; font-variant-numeric: tabular-nums; }
 
-.cal-tg-more { position: absolute; right: 4px; z-index: 4; background: var(--bg-surface); color: var(--text-secondary); border: 1px solid var(--border-subtle); font-size: 9px; font-weight: 700; padding: 2px 6px; border-radius: 10px; cursor: default; transform: translateY(2px); }
+.cal-tg-more { position: absolute; right: 4px; z-index: 4; background: var(--bg-surface); color: var(--text-secondary); border: 1px solid var(--border-subtle); font-size: 9px; font-weight: 700; padding: 2px 6px; border-radius: 10px; cursor: pointer; transform: translateY(2px); }
+.cal-tg-more:hover { color: var(--accent); border-color: var(--accent); }
+/* Panel pequeño para elegir entre reuniones solapadas del calendario */
+.cal-pick-panel { min-width: 200px; }
+.cal-pick-time { font-family: var(--font-mono); font-size: 9.5px; color: var(--text-faint); margin-left: 12px; flex: none; }
 .cal-empty { display: flex; align-items: center; justify-content: center; gap: 8px; color: var(--text-muted); font-size: 11px; padding: 16px; margin-top: 12px; }
 
 /* ============================================================
