@@ -3972,6 +3972,18 @@ function _renderInitRow(tree, it) {
           if (!STATE.meetingsByInit[it.id]) STATE.meetingsByInit[it.id] = await api.listMeetings(it.id) || [];
           renderSidebar(); renderMain(); renderTopStatus();
         };
+        // También es destino del arrastre: soltar una reunión aquí la mueve
+        fr.addEventListener('dragover', (e) => { if (_dragMeetingId == null) return; e.preventDefault(); fr.classList.add('drop-over'); });
+        fr.addEventListener('dragleave', () => fr.classList.remove('drop-over'));
+        fr.addEventListener('drop', (e) => {
+          e.preventDefault(); fr.classList.remove('drop-over');
+          if (_dragMeetingId == null) return;
+          _setMeetingFolder(_dragMeetingId, f.id);
+          toast('ok', `Movida a «${f.name}»`);
+          _dragMeetingId = null;
+          renderSidebar();
+          if (STATE.screen === 'initiative') renderMain();
+        });
         sub.appendChild(fr);
       });
     }
@@ -4050,6 +4062,20 @@ function _renderInitRow(tree, it) {
             mr.innerHTML = `<span class="stat ${st}"${dotStyle}></span><span class="mtitle">${esc(_fmtMeetingLabel(m))}</span>${m.time ? '<span class="mtime">' + esc(m.time) + '</span>' : ''}`;
             mr.onclick = (e) => { e.stopPropagation(); openMeeting(m.id); };
             mr.oncontextmenu = (e) => { e.preventDefault(); e.stopPropagation(); openMeetingMenu(e, m.id); };
+            // Arrastrable hacia las carpetas del árbol (o las pestañas)
+            mr.draggable = true;
+            mr.addEventListener('dragstart', (e) => {
+              _dragMeetingId = m.id;
+              mr.classList.add('dragging');
+              document.body.classList.add('folder-dragging');
+              e.dataTransfer.effectAllowed = 'move';
+              try { e.dataTransfer.setData('text/plain', ''); } catch (err) {}
+            });
+            mr.addEventListener('dragend', () => {
+              _dragMeetingId = null;
+              mr.classList.remove('dragging');
+              document.body.classList.remove('folder-dragging');
+            });
             sub.appendChild(mr);
           });
         }
