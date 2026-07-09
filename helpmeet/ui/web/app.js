@@ -4238,12 +4238,13 @@ function closeMenu() { if (_ctxOpen) { if (_ctxOpen._owner) _ctxOpen._owner.setA
 function _openRecordPicker(anchor, options) {
   if (_ctxOpen && _ctxOpen._owner === anchor) { closeMenu(); return; }
   closeMenu();
-  const panel = el('div', 'cdrop-panel');
+  const panel = el('div', 'cdrop-panel rec-pick-panel');
   panel._owner = anchor;
   anchor.setAttribute('aria-expanded', 'true');
-  options.forEach(opt => {
-    const o = el('div', 'cdrop-opt');
-    o.innerHTML = `<span class="cdrop-ico">${svg(opt.icon, 15)}</span><span class="cdrop-opt-label">${esc(opt.label)}</span>`;
+  options.forEach((opt, i) => {
+    const o = el('div', 'cdrop-opt rec-pick-opt');
+    o.style.animationDelay = (i * 0.035) + 's';
+    o.innerHTML = `<span class="cdrop-ico dock-ico--${opt.icon === 'mic' ? 'rec' : 'screen'}">${svg(opt.icon, 15)}</span><span class="cdrop-opt-label">${esc(opt.label)}</span>`;
     o.onclick = (e) => { e.stopPropagation(); closeMenu(); opt.run(); };
     panel.appendChild(o);
   });
