@@ -2935,4 +2935,11 @@ def run():
         frameless=True, easy_drag=False,
     )
     api.set_window(window)
-    webview.start(_apply_native_window_icon, args=(window, icon_path))
+    # Perfil persistente de WebView2. Sin esto (modo privado por defecto de
+    # pywebview) el tema oscuro, el "tour visto" y las preferencias de la
+    # interfaz se pierden cada vez que se cierra la app.
+    webview.start(
+        _apply_native_window_icon, args=(window, icon_path),
+        private_mode=False,
+        storage_path=str(config.DATA_DIR / "webview"),
+    )
