@@ -3939,9 +3939,11 @@ function _renderInitRow(tree, it) {
   const row = el('div', 'tree-initiative' + (open ? ' open' : '') + (isSelected ? ' selected' : ''));
   row.dataset.iid = it.id;
   row.title = it.name || '';
-  const av = `<span class="proj-av" style="--av:${it.color || avatarColorFor(it.name)}">${esc(initialsFor(it.name))}</span>`;
+  // Rail de color: la barra izquierda lleva el color del proyecto (siempre
+  // visible) y la selección tiñe la fila con ese mismo color, sin avatar.
+  row.style.setProperty('--pc', it.color || avatarColorFor(it.name));
   // Pin al pasar el mouse (fijados: siempre visible); reemplaza al indicador fijo
-  row.innerHTML = `<span class="chev">${svg('chevron', 14)}</span>${av}<span class="name">${esc(it.name)}</span><button class="tree-pin${it.pinned ? ' on' : ''}" title="${it.pinned ? 'Desfijar' : 'Fijar arriba'}" aria-label="${it.pinned ? 'Desfijar proyecto' : 'Fijar proyecto arriba'}">${svg('pin', 12)}</button><span class="count">${ms.length || ''}</span>`;
+  row.innerHTML = `<span class="chev">${svg('chevron', 14)}</span><span class="name">${esc(it.name)}</span><button class="tree-pin${it.pinned ? ' on' : ''}" title="${it.pinned ? 'Desfijar' : 'Fijar arriba'}" aria-label="${it.pinned ? 'Desfijar proyecto' : 'Fijar proyecto arriba'}">${svg('pin', 12)}</button><span class="count">${ms.length || ''}</span>`;
   row.querySelector('.tree-pin').onclick = async (e) => {
     e.stopPropagation();
     await api.toggleInitiativePin(it.id).catch(() => {});

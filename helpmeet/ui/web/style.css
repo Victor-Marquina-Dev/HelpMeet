@@ -497,17 +497,18 @@ body.rail-expanding .rail-resize-handle { background: var(--accent); }
 .tree-initiative.open .chev { transform: rotate(90deg); }
 .tree-initiative .name { font-weight: 500; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .tree-initiative .count { font-size: 9px; color: var(--text-faint); font-family: var(--font-mono); }
-/* Actividad en vivo (grabando / transcribiendo): anillo girando alrededor
-   del avatar del proyecto. Las clases las pone refreshSidebarJobs(). */
-.tree-initiative.has-recording .proj-av::after,
-.tree-initiative.has-transcribing .proj-av::after {
-  content: ''; position: absolute; inset: -3px; border-radius: 50%;
-  border: 2px solid color-mix(in srgb, var(--danger) 25%, transparent); border-top-color: var(--recording);
-  animation: spin .7s linear infinite;
+/* Actividad en vivo (grabando / transcribiendo): el rail de color de la
+   fila late en rojo o en acento. Las clases las pone refreshSidebarJobs(). */
+@keyframes railPulseRec {
+  0%, 100% { border-left-color: var(--recording); }
+  50%      { border-left-color: color-mix(in srgb, var(--recording) 30%, transparent); }
 }
-.tree-initiative.has-transcribing .proj-av::after {
-  border-color: color-mix(in srgb, var(--accent) 25%, transparent); border-top-color: var(--accent);
+@keyframes railPulseTx {
+  0%, 100% { border-left-color: var(--accent); }
+  50%      { border-left-color: color-mix(in srgb, var(--accent) 30%, transparent); }
 }
+.tree-initiative.has-recording { animation: railPulseRec 1.1s ease-in-out infinite; }
+.tree-initiative.has-transcribing { animation: railPulseTx 1.1s ease-in-out infinite; }
 
 /* Árbol de reuniones dentro de una iniciativa */
 .tree-meetings {
@@ -676,18 +677,22 @@ body.rail-expanding .rail-resize-handle { background: var(--accent); }
   color: #fff; font-size: 9px; font-weight: 600; letter-spacing: .02em;
 }
 
-/* Fila de proyecto: rectangular con barra de acento a la izquierda,
-   deliberadamente distinta de las píldoras de navegación ("Proyectos"). */
+/* Fila de proyecto — "rail de color": la barra izquierda lleva SIEMPRE el
+   color del proyecto (--pc lo pone _renderInitRow) y la selección tiñe la
+   fila con ese mismo color. Sin avatar; deliberadamente distinta de las
+   píldoras de navegación ("Proyectos", "Inicio"…). */
 .tree-initiative {
-  gap: 9px; padding: 4px 10px 4px 8px; font-size: 11.5px;
-  border-radius: 5px; margin: 1px 6px;
-  border-left: 2.5px solid transparent;
+  gap: 8px; padding: 4.5px 10px 4.5px 9px; font-size: 11.5px;
+  border-radius: 0 5px 5px 0; margin: 1.5px 6px 1.5px 8px;
+  border-left: 3px solid var(--pc, var(--border-strong));
 }
 .tree-initiative:hover { background: var(--hover-soft); }
 .tree-initiative.selected {
-  background: var(--sel-bg); color: var(--sel-text);
-  border-left-color: var(--accent); border-radius: 0 5px 5px 0;
+  background: color-mix(in srgb, var(--pc, var(--accent)) 14%, transparent);
+  color: var(--text-primary);
+  border-left-color: var(--pc, var(--accent));
 }
+.tree-initiative.selected .name { font-weight: 700; }
 
 /* Reuniones indentadas con línea guía vertical */
 .tree-meeting {
