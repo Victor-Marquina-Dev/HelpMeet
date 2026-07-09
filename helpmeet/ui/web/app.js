@@ -3419,10 +3419,25 @@ function viewAllInitiatives() {
     { fixed: false, w: 200, min: 110 },  // nombre
     { fixed: false, w: 110, min: 80  },  // actividad
     { fixed: false, w: 62,  min: 50  },  // reuniones
+    { fixed: false, w: 78,  min: 58  },  // horas grabadas
     { fixed: false, w: 115, min: 80  },  // pendientes
     { fixed: false, w: 160, min: 80  },  // notas
     { fixed: true,  w: 34,  min: 34  },  // menú
   ];
+  // Duración total grabada del proyecto ("2 h 15 m") a partir de m.dur (MM:SS)
+  const _durSecs = (d) => {
+    if (!d || typeof d !== 'string') return 0;
+    const p = d.split(':').map(Number);
+    if (p.some(isNaN)) return 0;
+    return p.length === 3 ? p[0] * 3600 + p[1] * 60 + p[2] : p.length === 2 ? p[0] * 60 + p[1] : 0;
+  };
+  const _fmtHours = (ms) => {
+    if (ms === undefined) return '…';
+    const total = (ms || []).reduce((a, m) => a + _durSecs(m.dur), 0);
+    if (!total) return '—';
+    const h = Math.floor(total / 3600), mn = Math.round((total % 3600) / 60);
+    return h ? `${h} h${mn ? ' ' + mn + ' m' : ''}` : `${Math.max(1, mn)} m`;
+  };
   const _gridTpl = () => _cols.map(c => c.w + 'px').join(' ');
   const _applyWidths = () => {
     const tpl = _gridTpl();
@@ -3434,8 +3449,8 @@ function viewAllInitiatives() {
   const tableWrap = el('div', 'init-hub-table');
   const thead = el('div', 'init-hub-thead');
 
-  const colLabels = ['', '', 'Proyecto', 'Actividad', 'Reuniones', 'Pendientes', 'Notas', ''];
-  const _centeredCols = new Set([3, 4, 5, 6]); // Actividad, Reuniones, Pendientes, Notas
+  const colLabels = ['', '', 'Proyecto', 'Actividad', 'Reuniones', 'Horas', 'Pendientes', 'Notas', ''];
+  const _centeredCols = new Set([3, 4, 5, 6, 7]); // Actividad, Reuniones, Horas, Pendientes, Notas
   _cols.forEach((col, i) => {
     const cell = el('div', 'iht' + (_centeredCols.has(i) ? ' iht--center' : ''));
     cell.textContent = colLabels[i];
@@ -3552,6 +3567,7 @@ function viewAllInitiatives() {
       </div>
       <span class="ihr-activity">${_fmtActivity(it)}</span>
       <span class="ihr-meetings">${ms === undefined ? '…' : ms.length}</span>
+      <span class="ihr-hours" title="Tiempo total grabado">${_fmtHours(ms)}</span>
       <span class="ihr-pending${pending > 0 ? ' has-pending' : ''}">${pending === null ? '…' : pending > 0 ? `${pending} por transcribir` : ''}</span>`;
 
     // Celda de notas editable inline
@@ -3686,7 +3702,12 @@ function viewAllInitiatives() {
                 const st = m.status || 'done';
                 const ds = st === 'pending' ? `border:1.5px solid ${mc};background:transparent` : `background:${mc}`;
                 const isFav = _isMeetingFav(m.id);
-                mr.innerHTML = `<div class="ihm-info"><span class="stat ${st}" style="${ds}"></span><span class="ihm-title">${esc(_fmtMeetingLabel(m))}</span></div>
+                // Origen de la reunión: audio, video importado o pantalla grabada
+                const srcIcon = m.source === 'audio' ? 'mic' : m.source === 'import' ? 'upload' : m.source === 'screen' ? 'monitorDot' : 'calendar';
+                const srcTitle = m.source === 'audio' ? 'Audio de reunión' : m.source === 'import' ? 'Vídeo importado' : m.source === 'screen' ? 'Grabación de pantalla' : 'Reunión';
+                const detail = [m.dur && m.dur !== '—' ? m.dur : '', m.size || ''].filter(Boolean).join(' · ');
+                mr.innerHTML = `<div class="ihm-info"><span class="stat ${st}" style="${ds}"></span><span class="ihm-kind" title="${srcTitle}">${svg(srcIcon, 12)}</span><span class="ihm-title">${esc(_fmtMeetingLabel(m))}</span></div>
+                  <span class="ihm-detail">${esc(detail)}</span>
                   <span class="ihm-date">${m.time || ''}</span>
                   <button class="icon-btn sm ihm-fav-btn${isFav ? ' fav-on' : ''}" title="${isFav ? 'Quitar de favoritos' : 'Marcar como favorito'}">${svg('star', 12)}</button>`;
                 mr.querySelector('.ihm-fav-btn').onclick = (e) => {

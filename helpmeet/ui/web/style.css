@@ -2812,12 +2812,13 @@ body[data-theme="dark"] .cal-tg-ev:hover { filter: brightness(1.18) saturate(1.1
 /* Una sola medida de letra para toda la tabla (10.5px, como el selector de Documentos). */
 .ihr-name { font-size: 10.5px; font-weight: 700; color: var(--text-primary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .ihr-desc { font-size: 9.5px; color: var(--text-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.ihr-status, .ihr-activity, .ihr-meetings, .ihr-pending {
+.ihr-status, .ihr-activity, .ihr-meetings, .ihr-hours, .ihr-pending {
   padding: 0 6px; font-size: 10.5px; color: var(--text-secondary);
   display: flex; align-items: center; justify-content: center; text-align: center;
 }
 .ihr-activity { color: var(--text-muted); }
 .ihr-meetings { gap: 4px; color: var(--text-muted); }
+.ihr-hours { color: var(--text-muted); white-space: nowrap; }
 .ihr-pending { color: var(--text-faint); }
 .ihr-pending.has-pending { color: var(--warning); font-weight: 600; }
 .ihr-menu-btn { justify-self: end; opacity: 0; transition: opacity .12s; }
@@ -2843,7 +2844,9 @@ body[data-theme="dark"] .cal-tg-ev:hover { filter: brightness(1.18) saturate(1.1
   border-bottom: 1px solid rgba(86,93,89,.15);
 }
 .ihm-info { display: flex; align-items: center; gap: 8px; padding: 9px 6px; min-width: 0; }
+.ihm-kind { display: inline-flex; flex: none; color: var(--text-faint); }
 .ihm-title { font-size: 10.5px; color: var(--text-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ihm-detail { flex: none; font-size: 9.5px; color: var(--text-faint); padding: 0 6px; font-family: var(--font-mono); white-space: nowrap; }
 .ihm-date { font-size: 9.5px; color: var(--text-faint); padding: 0 6px; font-family: var(--font-mono); }
 /* ── Encabezados mes/semana en la tabla de iniciativas ── */
 .ihm-month-hdr {
