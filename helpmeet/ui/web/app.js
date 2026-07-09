@@ -6054,10 +6054,16 @@ function wireTopbar() {
   // Arrastre de ventana: solo desde el topbar, ignorando elementos interactivos
   const topbar = document.querySelector('.topbar');
   if (topbar) {
-    topbar.addEventListener('mousedown', (e) => {
+    topbar.addEventListener('mousedown', async (e) => {
       if (e.button !== 0) return;
       if (e.target.closest('button, input, a, [role="button"], .brand, .win-controls')) return;
       e.preventDefault();
+      // Maximizada: al agarrarla se restaura primero (como cualquier app de
+      // Windows) y recién entonces se arrastra; antes se movía a pantalla completa.
+      try {
+        const r = await api.winIsMaximized().catch(() => null);
+        if (r && r.maximized) { await api.winMaximize(); setTimeout(updateMaxIcon, 80); }
+      } catch (err) { /* sin backend: seguir con el arrastre normal */ }
       api.winStartMove();
     });
     // Doble clic → maximizar/restaurar
