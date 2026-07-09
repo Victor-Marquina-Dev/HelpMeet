@@ -1,3 +1,4 @@
+import time
 import wave
 import threading
 from pathlib import Path
@@ -48,6 +49,12 @@ class DualAudioRecorder:
             frames_per_buffer=1024,
         )
         while self._running:
+            # El loopback WASAPI no entrega datos si no suena nada: read()
+            # bloquearía indefinidamente y stop() no podría cerrar limpio.
+            # Solo se lee cuando hay un bloque completo disponible.
+            if stream.get_read_available() < 1024:
+                time.sleep(0.01)
+                continue
             data = stream.read(1024, exception_on_overflow=False)
             if label == "me" and self._mic_muted:
                 data = b"\x00" * len(data)   # silencio mientras el micro está muteado
@@ -73,5 +80,9 @@ class DualAudioRecorder:
     def stop(self):
         self._running = False
         for t in self._threads:
-            t.join(timeout=2)
+            t.join(timeout=5)
+        # Nunca liberar PortAudio con un hilo aún dentro de read():
+        # terminate() en ese estado revienta el proceso (access violation).
+        if any(t.is_alive() for t in self._threads):
+            return
         self._pa.terminate()
