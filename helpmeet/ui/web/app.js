@@ -3954,38 +3954,39 @@ function _renderInitRow(tree, it) {
   if (open) {
     const sub = el('div', 'tree-meetings');
 
-    // Subcarpetas del proyecto como mini-pastillas (distintas de las
-    // semanas y de las filas de proyecto). Al pasar el mouse por la fila
-    // del proyecto se desliza el chip "+ Carpeta" para crear una nueva;
-    // si el proyecto aún no tiene carpetas, la fila entera aparece solo
-    // con el mouse encima (sin ocupar espacio el resto del tiempo).
+    // Subcarpetas del proyecto: filas finas con línea guía, deliberadamente
+    // distintas de las filas de proyecto (sin avatar ni pastilla). Clic:
+    // abre el proyecto ya filtrado por esa carpeta.
     const _sbFolders = _getFolders(it.id);
-    {
+    if (_sbFolders.length) {
       const selF = _getSelFolder(it.id);
-      const chips = el('div', 'tree-fchips' + (_sbFolders.length ? '' : ' empty'));
       _sbFolders.forEach(f => {
         const n = ms.filter(m => _getMeetingFolder(m.id) === f.id).length;
-        const ch = el('button', 'tree-fchip' + (selF === f.id ? ' on' : ''));
-        ch.type = 'button';
-        ch.title = f.name;
-        ch.innerHTML = `${svg('folder', 10)}<span class="fc-name">${esc(f.name)}</span>${n ? `<span class="fc-n">${n}</span>` : ''}`;
-        ch.onclick = async (e) => {
+        const fr = el('div', 'tree-folder' + (selF === f.id ? ' on' : ''));
+        fr.title = f.name;
+        fr.innerHTML = `${svg('folder', 11)}<span class="tf-name">${esc(f.name)}</span><span class="tf-cnt">${n || ''}</span>`;
+        fr.onclick = async (e) => {
           e.stopPropagation();
           _setSelFolder(it.id, f.id);
           STATE.selInit = it.id; STATE.screen = 'initiative';
           if (!STATE.meetingsByInit[it.id]) STATE.meetingsByInit[it.id] = await api.listMeetings(it.id) || [];
           renderSidebar(); renderMain(); renderTopStatus();
         };
-        chips.appendChild(ch);
+        sub.appendChild(fr);
       });
-      const add = el('button', 'tree-fchip tree-fchip-add');
-      add.type = 'button';
-      add.title = 'Crear carpeta en este proyecto';
-      add.innerHTML = `${svg('plus', 10)}<span class="fc-name">Carpeta</span>`;
-      add.onclick = (e) => { e.stopPropagation(); promptCreateFolder(it.id); };
-      chips.appendChild(add);
-      sub.appendChild(chips);
     }
+
+    // Chip punteado "+ Carpeta": no ocupa espacio (alto cero) hasta que
+    // el mouse pasa por la fila del proyecto; entonces se despliega de
+    // arriba hacia abajo empujando el contenido, sin dejar huecos.
+    const addWrap = el('div', 'tree-newfolder');
+    const addBtn = el('button', 'tree-fchip-add');
+    addBtn.type = 'button';
+    addBtn.title = 'Crear carpeta en este proyecto';
+    addBtn.innerHTML = `${svg('plus', 10)}<span>Carpeta</span>`;
+    addBtn.onclick = (e) => { e.stopPropagation(); promptCreateFolder(it.id); };
+    addWrap.appendChild(addBtn);
+    sub.appendChild(addWrap);
 
     // Agrupación por semanas: única fuente de verdad en weekInfoOf()
     const _monKey = (iso) => {

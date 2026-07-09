@@ -697,39 +697,41 @@ body.rail-expanding .rail-resize-handle { background: var(--accent); }
 .tree-meeting.selected { background: var(--sel-bg); color: var(--sel-text); }
 .tree-week { padding-left: 28px; }
 
-/* Subcarpetas del proyecto en el árbol: mini-pastillas bajo su fila,
-   deliberadamente distintas de las semanas y las filas de proyecto. */
-.tree-fchips { display: flex; flex-wrap: wrap; gap: 5px; padding: 4px 10px 6px 30px; }
-.tree-fchip {
+/* Subcarpetas del proyecto en el árbol: filas finas con línea guía,
+   deliberadamente distintas de las filas de proyecto (sin avatar). */
+.tree-folder {
+  display: flex; align-items: center; gap: 6px;
+  margin-left: 30px; padding: 4.5px 8px;
+  border-left: 1.5px solid var(--border-subtle); border-radius: 0 8px 8px 0;
+  color: var(--text-muted); font-size: 10.5px; cursor: pointer;
+}
+.tree-folder svg { opacity: .75; flex: none; }
+.tree-folder .tf-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tree-folder .tf-cnt { margin-left: auto; font-size: 9.5px; color: var(--text-faint); width: 20px; text-align: right; flex: none; font-variant-numeric: tabular-nums; }
+.tree-folder:hover { background: var(--hover-soft); color: var(--text-primary); }
+.tree-folder.on { color: var(--accent); border-left-color: var(--accent); background: color-mix(in srgb, var(--accent) 8%, transparent); }
+.tree-folder.on .tf-cnt { color: var(--accent); opacity: .7; }
+/* Chip punteado "+ Carpeta": oculto; al pasar el mouse por la fila del
+   proyecto se despliega de arriba hacia abajo, bajo el nombre. El retardo
+   al esconderse da tiempo a llegar con el mouse sin que desaparezca. */
+.tree-newfolder {
+  padding: 0 10px 0 30px; max-height: 0; opacity: 0; overflow: hidden;
+  transform: translateY(-6px);
+  transition: max-height .18s ease .3s, opacity .18s ease .3s, transform .18s ease .3s, padding .18s ease .3s;
+}
+.tree-initiative:hover + .tree-meetings .tree-newfolder,
+.tree-newfolder:hover {
+  max-height: 30px; opacity: 1; transform: none;
+  padding-top: 3px; padding-bottom: 4px; transition-delay: 0s;
+}
+.tree-fchip-add {
   display: inline-flex; align-items: center; gap: 5px;
   font-family: inherit; font-size: 10px; font-weight: 600; color: var(--text-muted);
-  background: var(--bg-surface); border: 1px solid var(--border-subtle);
-  border-radius: 999px; padding: 3px 9px; cursor: pointer;
+  background: none; border: 1px dashed var(--border-strong);
+  border-radius: 8px; padding: 3px 10px; cursor: pointer;
   transition: color .12s, border-color .12s;
 }
-.tree-fchip svg { opacity: .75; flex: none; }
-.tree-fchip .fc-name { max-width: 110px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.tree-fchip .fc-n { font-size: 9px; color: var(--text-faint); font-variant-numeric: tabular-nums; }
-.tree-fchip:hover { color: var(--text-primary); border-color: var(--border-strong); }
-.tree-fchip.on { color: var(--accent); border-color: var(--accent); background: color-mix(in srgb, var(--accent) 10%, transparent); }
-.tree-fchip.on .fc-n { color: var(--accent); opacity: .75; }
-/* Chip "+ Carpeta": oculto; se desliza al pasar el mouse por la fila del
-   proyecto (o por la fila de chips). El retardo al esconderse da tiempo
-   a llegar con el mouse sin que desaparezca. */
-.tree-fchip-add {
-  opacity: 0; transform: translateY(-5px); pointer-events: none;
-  border-style: dashed; color: var(--text-faint);
-  transition: opacity .18s ease .3s, transform .18s ease .3s;
-}
-.tree-initiative:hover + .tree-meetings .tree-fchip-add,
-.tree-fchips:hover .tree-fchip-add {
-  opacity: 1; transform: none; pointer-events: auto; transition-delay: 0s;
-}
 .tree-fchip-add:hover { color: var(--accent); border-color: var(--accent); }
-/* Proyecto sin carpetas: la fila entera solo aparece con el mouse encima */
-.tree-fchips.empty { max-height: 0; padding-top: 0; padding-bottom: 0; overflow: hidden; transition: max-height .18s ease .3s, padding .18s ease .3s; }
-.tree-initiative:hover + .tree-meetings .tree-fchips.empty,
-.tree-fchips.empty:hover { max-height: 34px; padding-top: 4px; padding-bottom: 6px; transition-delay: 0s; }
 
 /* "Mostrar todo" */
 .sb-show-more {
