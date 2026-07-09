@@ -515,11 +515,6 @@ body.rail-expanding .rail-resize-handle { background: var(--accent); }
   display: flex; flex-direction: column; gap: 0;
   border-left: none; padding-left: 0;
 }
-.tree-month {
-  padding: 8px 14px 3px 32px;
-  color: var(--text-faint); font-size: 8px; font-weight: 700;
-  letter-spacing: 1px; text-transform: uppercase;
-}
 .tree-week {
   display: flex; align-items: center; gap: 4px;
   padding: 4px 14px 4px 32px;
@@ -700,7 +695,6 @@ body.rail-expanding .rail-resize-handle { background: var(--accent); }
 }
 .tree-meeting:hover { background: var(--hover-soft); color: var(--text-primary); }
 .tree-meeting.selected { background: var(--sel-bg); color: var(--sel-text); }
-.tree-month { padding-left: 28px; }
 .tree-week { padding-left: 28px; }
 
 /* "Mostrar todo" */
@@ -1511,6 +1505,25 @@ body[data-sidebar="collapsed"] .actionbar--dock { left: 52px; }
 .pick-init-row .proj-av { width: 26px; height: 26px; font-size: 10px; flex: none; }
 .pick-init-name { font-size: 12px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .pick-init-new { margin-top: 10px; width: 100%; display: flex; align-items: center; justify-content: center; gap: 6px; }
+.pick-init-row.on { background: var(--accent-soft); color: var(--accent); }
+
+/* Carpetas dentro de un proyecto (filtro arriba de la lista de reuniones) */
+.init-folder-row { display: flex; align-items: center; gap: 6px; margin-top: 10px; }
+.init-folder-trig { font-weight: 600; }
+.folder-filter-opt { justify-content: flex-start; position: relative; }
+.folder-filter-opt.on { color: var(--accent); font-weight: 700; }
+.cdrop-count { color: var(--text-faint); font-size: 9.5px; margin-left: 6px; flex: none; }
+.folder-del-btn {
+  display: none; align-items: center; justify-content: center; margin-left: 6px;
+  width: 20px; height: 20px; border-radius: 6px; border: none; background: none;
+  color: var(--text-faint); cursor: pointer; flex: none;
+}
+.folder-filter-opt:hover .folder-del-btn { display: inline-flex; }
+.folder-del-btn:hover { background: var(--danger-soft); color: var(--danger); }
+.rc-folder-chip {
+  display: inline-flex; align-items: center; gap: 3px; color: var(--text-faint);
+}
+.rc-folder-chip svg { width: 11px; height: 11px; }
 
 /* ——— Ajustes como pantalla plana (sv = settings view) ——— */
 .sv-page { display: flex; flex-direction: column; gap: 0; }

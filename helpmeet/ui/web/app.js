@@ -1284,7 +1284,11 @@ function _calTzAbbr() {
 
 function viewInitiative() {
   const it = STATE.initiatives.find(x => x.id === STATE.selInit);
-  const ms = STATE.meetingsByInit[STATE.selInit] || [];
+  const allMs = STATE.meetingsByInit[STATE.selInit] || [];
+  // Carpetas: filtro por carpeta seleccionada (null = "Todas").
+  if (!STATE._ivFolder) STATE._ivFolder = {};
+  const curFid = STATE._ivFolder[STATE.selInit] ?? null;
+  const ms = curFid == null ? allMs : allMs.filter(m => _getMeetingFolder(m.id) === curFid);
   const wrap = el('div');
   wrap.style.cssText = 'display:flex;flex-direction:column;flex:1;min-height:0';
 
@@ -1347,6 +1351,37 @@ function viewInitiative() {
   };
   head.appendChild(objBox);
 
+  // Carpetas: filtro "Todas ▾" + crear carpeta (agrupan reuniones dentro
+  // del proyecto; solo se muestra si ya hay reuniones o carpetas creadas).
+  if (allMs.length || _getFolders(STATE.selInit).length) {
+    const folderBar = el('div', 'init-folder-row');
+    const folders = _getFolders(STATE.selInit);
+    const curFolder = folders.find(f => f.id === curFid);
+    const trig = el('button', 'cdrop init-folder-trig');
+    trig.type = 'button';
+    trig.setAttribute('aria-haspopup', 'true');
+    trig.setAttribute('aria-expanded', 'false');
+    trig.innerHTML = `<span class="cdrop-ico">${svg('folder', 13)}</span>`
+      + `<span class="cdrop-label">${esc(curFolder ? curFolder.name : 'Todas')}</span>`
+      + `<span class="cdrop-chev">${svg('chevronDown', 14)}</span>`;
+    trig.onclick = (e) => {
+      e.stopPropagation();
+      if (_ctxOpen && _ctxOpen._owner === trig) { closeMenu(); return; }
+      _openFolderFilterPanel(trig, STATE.selInit, curFid, (fid) => {
+        STATE._ivFolder[STATE.selInit] = fid;
+        renderMain();
+      });
+    };
+    folderBar.appendChild(trig);
+    const addBtn = el('button', 'icon-btn sm init-folder-add');
+    addBtn.type = 'button';
+    addBtn.title = 'Nueva carpeta';
+    addBtn.innerHTML = svg('plus', 13);
+    addBtn.onclick = () => promptCreateFolder(STATE.selInit);
+    folderBar.appendChild(addBtn);
+    head.appendChild(folderBar);
+  }
+
   const scroll = el('div', 'content');
   const recents = el('div');
   // El buscador vive en la barra de acciones del header (ver initActionsSearchbox)
@@ -1358,6 +1393,7 @@ function viewInitiative() {
     listWrapper.appendChild(p);
   } else {
     row = el('div', 'list');
+    const _foldersMap = new Map(_getFolders(STATE.selInit).map(f => [f.id, f.name]));
 
     // Función que crea y añade una card de reunión al contenedor dado
     const _appendCard = (m, container) => {
@@ -1365,6 +1401,7 @@ function viewInitiative() {
       const { day, mon } = parseMeetingDate(m.date || m.started_at);
       // Hora de la reunión (p. ej. "18:32") para distinguir varias del mismo día
       const hhmm = hhmmOf(m.date || m.started_at);
+      const fname = _foldersMap.get(_getMeetingFolder(m.id));
       // Estado como etiqueta pequeña en la meta (modelo de fila unificado)
       const stTag = m.status === 'done'
         ? '<span class="hm-tag ok"><span class="dt"></span>Finalizada</span>'
@@ -1379,12 +1416,13 @@ function viewInitiative() {
       c.innerHTML = `
         <div class="rc-sel"><span class="rc-cb"></span></div>
         <div class="rc-date"><span class="rc-mon">${mon}</span><span class="rc-day">${day}</span></div>
-        <div class="rc-body"><div class="rc-title">${esc(_fmtMeetingLabel(m))}${hhmm ? `<span class="rc-hour">${hhmm}</span>` : ''}</div><div class="rc-meta">${_kindIcon(m)}${m.dur ? esc(m.dur) : ''}${m.size ? '<span class="rc-size">' + esc(m.size) + '</span>' : ''}${stTag}</div></div>
+        <div class="rc-body"><div class="rc-title">${esc(_fmtMeetingLabel(m))}${hhmm ? `<span class="rc-hour">${hhmm}</span>` : ''}</div><div class="rc-meta">${_kindIcon(m)}${m.dur ? esc(m.dur) : ''}${m.size ? '<span class="rc-size">' + esc(m.size) + '</span>' : ''}${fname ? `<span class="rc-folder-chip">${svg('folder', 11)}${esc(fname)}</span>` : ''}${stTag}</div></div>
         <div class="rc-right">
           <div class="rc-actions">
             <button class="icon-btn sm rc-act-btn${isFav ? ' fav-on' : ''}" data-act="fav" title="${isFav ? 'Quitar de favoritas' : 'Marcar como favorita'}">${svg('star', 13)}</button>
             <button class="icon-btn sm rc-act-btn" data-act="rename" title="Renombrar">${svg('edit', 13)}</button>
             <button class="icon-btn sm rc-act-btn" data-act="archive" title="Archivar reunión">${svg('archive', 13)}</button>
+            <button class="icon-btn sm rc-act-btn" data-act="more" title="Más acciones">${svg('dots', 13)}</button>
           </div>
           <button class="hm-view" data-act="open">${viewLabel}</button>
         </div>`;
@@ -1394,6 +1432,7 @@ function viewInitiative() {
         if (m.status === 'done') { STATE.activeTab = 'notas'; openMeeting(m.id, true); }
         else openMeeting(m.id);
       };
+      c.oncontextmenu = (e) => { e.preventDefault(); openMeetingMenu(e, m.id); };
       c.onclick = () => {
         if (selectMode) {
           if (selected.has(m.id)) { selected.delete(m.id); c.classList.remove('sel'); }
@@ -1436,6 +1475,7 @@ function viewInitiative() {
             btn.title = nowFav ? 'Quitar de favoritas' : 'Marcar como favorita';
             renderSidebar();
           } else if (btn.dataset.act === 'trash') archiveMeeting(m.id);
+          else if (btn.dataset.act === 'more') openMeetingMenu(e, m.id);
         });
       });
       container.appendChild(c);
@@ -3908,7 +3948,6 @@ function _renderInitRow(tree, it) {
 
     const mColor = _initColor(it);
     monthMap.forEach((weeks, month) => {
-      sub.appendChild(el('div', 'tree-month', esc(month)));
       weeks.forEach(({ weekKey, weekLabel, ms: wms }) => {
         const wkId = `${month}|${weekKey}`;
         const isWkOpen = openWeeks.has(wkId);
@@ -4316,18 +4355,121 @@ function openCustomSelectPanel(anchor, items, curVal, minWidth, onPick) {
   setTimeout(() => document.addEventListener('click', closeMenu, { once: true }), 0);
 }
 
-// ── Carpetas de iniciativa (almacenadas localmente) ──────────
+// ── Carpetas de proyecto (agrupan reuniones; guardadas localmente) ──
 function _getFolders(iid) { try { return JSON.parse(localStorage.getItem('hm.folders.' + iid) || '[]'); } catch { return []; } }
 function _saveFolders(iid, folders) { localStorage.setItem('hm.folders.' + iid, JSON.stringify(folders)); }
+function _createFolder(iid, name) {
+  const folders = _getFolders(iid);
+  const f = { id: Date.now(), name: name.trim() };
+  folders.push(f);
+  _saveFolders(iid, folders);
+  return f;
+}
+function _deleteFolder(iid, fid) { _saveFolders(iid, _getFolders(iid).filter(f => f.id !== fid)); }
+// Carpeta asignada a una reunión (o null): la carpeta vive dentro del
+// proyecto, así que si ya no existe (se borró) la reunión queda "sin carpeta".
+function _getMeetingFolder(mid) {
+  const v = localStorage.getItem('hm.mfolder.' + mid);
+  return v ? +v : null;
+}
+function _setMeetingFolder(mid, fid) {
+  if (fid == null) localStorage.removeItem('hm.mfolder.' + mid);
+  else localStorage.setItem('hm.mfolder.' + mid, String(fid));
+}
 function promptCreateFolder(iid) {
   formModal('Nueva carpeta', 'Nombre de la carpeta', '', 'Crear', (name) => {
     if (!name.trim()) return;
-    const folders = _getFolders(iid);
-    folders.push({ id: Date.now(), name: name.trim() });
-    _saveFolders(iid, folders);
+    _createFolder(iid, name);
     toast('ok', `Carpeta «${name.trim()}» creada`);
     if (STATE.screen === 'initiative' && STATE.selInit === iid) renderMain();
   });
+}
+// Panel del filtro de carpetas en la vista de proyecto: "Todas" + cada
+// carpeta con su conteo; el icono de borrar aparece al pasar el mouse.
+function _openFolderFilterPanel(anchor, iid, curFid, onPick) {
+  closeMenu();
+  const allMs = STATE.meetingsByInit[iid] || [];
+  const folders = _getFolders(iid);
+  const panel = el('div', 'cdrop-panel folder-filter-panel');
+  panel._owner = anchor;
+  anchor.setAttribute('aria-expanded', 'true');
+  const mkRow = (fid, label, count) => {
+    const o = el('div', 'cdrop-opt folder-filter-opt' + (fid === curFid ? ' on' : ''));
+    o.innerHTML = `<span class="cdrop-opt-label">${esc(label)}</span><span class="cdrop-count">${count}</span>`
+      + (fid !== null ? `<button type="button" class="folder-del-btn" title="Eliminar carpeta">${svg('trash', 12)}</button>` : '');
+    o.onclick = (e) => { e.stopPropagation(); closeMenu(); onPick(fid); };
+    if (fid !== null) {
+      o.querySelector('.folder-del-btn').onclick = (e) => {
+        e.stopPropagation(); closeMenu();
+        confirmModal('Eliminar carpeta', `Se elimina la carpeta «${label}». Las reuniones que tenía no se borran, solo quedan sin carpeta.`, 'Eliminar', () => {
+          _deleteFolder(iid, fid);
+          if (STATE._ivFolder[iid] === fid) STATE._ivFolder[iid] = null;
+          toast('ok', 'Carpeta eliminada');
+          renderMain();
+        });
+      };
+    }
+    panel.appendChild(o);
+  };
+  mkRow(null, 'Todas', allMs.length);
+  folders.forEach(f => mkRow(f.id, f.name, allMs.filter(m => _getMeetingFolder(m.id) === f.id).length));
+  document.body.appendChild(panel);
+  const r = anchor.getBoundingClientRect();
+  panel.style.minWidth = Math.max(r.width, 220) + 'px';
+  let left = r.left, top = r.bottom + 6;
+  if (left + panel.offsetWidth > window.innerWidth - 10) left = window.innerWidth - panel.offsetWidth - 10;
+  if (top + panel.offsetHeight > window.innerHeight - 10) top = r.top - panel.offsetHeight - 6;
+  panel.style.left = Math.max(10, left) + 'px';
+  panel.style.top = Math.max(10, top) + 'px';
+  _ctxOpen = panel;
+  setTimeout(() => document.addEventListener('click', closeMenu, { once: true }), 0);
+}
+// Modal "Mover a carpeta": lista las carpetas del proyecto de la reunión
+// (con "Sin carpeta" y "+ Nueva carpeta"), igual patrón que pickInitiativeModal.
+function promptMoveMeetingToFolder(mid) {
+  let iid = null;
+  for (const k in STATE.meetingsByInit) {
+    if (STATE.meetingsByInit[k].some(x => x.id === mid)) { iid = k; break; }
+  }
+  if (iid == null) return;
+  const folders = _getFolders(iid);
+  const current = _getMeetingFolder(mid);
+  const apply = (fid, okMsg) => {
+    _setMeetingFolder(mid, fid);
+    closeModal();
+    toast('ok', okMsg);
+    if (STATE.screen === 'initiative') renderMain();
+  };
+  const m = el('div', 'modal pick-init-modal');
+  m.setAttribute('role', 'dialog'); m.setAttribute('aria-label', 'Mover a carpeta');
+  m.innerHTML = `
+    <div class="modal-head"><h3>Mover a carpeta</h3><button class="icon-btn sm" data-x aria-label="Cerrar">${svg('x', 14)}</button></div>
+    <div class="modal-body">
+      <div class="pick-init-list">
+        <button type="button" class="pick-init-row${current == null ? ' on' : ''}" data-fid="none">
+          <span class="pick-init-name">Sin carpeta</span>
+        </button>
+        ${folders.map(f => `
+        <button type="button" class="pick-init-row${current === f.id ? ' on' : ''}" data-fid="${f.id}">
+          <span class="pick-init-name">${esc(f.name)}</span>
+        </button>`).join('')}
+      </div>
+      <button type="button" class="btn pick-init-new">${svg('plus', 13)} Nueva carpeta</button>
+    </div>`;
+  m.querySelectorAll('.pick-init-row').forEach(b => b.onclick = () => {
+    const fid = b.dataset.fid === 'none' ? null : Number(b.dataset.fid);
+    apply(fid, fid == null ? 'Reunión sin carpeta' : 'Reunión movida de carpeta');
+  });
+  m.querySelector('.pick-init-new').onclick = () => {
+    closeModal();
+    formModal('Nueva carpeta', 'Nombre de la carpeta', '', 'Crear', (name) => {
+      if (!name.trim()) return;
+      const f = _createFolder(iid, name);
+      apply(f.id, `Movida a «${name.trim()}»`);
+    });
+  };
+  m.querySelector('[data-x]').onclick = closeModal;
+  openModal(m);
 }
 
 async function _importVideosToInit(iid) {
@@ -4421,6 +4563,7 @@ function openMeetingMenu(e, mid) {
     { label: 'Renombrar reunión', icon: 'edit', onClick: () => promptRenameMeeting(mid) },
     { label: 'Cambiar fecha', icon: 'calendar', onClick: () => promptChangeMeetingDate(mid) },
     { label: 'Mover a otro proyecto', icon: 'folder', onClick: () => promptMoveMeeting(mid) },
+    { label: 'Mover a carpeta', icon: 'folder', onClick: () => promptMoveMeetingToFolder(mid) },
     { sep: true },
     { label: 'Archivar reunión', icon: 'archive', onClick: () => archiveMeeting(mid) },
   ]);
