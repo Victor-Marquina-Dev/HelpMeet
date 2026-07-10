@@ -497,18 +497,11 @@ body.rail-expanding .rail-resize-handle { background: var(--accent); }
 .tree-initiative.open .chev { transform: rotate(90deg); }
 .tree-initiative .name { font-weight: 500; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .tree-initiative .count { font-size: 9px; color: var(--text-faint); font-family: var(--font-mono); }
-/* Actividad en vivo (grabando / transcribiendo): el rail de color de la
-   fila late en rojo o en acento. Las clases las pone refreshSidebarJobs(). */
-@keyframes railPulseRec {
-  0%, 100% { border-left-color: var(--recording); }
-  50%      { border-left-color: color-mix(in srgb, var(--recording) 30%, transparent); }
-}
-@keyframes railPulseTx {
-  0%, 100% { border-left-color: var(--accent); }
-  50%      { border-left-color: color-mix(in srgb, var(--accent) 30%, transparent); }
-}
-.tree-initiative.has-recording { animation: railPulseRec 1.1s ease-in-out infinite; }
-.tree-initiative.has-transcribing { animation: railPulseTx 1.1s ease-in-out infinite; }
+/* Actividad en vivo (grabando / transcribiendo): el punto de color de la
+   fila late en rojo o en acento. Las clases las pone refreshSidebarJobs().
+   El !important es necesario: el color normal del punto va inline. */
+.tree-initiative.has-recording .tree-dot { background: var(--recording) !important; animation: pulse 1.1s ease-in-out infinite; }
+.tree-initiative.has-transcribing .tree-dot { background: var(--accent) !important; animation: pulse 1.1s ease-in-out infinite; }
 
 /* Árbol de reuniones dentro de una iniciativa */
 .tree-meetings {
@@ -677,22 +670,20 @@ body.rail-expanding .rail-resize-handle { background: var(--accent); }
   color: #fff; font-size: 9px; font-weight: 600; letter-spacing: .02em;
 }
 
-/* Fila de proyecto — "rail de color": la barra izquierda lleva SIEMPRE el
-   color del proyecto (--pc lo pone _renderInitRow) y la selección tiñe la
-   fila con ese mismo color. Sin avatar; deliberadamente distinta de las
-   píldoras de navegación ("Proyectos", "Inicio"…). */
+/* Fila de proyecto: punto circular con el color del proyecto (sin rail
+   ni avatar); la selección se hunde con tinte del acento, estilo clay. */
 .tree-initiative {
   gap: 8px; padding: 4.5px 10px 4.5px 9px; font-size: 11.5px;
-  border-radius: 0 5px 5px 0; margin: 1.5px 6px 1.5px 8px;
-  border-left: 3px solid var(--pc, var(--border-strong));
+  border-radius: 7px; margin: 1.5px 6px; border-left: none;
 }
 .tree-initiative:hover { background: var(--hover-soft); }
 .tree-initiative.selected {
-  background: color-mix(in srgb, var(--pc, var(--accent)) 14%, transparent);
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
   color: var(--text-primary);
-  border-left-color: var(--pc, var(--accent));
+  box-shadow: inset 0 2px 4px color-mix(in srgb, var(--accent) 20%, transparent);
 }
 .tree-initiative.selected .name { font-weight: 700; }
+.tree-dot { width: 9px; height: 9px; border-radius: 50%; flex: none; }
 
 /* Reuniones indentadas con línea guía vertical */
 .tree-meeting {
@@ -729,23 +720,25 @@ body.folder-dragging .tree-folder { border-left-style: dashed; border-left-color
    proyecto se despliega de arriba hacia abajo, bajo el nombre. El retardo
    al esconderse da tiempo a llegar con el mouse sin que desaparezca. */
 .tree-newfolder {
-  padding: 0 10px 0 30px; max-height: 0; opacity: 0; overflow: hidden;
+  padding: 0 6px 0 24px; max-height: 0; opacity: 0; overflow: hidden;
   transform: translateY(-6px);
   transition: max-height .18s ease .3s, opacity .18s ease .3s, transform .18s ease .3s, padding .18s ease .3s;
 }
 .tree-initiative:hover + .tree-meetings .tree-newfolder,
 .tree-newfolder:hover {
-  max-height: 30px; opacity: 1; transform: none;
-  padding-top: 3px; padding-bottom: 4px; transition-delay: 0s;
+  max-height: 32px; opacity: 1; transform: none;
+  padding-top: 2px; padding-bottom: 3px; transition-delay: 0s;
 }
+/* Fila punteada a lo ancho, con las mismas medidas que las carpetas:
+   se lee como "el hueco de la siguiente carpeta". */
 .tree-fchip-add {
-  display: inline-flex; align-items: center; gap: 5px;
-  font-family: inherit; font-size: 10px; font-weight: 600; color: var(--text-muted);
-  background: none; border: 1px dashed var(--border-strong);
-  border-radius: 8px; padding: 3px 10px; cursor: pointer;
-  transition: color .12s, border-color .12s;
+  display: flex; width: 100%; align-items: center; gap: 6px;
+  font-family: inherit; font-size: 10.5px; font-weight: 600; color: var(--text-muted);
+  background: none; border: 1.2px dashed var(--border-strong);
+  border-radius: 7px; padding: 4px 10px; cursor: pointer; text-align: left;
+  transition: color .12s, border-color .12s, background .12s;
 }
-.tree-fchip-add:hover { color: var(--accent); border-color: var(--accent); }
+.tree-fchip-add:hover { color: var(--accent); border-color: var(--accent); background: var(--accent-soft); }
 
 /* "Mostrar todo" */
 .sb-show-more {
@@ -3550,7 +3543,6 @@ body[data-theme="dark"] .proj-av {
    por ahora; el resto de la app se hará a juego en otra sesión.
    ============================================================ */
 :root {
-  --clay-panel: #edeff3;
   --clay-surface: #fbfcfd;
   --clay-sunk-bg: #eef0f3;
   --clay-out: 0 6px 14px rgba(70, 80, 100, .13);
@@ -3558,7 +3550,6 @@ body[data-theme="dark"] .proj-av {
   --clay-sunk: inset 0 2px 4px rgba(70, 80, 100, .15), inset 0 -1px 2px rgba(255, 255, 255, .85);
 }
 body[data-theme="dark"] {
-  --clay-panel: #292420;
   --clay-surface: #332d28;
   --clay-sunk-bg: #2b2621;
   --clay-out: 0 6px 14px rgba(0, 0, 0, .42);
@@ -3566,16 +3557,10 @@ body[data-theme="dark"] {
   --clay-sunk: inset 0 2px 5px rgba(0, 0, 0, .45), inset 0 -1px 2px rgba(255, 240, 220, .05);
 }
 
-.sidebar { background: var(--clay-panel); }
 
-/* Botón "Nuevo proyecto": flota (elevado) y se hunde al pulsar */
-.new-project-btn {
-  border-radius: 9px;
-  box-shadow: var(--clay-out), var(--clay-in);
-  transition: box-shadow .15s, transform .15s, filter .15s;
-}
-.new-project-btn:hover { box-shadow: var(--clay-out), var(--clay-in); transform: translateY(-1px); filter: none; }
-.new-project-btn:active { transform: none; box-shadow: var(--clay-sunk); }
+/* Botón "Nuevo proyecto": color sólido plano, sin efectos clay */
+.new-project-btn { border-radius: 9px; box-shadow: none; }
+.new-project-btn:hover { box-shadow: none; filter: brightness(.97); }
 
 /* Accesos directos: píldora → rectángulo suave; el activo flota en blanco */
 .side-item { border-radius: 8px; }
@@ -3585,6 +3570,16 @@ body[data-theme="dark"] {
 }
 .side-link { border-radius: 8px; }
 .side-link.active { background: var(--clay-surface); box-shadow: var(--clay-out), var(--clay-in); }
+
+/* Cabecera "Proyectos" activa: misma superficie que los otros accesos,
+   nada de fondo verde */
+.sb-projects-hdr { border-radius: 8px; }
+.sb-projects-hdr.active { background: var(--clay-surface); box-shadow: var(--clay-out), var(--clay-in); }
+.sb-projects-hdr.active .nav-label,
+.sb-projects-hdr.active .nav-ico { color: var(--accent); }
+
+/* Footer sin línea separadora */
+.sidebar-foot { border-top: none; }
 
 /* Proyecto expandido = tarjeta de arcilla que contiene fila + subárbol */
 .tree-card.open {
