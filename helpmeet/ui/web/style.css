@@ -3542,3 +3542,87 @@ body[data-theme="dark"] .proj-av {
 .init-head .init-folder-tabs,
 .init-head .obj-box { max-width: 1120px; width: 100%; margin-left: auto; margin-right: auto; }
 .mhead-row--mid { width: 100%; margin-left: auto; margin-right: auto; }
+
+/* ============================================================
+   CLAYMORFISMO · PANEL LATERAL (modelos C1 claro / C3 oscuro)
+   Superficies "de arcilla": sombra exterior suave + luz interior
+   arriba + sombra interior abajo, esquinas formales. Solo el panel
+   por ahora; el resto de la app se hará a juego en otra sesión.
+   ============================================================ */
+:root {
+  --clay-panel: #edeff3;
+  --clay-surface: #fbfcfd;
+  --clay-sunk-bg: #eef0f3;
+  --clay-out: 0 6px 14px rgba(70, 80, 100, .13);
+  --clay-in: inset 0 2px 3px rgba(255, 255, 255, .92), inset 0 -3px 5px rgba(70, 80, 100, .10);
+  --clay-sunk: inset 0 2px 4px rgba(70, 80, 100, .15), inset 0 -1px 2px rgba(255, 255, 255, .85);
+}
+body[data-theme="dark"] {
+  --clay-panel: #292420;
+  --clay-surface: #332d28;
+  --clay-sunk-bg: #2b2621;
+  --clay-out: 0 6px 14px rgba(0, 0, 0, .42);
+  --clay-in: inset 0 2px 3px rgba(255, 240, 220, .07), inset 0 -3px 5px rgba(0, 0, 0, .38);
+  --clay-sunk: inset 0 2px 5px rgba(0, 0, 0, .45), inset 0 -1px 2px rgba(255, 240, 220, .05);
+}
+
+.sidebar { background: var(--clay-panel); }
+
+/* Botón "Nuevo proyecto": flota (elevado) y se hunde al pulsar */
+.new-project-btn {
+  border-radius: 9px;
+  box-shadow: var(--clay-out), var(--clay-in);
+  transition: box-shadow .15s, transform .15s, filter .15s;
+}
+.new-project-btn:hover { box-shadow: var(--clay-out), var(--clay-in); transform: translateY(-1px); filter: none; }
+.new-project-btn:active { transform: none; box-shadow: var(--clay-sunk); }
+
+/* Accesos directos: píldora → rectángulo suave; el activo flota en blanco */
+.side-item { border-radius: 8px; }
+.side-item.active {
+  background: var(--clay-surface); color: var(--accent);
+  box-shadow: var(--clay-out), var(--clay-in);
+}
+.side-link { border-radius: 8px; }
+.side-link.active { background: var(--clay-surface); box-shadow: var(--clay-out), var(--clay-in); }
+
+/* Proyecto expandido = tarjeta de arcilla que contiene fila + subárbol */
+.tree-card.open {
+  background: var(--clay-surface);
+  border-radius: 12px;
+  margin: 5px 8px 7px;
+  padding: 4px 4px 6px;
+  box-shadow: var(--clay-out), var(--clay-in);
+}
+.tree-card.open > .tree-initiative { margin: 0 0 2px; }
+.tree-card.open .tree-meetings { margin-bottom: 0; }
+
+/* Carpetas: pastilla hundida en la arcilla (sustituye a la línea guía) */
+.tree-folder {
+  border-left: none; border-radius: 7px;
+  margin: 2px 6px 2px 24px; padding: 4.5px 10px;
+  background: var(--clay-sunk-bg);
+  box-shadow: var(--clay-sunk);
+}
+.tree-folder.on {
+  background: color-mix(in srgb, var(--accent) 16%, var(--clay-surface));
+  color: var(--accent);
+}
+/* El indicador de arrastre usaba la línea guía izquierda; ahora es contorno */
+body.folder-dragging .tree-folder {
+  border-left: none;
+  outline: 1.5px dashed color-mix(in srgb, var(--accent) 45%, transparent);
+  outline-offset: -1.5px;
+}
+.tree-folder.drop-over {
+  border-left: none;
+  outline: 1.5px dashed var(--accent);
+  background: var(--accent-soft); color: var(--accent);
+}
+
+/* Reunión seleccionada: hundida con tinte de acento */
+.tree-meeting { border-radius: 7px; }
+.tree-meeting.selected {
+  background: color-mix(in srgb, var(--accent) 15%, var(--clay-surface));
+  box-shadow: inset 0 2px 4px color-mix(in srgb, var(--accent) 22%, transparent);
+}
