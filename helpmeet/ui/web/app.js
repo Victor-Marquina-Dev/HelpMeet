@@ -3951,11 +3951,7 @@ function _renderInitRow(tree, it) {
   };
   row.onclick = () => selectInitiative(it.id);
   row.oncontextmenu = (e) => { e.preventDefault(); openInitiativeMenu(e, it.id); };
-  // Tarjeta clay: al expandir, la fila y su subárbol viven en una misma
-  // superficie elevada (fila y sub siguen siendo hermanos para el CSS).
-  const card = el('div', 'tree-card' + (open ? ' open' : ''));
-  card.appendChild(row);
-  tree.appendChild(card);
+  tree.appendChild(row);
   if (open) {
     const sub = el('div', 'tree-meetings');
 
@@ -4087,7 +4083,7 @@ function _renderInitRow(tree, it) {
       });
     });
     if (!ms.length) sub.appendChild(el('div', 'tree-meeting', '<span style="color:var(--text-faint);font-size:12px">Sin reuniones</span>'));
-    card.appendChild(sub);
+    tree.appendChild(sub);
   }
 }
 
