@@ -68,6 +68,74 @@ def _hook_exceptions():
 _hook_exceptions()
 
 
+ARCHIVE_FOLDER_NAME = "Archivados"
+
+
+def _archive_root() -> Path:
+    root = settings.get_export_dir() / ARCHIVE_FOLDER_NAME
+    root.mkdir(parents=True, exist_ok=True)
+    return root
+
+
+def _is_inside(child: Path, parent: Path) -> bool:
+    try:
+        child.resolve().relative_to(parent.resolve())
+        return True
+    except ValueError:
+        return False
+
+
+def _remap_path(value, source_dir: Path, dest_dir: Path) -> str | None:
+    if not value:
+        return value
+    try:
+        path = Path(value)
+        rel = path.resolve().relative_to(source_dir.resolve())
+        return str(dest_dir / rel)
+    except Exception:
+        return value
+
+
+def _remap_meeting_paths(meeting, source_dir: Path, dest_dir: Path) -> None:
+    meeting.audio_path = _remap_path(meeting.audio_path, source_dir, dest_dir)
+    for cap in getattr(meeting, "captures", []) or []:
+        cap.image_path = _remap_path(cap.image_path, source_dir, dest_dir)
+
+
+def _remove_empty_export_parents(path: Path, stop_at: Path) -> None:
+    current = path.parent
+    stop = stop_at.resolve()
+    while current.exists() and current.resolve() != stop:
+        try:
+            current.rmdir()
+        except OSError:
+            break
+        current = current.parent
+
+
+def _move_managed_folder(source: Path, dest: Path) -> bool:
+    """Mueve una carpeta Helpmeet si existe; devuelve True si movió algo."""
+    if not source.exists() or not source.is_dir():
+        return False
+    if source.resolve() == dest.resolve():
+        return False
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    if dest.exists():
+        raise FileExistsError(f"La carpeta de destino ya existe: {dest}")
+    shutil.move(str(source), str(dest))
+    return True
+
+
+def _delete_archived_folder(path: Path) -> bool:
+    root = _archive_root()
+    if not path.exists():
+        return False
+    if not _is_inside(path, root):
+        raise ValueError("Por seguridad, solo se eliminan carpetas dentro de Archivados.")
+    shutil.rmtree(path)
+    return True
+
+
 class _JobCancelled(Exception):
     """Excepción interna: el usuario canceló la transcripción."""
 
@@ -667,7 +735,13 @@ class Api:
     def archive_item(self, kind, item_id):
         if self._item_in_use(kind, int(item_id)):
             return {"ok": False, "error": "Detén la grabación antes de archivar este elemento."}
-        return {"ok": repo.archive_item(self._session, kind, int(item_id))}
+        try:
+            self._move_item_to_archive(kind, int(item_id))
+            return {"ok": repo.archive_item(self._session, kind, int(item_id))}
+        except Exception as exc:  # noqa: BLE001
+            self._session.rollback()
+            _log.exception("No se pudo archivar físicamente %s %s", kind, item_id)
+            return {"ok": False, "error": str(exc)}
 
     def trash_item(self, kind, item_id):
         if self._item_in_use(kind, int(item_id)):
@@ -675,12 +749,116 @@ class Api:
         return {"ok": repo.trash_item(self._session, kind, int(item_id))}
 
     def restore_item(self, kind, item_id):
-        return {"ok": repo.restore_item(self._session, kind, int(item_id))}
+        try:
+            self._restore_item_from_archive(kind, int(item_id))
+            return {"ok": repo.restore_item(self._session, kind, int(item_id))}
+        except Exception as exc:  # noqa: BLE001
+            self._session.rollback()
+            _log.exception("No se pudo restaurar físicamente %s %s", kind, item_id)
+            return {"ok": False, "error": str(exc)}
 
     def permanently_delete_item(self, kind, item_id):
         if self._item_in_use(kind, int(item_id)):
             return {"ok": False, "error": "Detén la grabación antes de eliminar este elemento."}
-        return {"ok": repo.permanently_delete_item(self._session, kind, int(item_id))}
+        try:
+            self._delete_archived_item_files(kind, int(item_id))
+            return {"ok": repo.permanently_delete_item(self._session, kind, int(item_id))}
+        except Exception as exc:  # noqa: BLE001
+            self._session.rollback()
+            _log.exception("No se pudo eliminar físicamente %s %s", kind, item_id)
+            return {"ok": False, "error": str(exc)}
+
+    def _move_item_to_archive(self, kind: str, item_id: int) -> None:
+        from helpmeet.db.models import Initiative, Meeting
+        base = settings.get_export_dir()
+        archive_base = _archive_root()
+        if kind == "meeting":
+            meeting = self._session.get(Meeting, item_id)
+            if meeting is None:
+                raise ValueError("La reunión ya no existe.")
+            source = organize_meeting_folder(self._session, item_id, base)
+            # Crea la carpeta de proyecto dentro de Archivados con su marcador .helpmeet.
+            initiative_export_dir(meeting.initiative, archive_base)
+            dest = meeting_export_dir(meeting, archive_base)
+            moved = _move_managed_folder(source, dest)
+            if moved:
+                _remap_meeting_paths(meeting, source, dest)
+                _remove_empty_export_parents(source, base)
+                self._session.commit()
+            return
+        if kind == "initiative":
+            initiative = self._session.get(Initiative, item_id)
+            if initiative is None:
+                raise ValueError("El proyecto ya no existe.")
+            source = export_initiative(self._session, item_id, base)
+            dest = initiative_export_dir(initiative, archive_base)
+            # initiative_export_dir crea el destino; para mover la carpeta completa
+            # necesitamos retirarlo si solo contiene el marcador recién creado.
+            marker = dest / ".helpmeet"
+            if dest.exists() and not any(p.name != ".helpmeet" for p in dest.iterdir()):
+                if marker.exists():
+                    marker.unlink()
+                dest.rmdir()
+            moved = _move_managed_folder(source, dest)
+            if moved:
+                for meeting in initiative.meetings:
+                    _remap_meeting_paths(meeting, source, dest)
+                self._session.commit()
+            return
+        raise ValueError("Tipo de elemento no soportado.")
+
+    def _restore_item_from_archive(self, kind: str, item_id: int) -> None:
+        from helpmeet.db.models import Initiative, Meeting
+        base = settings.get_export_dir()
+        archive_base = _archive_root()
+        if kind == "meeting":
+            meeting = self._session.get(Meeting, item_id)
+            if meeting is None:
+                raise ValueError("La reunión ya no existe.")
+            source = meeting_export_dir(meeting, archive_base)
+            initiative_export_dir(meeting.initiative, base)
+            dest = meeting_export_dir(meeting, base)
+            moved = _move_managed_folder(source, dest)
+            if moved:
+                _remap_meeting_paths(meeting, source, dest)
+                _remove_empty_export_parents(source, archive_base)
+                self._session.commit()
+            return
+        if kind == "initiative":
+            initiative = self._session.get(Initiative, item_id)
+            if initiative is None:
+                raise ValueError("El proyecto ya no existe.")
+            source = initiative_export_dir(initiative, archive_base)
+            dest = initiative_export_dir(initiative, base)
+            marker = dest / ".helpmeet"
+            if dest.exists() and not any(p.name != ".helpmeet" for p in dest.iterdir()):
+                if marker.exists():
+                    marker.unlink()
+                dest.rmdir()
+            moved = _move_managed_folder(source, dest)
+            if moved:
+                for meeting in initiative.meetings:
+                    _remap_meeting_paths(meeting, source, dest)
+                self._session.commit()
+            return
+        raise ValueError("Tipo de elemento no soportado.")
+
+    def _delete_archived_item_files(self, kind: str, item_id: int) -> None:
+        from helpmeet.db.models import Initiative, Meeting
+        archive_base = _archive_root()
+        if kind == "meeting":
+            meeting = self._session.get(Meeting, item_id)
+            if meeting is None:
+                return
+            _delete_archived_folder(meeting_export_dir(meeting, archive_base))
+            return
+        if kind == "initiative":
+            initiative = self._session.get(Initiative, item_id)
+            if initiative is None:
+                return
+            _delete_archived_folder(initiative_export_dir(initiative, archive_base))
+            return
+        raise ValueError("Tipo de elemento no soportado.")
 
     def _item_in_use(self, kind, item_id):
         meeting_ids = set()
@@ -697,6 +875,10 @@ class Api:
         return False
 
     def create_initiative(self, name, color=None):
+        name = (name or "").strip()
+        existing = repo.list_initiatives(self._session)
+        if any((i.name or "").strip().lower() == name.lower() for i in existing):
+            return {"error": "duplicate_name"}
         i = repo.create_initiative(self._session, name, color=color)
         return _initiative_payload(i)
 
@@ -743,7 +925,13 @@ class Api:
         return {"trashed": trashed, "created": created}
 
     def rename_initiative(self, initiative_id, name):
-        repo.rename_initiative(self._session, int(initiative_id), name)
+        initiative_id = int(initiative_id)
+        name = (name or "").strip()
+        existing = repo.list_initiatives(self._session)
+        if any((i.name or "").strip().lower() == name.lower() and i.id != initiative_id
+               for i in existing):
+            return {"ok": False, "error": "duplicate_name"}
+        repo.rename_initiative(self._session, initiative_id, name)
         return {"ok": True}
 
     def set_initiative_color(self, initiative_id, color):
@@ -1161,6 +1349,32 @@ class Api:
                 b64 = base64.b64encode(fh.read()).decode("ascii")
             return {"ok": True, "data_url": f"data:image/jpeg;base64,{b64}"}
         return self.get_capture_image(capture_id)  # fallback al original
+
+    _VIDEO_EXTS = (".mp4", ".mkv", ".mov", ".avi", ".webm")
+
+    def get_meeting_thumbnail(self, meeting_id):
+        """Miniatura JPEG del primer fotograma del vídeo de una reunión (para
+        la cabecera). Mismo patrón que get_capture_thumbnail: se genera una
+        vez, se cachea en `captures/thumbs`, y se reutiliza."""
+        m = repo.get_meeting(self._session, int(meeting_id))
+        if (m is None or not m.audio_path or not os.path.exists(m.audio_path)
+                or not str(m.audio_path).lower().endswith(self._VIDEO_EXTS)):
+            return {"ok": False, "data_url": ""}
+        from helpmeet.media import make_thumbnail
+        thumbs_dir = config.CAPTURES_DIR / "thumbs"
+        thumb = thumbs_dir / f"meeting-{int(meeting_id)}.jpg"
+        try:
+            fresh = (thumb.exists() and
+                     thumb.stat().st_mtime >= os.path.getmtime(m.audio_path))
+        except OSError:
+            fresh = False
+        if not fresh:
+            make_thumbnail(m.audio_path, str(thumb))
+        if thumb.exists():
+            with open(thumb, "rb") as fh:
+                b64 = base64.b64encode(fh.read()).decode("ascii")
+            return {"ok": True, "data_url": f"data:image/jpeg;base64,{b64}"}
+        return {"ok": False, "data_url": ""}
 
     def export_meeting_by_id(self, meeting_id):
         out = export_meeting(self._session, int(meeting_id), settings.get_export_dir())
@@ -2633,8 +2847,13 @@ class Api:
         return {"ok": True, "queued": True, "meeting_id": meeting.id,
                 "filename": filename}
 
-    def _pick_files(self):
-        """Abre el diálogo nativo para elegir MÚLTIPLES archivos de video/audio."""
+    def _pick_files(self, kind=None):
+        """Abre el diálogo nativo para elegir MÚLTIPLES archivos de video/audio.
+
+        El filtro siempre admite video Y audio (mp4, mkv, mov, avi, webm,
+        mp3, m4a, wav, ogg): "Importar video" e "Importar audio" son solo
+        dos accesos distintos al mismo selector, no una restricción real
+        de formato — así un .mp3 se puede elegir desde cualquiera de los dos."""
         types = (
             "Video o audio (*.mp4;*.mkv;*.mov;*.avi;*.webm;*.mp3;*.m4a;*.wav;*.ogg)",
             "Todos los archivos (*.*)",
@@ -2644,9 +2863,9 @@ class Api:
         )
         return list(result) if result else []
 
-    def import_media_multiple(self, initiative_id):
+    def import_media_multiple(self, initiative_id, kind=None):
         """Abre selector múltiple, mueve los archivos a la carpeta de la iniciativa y encola."""
-        files = self._pick_files()
+        files = self._pick_files(kind)
         if not files:
             return {"ok": False, "cancelled": True, "count": 0}
         imported = []

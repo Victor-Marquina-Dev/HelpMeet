@@ -116,13 +116,13 @@ def test_trash_initiative_hides_children_and_can_restore(session):
     assert repo.list_meetings(session, ini.id)[0].id == meeting.id
 
 
-def test_permanent_delete_only_works_from_trash(session):
+def test_permanent_delete_only_works_from_library_states(session):
     ini = repo.create_initiative(session, "Proyecto")
     meeting = repo.start_meeting(session, ini.id, "Reunión")
     repo.add_utterance(session, meeting.id, "me", "texto", 0, 1)
 
     assert not repo.permanently_delete_item(session, "meeting", meeting.id)
-    repo.trash_item(session, "meeting", meeting.id)
+    repo.archive_item(session, "meeting", meeting.id)
     assert repo.permanently_delete_item(session, "meeting", meeting.id)
     assert repo.get_meeting(session, meeting.id) is None
 

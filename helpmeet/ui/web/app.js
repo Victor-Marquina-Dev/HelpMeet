@@ -178,7 +178,7 @@ const api = {
   addNote: (text) => call('add_note', text),
   toggleMeetingMicMute: (muted) => call('toggle_meeting_mic_mute', muted),
   importMedia: (iid) => call('import_media', iid),
-  importMediaMultiple: (iid) => call('import_media_multiple', iid),
+  importMediaMultiple: (iid, kind) => call('import_media_multiple', iid, kind),
   importVideoForMeeting: (mid) => call('import_video_for_meeting', mid),
   exportMeetingById: (mid) => call('export_meeting_by_id', mid),
   exportTranscriptTxt: (mid) => call('export_transcript_txt', mid),
@@ -193,6 +193,7 @@ const api = {
   copyMeetingContext: (mid) => call('copy_meeting_context', mid),
   getCaptureImage: (cid) => call('get_capture_image', cid),
   getCaptureThumbnail: (cid) => call('get_capture_thumbnail', cid),
+  getMeetingThumbnail: (mid) => call('get_meeting_thumbnail', mid),
   getBackgroundJobs: () => call('get_background_jobs'),
   setAiInstructions: (t) => call('set_ai_instructions', t),
   openMeetingFolder: (mid) => call('open_meeting_folder', mid),
@@ -321,7 +322,7 @@ const MOCK = (() => {
   };
   const transcripts = {
     m1: {
-      id: 'm1', title: 'Kick-off con diseño', started_at: '2026-06-20T10:00:00', duration: '45:12',
+      id: 'm1', title: 'Kick-off con diseño', started_at: '2026-06-20T10:00:00', duration: '45:12', video_duration: '45:12', video_path: 'C:\Helpmeet\export\grabacion.mp4',
       context: 'Reunión inicial para alinear al equipo de diseño con los objetivos del rediseño. Se revisaron los pain points del flujo actual y se definieron los primeros entregables.',
       notes: [
         { id: 'n1', text: 'Revisar paleta de colores con marketing antes del viernes', created_at: '2026-06-20T10:32:00' },
@@ -366,8 +367,16 @@ const MOCK = (() => {
   let mctr = 100;
   return {
     list_initiatives: () => wait(inits.slice()),
-    create_initiative: (name, color) => { const it = { id: 'i' + (++mctr), name, color: color || '#aacfbf', created_at: new Date().toISOString() }; inits.push(it); meetings[it.id] = []; return wait(it); },
-    rename_initiative: (id, name) => { const it = inits.find(x => x.id === id); if (it) it.name = name; return wait({ ok: true }); },
+    create_initiative: (name, color) => {
+      name = (name || '').trim();
+      if (inits.some(x => (x.name || '').trim().toLowerCase() === name.toLowerCase())) return wait({ error: 'duplicate_name' });
+      const it = { id: 'i' + (++mctr), name, color: color || '#aacfbf', created_at: new Date().toISOString() }; inits.push(it); meetings[it.id] = []; return wait(it);
+    },
+    rename_initiative: (id, name) => {
+      name = (name || '').trim();
+      if (inits.some(x => x.id !== id && (x.name || '').trim().toLowerCase() === name.toLowerCase())) return wait({ ok: false, error: 'duplicate_name' });
+      const it = inits.find(x => x.id === id); if (it) it.name = name; return wait({ ok: true });
+    },
     rename_meeting: (id, title) => { for (const k in meetings) { const m = meetings[k].find(x => x.id === id); if (m) m.title = title; } return wait({ ok: true }); },
     set_meeting_context: (id, context) => { if (transcripts[id]) transcripts[id].context = context; return wait({ ok: true, context }); },
     add_meeting_note: (id, text) => {
@@ -427,6 +436,10 @@ const MOCK = (() => {
     add_note: () => wait({ ok: true }),
     import_media: (iid) => wait({ id: 'm' + (++mctr), title: 'Vídeo importado', initiative_id: iid, utterances: 30 }, 600),
     import_video_for_meeting: (mid) => wait({ ok: true, queued: true, meeting_id: mid, filename: 'grabacion.mp4' }, 400),
+    get_meeting_thumbnail: (mid) => {
+      const svg = `<svg xmlns='http://www.w3.org/2000/svg' width='160' height='90'><rect width='160' height='90' fill='#3a5a52'/><circle cx='80' cy='45' r='22' fill='#fff' fill-opacity='.85'/><polygon points='72,32 72,58 96,45' fill='#3a5a52'/></svg>`;
+      return wait({ ok: true, data_url: 'data:image/svg+xml;utf8,' + encodeURIComponent(svg) }, 250);
+    },
     export_meeting_by_id: () => wait({ path: 'C:\\Helpmeet\\export' }, 500),
     export_transcript_txt: () => wait({ ok: true, path: 'C:\\Helpmeet\\transcripcion.txt' }, 500),
     export_transcript_package: () => wait({ ok: true, path: 'C:\\Helpmeet\\transcripcion.zip', captures: 2, files: 1 }, 500),
@@ -1901,6 +1914,12 @@ function refreshMeetingTitleJob() {
   if (!group) return;
   const job = currentMeetingJob();
   group.classList.toggle('is-processing', !!job);
+  // Los botones de transcribir del panel de vídeo no deben quedar activos
+  // mientras ya hay una transcripción en curso para esta misma reunión.
+  document.querySelectorAll('.video-file .rec-actions .btn').forEach(b => {
+    b.disabled = !!job; b.classList.toggle('is-disabled', !!job);
+    b.title = job ? 'Ya se está transcribiendo esta reunión…' : '';
+  });
   let spin = group.querySelector('.meeting-title-spinner');
   if (job && !spin) {
     spin = el('span', 'spinner sm meeting-title-spinner');
@@ -1953,6 +1972,11 @@ function viewMeeting() {
     : t && t.duration && !t.video_path
     ? `<span class="meeting-video-dur"><span class="mvd-ico">${svg('mic', 11)}</span>${esc(t.duration)}</span>`
     : '';
+  // Miniatura del video (primer fotograma), justo al lado del play/duración.
+  // Se carga aparte (loadMeetingThumb) para no inflar get_transcript.
+  const meetingThumb = t && t.video_duration
+    ? `<button type="button" class="meeting-thumb is-empty" id="meetingThumbBtn" title="Ver miniatura ampliada" aria-label="Ver miniatura ampliada del video"></button>`
+    : '';
   head.innerHTML = `
     <div class="init-status-row meeting-status-row">
       <div class="init-title-group meeting-title-group ${meetingJob ? 'is-processing' : ''}">
@@ -1961,7 +1985,7 @@ function viewMeeting() {
           <div class="meeting-title-line">
             <h1 class="mtitle-h title-lg">${esc(t ? _fmtMeetingLabel(t) : 'Reunión')}</h1>
             ${meetingDateStr ? `<span class="init-created">${esc(meetingDateStr)}</span>` : ''}
-            ${videoDur}
+            ${meetingThumb}${videoDur}
           </div>
         </div>
       </div>
@@ -1992,6 +2016,8 @@ function viewMeeting() {
   content.appendChild(renderTab(STATE.activeTab, t));
   // Wire botón cancelar si hay trabajo activo al renderizar la vista
   _wireJobCancel(head.querySelector('[data-meeting-job]'));
+  const thumbBtn = head.querySelector('#meetingThumbBtn');
+  if (thumbBtn && STATE.selMeeting) loadMeetingThumb(thumbBtn, STATE.selMeeting);
   // eventos
   head.querySelector('#mCopy').onclick = (e) => copyMeetingContext(STATE.selMeeting, e.currentTarget);
   head.querySelector('#mOpen').onclick = (e) => doOpenFolder(e.currentTarget);
@@ -2269,6 +2295,8 @@ function renderTranscript(t) {
 // el usuario decide cuándo abrirlo en su reproductor habitual.
 function videoPanel(t) {
   const hasTx = !!(t.utterances && t.utterances.some(u => !u.kind || u.kind === 'utterance'));
+  const mid = t.meeting_id || STATE.selMeeting;
+  const busy = meetingIsTranscribing(mid);
   const wrap = el('div', 'video-panel');
   const name = String(t.video_path || '').split(/[\\/]/).pop() || 'grabacion.mp4';
   wrap.innerHTML = `<div class="video-file">
@@ -2292,6 +2320,12 @@ function videoPanel(t) {
   btNow.onclick = () => transcribeScreenVideo(t.meeting_id || STATE.selMeeting, hasTx, null);
   actions.appendChild(btNow);
   wrap.querySelector('.rec-actions').replaceWith(actions);
+  // Ya se está transcribiendo (p. ej. justo tras importar): no dejar que se
+  // dispare una segunda transcripción en paralelo — se ve la barra de
+  // progreso arriba, así que aquí solo se deshabilita, sin duplicar el aviso.
+  if (busy) {
+    [bt, btNow].forEach(b => { b.disabled = true; b.classList.add('is-disabled'); b.title = 'Ya se está transcribiendo esta reunión…'; });
+  }
   return wrap;
 }
 
@@ -3009,6 +3043,18 @@ async function loadCaptureThumb(ph, captureId) {
   } catch (e) { /* sin imagen: queda el marcador por defecto */ }
 }
 
+// Miniatura del video en la cabecera de la reunión: mismo patrón que
+// loadCaptureThumb (carga aparte, cae en silencio si no hay video/falla).
+async function loadMeetingThumb(btn, meetingId) {
+  try {
+    const r = await api.getMeetingThumbnail(meetingId);
+    if (!r || !r.data_url) return;
+    btn.classList.remove('is-empty');
+    btn.style.backgroundImage = `url("${r.data_url}")`;
+    btn.onclick = () => openLightbox(r.data_url);
+  } catch (e) { /* sin miniatura: el botón queda oculto (is-empty) */ }
+}
+
 function openLightbox(dataUrl) {
   const m = el('div', 'lightbox');
   m.innerHTML = `<img src="${dataUrl}" alt="Captura ampliada">`;
@@ -3138,19 +3184,23 @@ function renderActionBar() {
         <span class="dock-sep"></span>
         <button class="dock-btn" id="abRecord" aria-haspopup="true" aria-expanded="false" title="Grabar reunión o pantalla"><span class="dock-ico dock-ico--rec">${svg('mic', 18)}</span>Grabar<span class="cdrop-chev">${svg('chevronDown', 14)}</span></button>
         <span class="dock-sep"></span>
-        <button class="dock-btn" id="abUpload" title="Importar video"><span class="dock-ico">${svg('upload', 18)}</span>Importar video</button>
+        <button class="dock-btn" id="abUpload" aria-haspopup="true" aria-expanded="false" title="Importar video o audio"><span class="dock-ico">${svg('upload', 18)}</span>Importar<span class="cdrop-chev">${svg('chevronDown', 14)}</span></button>
       </div>`;
     // Sin proyecto seleccionado: modal para elegir/crear uno y seguir con la acción
     const needProject = (cont) => pickInitiativeModal((iid) => { selectInitiative(iid); cont(); });
     const _rec = () => withRecordingConsent(() => startMeetingRecording());
     const _scr = () => withRecordingConsent(() => openScreenPanel());
-    const _imp = () => doImport(document.getElementById('abUpload'));
+    const _imp = (kind) => confirmImportDestination(STATE.selInit, kind,
+      (folderId) => doImport(document.getElementById('abUpload'), kind, folderId));
     bar.querySelector('#btnMic').onclick = toggleMic;
     bar.querySelector('#abRecord').onclick = (e) => _openRecordPicker(e.currentTarget, [
       { icon: 'mic', label: 'Grabar reunión (audio)', run: () => canRecord ? _rec() : needProject(_rec) },
       { icon: 'monitorDot', label: 'Grabar pantalla', run: () => canRecord ? _scr() : needProject(_scr) },
     ]);
-    bar.querySelector('#abUpload').onclick = () => canRecord ? _imp() : needProject(_imp);
+    bar.querySelector('#abUpload').onclick = (e) => _openRecordPicker(e.currentTarget, [
+      { icon: 'upload', label: 'Importar video', run: () => canRecord ? _imp('video') : needProject(() => _imp('video')) },
+      { icon: 'upload', label: 'Importar audio', run: () => canRecord ? _imp('audio') : needProject(() => _imp('audio')) },
+    ]);
   } else if (s === 'recording' || s === 'recording-local' || s === 'recording-cloud') {
     // Grabación de solo audio: sin botón "Captura" (capturar pantalla
     // solo tiene sentido cuando se está grabando la pantalla).
@@ -3942,7 +3992,12 @@ function _renderInitRow(tree, it) {
   // Punto circular con el color del proyecto (sin rail ni avatar)
   const pcolor = it.color || avatarColorFor(it.name);
   // Pin al pasar el mouse (fijados: siempre visible); reemplaza al indicador fijo
-  row.innerHTML = `<span class="chev">${svg('chevron', 14)}</span><span class="tree-dot" style="background:${pcolor}"></span><span class="name">${esc(it.name)}</span><button class="tree-pin${it.pinned ? ' on' : ''}" title="${it.pinned ? 'Desfijar' : 'Fijar arriba'}" aria-label="${it.pinned ? 'Desfijar proyecto' : 'Fijar proyecto arriba'}">${svg('pin', 12)}</button><span class="count">${ms.length || ''}</span>`;
+  row.innerHTML = `<span class="chev">${svg('chevron', 14)}</span><span class="tree-dot" style="background:${pcolor}"></span><span class="name">${esc(it.name)}</span><button class="tree-addfolder" title="Nueva carpeta" aria-label="Crear carpeta en ${esc(it.name)}">${svg('plus', 10)}${svg('folder', 12)}</button><button class="tree-pin${it.pinned ? ' on' : ''}" title="${it.pinned ? 'Desfijar' : 'Fijar arriba'}" aria-label="${it.pinned ? 'Desfijar proyecto' : 'Fijar proyecto arriba'}">${svg('pin', 12)}</button><span class="count">${ms.length || ''}</span>`;
+  row.querySelector('.tree-addfolder').onclick = (e) => {
+    e.stopPropagation();
+    STATE.openInits[it.id] = true;
+    promptCreateFolder(it.id);
+  };
   row.querySelector('.tree-pin').onclick = async (e) => {
     e.stopPropagation();
     await api.toggleInitiativePin(it.id).catch(() => {});
@@ -3988,18 +4043,6 @@ function _renderInitRow(tree, it) {
         sub.appendChild(fr);
       });
     }
-
-    // Chip punteado "+ Carpeta": no ocupa espacio (alto cero) hasta que
-    // el mouse pasa por la fila del proyecto; entonces se despliega de
-    // arriba hacia abajo empujando el contenido, sin dejar huecos.
-    const addWrap = el('div', 'tree-newfolder');
-    const addBtn = el('button', 'tree-fchip-add');
-    addBtn.type = 'button';
-    addBtn.title = 'Crear carpeta en este proyecto';
-    addBtn.innerHTML = `${svg('plus', 10)}<span>Nueva carpeta</span>`;
-    addBtn.onclick = (e) => { e.stopPropagation(); promptCreateFolder(it.id); };
-    addWrap.appendChild(addBtn);
-    sub.appendChild(addWrap);
 
     // Agrupación por semanas: única fuente de verdad en weekInfoOf()
     const _monKey = (iso) => {
@@ -4733,25 +4776,35 @@ function promptNewInitiative(onCreated) {
     const okBtn = m.querySelector('[data-ok]'); okBtn.classList.add('is-loading');
     try {
       const it = await api.createInitiative(name, color);
-      if (it) {
+      if (it && it.error === 'duplicate_name') {
+        okBtn.classList.remove('is-loading');
+        input.classList.add('invalid'); err.textContent = 'Ya existe un proyecto con ese nombre. Elige otro.'; input.focus(); input.select();
+        return;
+      }
+      if (it && it.id) {
         if (!it.color) it.color = color;
         STATE.initiatives.push(it); STATE.meetingsByInit[it.id] = [];
         renderSidebar(); toast('ok', 'Proyecto creado'); closeModal(); selectInitiative(it.id);
         // Si venimos de "elige un proyecto" (p. ej. al grabar), continuar la acción
         if (typeof onCreated === 'function') onCreated(it.id);
+      } else {
+        okBtn.classList.remove('is-loading'); err.textContent = 'No se pudo crear el proyecto.';
       }
     } catch (e) { okBtn.classList.remove('is-loading'); err.textContent = 'No se pudo crear. ' + (e && e.message || ''); }
   };
   m.querySelector('[data-ok]').onclick = submit;
   m.querySelector('[data-c]').onclick = closeModal;
   m.querySelector('[data-x]').onclick = closeModal;
+  input.addEventListener('input', () => { input.classList.remove('invalid'); err.textContent = ''; });
   input.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); submit(); } });
   openModal(m);
 }
 function promptRenameInitiative(iid) {
   const it = STATE.initiatives.find(x => x.id === iid);
   formModal('Renombrar proyecto', 'Nuevo nombre', it ? it.name : '', 'Guardar', async (name) => {
-    await api.renameInitiative(iid, name); if (it) it.name = name; renderSidebar(); renderMain(); toast('ok', 'Proyecto renombrado');
+    const r = await api.renameInitiative(iid, name);
+    if (r && r.error === 'duplicate_name') throw new Error('Ya existe un proyecto con ese nombre.');
+    if (it) it.name = name; renderSidebar(); renderMain(); toast('ok', 'Proyecto renombrado');
   });
 }
 function promptRenameMeeting(mid) {
@@ -4906,25 +4959,65 @@ function _promptNewInitiativeReturn(onCreated) {
       <button class="btn btn-primary" id="niOk2">Crear</button>
     </div>`;
   const inp = m.querySelector('#niName2');
+  const errEl = el('div', 'field-error'); m.querySelector('.modal-body').appendChild(errEl);
   const ok = async () => {
     const name = inp.value.trim();
     if (!name) { inp.focus(); return; }
-    closeModal();
+    const okBtn = m.querySelector('#niOk2'); okBtn.classList.add('is-loading');
     const r = await api.createInitiative(name, color).catch(() => null);
+    okBtn.classList.remove('is-loading');
+    if (r && r.error === 'duplicate_name') {
+      errEl.textContent = 'Ya existe un proyecto con ese nombre. Elige otro.'; inp.focus(); inp.select();
+      return;
+    }
     if (r && r.id) {
       STATE.initiatives.unshift(r);
       renderSidebar();
+      closeModal();
       onCreated(r.id);
-    } else { toast('err', 'No se pudo crear el proyecto'); onCreated(null); }
+    } else { closeModal(); toast('err', 'No se pudo crear el proyecto'); onCreated(null); }
   };
   m.querySelector('#niOk2').onclick = ok;
+  inp.addEventListener('input', () => { errEl.textContent = ''; });
   inp.onkeydown = (e) => { if (e.key === 'Enter') ok(); };
   m.querySelectorAll('[data-x]').forEach(b => b.onclick = () => { closeModal(); onCreated(null); });
   openModal(m);
   setTimeout(() => inp.focus(), 50);
 }
 
-async function doImport(btn) {
+// Antes de abrir el selector nativo de archivos, confirma en qué proyecto
+// (y, si tiene carpetas, en cuál) va a quedar guardado lo importado.
+function confirmImportDestination(iid, kind, onConfirm) {
+  const it = STATE.initiatives.find(x => x.id === iid);
+  const name = it ? it.name : 'el proyecto';
+  const folders = iid ? _getFolders(iid) : [];
+  const noun = kind === 'audio' ? 'el audio' : 'el video';
+  const m = el('div', 'modal');
+  m.setAttribute('role', 'dialog'); m.setAttribute('aria-label', 'Confirmar importación');
+  m.innerHTML = `
+    <div class="modal-head"><h3>Importar a «${esc(name)}»</h3><button class="icon-btn sm" data-x aria-label="Cerrar">${svg('x', 14)}</button></div>
+    <div class="modal-body" style="gap:12px">
+      <p style="font-size:12px;color:var(--text-secondary);margin:0;line-height:1.5">Vas a elegir ${noun} desde tu computadora. Se guardará dentro del proyecto <b>${esc(name)}</b>.</p>
+      ${folders.length ? `<div><label>Carpeta (opcional)</label><div id="impFolderSel"></div></div>` : ''}
+    </div>
+    <div class="modal-foot"><button class="btn" data-x>Cancelar</button><button class="btn btn-primary" data-ok>Elegir archivo…</button></div>`;
+  let selFolder = null;
+  if (folders.length) {
+    const sel = customSelect({
+      value: null,
+      items: [{ value: null, label: 'Sin carpeta' }, ...folders.map(f => ({ value: f.id, label: f.name }))],
+      icon: 'folder',
+      onChange: (v) => { selFolder = v; },
+    });
+    m.querySelector('#impFolderSel').appendChild(sel);
+  }
+  m.querySelector('[data-ok]').onclick = () => { closeModal(); onConfirm(selFolder); };
+  m.querySelectorAll('[data-x]').forEach(b => b.onclick = closeModal);
+  openModal(m);
+}
+
+async function doImport(btn, kind, folderId) {
+  const noun = kind === 'audio' ? 'audio' : 'video';
   btn.classList.add('is-loading');
   try {
     let initId = STATE.selInit || (STATE.transcript && STATE.transcript.initiative_id) || null;
@@ -4934,14 +5027,16 @@ async function doImport(btn) {
       if (!initId) return;
       btn.classList.add('is-loading');
     }
-    const r = await api.importMediaMultiple(initId);
+    const r = await api.importMediaMultiple(initId, kind);
     if (r && r.error) { toast('err', errMsg(r.error, 'No se pudo importar el archivo')); }
     else if (r && r.cancelled) { /* usuario cerró el diálogo */ }
     else if (r && r.ok) {
-      toast('info', `Registrando ${r.count} video${r.count !== 1 ? 's' : ''}…`);
+      if (folderId != null && r.files) r.files.forEach(f => _setMeetingFolder(f.meeting_id, folderId));
+      toast('info', `Registrando ${r.count} ${noun}${r.count !== 1 ? 's' : ''}…`);
       await refreshMeetings(initId);
       try { renderBgJobs(await api.getBackgroundJobs()); } catch { /* sin jobs */ }
-      toast('ok', `${r.count} video${r.count !== 1 ? 's' : ''} importado${r.count !== 1 ? 's' : ''} · transcribiendo en 2.º plano`);
+      toast('ok', `${r.count} ${noun}${r.count !== 1 ? 's' : ''} importado${r.count !== 1 ? 's' : ''} · transcribiendo en 2.º plano`);
+      if (folderId != null) renderSidebar();
     }
   } catch { toast('err', 'Error al importar'); }
   btn.classList.remove('is-loading');
@@ -6435,6 +6530,10 @@ function showSetupOverlay(cfg) {
   // cfg: objeto get_transcription_settings (puede ser null si aún no cargó)
   const ov = el('div', 'setup-overlay');
   ov.innerHTML = `
+    <div class="setup-theme-toggle" id="setupThemeChips">
+      <button class="cfg-chip" data-theme-opt="light">Claro</button>
+      <button class="cfg-chip" data-theme-opt="dark">Oscuro</button>
+    </div>
     <div class="setup-box">
       <div class="setup-hero">
         <img class="setup-logo-img" src="assets/helpmeet-symbol.svg" alt="">
@@ -6474,6 +6573,25 @@ function showSetupOverlay(cfg) {
     </div>`;
 
   document.body.appendChild(ov);
+
+  // Modo claro/oscuro también aquí: es la primera pantalla que se ve y
+  // todavía no hay forma de llegar a Configuración para elegirlo.
+  const themeBox = ov.querySelector('#setupThemeChips');
+  if (themeBox) {
+    const renderTheme = () => {
+      const cur = load('hm.theme', 'light');
+      themeBox.querySelectorAll('[data-theme-opt]').forEach(b =>
+        b.classList.toggle('on', b.dataset.themeOpt === cur));
+    };
+    themeBox.querySelectorAll('[data-theme-opt]').forEach(b => b.onclick = () => {
+      const v = b.dataset.themeOpt;
+      save('hm.theme', v);
+      if (v === 'dark') document.body.dataset.theme = 'dark';
+      else delete document.body.dataset.theme;
+      renderTheme();
+    });
+    renderTheme();
+  }
 
   let _cfg = cfg || {};
   let _started = false;

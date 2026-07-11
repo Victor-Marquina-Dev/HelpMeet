@@ -146,7 +146,7 @@ def restore_item(session: Session, kind: str, item_id: int) -> bool:
 
 def permanently_delete_item(session: Session, kind: str, item_id: int) -> bool:
     item = _get_item(session, kind, item_id)
-    if item is None or item.deleted_at is None:
+    if item is None or (item.deleted_at is None and item.archived_at is None):
         return False
     session.delete(item)
     session.commit()

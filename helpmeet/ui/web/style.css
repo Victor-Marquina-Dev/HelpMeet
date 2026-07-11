@@ -716,30 +716,6 @@ body.rail-expanding .rail-resize-handle { background: var(--accent); }
 body.folder-dragging .tree-folder { border-left-style: dashed; border-left-color: color-mix(in srgb, var(--accent) 45%, transparent); }
 .tree-folder.drop-over { background: var(--accent-soft); color: var(--accent); border-left-style: solid; border-left-color: var(--accent); }
 .tree-meeting.dragging { opacity: .45; }
-/* Chip punteado "+ Carpeta": oculto; al pasar el mouse por la fila del
-   proyecto se despliega de arriba hacia abajo, bajo el nombre. El retardo
-   al esconderse da tiempo a llegar con el mouse sin que desaparezca. */
-.tree-newfolder {
-  padding: 0 6px 0 24px; max-height: 0; opacity: 0; overflow: hidden;
-  transform: translateY(-6px);
-  transition: max-height .18s ease .3s, opacity .18s ease .3s, transform .18s ease .3s, padding .18s ease .3s;
-}
-.tree-initiative:hover + .tree-meetings .tree-newfolder,
-.tree-newfolder:hover {
-  max-height: 32px; opacity: 1; transform: none;
-  padding-top: 2px; padding-bottom: 3px; transition-delay: 0s;
-}
-/* Fila punteada a lo ancho, con las mismas medidas que las carpetas:
-   se lee como "el hueco de la siguiente carpeta". */
-.tree-fchip-add {
-  display: flex; width: 100%; align-items: center; gap: 6px;
-  font-family: inherit; font-size: 10.5px; font-weight: 600; color: var(--text-muted);
-  background: none; border: 1.2px dashed var(--border-strong);
-  border-radius: 7px; padding: 4px 10px; cursor: pointer; text-align: left;
-  transition: color .12s, border-color .12s, background .12s;
-}
-.tree-fchip-add:hover { color: var(--accent); border-color: var(--accent); background: var(--accent-soft); }
-
 /* "Mostrar todo" */
 .sb-show-more {
   display: flex; align-items: center; gap: 9px;
@@ -1533,6 +1509,16 @@ body[data-sidebar="collapsed"] .actionbar--dock { left: 52px; }
 .tree-initiative:hover .tree-pin { opacity: 1; }
 .tree-pin:hover { color: var(--accent); background: var(--hover-med); }
 .tree-pin.on { opacity: 1; color: var(--accent); }
+/* "+ carpeta": mismo patrón de aparición que el pin, justo a su costado */
+.tree-addfolder {
+  display: inline-flex; align-items: center; justify-content: center; gap: 1px;
+  flex: none; width: 26px; height: 20px; padding: 0;
+  border: none; border-radius: 5px; background: transparent;
+  color: var(--text-faint); cursor: pointer;
+  opacity: 0; transition: opacity .12s, color .12s, background .12s;
+}
+.tree-initiative:hover .tree-addfolder { opacity: 1; }
+.tree-addfolder:hover { color: var(--accent); background: var(--hover-med); }
 /* Contador con ancho fijo: así los pines quedan alineados en columna */
 .tree-initiative .count { width: 20px; text-align: right; flex: none; }
 
@@ -2092,6 +2078,15 @@ body.folder-dragging .ftab[data-droppable] { border-bottom-style: dashed; border
 .meeting-video-dur { font-size:10.2px; color:var(--text-muted); font-family:var(--font-mono); white-space:nowrap; flex:none; }
 .meeting-video-dur .mvd-ico { margin-right:3px; vertical-align:-1px; opacity:.8; }
 .meeting-video-dur .mvd-ico svg { display:inline-block; }
+/* Miniatura del primer fotograma, junto al indicador de duración/play */
+.meeting-thumb {
+  align-self: center; flex: none; width: 40px; height: 24px;
+  border-radius: 5px; border: 1px solid var(--border-subtle);
+  background-color: var(--hover-med); background-size: cover; background-position: center;
+  padding: 0; cursor: zoom-in; transition: transform .12s, box-shadow .12s;
+}
+.meeting-thumb:hover { transform: scale(1.08); box-shadow: 0 3px 10px rgba(0,0,0,.28); }
+.meeting-thumb.is-empty { display: none; }
 .init-badge {
   font-size: 8.5px; font-weight: 700; letter-spacing: .7px;
   color: var(--accent); background: var(--accent-soft);
@@ -2628,6 +2623,11 @@ body[data-theme="dark"] .cal-tg-ev:hover { filter: brightness(1.18) saturate(1.1
 .setup-overlay.setup-fade-out { animation: setupFadeOut .38s ease forwards; pointer-events: none; }
 @keyframes setupFadeIn  { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
 @keyframes setupFadeOut { from { opacity: 1; } to { opacity: 0; } }
+/* Claro/oscuro también en el asistente de primera ejecución: aún no hay
+   forma de llegar a Configuración para elegirlo en este punto. Debajo del
+   topbar (que tiene z-index:10000, por encima de todo para los controles
+   de ventana) para no quedar tapado por los botones minimizar/cerrar. */
+.setup-theme-toggle { position: absolute; top: 62px; right: 24px; display: flex; gap: 6px; }
 
 .setup-box {
   width: 100%; max-width: 580px; margin: auto;
