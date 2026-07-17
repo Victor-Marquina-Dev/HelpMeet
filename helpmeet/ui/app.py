@@ -2411,6 +2411,10 @@ class Api:
             return {"_error": str(exc)}
 
     def check_license(self):
+        # TEMPORAL: el servidor de licencias en Railway está caído ("Application
+        # not found"). Este return salta la activación para poder usar la app.
+        # Quitar esta línea cuando el servidor vuelva a estar operativo.
+        return {"ok": True, "plan": "personal"}
         from datetime import datetime, timezone, timedelta
         token = settings.get_license_token()
         if not token:
