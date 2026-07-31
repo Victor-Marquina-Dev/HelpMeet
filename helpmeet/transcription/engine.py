@@ -80,7 +80,7 @@ class TranscriptionEngine:
             if not chunk:
                 break
             processed_frames += len(chunk) // (channels * sampwidth)
-            pcm = to_16k_mono(chunk, rate, channels)
+            pcm = to_16k_mono(chunk, rate, channels, sampwidth)
             if pcm and rec.AcceptWaveform(pcm):
                 results.append(_parse_result(rec.Result()))
             if on_progress and total_frames:

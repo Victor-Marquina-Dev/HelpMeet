@@ -117,7 +117,10 @@ class VoskLiveTranscriber:
             data = buf.drain()
             if not data:
                 return
-            pcm = to_16k_mono(data, buf.rate, buf.channels)
+            # La captura propia es paInt16, asi que el 2 por defecto es
+            # correcto; se lee del buffer por si algun dia deja de serlo.
+            pcm = to_16k_mono(data, buf.rate, buf.channels,
+                              getattr(buf, "sampwidth", 2))
             if not pcm:
                 return
             if rec.AcceptWaveform(pcm):
