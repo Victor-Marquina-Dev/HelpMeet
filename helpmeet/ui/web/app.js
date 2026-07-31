@@ -5184,9 +5184,10 @@ function promptMoveMeetingToFolder(mid) {
     <div class="modal-head"><h3>Mover a carpeta</h3><button class="icon-btn sm" data-x aria-label="Cerrar">${svg('x', 14)}</button></div>
     <div class="modal-body">
       <div class="pick-init-list">
-        <button type="button" class="pick-init-row${current == null ? ' on' : ''}" data-fid="none">
-          <span class="pick-init-name">Sin carpeta</span>
-        </button>
+        ${/* Sin la fila "Sin carpeta": este diálogo se abre para ELEGIR una
+             carpeta, y sacarla de donde está no es una carpeta más de la lista.
+             Para eso está "Sacar de la carpeta", en el menú "···" de la fila y
+             en la barra de selección múltiple. */''}
         ${folders.map(f => `
         <button type="button" class="pick-init-row${current === f.id ? ' on' : ''}" data-fid="${f.id}">
           <span class="pick-init-name">${esc(f.name)}</span>
@@ -5316,6 +5317,17 @@ function openMeetingMenu(e, mid) {
     { label: 'Cambiar fecha', icon: 'calendar', onClick: () => promptChangeMeetingDate(mid) },
     { label: 'Mover a otro proyecto', icon: 'folder', onClick: () => promptMoveMeeting(mid) },
     { label: 'Mover a carpeta', icon: 'folder', onClick: () => promptMoveMeetingToFolder(mid) },
+    /* Solo si está dentro de una: es la contrapartida de "Mover a carpeta" y la
+       única salida para UNA reunión desde que el diálogo dejó de ofrecer "Sin
+       carpeta" (antes solo existía en la selección múltiple). No borra nada —
+       la reunión vuelve a la lista del proyecto. */
+    ...(_getMeetingFolder(mid) != null
+      ? [{ label: 'Sacar de la carpeta', icon: 'x', onClick: () => {
+            _setMeetingFolder(mid, null);
+            toast('ok', 'Fuera de la carpeta');
+            renderMain(); renderSidebar();
+          } }]
+      : []),
     { sep: true },
     { label: 'Archivar reunión', icon: 'archive', onClick: () => archiveMeeting(mid) },
   ]);
