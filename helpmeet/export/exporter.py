@@ -238,8 +238,20 @@ def meeting_export_dir(meeting: Meeting, base_dir: Path) -> Path:
 
 
 def meeting_folder_name(meeting: Meeting) -> str:
-    """Nombre estable, cronológico y corto para la carpeta visible."""
-    return f"{meeting.started_at:%Y-%m-%d_%H-%M-%S}_{meeting.id:04d}"
+    """Nombre de la carpeta visible: dia-mes-anio_horaminuto_segundo.
+
+    Los dos puntos de la hora no valen en nombres de archivo en Windows, de ahi
+    la "h" y la "m". Los SEGUNDOS no son un adorno: dentro de una misma carpeta
+    de mes conviven reuniones del mismo minuto (grabar dos seguidas es normal),
+    y si el nombre chocara, la segunda escribiria su transcripcion.md encima de
+    la primera.
+
+    El orden dia-primero no rompe la ordenacion del explorador porque estas
+    carpetas cuelgan de la del mes: todas comparten mes y anio, asi que ordenar
+    por texto ordena por dia. Se quito el id de la reunion, que solo servia
+    para desempatar y ya lo hace el segundo.
+    """
+    return f"{meeting.started_at:%d-%m-%Y_%Hh%Mm_%S}"
 
 
 _MARKER = ".helpmeet"

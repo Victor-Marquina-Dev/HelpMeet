@@ -2124,10 +2124,9 @@ function _carpetaReunion(m) {
 function _slugCarpeta(m) {
   const d = new Date(m.started_at);
   const p = (n) => String(n).padStart(2, '0');
-  const fecha = isNaN(d) ? '0000-00-00_00-00-00'
-    : `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}_` +
-      `${p(d.getHours())}-${p(d.getMinutes())}-${p(d.getSeconds())}`;
-  return `${fecha}_${String(m.id == null ? 0 : m.id).padStart(4, '0')}`;
+  if (isNaN(d)) return 'sin-fecha';
+  return `${p(d.getDate())}-${p(d.getMonth() + 1)}-${d.getFullYear()}_` +
+    `${p(d.getHours())}h${p(d.getMinutes())}m_${p(d.getSeconds())}`;
 }
 
 /* Carpeta de mes del exportador (month_folder_name): "2026-07 Julio". */
