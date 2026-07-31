@@ -248,10 +248,16 @@ def meeting_folder_name(meeting: Meeting) -> str:
 
     El orden dia-primero no rompe la ordenacion del explorador porque estas
     carpetas cuelgan de la del mes: todas comparten mes y anio, asi que ordenar
-    por texto ordena por dia. Se quito el id de la reunion, que solo servia
-    para desempatar y ya lo hace el segundo.
+    por texto ordena por dia.
+
+    El id se conserva y NO es redundante: el segundo hace improbable el choque,
+    el id lo hace imposible. Se quito en una version anterior con el argumento
+    de que "ya desempata el segundo" — era falso, y el resultado fue que dos
+    reuniones del mismo segundo compartian carpeta y la segunda escribia su
+    transcripcion.md encima de la primera. Lo cubre
+    test_export_meeting_same_day_does_not_overwrite.
     """
-    return f"{meeting.started_at:%d-%m-%Y_%Hh%Mm_%S}"
+    return f"{meeting.started_at:%d-%m-%Y_%Hh%Mm_%S}_{meeting.id:04d}"
 
 
 _MARKER = ".helpmeet"

@@ -140,7 +140,7 @@ def test_export_meeting_writes_contexto_and_dated_file(session, tmp_path):
     dated = [p for p in out_dir.rglob("*.md") if p.name != "contexto.md"]
     assert len(dated) == 1
     assert dated[0].name == "transcripcion.md"
-    assert dated[0].parent.name.startswith(f"{m.started_at:%Y-%m-%d_%H-%M-%S}")
+    assert dated[0].parent.name.startswith(f"{m.started_at:%d-%m-%Y_%Hh%Mm_%S}")
 
 
 def test_export_meeting_same_day_does_not_overwrite(session, tmp_path):
@@ -188,7 +188,7 @@ def test_export_initiative_writes_one_md_per_meeting(session, tmp_path):
     per_meeting = [p for p in out_dir.rglob("*.md") if p.name != "contexto.md"]
     assert len(per_meeting) == 2
     # cada carpeta lleva la fecha y la hora de su reunión
-    expected1 = f"{m1.started_at:%Y-%m-%d_%H-%M-%S}"
+    expected1 = f"{m1.started_at:%d-%m-%Y_%Hh%Mm_%S}"
     assert any(p.parent.name.startswith(expected1) for p in per_meeting)
     # y contiene SOLO el texto de su reunión
     kickoff = next(p for p in per_meeting if p.parent.name.startswith(expected1)

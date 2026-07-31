@@ -2126,7 +2126,8 @@ function _slugCarpeta(m) {
   const p = (n) => String(n).padStart(2, '0');
   if (isNaN(d)) return 'sin-fecha';
   return `${p(d.getDate())}-${p(d.getMonth() + 1)}-${d.getFullYear()}_` +
-    `${p(d.getHours())}h${p(d.getMinutes())}m_${p(d.getSeconds())}`;
+    `${p(d.getHours())}h${p(d.getMinutes())}m_${p(d.getSeconds())}_` +
+    String(m.id == null ? 0 : m.id).padStart(4, '0');
 }
 
 /* Carpeta de mes del exportador (month_folder_name): "2026-07 Julio". */
