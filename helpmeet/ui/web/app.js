@@ -2161,13 +2161,43 @@ function _rotuloSemana(iso) {
   return `${ini.getDate()} \u2013 ${fin.getDate()} ${MESES_CORTOS[fin.getMonth()]}`;
 }
 
+/* Busca la carpeta de usuario `fid` sin depender de que el llamador pase el
+   proyecto correcto.
+
+   El box de la fila dec\u00eda la carpeta de mes incluso para reuniones que S\u00cd
+   estaban archivadas en una carpeta: la b\u00fasqueda usaba `_getFolders(it.id)`, y
+   el `it` que recibe meetingRow no siempre trae el mismo id con el que se
+   guardaron las carpetas (en Inicio, Favoritos y "Todas mis notas" ni siquiera
+   llega). Cuando la lista sal\u00eda vac\u00eda, la reuni\u00f3n "no ten\u00eda carpeta" y ca\u00eda al
+   mes \u2014 sin fallar en voz alta, que es lo que lo hizo dif\u00edcil de ver: el panel
+   de Reuniones s\u00ed agrupaba bien, porque ese usa STATE.selInit.
+
+   Ahora se prueban tres or\u00edgenes en orden y gana el primero que la encuentre:
+   el proyecto que vino por par\u00e1metro, el que la propia reuni\u00f3n declara, y el
+   proyecto donde STATE dice que vive. */
+function _carpetaDe(m, it, fid) {
+  const candidatos = [];
+  if (it && it.id != null) candidatos.push(it.id);
+  if (m.initiative_id != null) candidatos.push(m.initiative_id);
+  for (const k in (STATE.meetingsByInit || {})) {
+    if ((STATE.meetingsByInit[k] || []).some(x => x.id === m.id)) { candidatos.push(k); break; }
+  }
+  for (const iid of candidatos) {
+    // Number() en los dos lados: un id guardado como texto por una versi\u00f3n
+    // anterior no debe hacer fallar la comparaci\u00f3n en silencio.
+    const f = (_getFolders(iid) || []).find(x => Number(x.id) === Number(fid));
+    if (f) return f;
+  }
+  return null;
+}
+
 /* Subcarpeta donde la reuni\u00f3n est\u00e1 guardada, para el box del subt\u00edtulo de la
    fila. Prioridad: la carpeta del usuario si est\u00e1 archivada en una; si no, la
    carpeta de mes del exportador. Las dos contestan "\u00bfd\u00f3nde est\u00e1?" \u2014 una dentro
    de la app, la otra en disco. */
 function _ubicacionReunion(m, it) {
   const fid = _getMeetingFolder(m.id);
-  const carpeta = (it && fid != null) ? (_getFolders(it.id) || []).find(f => f.id === fid) : null;
+  const carpeta = fid == null ? null : _carpetaDe(m, it, fid);
   if (carpeta) return { nombre: carpeta.name, titulo: `Carpeta: ${carpeta.name}` };
   const mes = _slugMes(m.started_at);
   const raiz = it ? _slugProyecto(it.name) + '/' : '';
