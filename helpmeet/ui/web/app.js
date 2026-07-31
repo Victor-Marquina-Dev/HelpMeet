@@ -683,12 +683,15 @@ function waveMarkup(n = 7, cls = '') {
 function renderTopStatus() {
   const root = $('#topbarStatus');
   const s = STATE.appState;
-  if (s === 'recording' || s === 'recording-local' || s === 'recording-cloud') {
-    // Icono de origen: micrófono = solo audio
-    root.innerHTML = `<div class="status-rec"><span class="rdot"></span><span class="rec-kind">${svg('mic', 12)}</span>Grabando reunión · <span class="mono">${fmt(STATE.recElapsed)}</span>${waveMarkup()}</div>`;
-  } else if (s === 'screen-recording') {
-    // Icono de origen: pantalla
-    root.innerHTML = `<div class="status-rec"><span class="rdot"></span><span class="rec-kind">${svg('monitorDot', 12)}</span>REC pantalla · <span class="mono">${fmt(STATE.recElapsed)}</span>${waveMarkup()}</div>`;
+  /* Grabando (audio o pantalla): la barra de título va VACÍA.
+     Tenía una pastilla roja con punto, cronómetro y waveform, y decía
+     exactamente lo mismo que el panel flotante que está abajo en ese momento:
+     que se está grabando, desde cuándo y que entra audio. Dos relojes corriendo
+     en la misma pantalla no dan más información, solo obligan a decidir cuál
+     mirar. El panel es el que manda porque además tiene los controles. */
+  if (s === 'recording' || s === 'recording-local' || s === 'recording-cloud'
+      || s === 'screen-recording') {
+    root.innerHTML = '';
   } else if (s === 'processing') {
     const progressText = STATE.jobDeterminate ? Math.round(STATE.jobProgress) + '%' : processingElapsed();
     root.innerHTML = `<div class="status-proc"><span class="spinner"></span>${esc(STATE.jobStage)} · ${progressText}</div>`;
@@ -698,9 +701,8 @@ function renderTopStatus() {
        proyecto está resaltado en el panel lateral y el título de la reunión es
        lo más grande de la pantalla. Repetirlo arriba no añadía nada y llenaba
        una barra que el rediseño deja despejada.
-       El hueco sigue usándose cuando SÍ hay algo que no se ve en otro sitio: el
-       estado de la grabación en curso y el del trabajo en segundo plano — las
-       tres ramas de arriba. */
+       El hueco solo se usa para lo que no se ve en ningún otro sitio: el
+       trabajo en segundo plano. La grabación tiene su propio panel. */
     root.innerHTML = '';
   }
   updateMicChip();
