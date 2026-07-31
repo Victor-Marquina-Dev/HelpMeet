@@ -18,7 +18,7 @@ $exe = Join-Path $Dist "Helpmeet\Helpmeet.exe"
 if (Test-Path -LiteralPath $exe) { $candidates += Get-Item -LiteralPath $exe }
 
 if ($candidates.Count -eq 0) {
-    throw "No hay artefactos en dist\. Genera el build (build_windows.ps1) o el instalador (build_installer.ps1) primero."
+    throw "No hay artefactos en dist\. Genera el build (build_release.ps1) o build_dev.ps1 primero."
 }
 
 $lines = foreach ($file in $candidates) {

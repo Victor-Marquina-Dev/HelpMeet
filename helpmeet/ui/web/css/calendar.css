@@ -1,0 +1,135 @@
+/* ============================================================
+   Helpmeet — CALENDARIO
+   Portado desde 01-projects/helpmeet/03-diseno/mockup.html — FASE 5.
+   ============================================================ */
+
+.cal-head .page-title { margin: 0 0 16px; }
+.cal-bar { display: flex; align-items: center; gap: 8px; margin: 0 0 14px; flex-wrap: wrap; }
+
+/* Conmutador de dos posiciones, no dos botones sueltos: el riel hundido con la
+   pastilla elevada encima dice "una de estas dos", que es justo lo que dos
+   píldoras separadas no dicen. */
+.cal-modes {
+  display: flex; gap: 2px; padding: 2px; border-radius: var(--r-pill);
+  background: var(--bg-hover); border: 1px solid var(--border-subtle);
+}
+.cal-mode {
+  padding: 4px 13px; border-radius: var(--r-pill); border: none; background: none;
+  font-family: inherit; font-size: 11px; color: var(--text-muted); cursor: pointer;
+  transition: background .12s, color .12s;
+}
+.cal-mode:hover { color: var(--text-primary); }
+.cal-mode.is-on { background: var(--bg-app); color: var(--text-primary); box-shadow: 0 1px 2px rgba(0,0,0,.08); }
+body[data-theme="dark"] .cal-mode.is-on { background: var(--bg-elevated); box-shadow: 0 1px 2px rgba(0,0,0,.25); }
+
+.cal-nav { display: flex; align-items: center; gap: 4px; margin-left: auto; }
+.cal-month { min-width: 118px; text-align: center; font-size: 14px; font-weight: 500; color: var(--text-primary); text-transform: capitalize; }
+.cal-today-btn {
+  padding: 5px 11px; border-radius: var(--r-pill); border: 1px solid var(--border-strong);
+  background: none; color: var(--text-secondary); font-family: inherit; font-size: 11px;
+  margin-left: 6px; cursor: pointer;
+  transition: background .12s, color .12s, border-color .12s;
+}
+.cal-today-btn:hover { background: var(--bg-hover); color: var(--text-primary); border-color: var(--text-muted); }
+
+.cal-dows { display: grid; grid-template-columns: repeat(7, 1fr); gap: 1px; margin-bottom: 7px; }
+/* display/padding/border explícitos: el .cal-dow del diseño anterior era una
+   celda de tabla con `display:flex; justify-content:flex-start; padding:8px 10px;
+   border-bottom`. Esta regla gana en color y tamaño, pero no redeclaraba
+   `display`, así que el flex sobrevivía — y dentro de un contenedor flex el
+   `text-align:center` no centra nada. Las iniciales de los días salían pegadas
+   a la izquierda de su columna y con una línea debajo que el mockup no tiene. */
+.cal-dow {
+  display: block; padding: 0; border-bottom: none;
+  font-size: 11px; text-transform: uppercase; letter-spacing: .07em;
+  color: var(--text-muted); text-align: center;
+}
+
+/* gap:1px sobre un fondo del color del borde dibuja la rejilla: líneas de 1px
+   de verdad, sin bordes que se doblan a dos píxeles entre celda y celda. */
+.cal-grid {
+  display: grid; grid-template-columns: repeat(7, 1fr); gap: 1px;
+  background: var(--border-subtle); border: 1px solid var(--border-subtle);
+  border-radius: 10px; overflow: hidden;
+}
+.cal-cell { background: var(--bg-app); min-height: 116px; padding: 6px 6px 8px; display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.cal-cell.is-out { background: var(--bg-hover); }
+.cal-cell.is-out .cal-num, .cal-cell.is-future .cal-num { opacity: .4; }
+.cal-num {
+  width: 21px; height: 21px; flex-shrink: 0; display: grid; place-items: center;
+  font-size: 11px; font-family: var(--font-mono); color: var(--text-secondary);
+}
+/* Hoy en círculo relleno: código universal de los calendarios, y reusa el rojo
+   que ya significa "ahora" en el punto de grabación. */
+.cal-cell.is-today .cal-num { background: var(--recording); color: #fff; border-radius: 50%; font-weight: 600; }
+.cal-evs { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.cal-ev {
+  display: flex; align-items: center; gap: 5px; width: 100%; min-width: 0;
+  padding: 2px 4px; border-radius: 5px; border: none; background: none;
+  font-family: inherit; font-size: 11px; text-align: left; cursor: pointer;
+  transition: background .12s;
+}
+.cal-ev:hover { background: var(--bg-hover); }
+.cal-ev-dot { width: 6px; height: 6px; border-radius: 2px; flex-shrink: 0; }
+/* Hora en 24 h solo dentro de la rejilla: el sufijo "a. m./p. m." cuesta seis
+   caracteres por evento en una celda que ya va justa, y sin él "5:20" no se
+   distingue de las cinco de la mañana. */
+.cal-ev-time { font-family: var(--font-mono); color: var(--text-muted); flex-shrink: 0; }
+.cal-ev-title { color: var(--text-secondary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.cal-ev:hover .cal-ev-title { color: var(--text-primary); }
+.cal-more { font-size: 11px; color: var(--text-muted); padding: 1px 5px; text-align: left; border: none; background: none; cursor: pointer; font-family: inherit; }
+.cal-more:hover { color: var(--text-primary); }
+
+/* Obligatorio: el display:grid de estas reglas tiene la misma especificidad que
+   el [hidden]{display:none} del navegador y, al ir después, lo gana — sin esto
+   el mes y la semana se dibujan uno debajo del otro. */
+.cal-grid[hidden], .cal-week[hidden], .cal-dows[hidden] { display: none; }
+
+/* Semana: siete columnas altas con la lista del día, no una rejilla con eje
+   horario. Estas reuniones duran de 1 a 45 minutos; sobre doce horas de eje, la
+   mitad serían bloques de dos píxeles. Lo que sí aporta el modo semana es
+   espacio para leer el título entero y la duración. */
+.cal-week {
+  display: grid; grid-template-columns: repeat(7, 1fr); gap: 1px;
+  background: var(--border-subtle); border: 1px solid var(--border-subtle);
+  border-radius: 10px; overflow: hidden;
+}
+.cal-wday { background: var(--bg-app); min-height: 380px; padding: 8px 8px 12px; display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.cal-wday.is-future .cal-num, .cal-wday.is-future .cal-wday-dow { opacity: .4; }
+.cal-wday-head { display: flex; align-items: center; gap: 6px; }
+.cal-wday-dow { font-size: 11px; text-transform: uppercase; letter-spacing: .07em; color: var(--text-muted); }
+.cal-wday-evs { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.cal-wev {
+  display: flex; flex-direction: column; align-items: flex-start; gap: 3px; width: 100%; min-width: 0;
+  padding: 7px 8px; border-radius: 8px; background: var(--bg-hover); border: none;
+  font-family: inherit; text-align: left; cursor: pointer; transition: background .12s;
+}
+.cal-wev:hover { background: var(--bg-elevated); }
+.cal-wev-top { display: flex; align-items: center; gap: 6px; width: 100%; min-width: 0; }
+.cal-wev-dur { font-size: 11px; color: var(--text-muted); margin-left: auto; flex-shrink: 0; }
+/* Dos líneas como máximo: con tres, un título largo empuja a las siguientes
+   fuera de la columna. */
+.cal-wev-title {
+  font-size: 11px; color: var(--text-secondary); line-height: 1.4;
+  display: -webkit-box; -webkit-line-clamp: 2; line-clamp: 2;
+  -webkit-box-orient: vertical; overflow: hidden;
+}
+.cal-wev:hover .cal-wev-title { color: var(--text-primary); }
+.cal-empty-month { margin: 14px 0 0; font-size: 12px; color: var(--text-muted); text-align: center; }
+
+/* ---- Flechas de navegacion del calendario, sin recuadro ----
+   En el mockup son chevrones desnudos; heredaban borde y fondo de reglas de
+   .icon-btn/.btn del diseno anterior y quedaban como botones cuadrados. */
+.cal-nav .icon-btn {
+  border: none; background: none; width: 26px; height: 26px;
+  color: var(--text-muted);
+}
+.cal-nav .icon-btn:hover { background: var(--bg-hover); color: var(--text-primary); }
+.cal-month { font-weight: 600; }
+/* El conmutador Mes/Semana necesita contraste real entre el riel hundido y la
+   pastilla elevada: con --bg-app sobre --bg-hover en oscuro los dos tonos casi
+   coincidian y no se notaba cual estaba activo. */
+.cal-modes { background: var(--bg-input); }
+.cal-mode.is-on { background: var(--bg-app); color: var(--text-primary); font-weight: 600; }
+body[data-theme="dark"] .cal-modes { background: #141414; }
+body[data-theme="dark"] .cal-mode.is-on { background: #2e2e2e; }

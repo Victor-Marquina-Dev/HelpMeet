@@ -9,23 +9,36 @@ import uuid
 import wave
 from datetime import datetime
 from pathlib import Path
+from typing import TypedDict
 
 from helpmeet import config
+from helpmeet.db.models import Meeting
 
 
 MANIFEST = "recovery.json"
 
 
+class SessionManifest(TypedDict, total=False):
+    version: int
+    id: str
+    kind: str
+    meeting_id: int
+    initiative_id: int
+    title: str
+    started_at: str
+    state: str
+
+
 def recovery_dir() -> Path:
-    """Se calcula al usarlo para respetar DATA_DIR configurado en ejecución."""
+    """Se calcula al usarlo para respetar DATA_DIR configurado en ejecucion."""
     return config.DATA_DIR / "recovery"
 
 
-def create_session(kind: str, meeting, **extra) -> Path:
-    """Crea una carpeta única y escribe el manifiesto antes de capturar datos."""
+def create_session(kind: str, meeting: Meeting, **extra: str) -> Path:
+    """Crea una carpeta unica y escribe el manifiesto antes de capturar datos."""
     work_dir = recovery_dir() / uuid.uuid4().hex
     work_dir.mkdir(parents=True, exist_ok=False)
-    data = {
+    data: SessionManifest = {
         "version": 1,
         "id": work_dir.name,
         "kind": kind,
@@ -73,7 +86,11 @@ def get_session(recovery_id: str) -> dict | None:
 
 
 def list_sessions() -> list[dict]:
-    """Devuelve solo sesiones con material real que todavía se puede recuperar."""
+    """Devuelve solo sesiones con material real que todavia se puede recuperar.
+
+    No calcula la duración exacta de cada WAV (costoso con muchas sesiones
+    huerfanas). Usa el elapsed time del manifiesto como estimacion inicial.
+    La duracion real se calcula bajo demanda al seleccionar una sesion."""
     root = recovery_dir()
     if not root.exists():
         return []
@@ -86,19 +103,19 @@ def list_sessions() -> list[dict]:
         except (OSError, ValueError, json.JSONDecodeError):
             continue
         tracks = []
-        durations = []
+        has_valid_audio = False
         for label, filename in (("mic", "me.wav"), ("system", "others.wav")):
             path = work_dir / filename
             if path.exists() and path.stat().st_size > 44:
                 repair_wav(path)
                 tracks.append(label)
-                durations.append(wav_seconds(path))
+                has_valid_audio = True
         video = work_dir / "video_temp.mp4"
         if video.exists() and video.stat().st_size > 0:
             tracks.append("video")
         if not tracks:
             continue
-        seconds = max(durations, default=_elapsed_seconds(data.get("started_at")))
+        seconds = _elapsed_seconds(data.get("started_at"))
         started = _parse_datetime(data.get("started_at"))
         result.append({
             **data,
@@ -107,6 +124,7 @@ def list_sessions() -> list[dict]:
             "duration_seconds": round(seconds, 1),
             "tracks": tracks,
             "has_video": "video" in tracks,
+            "has_audio": has_valid_audio,
         })
     result.sort(key=lambda item: item.get("started_at", ""), reverse=True)
     return result

@@ -7,6 +7,12 @@ import av
 from helpmeet import config
 from helpmeet.audio.capture import DualAudioRecorder
 from helpmeet.audio.mixing import mix_wavs
+from helpmeet.screenshot.capture import make_thread_dpi_aware
+from helpmeet.session.vosk_live_transcriber import VoskLiveTranscriber
+
+# Cota de seguridad del buffer en memoria que vacía VoskLiveTranscriber
+# (ver MeetingRecorder.PREVIEW_WINDOW_SECONDS: mismo criterio).
+PREVIEW_WINDOW_SECONDS = 10.0
 
 MIC_WAV = "me.wav"        # pista del micrófono (la que escribe DualAudioRecorder)
 SYS_WAV = "others.wav"    # pista del audio del sistema
@@ -49,8 +55,19 @@ class ScreenVideoRecorder:
     """
 
     def __init__(self, dest_path, monitor, fps=None, on_status=None, on_preview=None,
-                 work_dir=None, profile=None):
+                 work_dir=None, profile=None, meeting_id=None,
+                 language="", on_transcript_utterance=None, on_transcript_partial=None):
         self.dest_path = Path(dest_path)
+        # Transcripción en vivo (opcional): si se pasa meeting_id, se
+        # transcribe con Vosk mientras se graba (ver VoskLiveTranscriber).
+        # `on_preview` de este constructor es la miniatura de pantalla (JPEG)
+        # — NO tiene relación con esto.
+        self._meeting_id = meeting_id
+        self._language = language
+        self._on_transcript_utterance = on_transcript_utterance
+        self._on_transcript_partial = on_transcript_partial
+        self._progressive = None
+        self.transcript_produced = False
         self.monitor = dict(monitor)  # monitor actual (puede cambiarse en caliente)
         # Perfil de calidad (P-12): fija fps, CRF y resolución máxima de salida.
         prof = config.video_profile(profile) if profile else None
@@ -104,7 +121,8 @@ class ScreenVideoRecorder:
     def start(self):
         self._tmp_dir.mkdir(parents=True, exist_ok=True)
         self._running = True
-        self._audio = DualAudioRecorder(self._tmp_dir)
+        preview_seconds = PREVIEW_WINDOW_SECONDS if self._meeting_id else None
+        self._audio = DualAudioRecorder(self._tmp_dir, preview_seconds=preview_seconds)
         self._audio.set_mic_muted(self._mic_muted)
         self._audio.start()
         self._thread = threading.Thread(target=self._record_video, daemon=True)
@@ -112,6 +130,13 @@ class ScreenVideoRecorder:
         if self.on_preview:
             self._preview_thread = threading.Thread(target=self._preview_loop, daemon=True)
             self._preview_thread.start()
+        if self._meeting_id:
+            self._progressive = VoskLiveTranscriber(
+                self._audio.preview_buffers, self._meeting_id,
+                language=self._language, on_utterance=self._on_transcript_utterance,
+                on_partial=self._on_transcript_partial,
+            )
+            self._progressive.start()
 
     def set_mic_muted(self, muted: bool) -> None:
         """Silencia/activa el micrófono durante la grabación."""
@@ -135,8 +160,7 @@ class ScreenVideoRecorder:
         self._monitor_changed.set()
 
     def set_transform(self, x, y, w, h) -> None:
-        """Coloca la pantalla LIBRE dentro del lienzo (estilo OBS): posición (x, y)
-        y tamaño (w, h), todo normalizado 0..1 respecto al lienzo de salida."""
+        """Coloca la pantalla como fuente dentro del lienzo de salida estilo OBS."""
         with self._monitor_lock:
             self._transform = (float(x), float(y), float(w), float(h))
             self._scale_mode = "transform"
@@ -157,8 +181,8 @@ class ScreenVideoRecorder:
         graph = av.filter.Graph()
         source = graph.add_buffer(template=template)
         if mode == "transform" and self._transform:
-            # Escala la fuente al tamaño elegido y la pega en su posición sobre
-            # un lienzo negro (el resto queda en negro), como una fuente en OBS.
+            # La fuente completa se escala y se pega sobre un lienzo negro.
+            # Así una fuente pequeña queda pequeña en el video final, como en OBS.
             tw, th, tx, ty = self._transform_pixels()
             scale = graph.add("scale", f"{tw}:{th}")
             framing = graph.add("pad", f"{self._out_w}:{self._out_h}:{tx}:{ty}:black")
@@ -191,6 +215,9 @@ class ScreenVideoRecorder:
                 ("others", self._tmp_dir / SYS_WAV)]
 
     def _record_video(self):
+        # Píxeles físicos en este hilo: gdigrab usa GDI y en monitores con
+        # escala de Windows grabaría recortado (igual que la vista previa).
+        make_thread_dpi_aware()
         # MP4 fragmentado: escribe cabeceras reproducibles desde el inicio. Así
         # el archivo temporal sigue siendo recuperable aunque el proceso no
         # alcance `out.close()` por un apagado o cierre forzado.
@@ -313,6 +340,15 @@ class ScreenVideoRecorder:
             self._thread.join(timeout=30)
         if self._preview_thread:
             self._preview_thread.join(timeout=5)
+        self.transcript_produced = False
+        if self._progressive:
+            # `stop()` de ScreenVideoRecorder YA corre en un hilo de fondo
+            # (`_save_screen_video_bg`), así que procesar aquí el último
+            # tramo (unos segundos) no bloquea la UI.
+            self._progressive.stop_loop()
+            self._progressive.flush_tail()
+            self.transcript_produced = self._progressive.produced_any
+            self._progressive.close()
         if self._audio:
             self._audio.stop()
 

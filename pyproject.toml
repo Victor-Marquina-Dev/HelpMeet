@@ -1,0 +1,34 @@
+[tool.pytest.ini_options]
+minversion = "8.0"
+testpaths = ["tests"]
+python_files = "test_*.py"
+python_classes = "Test*"
+python_functions = "test_*"
+addopts = [
+    "-v",
+    "--tb=short",
+    "--strict-markers",
+    "--cov=helpmeet",
+    "--cov-report=term-missing",
+    "--cov-report=html:coverage_html",
+    "--cov-report=xml:coverage.xml",
+    "--cov-fail-under=0",
+]
+markers = [
+    "slow: tests that take more than 30 seconds",
+    "integration: tests that require full app environment",
+    "e2e: end-to-end tests (app startup, recording, export)",
+    "performance: tests that measure resource usage or throughput",
+]
+
+[tool.coverage.run]
+source = ["helpmeet"]
+omit = [
+    "helpmeet/ui/web/*",
+    "helpmeet/main.py",
+]
+
+[tool.coverage.report]
+show_missing = true
+skip_covered = false
+skip_empty = true

@@ -20,12 +20,6 @@ DB_PATH = DATA_DIR / "helpmeet.sqlite"
 # Cadena de conexión (SQLite; cambiar a PostgreSQL aquí en el futuro)
 DATABASE_URL = f"sqlite:///{DB_PATH}"
 
-# Transcripción
-WHISPER_MODEL = "small"      # "base" (más rápido) | "small" (equilibrado) | "medium" (más preciso pero lento)
-WHISPER_DEVICE = "cpu"
-WHISPER_COMPUTE_TYPE = "int8"
-WHISPER_LANGUAGE = "es"
-
 # Cada cuántos segundos se procesa un trozo de audio (modo local en vivo)
 CHUNK_SECONDS = 6
 
@@ -34,12 +28,6 @@ CHUNK_SECONDS = 6
 #            terminar (alta calidad, 1 cobro por reunión, sin texto en vivo).
 #   False -> Local: modelo en tu PC, texto en vivo por trozos (gratis, privado).
 USE_REPLICATE = True
-
-# "Pista" de vocabulario para reconocer mejor términos técnicos.
-# Desactivada (None) por defecto: con audio variado/silencios se "colaba" como
-# texto transcrito. Actívala SOLO para reuniones técnicas reales poniendo aquí
-# una frase con tus términos (ej. "Reunión de programación: endpoint, deploy, token").
-WHISPER_INITIAL_PROMPT = None
 
 # Atajo global para captura de pantalla
 SCREENSHOT_HOTKEY = "<ctrl>+<shift>+s"

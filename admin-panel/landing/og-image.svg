@@ -1,0 +1,88 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630" fill="none">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1200" y2="630" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#0a0f0c"/>
+      <stop offset="1" stop-color="#0d140f"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(340 250) rotate(90) scale(420)">
+      <stop stop-color="#34C78A" stop-opacity="0.16"/>
+      <stop offset="1" stop-color="#34C78A" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="greenGrad" x1="0" y1="0" x2="0" y2="1">
+      <stop stop-color="#6FE3B5"/>
+      <stop offset="1" stop-color="#34C78A"/>
+    </linearGradient>
+    <linearGradient id="wave" x1="640" y1="0" x2="1120" y2="0" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#34C78A" stop-opacity="0.25"/>
+      <stop offset="0.5" stop-color="#6FE3B5"/>
+      <stop offset="1" stop-color="#34C78A" stop-opacity="0.25"/>
+    </linearGradient>
+    <filter id="soft" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="8"/>
+    </filter>
+  </defs>
+
+  <!-- Background -->
+  <rect width="1200" height="630" fill="url(#bg)"/>
+  <rect width="1200" height="630" fill="url(#glow)"/>
+
+  <!-- Framed card -->
+  <rect x="64" y="64" width="1072" height="502" rx="28" fill="#111814" stroke="rgba(111,227,181,.14)" stroke-width="1.5"/>
+
+  <!-- Top-left brand row -->
+  <g transform="translate(112 118)">
+    <rect x="0" y="0" width="56" height="56" rx="14" fill="#151e19" stroke="rgba(111,227,181,.18)" stroke-width="1.5"/>
+    <text x="28" y="38" text-anchor="middle" font-family="Syne, sans-serif" font-size="28" font-weight="800" fill="url(#greenGrad)">H</text>
+    <text x="74" y="37" font-family="Syne, sans-serif" font-size="26" font-weight="700" letter-spacing="-0.3" fill="#eaf3ee">HelpMeet</text>
+  </g>
+
+  <!-- Section label -->
+  <g transform="translate(112 232)">
+    <rect x="0" y="0" width="20" height="2" rx="1" fill="#34C78A"/>
+    <text x="34" y="6" font-family="'JetBrains Mono', monospace" font-size="13" font-weight="500" letter-spacing="3" fill="#34C78A">GRABACIÓN LOCAL DE REUNIONES</text>
+  </g>
+
+  <!-- Headline -->
+  <text x="110" y="320" font-family="Syne, sans-serif" font-size="72" font-weight="800" letter-spacing="-2" fill="#eaf3ee">Graba, transcribe</text>
+  <text x="110" y="398" font-family="Syne, sans-serif" font-size="72" font-weight="800" letter-spacing="-2" fill="#eaf3ee">y entiende tus <tspan fill="#34C78A">reuniones</tspan></text>
+
+  <!-- Subhead -->
+  <text x="112" y="448" font-family="'DM Sans', sans-serif" font-size="22" font-weight="300" fill="#b6c8bd">Todo procesado en tu equipo. Sin nube, sin suscripciones.</text>
+
+  <!-- Feature pills -->
+  <g font-family="'DM Sans', sans-serif" font-size="15" font-weight="500" fill="#6FE3B5">
+    <rect x="112" y="480" width="150" height="38" rx="19" fill="rgba(52,199,138,.10)" stroke="rgba(111,227,181,.22)" stroke-width="1"/>
+    <circle cx="136" cy="499" r="4" fill="#34C78A"/>
+    <text x="150" y="504">100% local</text>
+
+    <rect x="278" y="480" width="130" height="38" rx="19" fill="rgba(52,199,138,.10)" stroke="rgba(111,227,181,.22)" stroke-width="1"/>
+    <circle cx="302" cy="499" r="4" fill="#34C78A"/>
+    <text x="316" y="504">Sin nube</text>
+
+    <rect x="424" y="480" width="150" height="38" rx="19" fill="rgba(52,199,138,.10)" stroke="rgba(111,227,181,.22)" stroke-width="1"/>
+    <circle cx="448" cy="499" r="4" fill="#34C78A"/>
+    <text x="462" y="504">Pago único</text>
+  </g>
+
+  <!-- Right side: audio waveform motif -->
+  <g transform="translate(0 300)">
+    <circle cx="920" cy="0" r="180" fill="url(#glow)" opacity="0.6"/>
+    <circle cx="920" cy="0" r="160" fill="none" stroke="rgba(111,227,181,.10)" stroke-width="1.5"/>
+    <circle cx="920" cy="0" r="120" fill="none" stroke="rgba(111,227,181,.14)" stroke-width="1.5"/>
+    <g stroke="url(#wave)" stroke-width="7" stroke-linecap="round">
+      <line x1="800" y1="-26" x2="800" y2="26"/>
+      <line x1="826" y1="-52" x2="826" y2="52"/>
+      <line x1="852" y1="-84" x2="852" y2="84"/>
+      <line x1="878" y1="-40" x2="878" y2="40"/>
+      <line x1="904" y1="-96" x2="904" y2="96"/>
+      <line x1="930" y1="-64" x2="930" y2="64"/>
+      <line x1="956" y1="-108" x2="956" y2="108"/>
+      <line x1="982" y1="-48" x2="982" y2="48"/>
+      <line x1="1008" y1="-76" x2="1008" y2="76"/>
+      <line x1="1034" y1="-36" x2="1034" y2="36"/>
+    </g>
+  </g>
+
+  <!-- Bottom-right URL -->
+  <text x="1088" y="524" text-anchor="end" font-family="'JetBrains Mono', monospace" font-size="16" fill="#7a9486">helpmeet.mimotech.vip</text>
+</svg>

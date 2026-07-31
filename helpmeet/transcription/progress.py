@@ -7,17 +7,8 @@ proporcional al trabajo que queda y se mueve de forma continua.
 """
 from __future__ import annotations
 
-import wave
 from pathlib import Path
-
-
-def wav_seconds(path) -> float:
-    """Duración en segundos de un WAV (0 si no se puede leer)."""
-    try:
-        with wave.open(str(path), "rb") as wf:
-            return wf.getnframes() / (wf.getframerate() or 1)
-    except Exception:
-        return 0.0
+from helpmeet.utils import wav_seconds
 
 
 class WeightedProgress:

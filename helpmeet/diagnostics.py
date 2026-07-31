@@ -37,42 +37,17 @@ def disk_space(path) -> dict:
                 "label": f"No se pudo leer el disco ({exc})"}
 
 
-def whisper_model_status(model_name: str) -> dict:
-    """Comprueba si el modelo Whisper local ya está descargado (caché de Hugging
-    Face). Si no, la primera transcripción tendrá que descargarlo."""
-    repo = f"Systran/faster-whisper-{model_name}"
+def vosk_model_status(model_name: str) -> dict:
+    """Comprueba si el modelo Vosk local ya está descargado (carpeta propia
+    de Helpmeet: DATA_DIR/models/vosk/{model_name}, marcador am/final.mdl)."""
     try:
-        try:
-            from huggingface_hub import constants
-            cache = Path(constants.HF_HUB_CACHE)
-        except Exception:
-            cache = Path.home() / ".cache" / "huggingface" / "hub"
-        folder = cache / ("models--" + repo.replace("/", "--"))
-        snapshots = list(folder.glob("snapshots/*/")) if folder.exists() else []
-        if snapshots:
-            # Existe la carpeta: comprobamos que model.bin esté completo (no a medias
-            # por una descarga interrumpida), porque si no la transcripción fallará.
-            complete = False
-            for snap in snapshots:
-                model_bin = snap / "model.bin"
-                try:
-                    # En Windows/HuggingFace puede ser enlace al blob real. `resolve`
-                    # evita marcar como 0 KB un enlace válido; si está roto, cae a warn.
-                    real_file = model_bin.resolve(strict=True)
-                    if real_file.is_file() and real_file.stat().st_size > 1024:
-                        complete = True
-                        break
-                except OSError:
-                    continue
-            if complete:
-                return {"status": "ok", "model": model_name, "downloaded": True,
-                        "label": f"Modelo «{model_name}» descargado"}
-            return {"status": "warn", "model": model_name, "downloaded": False,
-                    "label": f"Modelo «{model_name}» quedó incompleto; se volverá a "
-                             "descargar en la próxima transcripción"}
+        from helpmeet.transcription.vosk_engine import model_is_downloaded
+        if model_is_downloaded(model_name):
+            return {"status": "ok", "model": model_name, "downloaded": True,
+                    "label": f"Modelo «{model_name}» descargado"}
         return {"status": "warn", "model": model_name, "downloaded": False,
                 "label": f"Modelo «{model_name}» se descargará en la 1.ª transcripción"}
-    except Exception as exc:  # noqa: BLE001 - el diagnóstico nunca debe romper
+    except Exception as exc:  # noqa: BLE001
         return {"status": "warn", "model": model_name, "downloaded": False,
                 "label": f"No se pudo comprobar el modelo ({exc})"}
 
@@ -209,7 +184,7 @@ def recording_preflight(kind: str, data_dir, export_dir, model_name: str,
             {"key": "loopback", "title": "Audio del sistema", "required": False,
              **audio["loopback"]},
             {"key": "model", "title": "Transcripción", "required": False,
-             **whisper_model_status(model_name)},
+             **vosk_model_status(model_name)},
         ]
         title = "Grabar reunión"
         action = "Continuar"
@@ -227,7 +202,7 @@ def run_diagnostics(data_dir, export_dir, model_name: str) -> dict:
     return {
         "webview2": webview2_status(),
         "disk": disk_space(data_dir),
-        "whisper": whisper_model_status(model_name),
+        "vosk": vosk_model_status(model_name),
         "mic": audio["mic"],
         "loopback": audio["loopback"],
         "export_dir": {"status": "ok", "path": str(export_dir),

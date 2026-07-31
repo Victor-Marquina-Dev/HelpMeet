@@ -1,0 +1,98 @@
+/* ============================================================
+   CONFIGURACIÓN — piel del mockup sobre los ajustes reales
+
+   Aquí NO se reescribió la pantalla, se revistió. El mockup trae 11 ajustes de
+   fachada; la app tiene esos y varios más que el mockup no contempla
+   (instrucciones para la IA, carpeta de exportación, licencia, actualizaciones,
+   borrar datos). Reemplazar el markup habría sido un retroceso, así que las
+   clases que ya existen (.sv-card, .sv-sec-title, .sv-row, .sv-lbl) se mapean
+   a la forma de .cfg-group / .cfg-group-label / .cfg-row del mockup.
+   ============================================================ */
+
+/* Una columna centrada, como el resto de las pantallas del rediseño: el ancho
+   de 1100px en dos columnas venía del diseño anterior y rompía la lectura
+   contra Inicio, Reunión o Documentos. */
+.sv-page { max-width: var(--content-max) !important; margin: 0 auto; }
+.sv-cards { display: flex; flex-direction: column; gap: 0; }
+.sv-col { display: contents; }
+
+.sv-card, .sv-section {
+  border: 1px solid var(--border-subtle); border-radius: 12px;
+  margin-bottom: 22px; overflow: hidden; background: none; padding: 0;
+  box-shadow: none;
+}
+.sv-sec-title {
+  display: flex; align-items: center; gap: 8px;
+  font-size: 11px; text-transform: uppercase; letter-spacing: .07em;
+  color: var(--text-muted); padding: 14px 18px 8px; font-weight: 500;
+  border: none; background: none;
+}
+.sv-sec-title svg { width: 14px; height: 14px; opacity: .8; }
+
+/* Fila de ajuste: etiqueta a la izquierda, control a la derecha, separadas por
+   una línea que NO aparece en la primera — el borde del grupo ya la da. */
+.sv-row, .toggle-row, .sv-row-end {
+  display: flex; align-items: center; justify-content: space-between; gap: 16px;
+  padding: 12px 18px; border-top: 1px solid var(--border-subtle); margin: 0;
+}
+.sv-card > .sv-row:first-of-type,
+.sv-card > .toggle-row:first-of-type { border-top: none; }
+.sv-row-end { justify-content: flex-end; gap: 8px; }
+.sv-lbl { font-size: 13px; color: var(--text-primary); flex: 1; min-width: 0; }
+.sv-sub { font-size: 11px; color: var(--text-muted); display: block; margin-top: 2px; }
+
+/* Chips de opción (idioma, modelo, tema, calidad de vídeo): píldoras con borde,
+   la activa con relleno de superficie elevada y negrita — el mismo tratamiento
+   que .navitem.active y .tab-btn.active, en vez de invertir a negro sólido,
+   que en una pantalla de ajustes grita más de lo que corresponde. */
+.cfg-chips { display: flex; flex-wrap: wrap; gap: 6px; flex-shrink: 0; }
+.cfg-chips button, .sv-chip {
+  padding: 4px 12px; border-radius: var(--r-pill);
+  border: 1px solid var(--border-strong); background: none;
+  color: var(--text-secondary); font-family: inherit; font-size: 12px; cursor: pointer;
+  transition: background .12s, color .12s, border-color .12s;
+}
+.cfg-chips button:hover, .sv-chip:hover { background: var(--bg-hover); color: var(--text-primary); }
+.cfg-chips button.on, .cfg-chips button.active, .sv-chip.on, .sv-chip.active {
+  background: var(--bg-elevated); color: var(--text-primary); font-weight: 600;
+}
+
+/* Conmutador: relleno invertido al encender, igual que el resto de los estados
+   "activo" del rediseño. */
+.toggle-row input[type="checkbox"] { position: absolute; opacity: 0; width: 1px; height: 1px; pointer-events: none; }
+.toggle-ui {
+  width: 36px; height: 20px; border-radius: 999px; flex-shrink: 0;
+  background: var(--bg-hover); border: 1px solid var(--border-strong);
+  position: relative; transition: background .15s, border-color .15s;
+}
+.toggle-ui i, .toggle-ui::after {
+  content: ""; position: absolute; top: 1px; left: 1px; width: 16px; height: 16px;
+  border-radius: 50%; background: var(--text-secondary); transition: transform .15s, background .15s;
+}
+.toggle-ui i { display: none; }
+.toggle-row input:checked + .toggle-ui { background: var(--text-primary); border-color: var(--text-primary); }
+.toggle-row input:checked + .toggle-ui::after { transform: translateX(16px); background: var(--bg-app); }
+
+/* Campo de texto de las instrucciones para la IA. */
+#svAiInstr {
+  width: calc(100% - 36px); margin: 0 18px 14px; min-height: 120px; resize: vertical;
+  background: var(--bg-input); color: var(--text-primary);
+  border: 1px solid var(--border-strong); border-radius: 8px; padding: 10px 12px;
+  font-family: inherit; font-size: 12px; line-height: 1.55; outline: none;
+}
+#svAiInstr:focus { border-color: var(--text-muted); }
+
+/* Ruta de exportación y demás valores monoespaciados. */
+.sv-path, #svDir { font-family: var(--font-mono); font-size: 11px; color: var(--text-muted); }
+
+/* Acciones destructivas: solo el rojo de "borrar todo" se sale del gris. */
+.sv-act--danger, #svWipe { color: var(--danger); border-color: color-mix(in srgb, var(--danger) 40%, transparent); }
+.sv-act--danger:hover, #svWipe:hover { background: color-mix(in srgb, var(--danger) 12%, transparent); color: var(--danger); }
+
+.privacy-badge {
+  display: inline-flex; align-items: center; gap: 5px; margin-left: auto;
+  font-size: 10px; text-transform: none; letter-spacing: 0;
+  padding: 2px 8px; border-radius: var(--r-pill);
+  border: 1px solid var(--border-subtle); color: var(--text-muted);
+}
+.privacy-badge i { width: 6px; height: 6px; border-radius: 50%; background: var(--signal); }

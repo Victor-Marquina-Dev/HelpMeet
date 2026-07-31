@@ -1,4 +1,4 @@
-# build_release.ps1 — Pipeline completo de build para Helpmeet.
+# build_release.ps1 - Pipeline completo de build para Helpmeet.
 # Uso: .\scripts\build_release.ps1 [-Version "1.2.7"] [-Sign]
 #
 # Sin -Sign: build sin firma (para pruebas locales).
@@ -24,7 +24,7 @@ function Fail($msg)  { Write-Host "  FAIL $msg" -ForegroundColor Red; $script:ok
 function Warn($msg)  { Write-Host "  WARN $msg" -ForegroundColor Yellow }
 function Skip($msg)  { Write-Host "  SKIP $msg" -ForegroundColor DarkGray }
 
-# Detectar versión
+# Detectar version
 if (-not $Version) {
     $vf = "$root\helpmeet\version.py"
     if (Test-Path $vf) {
@@ -36,13 +36,13 @@ if (-not $Version) { $Version = "0.0.0" }
 Write-Host "Version: $Version" -ForegroundColor White
 
 # ------------------------------------------------------------------
-# 1. Ejecutar validación completa
+# 1. Ejecutar validacion completa
 # ------------------------------------------------------------------
 Step "Validacion (tests + sintaxis)"
 try {
     & "$root\scripts\check_all.ps1"
     if ($LASTEXITCODE -eq 0) { Pass "Validacion OK" }
-    else { Fail "Validacion fallida — corrige errores antes de compilar" }
+    else { Fail "Validacion fallida - corrige errores antes de compilar" }
 } catch { Fail "Error ejecutando check_all.ps1: $_" }
 
 if (-not $ok) {
@@ -75,14 +75,21 @@ Step "Limpiando build anterior"
 # ------------------------------------------------------------------
 Step "Compilando con PyInstaller"
 Push-Location $root
+$pyiExitCode = -1
 try {
+    $ErrorActionPreference = "Continue"
     & ".\.venv\Scripts\python.exe" -m PyInstaller Helpmeet.spec --noconfirm
-    if ($LASTEXITCODE -eq 0) { Pass "PyInstaller OK — dist\Helpmeet\Helpmeet.exe generado" }
-    else { Fail "PyInstaller falló" }
-} catch { Fail "Error en PyInstaller: $_" }
-finally { Pop-Location }
+    $pyiExitCode = $LASTEXITCODE
+} catch {
+    Warn "Excepcion en PyInstaller: $_"
+} finally {
+    $ErrorActionPreference = "Stop"
+    Pop-Location
+}
+if ($pyiExitCode -eq 0) { Pass "PyInstaller OK - dist\Helpmeet\Helpmeet.exe generado" }
+else { Fail "PyInstaller fallo (exit $pyiExitCode)" }
 
-if (-not $ok) { Write-Host "`nBuild cancelado: PyInstaller falló." -ForegroundColor Red; exit 1 }
+if (-not $ok) { Write-Host "`nBuild cancelado: PyInstaller fallo." -ForegroundColor Red; exit 1 }
 
 # ------------------------------------------------------------------
 # 5. Firmar Helpmeet.exe (solo con -Sign)
@@ -91,30 +98,33 @@ Step "Firma digital del ejecutable"
 $exePath = "$root\dist\Helpmeet\Helpmeet.exe"
 if ($Sign) {
     try {
-        signtool sign /fd SHA256 /tr http://timestamp.acs.microsoft.com /td SHA256 /a $exePath
-        signtool verify /pa /v $exePath
+        $signArgs = @("sign", "/fd", "SHA256", "/tr", "http://timestamp.acs.microsoft.com", "/td", "SHA256", "/a", $exePath)
+        & signtool @signArgs
+        & signtool verify /pa /v $exePath
         Pass "Helpmeet.exe firmado y verificado"
     } catch { Fail "Error al firmar Helpmeet.exe: $_" }
 } else {
     Skip "Firma omitida (usa -Sign para firmar)"
-    Warn "El ejecutable no está firmado. Windows mostrará 'Editor desconocido'."
+    Warn "El ejecutable no esta firmado. Windows mostrara Editor desconocido."
 }
 
 # ------------------------------------------------------------------
 # 6. Crear instalador con Inno Setup
 # ------------------------------------------------------------------
 Step "Creando instalador con Inno Setup"
-$iscc = (Get-Command iscc -ErrorAction SilentlyContinue)?.Source
+$isccCmd = Get-Command iscc -ErrorAction SilentlyContinue
+$iscc = if ($isccCmd) { $isccCmd.Source } else { $null }
 if (-not $iscc) { $iscc = $env:ISCC_PATH }
+if (-not $iscc) { $iscc = "C:\Program Files (x86)\Inno Setup 6\iscc.exe" }
 
 if ($iscc -and (Test-Path $iscc)) {
     try {
         & $iscc /DMyAppVersion=$Version "$root\installer\Helpmeet.iss"
         if ($LASTEXITCODE -eq 0) { Pass "Instalador creado: dist\installer\Helpmeet-Setup-$Version.exe" }
-        else { Fail "Inno Setup falló" }
+        else { Fail "Inno Setup fallo" }
     } catch { Fail "Error en Inno Setup: $_" }
 } else {
-    Warn "Inno Setup no encontrado. Instala iscc.exe y añádelo al PATH (o define ISCC_PATH)."
+    Warn "Inno Setup no encontrado. Instala iscc.exe y agrega al PATH (o define ISCC_PATH)."
     Warn "Descarga: https://jrsoftware.org/isdl.php"
     Skip "Instalador no generado"
 }
@@ -126,12 +136,13 @@ Step "Firma digital del instalador"
 $installerPath = "$root\dist\installer\Helpmeet-Setup-$Version.exe"
 if ($Sign -and (Test-Path $installerPath)) {
     try {
-        signtool sign /fd SHA256 /tr http://timestamp.acs.microsoft.com /td SHA256 /a $installerPath
-        signtool verify /pa /v $installerPath
+        $signArgs2 = @("sign", "/fd", "SHA256", "/tr", "http://timestamp.acs.microsoft.com", "/td", "SHA256", "/a", $installerPath)
+        & signtool @signArgs2
+        & signtool verify /pa /v $installerPath
         Pass "Instalador firmado y verificado"
     } catch { Fail "Error al firmar instalador: $_" }
 } elseif ($Sign) {
-    Warn "Instalador no encontrado — omitiendo firma"
+    Warn "Instalador no encontrado - omitiendo firma"
 } else {
     Skip "Firma omitida (usa -Sign para firmar)"
 }
@@ -146,13 +157,14 @@ if (Test-Path $installerPath) {
         Pass "SHA256SUMS.txt generado"
     } catch { Warn "No se pudo generar SHA-256: $_" }
 } else {
-    Skip "Instalador no disponible — SHA-256 omitido"
+    Skip "Instalador no disponible - SHA-256 omitido"
 }
 
 # ------------------------------------------------------------------
 # Resultado
 # ------------------------------------------------------------------
-Write-Host "`n" + ("=" * 60)
+Write-Host ""
+Write-Host ("=" * 60)
 if ($ok) {
     Write-Host "BUILD COMPLETADO: $Version" -ForegroundColor Green
     Write-Host "  Ejecutable:  dist\Helpmeet\Helpmeet.exe"

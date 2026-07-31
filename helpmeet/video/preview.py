@@ -16,6 +16,8 @@ import av
 import numpy as np
 import mss
 
+from helpmeet.screenshot.capture import make_thread_dpi_aware
+
 PREVIEW_WIDTH = 1280   # resolución alta para preview nítido
 
 
@@ -46,6 +48,9 @@ class ScreenPreview:
 
     def _loop(self) -> None:
         interval = 1.0 / self.fps
+        # Píxeles físicos en este hilo: sin esto, un monitor con escala de
+        # Windows (150%, 160%…) se muestra recortado en la vista previa.
+        make_thread_dpi_aware()
         try:
             with mss.mss() as sct:
                 while self._running:

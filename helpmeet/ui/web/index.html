@@ -4,77 +4,196 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Helpmeet</title>
-  <link rel="icon" type="image/svg+xml" href="assets/helpmeet-app-icon.svg?v=20260625-78">
-  <link rel="alternate icon" type="image/x-icon" href="assets/helpmeet.ico?v=20260625-78">
-  <link rel="stylesheet" href="style.css?v=20260629-03">
+  <link rel="icon" type="image/png" href="assets/helpmeet-favicon.png?v=20260722" id="faviconPng">
+  <link rel="alternate icon" type="image/x-icon" href="assets/helpmeet.ico?v=20260722" id="faviconIco">
+  <link rel="stylesheet" href="css/tokens.css?v=20260801x">
+  <link rel="stylesheet" href="css/layout.css?v=20260801x">
+  <link rel="stylesheet" href="css/components.css?v=20260801x">
+  <link rel="stylesheet" href="style.css?v=20260801x">
+  <link rel="stylesheet" href="css/shell.css?v=20260801x">
+  <link rel="stylesheet" href="css/content.css?v=20260801x">
+  <link rel="stylesheet" href="css/meeting.css?v=20260801x">
+  <link rel="stylesheet" href="css/calendar.css?v=20260801x">
+  <link rel="stylesheet" href="css/recording.css?v=20260801x">
+  <link rel="stylesheet" href="css/settings.css?v=20260801x">
+  <script src="js/i18n.js?v=20260725b"></script>
 </head>
 <body data-app-state="idle" data-screen="welcome">
 
-  <!-- Rail rojo persistente durante grabación/captura de pantalla -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <symbol id="i-home" viewBox="0 0 20 20"><path d="M3 9.5 10 3l7 6.5M5 8.5V17h10V8.5"/></symbol>
+    <symbol id="i-trash" viewBox="0 0 20 20"><path d="M4 6h12M8 6V4.5A1.5 1.5 0 0 1 9.5 3h1A1.5 1.5 0 0 1 12 4.5V6M6 6l.6 10a1.5 1.5 0 0 0 1.5 1.4h3.8a1.5 1.5 0 0 0 1.5-1.4L14 6"/></symbol>
+    <symbol id="i-settings" viewBox="0 0 20 20"><path d="M10 2.3 16.2 6v8L10 17.7 3.8 14V6z"/><circle cx="10" cy="10" r="2.7"/></symbol>
+    <symbol id="i-search" viewBox="0 0 20 20"><circle cx="9" cy="9" r="5.5"/><path d="M17 17l-3.8-3.8"/></symbol>
+    <symbol id="i-panel" viewBox="0 0 20 20"><rect x="3" y="4" width="14" height="12" rx="2"/><path d="M8 4v12"/></symbol>
+    <symbol id="i-chevleft" viewBox="0 0 20 20"><path d="M12 4.5 6.5 10l5.5 5.5"/></symbol>
+    <symbol id="i-star" viewBox="0 0 20 20"><path d="M10 3.3l2 4 4.4.6-3.2 3 .8 4.4L10 13.2l-4 2.1.8-4.4-3.2-3 4.4-.6 2-4z"/></symbol>
+    <symbol id="i-monitor" viewBox="0 0 20 20"><rect x="2.6" y="4" width="14.8" height="9.6" rx="1.6"/><path d="M7.4 16.6h5.2M10 13.6v3"/></symbol>
+    <symbol id="i-mic" viewBox="0 0 20 20"><rect x="7.5" y="3" width="5" height="9" rx="2.5"/><path d="M5 10a5 5 0 0 0 10 0M10 15v2.5M7.5 17.5h5"/></symbol>
+    <symbol id="i-mic-off" viewBox="0 0 20 20"><rect x="7.5" y="3" width="5" height="9" rx="2.5"/><path d="M5 10a5 5 0 0 0 10 0M10 15v2.5M7.5 17.5h5"/><path d="M3.5 3.5l13 13"/></symbol>
+    <symbol id="i-video" viewBox="0 0 20 20"><rect x="2.5" y="4.5" width="15" height="11" rx="2"/><path d="M8.3 8v4l3.6-2z" fill="currentColor" stroke="none"/></symbol>
+    <symbol id="i-scan" viewBox="0 0 20 20"><path d="M3 7V4.5A1.5 1.5 0 0 1 4.5 3H7M13 3h2.5A1.5 1.5 0 0 1 17 4.5V7M17 13v2.5a1.5 1.5 0 0 1-1.5 1.5H13M7 17H4.5A1.5 1.5 0 0 1 3 15.5V13"/></symbol>
+    <symbol id="i-pause" viewBox="0 0 20 20"><rect x="5.5" y="4" width="3" height="12" rx="1"/><rect x="11.5" y="4" width="3" height="12" rx="1"/></symbol>
+    <symbol id="i-play" viewBox="0 0 20 20"><path d="M6 4.5l10 5.5L6 15.5z" fill="currentColor" stroke="none"/></symbol>
+    <symbol id="i-square" viewBox="0 0 20 20"><rect x="5" y="5" width="10" height="10" rx="2"/></symbol>
+    <symbol id="i-image" viewBox="0 0 20 20"><rect x="3" y="4.5" width="14" height="11" rx="2"/><circle cx="7.3" cy="8.5" r="1.2"/><path d="M4 14l4-3.5 3 2.5 2-2L17 14"/></symbol>
+    <symbol id="i-pin" viewBox="0 0 20 20"><path d="M10 3l3 3-3.2 3.2L9 13l-2-2 3.8-3.8L8 4.2 10 3z"/><path d="M8.6 11.4 4 16"/></symbol>
+    <symbol id="i-download" viewBox="0 0 20 20"><path d="M10 3v9M6.5 9 10 12.5 13.5 9M4 15h12"/></symbol>
+    <symbol id="i-copy" viewBox="0 0 20 20"><rect x="7" y="7" width="9" height="9" rx="1.6"/><path d="M13 7V5.5A1.5 1.5 0 0 0 11.5 4H5.5A1.5 1.5 0 0 0 4 5.5v6A1.5 1.5 0 0 0 5.5 13H7"/></symbol>
+    <symbol id="i-check-square" viewBox="0 0 20 20"><rect x="3.5" y="3.5" width="13" height="13" rx="2.5"/><path d="M6.8 10.3l2.1 2.1 4.3-4.7"/></symbol>
+    <symbol id="i-check" viewBox="0 0 20 20"><path d="M6.8 10.3l2.1 2.1 4.3-4.7"/></symbol>
+    <symbol id="i-activity" viewBox="0 0 20 20"><path d="M3 10h3l1.5-5L11 15l1.5-5H17"/></symbol>
+    <symbol id="i-help" viewBox="0 0 20 20"><circle cx="10" cy="10" r="7"/><path d="M7.8 8a2.2 2.2 0 1 1 3.1 2c-.8.5-1 .9-1 1.7"/><circle cx="10" cy="14" r=".2"/></symbol>
+    <symbol id="i-sun" viewBox="0 0 20 20"><circle cx="10" cy="10" r="3.2"/><path d="M10 2.5v2M10 15.5v2M2.5 10h2M15.5 10h2M4.6 4.6l1.4 1.4M14 14l1.4 1.4M15.4 4.6 14 6M6 14l-1.4 1.4"/></symbol>
+    <symbol id="i-moon" viewBox="0 0 20 20"><path d="M15.5 12.4A6.5 6.5 0 1 1 7.6 4.5a5.2 5.2 0 0 0 7.9 7.9z"/></symbol>
+    <symbol id="i-plus" viewBox="0 0 20 20"><path d="M10 4v12M4 10h12"/></symbol>
+    <symbol id="i-doc" viewBox="0 0 20 20"><path d="M6 3h5l3 3v11H6z"/><path d="M11 3v3h3"/><path d="M8 11h4M8 13.5h4"/></symbol>
+    <!-- El .md se distingue del original por la "M" en la hoja: en la carpeta del
+         documento conviven los dos archivos y el nombre solo cambia en 2 letras. -->
+    <symbol id="i-md" viewBox="0 0 20 20"><path d="M6 3h5l3 3v11H6z"/><path d="M11 3v3h3"/><path d="M8 13.6v-3.2l1.2 1.6 1.2-1.6v3.2"/></symbol>
+    <symbol id="i-eye" viewBox="0 0 20 20"><path d="M2 10s3.1-5 8-5 8 5 8 5-3.1 5-8 5-8-5-8-5z"/><circle cx="10" cy="10" r="2.3"/></symbol>
+    <symbol id="i-external" viewBox="0 0 20 20"><path d="M15.4 11.4v3.1A1.7 1.7 0 0 1 13.7 16.2H5.5A1.7 1.7 0 0 1 3.8 14.5V6.3A1.7 1.7 0 0 1 5.5 4.6h3.1"/><path d="M12.3 3.8h3.9v3.9M16.2 3.8l-6.6 6.6"/></symbol>
+    <symbol id="i-minus" viewBox="0 0 20 20"><path d="M4.5 10h11"/></symbol>
+    <symbol id="i-maximize" viewBox="0 0 20 20"><rect x="4.5" y="4.5" width="11" height="11" rx="1.2"/></symbol>
+    <symbol id="i-close" viewBox="0 0 20 20"><path d="M5 5l10 10M15 5 5 15"/></symbol>
+    <symbol id="i-pages" viewBox="0 0 48 48">
+      <rect x="17" y="6" width="22" height="28" rx="3" opacity=".45"/>
+      <path d="M12 10h18l6 6v22a3 3 0 0 1-3 3H12a3 3 0 0 1-3-3V13a3 3 0 0 1 3-3z"/>
+      <path d="M30 10v6h6"/>
+      <path d="M13 23h18M13 28h18M13 33h11"/>
+    </symbol>
+    <symbol id="i-lock" viewBox="0 0 20 20"><path d="M6.2 9V6.6a3.8 3.8 0 0 1 7.6 0V9"/><rect x="4.5" y="9" width="11" height="8" rx="2"/></symbol>
+    <symbol id="i-audiowave" viewBox="0 0 20 20"><path d="M3.4 9v2"/><path d="M6.8 6.6v6.8"/><path d="M10 4.2v11.6"/><path d="M13.2 6.6v6.8"/><path d="M16.6 9v2"/></symbol>
+    <symbol id="i-expand-up" viewBox="0 0 20 20"><path d="m5.5 10.6 4.5-4.3 4.5 4.3"/><path d="m5.5 14.4 4.5-4.3 4.5 4.3"/></symbol>
+    <symbol id="i-clock" viewBox="0 0 20 20"><circle cx="10" cy="10" r="6.8"/><path d="M10 6.3V10l2.6 1.6"/></symbol>
+    <symbol id="i-crop" viewBox="0 0 20 20"><path d="M5.6 2.6v11.8h11.8"/><path d="M2.6 5.6h11.8v11.8"/></symbol>
+    <symbol id="i-notebook" viewBox="0 0 20 20"><path d="M6.2 3.2h8.2a1.4 1.4 0 0 1 1.4 1.4v10.8a1.4 1.4 0 0 1-1.4 1.4H6.2"/><path d="M6.2 3.2A1.6 1.6 0 0 0 4.6 4.8v10.4a1.6 1.6 0 0 0 1.6 1.6"/><path d="M8.4 7.4h4.6M8.4 10.4h4.6"/></symbol>
+    <symbol id="i-mynotes" viewBox="0 0 20 20"><path d="M15.6 8.4V5.1a1.5 1.5 0 0 0-1.5-1.5H5.9A1.5 1.5 0 0 0 4.4 5.1v9.8a1.5 1.5 0 0 0 1.5 1.5h3.2"/><circle cx="14.2" cy="12.4" r="1.9"/><path d="M11.3 17.1a3 3 0 0 1 5.8 0"/><path d="M7.2 7.1h5.6M7.2 10.1h3"/></symbol>
+    <symbol id="i-chevup" viewBox="0 0 20 20"><path d="m5.5 12.2 4.5-4.4 4.5 4.4"/></symbol>
+    <symbol id="i-chevright" viewBox="0 0 20 20"><path d="M8 4.5 13.5 10 8 15.5"/></symbol>
+    <symbol id="i-users" viewBox="0 0 20 20"><circle cx="7.6" cy="7.2" r="2.7"/><path d="M3 16.4c0-2.5 2.1-4.2 4.6-4.2s4.6 1.7 4.6 4.2"/><path d="M13.4 5.1a2.6 2.6 0 0 1 0 4.9"/><path d="M14.6 12.5c1.5.5 2.6 1.8 2.6 3.6"/></symbol>
+    <symbol id="i-upload" viewBox="0 0 20 20"><path d="M10 13.2V4.4"/><path d="m6.6 7.6 3.4-3.2 3.4 3.2"/><path d="M4 12.8v2.2a1.6 1.6 0 0 0 1.6 1.6h8.8a1.6 1.6 0 0 0 1.6-1.6v-2.2"/></symbol>
+    <symbol id="i-edit" viewBox="0 0 20 20"><path d="M13.4 3.9a1.7 1.7 0 0 1 2.4 2.4L7.3 14.8l-3.2.8.8-3.2z"/></symbol>
+    <symbol id="i-archive" viewBox="0 0 20 20"><rect x="3.2" y="4.2" width="13.6" height="3.4" rx="1"/><path d="M4.6 7.6v7.2a1.4 1.4 0 0 0 1.4 1.4h8a1.4 1.4 0 0 0 1.4-1.4V7.6"/><path d="M8.3 10.6h3.4"/></symbol>
+    <symbol id="i-calendar" viewBox="0 0 20 20"><rect x="3.5" y="4.5" width="13" height="12" rx="2"/><path d="M3.5 8.3h13M7 3v3M13 3v3"/></symbol>
+    <symbol id="i-more" viewBox="0 0 20 20"><circle cx="4.5" cy="10" r="1.3" fill="currentColor" stroke="none"/><circle cx="10" cy="10" r="1.3" fill="currentColor" stroke="none"/><circle cx="15.5" cy="10" r="1.3" fill="currentColor" stroke="none"/></symbol>
+    <symbol id="i-pencil" viewBox="0 0 20 20"><path d="M13.3 3.5 16.5 6.7 7 16.2H3.8V13z"/><path d="M11.8 5 15 8.2"/></symbol>
+    <symbol id="i-arrow-right" viewBox="0 0 20 20"><path d="M4 10h12M11 5.5 16 10l-5 4.5"/></symbol>
+    <symbol id="i-folder" viewBox="0 0 20 20"><path d="M3 6.2A1.7 1.7 0 0 1 4.7 4.5h3.1l1.7 2H15a1.7 1.7 0 0 1 1.7 1.7v6.1A1.7 1.7 0 0 1 15 16H4.7A1.7 1.7 0 0 1 3 14.3z"/></symbol>
+    <symbol id="i-filter" viewBox="0 0 20 20"><path d="M3.4 4.6h13.2l-5.1 5.9v4.6l-3 1.7v-6.3z"/></symbol>
+    <symbol id="i-layers" viewBox="0 0 20 20"><rect x="6.5" y="3.5" width="10" height="10" rx="2"/><rect x="3.5" y="6.5" width="10" height="10" rx="2"/></symbol>
+    <!-- Nota nueva: la hoja con lineas MAS el signo de sumar. i-notebook solo
+         decia "notas" (el objeto); el boton es "anadir una nota" (la accion). -->
+    <symbol id="i-note-plus" viewBox="0 0 20 20"><rect x="2.8" y="4" width="9.6" height="12" rx="1.8"/><path d="M5.5 8h4.2M5.5 11h3"/><path d="M15.6 4.6v4.2M13.5 6.7h4.2"/></symbol>
+    <!-- Capturar pantalla: las cuatro esquinas de encuadre, que es el glifo
+         universal de "capturar esta region". i-image mostraba una fotografia,
+         que es el RESULTADO, no la accion. -->
+    <symbol id="i-screenshot" viewBox="0 0 20 20"><path d="M3.4 7.6V5.2A1.8 1.8 0 0 1 5.2 3.4h2.4"/><path d="M12.4 3.4h2.4a1.8 1.8 0 0 1 1.8 1.8v2.4"/><path d="M16.6 12.4v2.4a1.8 1.8 0 0 1-1.8 1.8h-2.4"/><path d="M7.6 16.6H5.2a1.8 1.8 0 0 1-1.8-1.8v-2.4"/><circle cx="10" cy="10" r="2.2"/></symbol>
+  </defs>
+</svg>
+
+  <!-- Rail rojo persistente durante grabacion/captura de pantalla -->
   <div class="rec-rail" id="recRail" aria-hidden="true"></div>
 
-  <!-- ============ BARRA SUPERIOR GLOBAL ============ -->
-  <header class="topbar">
-    <div class="brand no-drag">
-      <span class="brand-mark" aria-hidden="true"><img src="assets/helpmeet-symbol.svg?v=20260625-78" alt=""></span>
-      <span class="brand-name">Helpmeet</span>
-      <span class="topbar-sep" aria-hidden="true"></span>
-      <span class="brand-version" id="headerVersion">v1.2.7</span>
-    </div>
+  <!-- ============ TITLEBAR ============
+       Reconstruida desde el mockup: minima, sin marca ni chip de version. A la
+       izquierda el plegado del panel; a la derecha buscar, tema y los controles
+       de ventana. #topbarStatus se conserva aunque el mockup no lo tenga: es
+       funcional (muestra el estado de la grabacion en curso). -->
+  <div class="titlebar">
+    <button class="icon-btn sidebar-collapse-btn no-drag" id="btnMenu" type="button"
+            data-i18n-attr="title:topbar.menu,aria-label:topbar.menu"
+            title="Mostrar u ocultar el panel" aria-label="Colapsar barra lateral">
+      <svg class="icon"><use href="#i-panel"/></svg>
+    </button>
 
-    <!-- Centro: contexto activo (iniciativa › reunión) en reposo · estado de grabación/proceso cuando hay actividad -->
     <div class="topbar-status" id="topbarStatus" aria-live="polite"></div>
 
-    <!-- Controles de ventana frameless -->
-    <div class="win-controls no-drag" id="winControls">
-      <button class="wc-btn wc-min" id="wcMin" title="Minimizar" aria-label="Minimizar"></button>
-      <button class="wc-btn wc-max" id="wcMax" title="Maximizar" aria-label="Maximizar"></button>
-      <button class="wc-btn wc-close" id="wcClose" title="Cerrar" aria-label="Cerrar"></button>
+    <div class="titlebar-right no-drag">
+      <button class="icon-btn titlebar-action" id="btnSearchTop" type="button" aria-label="Buscar" title="Buscar (Ctrl+K)">
+        <svg class="icon"><use href="#i-search"/></svg>
+      </button>
+      <button class="icon-btn titlebar-action" id="btnThemeToggle" type="button" aria-label="Cambiar tema" title="Cambiar tema">
+        <svg class="icon" id="themeIcon"><use href="#i-sun"/></svg>
+      </button>
+      <div class="wincontrols" id="winControls">
+        <button class="icon-btn" id="wcMin" type="button" data-i18n-attr="title:topbar.minimize,aria-label:topbar.minimize" title="Minimizar" aria-label="Minimizar"><svg class="icon"><use href="#i-minus"/></svg></button>
+        <button class="icon-btn" id="wcMax" type="button" data-i18n-attr="title:topbar.maximize,aria-label:topbar.maximize" title="Maximizar" aria-label="Maximizar"><svg class="icon"><use href="#i-maximize"/></svg></button>
+        <button class="icon-btn close" id="wcClose" type="button" data-i18n-attr="title:topbar.close,aria-label:topbar.close" title="Cerrar" aria-label="Cerrar"><svg class="icon"><use href="#i-close"/></svg></button>
+      </div>
     </div>
-  </header>
+  </div>
 
-  <!-- ============ CUERPO ============ -->
-  <div class="body no-drag">
-    <!-- Sidebar de iniciativas/reuniones -->
-    <aside class="sidebar" id="sidebar" aria-label="Iniciativas y reuniones">
-      <nav class="sidebar-nav" aria-label="Secciones">
-        <button class="nav-item" id="navMeetings"><span class="ico ico-meetings"></span>Reuniones</button>
-        <button class="nav-item" id="navFavorites"><span class="ico ico-star"></span>Favoritas</button>
-        <div class="nav-item active" id="navInitiatives">
-          <button class="nav-toggle" id="navInitiativesToggle" aria-expanded="true" aria-controls="sidebarTree">
-            <span class="ico ico-rocket"></span>
-            <span class="nav-label">Iniciativas</span>
-            <span class="nav-chev" aria-hidden="true"></span>
+  <!-- ============ SHELL ============
+       Un solo elemento para el panel lateral: al colapsar cambia de ancho
+       (.shell.collapsed) en vez de alternar entre dos <aside> distintos, que es
+       lo que hacia el diseno anterior con .sidebar + .sidebar-rail. -->
+  <div class="shell no-drag" id="shell">
+
+    <aside class="sidebar" id="sidebar" aria-label="Proyectos y navegacion">
+      <nav class="nav" aria-label="Accesos directos">
+        <button class="navitem" id="navHome" data-nav="inicio" type="button" data-i18n-attr="title:sidebar.home" title="Inicio">
+          <svg class="icon"><use href="#i-home"/></svg><span class="label-text" data-i18n="sidebar.home">Inicio</span>
+        </button>
+        <button class="navitem" id="navFavorites" data-nav="favoritos" type="button" data-i18n-attr="title:sidebar.favorites" title="Favoritos">
+          <svg class="icon"><use href="#i-star"/></svg><span class="label-text" data-i18n="sidebar.favorites">Favoritos</span><span class="nav-count" id="favCount"></span>
+        </button>
+        <button class="navitem" id="navMeetings" data-nav="calendario" type="button" data-i18n-attr="title:sidebar.calendar" title="Calendario">
+          <svg class="icon"><use href="#i-calendar"/></svg><span class="label-text" data-i18n="sidebar.calendar">Calendario</span>
+        </button>
+        <button class="navitem" id="navDocs" data-nav="documentos" type="button" data-i18n-attr="title:sidebar.documents" title="Documentos">
+          <svg class="icon"><use href="#i-doc"/></svg><span class="label-text" data-i18n="sidebar.documents">Documentos</span>
+        </button>
+      </nav>
+
+      <!-- "Mis notas": tres objetivos con destinos distintos — el icono pliega
+           la lista, el texto lleva a las reuniones de todos los proyectos y la
+           flecha a la tabla de gestion. -->
+      <div class="projlist" id="navInitiatives">
+        <div class="projitem space-root">
+          <button class="space-fold-btn" id="btnFoldProjects" type="button" aria-expanded="true" aria-label="Plegar o desplegar proyectos">
+            <svg class="icon"><use href="#i-mynotes"/></svg>
           </button>
-          <button class="icon-btn sm" id="btnNewInitiative" aria-label="Nueva iniciativa" title="Nueva iniciativa (Ctrl+N)"></button>
+          <button class="space-toggle-btn" id="btnMyNotes" data-nav="misnotas" type="button" title="Ver las reuniones de todos los proyectos">
+            <span class="label-text">Mis notas</span>
+          </button>
+          <button class="icon-btn space-add-btn" id="btnNewInitiative" type="button" data-i18n-attr="title:sidebar.newProjectTitle" title="Nuevo proyecto (Ctrl+N)" aria-label="Nuevo proyecto">
+            <svg class="icon"><use href="#i-plus"/></svg>
+          </button>
+          <button class="icon-btn space-manage-btn" id="btnManageSpaces" data-nav="gestionar-espacios" type="button" title="Gestionar espacios" aria-label="Gestionar espacios">
+            <svg class="icon icon-sm"><use href="#i-arrow-right"/></svg>
+          </button>
         </div>
-      </nav>
-      <nav class="sidebar-tree" id="sidebarTree" aria-label="Lista de iniciativas">
-        <!-- inyectado por app.js -->
-      </nav>
-      <div class="sidebar-foot">
-        <button class="side-link" id="btnTrash"><span class="ico ico-trash"></span>Papelera<span class="count" id="trashCount">0</span></button>
-        <button class="side-link" id="btnSettingsSide"><span class="ico ico-settings"></span>Configuración</button>
+        <!-- El plegado va en .projlist-fold y el contenido en .projlist-nested:
+             son dos elementos porque la animación usa grid-template-rows 0fr→1fr,
+             que necesita un único hijo con overflow:hidden. app.js sigue
+             inyectando las filas de proyecto en #sidebarTree. -->
+        <div class="projlist-fold" id="sidebarFold">
+          <div class="projlist-nested" id="sidebarTree"></div>
+        </div>
+      </div>
+
+      <div class="sidebar-spacer"></div>
+
+      <div class="sidebar-footer">
+        <!-- Archivados salio del pie para que el riel colapsado quede con dos
+             iconos, como el mockup. No se pierde: la pantalla de Papelera lleva
+             un conmutador Papelera/Archivados, asi que la vista sigue siendo
+             alcanzable — que era el motivo por el que estaba aqui. -->
+        <button class="navitem" id="btnTrash" type="button" title="Papelera">
+          <svg class="icon"><use href="#i-trash"/></svg><span class="label-text">Papelera</span><span class="nav-count" id="trashCount"></span>
+        </button>
+        <button class="navitem" id="btnSettingsSide" type="button" data-i18n-attr="title:sidebar.settings" title="Configuracion">
+          <svg class="icon"><use href="#i-settings"/></svg><span class="label-text" data-i18n="sidebar.settings">Configuracion</span>
+        </button>
       </div>
     </aside>
 
-    <!-- Handle para redimensionar el sidebar -->
-    <div class="sidebar-resize-handle no-drag" id="sidebarResizeHandle" title="Arrastrar para redimensionar"></div>
+    <div class="sidebar-resize-handle" id="sidebarResizeHandle" title="Arrastrar para redimensionar"></div>
 
-    <!-- Rail colapsado -->
-    <aside class="sidebar-rail" id="sidebarRail" aria-label="Panel colapsado" hidden>
-      <button class="rail-btn" id="railMeetings" aria-label="Reuniones" title="Reuniones"><span class="ico ico-meetings"></span></button>
-      <button class="rail-btn rail-btn--active" id="railInitiatives" aria-label="Iniciativas" title="Iniciativas"><span class="ico ico-rocket"></span></button>
-      <button class="rail-btn" id="btnNewInitiativeRail" aria-label="Nueva iniciativa" title="Nueva iniciativa (Ctrl+N)"></button>
-      <div class="rail-sep"></div>
-      <button class="rail-btn" id="railTrash" aria-label="Papelera" title="Papelera"><span class="ico ico-trash"></span></button>
-      <button class="rail-btn rail-btn--foot" id="railSettings" aria-label="Configuración" title="Configuración"><span class="ico ico-settings"></span></button>
-      <div class="rail-resize-handle no-drag" id="railResizeHandle" title="Arrastrar para expandir"></div>
-    </aside>
-
-    <!-- Área principal -->
     <main class="main" id="main" tabindex="-1">
-      <!-- inyectado por app.js: welcome | initiative | meeting | search | glossary | archive | trash -->
+      <!-- inyectado por app.js -->
     </main>
   </div>
 
@@ -116,7 +235,24 @@
   <div class="overlay" id="overlayRoot" hidden></div>
   <div class="toasts" id="toasts" aria-live="polite" aria-atomic="false"></div>
 
+  <!-- Buscador global (Ctrl+K). <dialog> nativo: el navegador aporta gratis el
+       cierre con Esc, el foco atrapado y el ::backdrop. Filtra proyectos y
+       reuniones al instante en local; Enter lanza la búsqueda dentro de las
+       transcripciones (api.search), que es lo que el mockup no podía hacer. -->
+  <dialog class="search-overlay" id="searchOverlay" aria-label="Buscar">
+    <div class="search-overlay-panel">
+      <div class="search-overlay-input-row">
+        <span class="so-ico" id="soIcon" aria-hidden="true"></span>
+        <input type="text" id="searchInput" autocomplete="off" spellcheck="false"
+               placeholder="Buscar proyectos, reuniones o texto transcrito"
+               aria-label="Buscar proyectos, reuniones o texto transcrito">
+        <span class="kbd">ESC</span>
+      </div>
+      <div class="search-overlay-results" id="searchOverlayResults"></div>
+    </div>
+  </dialog>
+
   <!-- Plantillas SVG de iconos. Inyectadas por app.js -->
-  <script src="app.js?v=20260629-13"></script>
+  <script src="app.js?v=20260801x"></script>
 </body>
 </html>

@@ -1,0 +1,416 @@
+/* ============================================================
+   Helpmeet — PANEL FLOTANTE DE GRABACIÓN
+   Portado desde 01-projects/helpmeet/03-diseno/mockup.html — FASE 7.
+
+   > Qué NO se portó, y por qué
+   > El mockup incluye Pausar/Reanudar. En la app **no existe**: api_recording.py
+   > solo expone silenciar el micrófono (toggle_meeting_mic_mute /
+   > toggle_screen_mic_mute) y detener (stop_recording / stop_screen_recording).
+   > Ponerlo aquí sería un botón que miente. Construirlo de verdad implica poder
+   > cortar y retomar la captura sin cerrar la sesión, y decidir qué pasa con las
+   > marcas de tiempo durante el hueco — es desarrollo, no rediseño.
+   ============================================================ */
+
+@keyframes recPanelIn {
+  from { opacity: 0; transform: translateX(-50%) translateY(22px) scale(.9); }
+  60%  { opacity: 1; }
+  to   { opacity: 1; transform: translateX(-50%) translateY(0) scale(1); }
+}
+
+.rec-panel {
+  position: fixed; left: 50%; transform: translateX(-50%); bottom: 20px; z-index: 30;
+  animation: recPanelIn 380ms var(--ease-reveal) both;
+  width: min(660px, calc(100% - 48px)); display: flex; flex-direction: column;
+  background: var(--bg-elevated); border: 1px solid var(--border-strong); border-radius: 14px;
+  box-shadow: 0 1px 2px rgba(0,0,0,.18), 0 18px 44px -12px rgba(0,0,0,.5);
+  overflow: hidden;
+  /* Solo el ancho se anima: animar la altura de un contenedor con contenido
+     variable obliga a un max-height inventado y deja el easing muerto en la
+     parte sobrante. */
+  transition: width 260ms var(--ease-reveal);
+}
+.rec-panel[hidden] { display: none; }
+
+/* Minimizado: el panel se reduce a su barra de controles. Se conserva lo que
+   sirve sin mirar (waveform, silenciar, detener) y se esconde lo que exige
+   lectura (burbujas, cronómetro, selectores). Sigue grabando igual: es una
+   reducción de presencia, no una interrupción — por eso el waveform, que es la
+   prueba de que la captura sigue viva, es justo lo que NO se oculta. */
+.rec-panel.is-minimized { width: auto; }
+.rec-panel.is-minimized .rec-panel-head,
+.rec-panel.is-minimized .rec-timer-center,
+.rec-panel.is-minimized .rec-stream,
+.rec-panel.is-minimized .rec-foot-right { display: none; }
+.rec-panel.is-minimized .rec-panel-foot { border-top: none; justify-content: flex-start; gap: 6px; padding: 7px 9px; }
+.rec-panel.is-minimized .hm-wave { margin-right: 2px; }
+.rec-expand-btn { display: none; }
+.rec-panel.is-minimized .rec-expand-btn { display: flex; }
+
+.rec-panel-head { display: flex; align-items: center; justify-content: space-between; padding: 8px 10px; }
+.rec-panel-head-right { display: flex; align-items: center; gap: 2px; }
+.rec-proj { display: inline-flex; align-items: center; gap: 6px; color: var(--text-muted); font-size: 12px; padding-left: 4px; }
+.rec-proj .icon { width: 14px; height: 14px; flex-shrink: 0; }
+
+.rec-timer-center { text-align: center; padding: 2px 0 10px; }
+/* 12,5px, el valor del mockup (--fs-sm). No es un numeral grande: el panel
+   entero es compacto y el cronometro es un dato mas, no el protagonista.
+   Estaba en 30-34px por una suposicion mia, y hacia que el panel se viera
+   mucho mas grande que la referencia. */
+.rec-timer { font-family: var(--font-mono); font-size: 12.5px; color: var(--text-primary); letter-spacing: .02em; font-variant-numeric: tabular-nums; }
+.rec-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--recording); animation: pulse 1.4s ease-in-out infinite; display: inline-block; margin-right: 7px; vertical-align: 0; }
+
+/* Burbujas: ancho al contenido con tope, para que una frase corta no ocupe toda
+   la línea y se lea como bloque suelto. */
+.rec-stream { display: flex; flex-direction: column; gap: 8px; align-items: flex-start; padding: 0 14px 14px; max-height: 230px; overflow-y: auto; }
+.rec-bubble { max-width: 88%; background: var(--bg-hover); border-radius: 12px; padding: 9px 12px; font-size: 12px; line-height: 1.5; color: var(--text-primary); }
+/* La frase que el motor todavía está cerrando va más apagada que las ya
+   confirmadas: comunica "esto puede cambiar" sin recurrir a otro color. Es
+   exactamente el estado que hace falta con Vosk, que emite parciales antes de
+   cerrar la frase. */
+.rec-bubble.is-live { color: var(--text-secondary); }
+.rec-bubble-who { font-weight: 600; font-size: 10px; text-transform: uppercase; letter-spacing: .06em; color: var(--text-muted); margin-right: 6px; }
+
+/* Puntos de "transcribiendo", escalonados con el mismo desfase que el indicador
+   de escucha de la transcripción: las dos señales de "sigue trabajando" del
+   producto se mueven igual en vez de parecer dos cosas distintas. */
+.rec-typing { display: inline-flex; align-items: center; gap: 3px; margin-left: 6px; vertical-align: middle; }
+.rec-typing span { width: 4px; height: 4px; border-radius: 50%; background: var(--text-muted); animation: bounce 1.1s infinite ease-in-out; }
+.rec-typing span:nth-child(2) { animation-delay: .15s; }
+.rec-typing span:nth-child(3) { animation-delay: .3s; }
+
+.rec-panel-foot { display: flex; align-items: center; justify-content: space-between; padding: 10px 12px; border-top: 1px solid var(--border-subtle); }
+.rec-foot-left, .rec-foot-right { display: flex; align-items: center; gap: 8px; }
+/* Separador que agrupa los controles por naturaleza: señal (waveform) ·
+   captura (micrófono) · sesión (detener, expandir). Sin esa agrupación,
+   "detener" queda a la misma distancia visual que el resto y se pulsa por
+   error. */
+.rec-foot-sep { width: 1px; height: 18px; background: var(--border-strong); flex-shrink: 0; margin: 0 2px; }
+
+/* Notas y Captura NO van en este grupo: llevan width:28px FIJO, y con el ancho
+   clavado la etiqueta que crece al pasar el mouse no tenia donde aparecer —
+   por eso el rotulo no se veia aunque el track pasara a 1fr. Su forma la define
+   .rec-tool-btn mas abajo, con ancho automatico. */
+.rec-mute-btn, .rec-stop, .rec-min-btn {
+  width: 28px; height: 28px; flex-shrink: 0; display: flex; align-items: center; justify-content: center;
+  border-radius: 6px; border: none; background: none; cursor: pointer; color: var(--text-secondary);
+  transition: background .12s, color .12s, transform 120ms var(--ease-reveal);
+}
+.rec-mute-btn:hover, .rec-expand-btn:hover, .rec-min-btn:hover { background: var(--border-strong); color: var(--text-primary); }
+.rec-mute-btn:active, .rec-stop:active { transform: scale(.94); }
+/* Silenciado invierte el relleno, igual que el resto de los estados "activos"
+   del rediseño. */
+.rec-mute-btn.muted { background: var(--text-primary); color: var(--bg-app); }
+/* Detener es la única acción irreversible del panel: se tiñe de rojo al
+   apuntarla. El resto comparte el gris neutro, así el color hace de aviso sin
+   necesidad de un diálogo de confirmación. */
+.rec-stop:hover { background: color-mix(in srgb, var(--recording) 14%, transparent); color: var(--recording); }
+/* Solo existe minimizado. Antes entraba en el grupo de arriba, que le ponia
+   display:flex DESPUES del display:none de mas arriba en este mismo archivo —
+   por eso se veia siempre, como un chevron suelto en medio del pie. */
+.rec-expand-btn {
+  width: 28px; height: 28px; flex-shrink: 0; align-items: center; justify-content: center;
+  border-radius: 6px; border: none; background: none; cursor: pointer;
+  color: var(--text-muted); transition: background .12s, color .12s;
+}
+
+/* Waveform del panel: barras verdes cuando entra audio. Reusa el .hm-wave que
+   ya alimenta window.onAudioLevels — no se inventa un componente nuevo. */
+.rec-panel .hm-wave { display: inline-flex; align-items: center; gap: 2px; height: 16px; }
+.rec-panel .hm-wave i { width: 2.5px; border-radius: 1px; background: var(--signal); opacity: 1; }
+.rec-panel .hm-wave.muted i { background: var(--text-muted); }
+
+@media (prefers-reduced-motion: reduce) {
+  .rec-panel { animation: none; transition: none; }
+  .rec-typing span, .rec-dot { animation: none; }
+  .rec-mute-btn:active, .rec-stop:active, .rec-note-btn:active, .rec-cap-btn:active { transform: none; }
+}
+
+/* ============================================================
+   DOCK EN REPOSO — antes de empezar a grabar
+   Mismo anclaje que .rec-panel: al pulsar Grabar, uno se va y el otro entra
+   en el mismo punto de la pantalla.
+   ============================================================ */
+/* Geometría exacta del mockup (.rec-dock/.rec-cta/.btn-ghost/.icon-btn):
+   padding 5, botón 6/14, texto 12px, iconos 16px, mute de 28px. Estaba todo un
+   30–40 % más grande porque lo agrandé "para que se vea bien" sin volver a leer
+   la referencia — la misma equivocación que había hecho con el cronómetro. El
+   dock es una barra en reposo: su trabajo es no estorbar. */
+.rec-dock {
+  position: fixed; left: 50%; transform: translateX(-50%); bottom: 20px; z-index: 29;
+  background: var(--bg-elevated); border: 1px solid var(--border-strong); border-radius: var(--r-pill);
+  box-shadow: 0 1px 2px rgba(0,0,0,.18), 0 12px 30px -10px rgba(0,0,0,.45);
+  padding: 5px;
+  /* Explícito y no heredado: el contenedor que lo envuelve (#actionbar) llevaba
+     pointer-events:none en el diseño anterior, y bastó con que quedara una regla
+     suelta para que el dock se viera pero no se pudiera pulsar. */
+  pointer-events: auto;
+}
+.rec-dock[hidden] { display: none; }
+
+.rec-actions { display: flex; align-items: center; gap: 6px; }
+
+/* Los dos modos viven como icono y despliegan su nombre al pasar el mouse por
+   el GRUPO, no por cada botón: así los dos se leen a la vez y se pueden
+   comparar antes de elegir, en vez de tener que pasar por encima de cada uno.
+   Misma técnica de ancho que la barra de acciones (grid 0fr→1fr). */
+.rec-actions.is-reveal .rec-label-grid {
+  display: grid; grid-template-columns: 0fr;
+  transition: grid-template-columns 190ms var(--ease-reveal);
+}
+.rec-actions.is-reveal .rec-label { overflow: hidden; white-space: nowrap; }
+.rec-actions.is-reveal:hover .rec-label-grid,
+.rec-actions.is-reveal:focus-within .rec-label-grid { grid-template-columns: 1fr; }
+.rec-actions.is-reveal:hover .rec-label,
+.rec-actions.is-reveal:focus-within .rec-label { padding-left: 7px; }
+
+/* Botón principal: relleno invertido, igual que el resto de los primarios del
+   rediseño. */
+.rec-cta {
+  display: inline-flex; align-items: center; gap: 7px; padding: 6px 14px;
+  border-radius: var(--r-pill); border: none; cursor: pointer;
+  background: var(--text-primary); color: var(--bg-app);
+  font-family: inherit; font-size: 12px; font-weight: 500;
+  transition: opacity .12s, transform 120ms var(--ease-reveal);
+}
+.rec-cta:hover { opacity: .88; }
+.rec-cta:active { transform: scale(.97); }
+.rec-cta .icon { width: 16px; height: 16px; }
+
+.rec-cta-screen, .dock-import-btn {
+  display: inline-flex; align-items: center; gap: 0; padding: 6px 10px;
+  border-radius: var(--r-pill); border: none; background: none; cursor: pointer;
+  color: var(--text-secondary); font-family: inherit; font-size: 12px;
+  transition: background .12s, color .12s;
+}
+.rec-cta-screen .icon, .dock-import-btn .icon { width: 16px; height: 16px; }
+.rec-cta-screen:hover, .dock-import-btn:hover { background: var(--bg-hover); color: var(--text-primary); }
+.rec-import-chev { width: 11px; height: 11px; opacity: .6; margin-left: 2px; flex-shrink: 0; transition: transform 140ms var(--ease-reveal); }
+.dock-import-btn[aria-expanded="true"] .rec-import-chev { transform: rotate(180deg); }
+
+.dock-mute-btn {
+  width: 28px; height: 28px; flex-shrink: 0; display: grid; place-items: center;
+  border-radius: var(--r-sm); border: none; background: none; cursor: pointer;
+  color: var(--text-secondary); transition: background .12s, color .12s;
+}
+.dock-mute-btn .icon { width: 16px; height: 16px; }
+.dock-mute-btn:hover { background: var(--bg-hover); color: var(--text-primary); }
+/* Silenciado: el micrófono tachado se tiñe de rojo. Es el único estado del dock
+   que hay que poder leer de un vistazo — arrancar una reunión creyendo que se
+   graba tu voz cuando no, se descubre demasiado tarde. */
+.dock-mute-btn.is-muted { color: var(--recording); }
+.dock-mute-btn.is-muted:hover { background: color-mix(in srgb, var(--recording) 14%, transparent); }
+
+/* ---- El micrófono reacciona a lo que oye ----
+   `--nivel` lo escribe _pintaNivelMic() (app.js) con el RMS medido de verdad en
+   el navegador; hasta hoy no había ninguna medición real en toda la app.
+   El halo crece y se enciende con la voz, en verde, que es el color que en este
+   rediseño significa "está entrando audio ahora". No hay animación por
+   keyframes a propósito: lo que se ve es el nivel, no un latido decorativo que
+   seguiría moviéndose en silencio. */
+.dock-mute-btn, .rec-mute-btn { position: relative; isolation: isolate; }
+.dock-mute-btn::after, .rec-mute-btn::after {
+  content: ''; position: absolute; inset: 0; border-radius: inherit; z-index: -1;
+  background: var(--signal); pointer-events: none;
+  opacity: calc(var(--nivel, 0) * .3);
+  transform: scale(calc(1 + var(--nivel, 0) * .3));
+  transition: opacity 90ms linear, transform 90ms linear;
+}
+/* Silenciado no hay halo, y el waveform tampoco: un halo en gris o un waveform
+   moviéndose seguirían diciendo que entra audio. */
+.dock-mute-btn.is-muted::after, .rec-mute-btn.muted::after { opacity: 0; transform: none; }
+.dock-mute-btn.oye:not(.is-muted), .rec-mute-btn.oye:not(.muted) { color: var(--signal); }
+@media (prefers-reduced-motion: reduce) {
+  .dock-mute-btn::after, .rec-mute-btn::after { transition: none; transform: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rec-actions.is-reveal .rec-label-grid, .rec-import-chev { transition: none; }
+  .rec-cta:active { transform: none; }
+}
+
+/* Sin override de alto: con los botones del dock ya en 28px —los del mockup— la
+   línea de 18px de .rec-foot-sep es la proporción correcta. El 26px de antes
+   compensaba unos botones de 38px que no venían de la referencia. */
+
+/* ============================================================
+   PANEL DE GRABACIÓN — piezas que faltaban del mockup
+   ============================================================ */
+
+/* Waveform propio del panel (no el .hm-wave del diseño anterior): cinco barras
+   verdes con desfase escalonado. El verde significa "entra audio" — es señal
+   funcional, el único acento cromático que sobrevive al monocromo. */
+.waveform { display: flex; align-items: center; gap: 2.5px; height: 18px; flex-shrink: 0; }
+.waveform span { width: 3px; border-radius: 1.5px; background: var(--text-muted); opacity: .75; }
+.waveform.live span { background: var(--signal); opacity: 1; animation: wavebar 1.1s ease-in-out infinite; }
+.waveform span:nth-child(1) { height: 40%; animation-delay: 0s; }
+.waveform span:nth-child(2) { height: 75%; animation-delay: .11s; }
+.waveform span:nth-child(3) { height: 100%; animation-delay: .22s; }
+.waveform span:nth-child(4) { height: 60%; animation-delay: .33s; }
+.waveform span:nth-child(5) { height: 35%; animation-delay: .44s; }
+@keyframes wavebar { 0%, 100% { transform: scaleY(.55); } 50% { transform: scaleY(1); } }
+/* Silenciado: el waveform pierde el verde Y deja de moverse. Uno animándose en
+   gris seguiría diciendo que entra audio. */
+.rec-panel .rec-mute-btn.muted ~ .waveform span,
+.waveform.live.is-muted span { animation-play-state: paused; background: var(--text-muted); }
+
+/* Detener: cuadrado dibujado, no icono. Es el lenguaje universal de "stop" y no
+   depende de que el sprite tenga el glifo correcto. */
+.rec-stop {
+  width: 34px; height: 34px; flex-shrink: 0; display: grid; place-items: center;
+  border-radius: 8px; border: none; background: none; cursor: pointer;
+  color: var(--text-secondary);
+  transition: background .12s, color .12s, transform 120ms var(--ease-reveal);
+}
+.rec-stop-sq { width: 13px; height: 13px; border-radius: 3px; background: currentColor; display: block; }
+.rec-stop:hover { background: color-mix(in srgb, var(--recording) 16%, transparent); color: var(--recording); }
+.rec-stop:active { transform: scale(.94); }
+
+/* Selectores del pie derecho: píldora compacta con el valor a la vista. El
+   chevron apunta hacia ARRIBA porque el panel vive pegado al borde inferior y
+   sus menús se abren hacia allá. */
+.rec-panel .rec-pick {
+  display: inline-flex; align-items: center; gap: 6px; padding: 6px 10px;
+  border-radius: 8px; border: 1px solid var(--border-subtle); background: none;
+  color: var(--text-secondary); font-family: inherit; font-size: 11.5px; cursor: pointer;
+  max-width: 150px; transition: background .12s, color .12s, border-color .12s;
+}
+.rec-panel .rec-pick:hover { background: var(--bg-hover); color: var(--text-primary); border-color: var(--border-strong); }
+.rec-panel .rec-pick .icon { width: 13px; height: 13px; flex-shrink: 0; }
+.rec-pick-val { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rec-panel .rec-pick-chev { width: 11px; height: 11px; opacity: .55; flex-shrink: 0; }
+.rec-crop-btn { padding: 6px 8px; }
+/* En modo audio no hay monitor que elegir ni área que recortar: se ocultan en
+   vez de quedar inertes. */
+.rec-panel.mode-audio .rec-monitor, .rec-panel.mode-audio .rec-crop-btn { display: none; }
+
+/* Espaciado del mockup, sin agrandar el cronometro. */
+.rec-panel .rec-timer-center { padding: 2px 0 10px; }
+
+/* El pie NO envuelve. Con flex-wrap el rotulo de Notas/Captura al revelarse
+   empujaba los selectores a una segunda fila y el panel entero cambiaba de
+   alto: eso es la distorsion. Sin wrap, quien cede espacio son los selectores
+   de la derecha —recortan su texto con puntos suspensivos, que se lee igual—
+   mientras el rotulo que esta apareciendo se muestra completo. */
+.rec-panel-foot { flex-wrap: nowrap; gap: 10px; }
+.rec-foot-right { flex-wrap: nowrap; overflow: hidden; }
+/* El grupo de herramientas gana la puja por el espacio: es el que esta
+   creciendo, y a medias no se lee. */
+.rec-tools { flex-shrink: 0; }
+.rec-panel .rec-pick { flex-shrink: 1; }
+.rec-panel .rec-pick .rec-pick-val { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+
+@media (prefers-reduced-motion: reduce) {
+  .waveform.live span { animation: none; }
+  .rec-stop:active { transform: none; }
+}
+
+/* ============================================================
+   PROCESANDO — pildora flotante
+   Antes era una franja a lo ancho de la ventana. Va en el mismo punto que el
+   dock y el panel de grabacion: los tres son estados del mismo sitio.
+   ============================================================ */
+.proc-dock {
+  position: fixed; left: 50%; transform: translateX(-50%); bottom: 24px; z-index: 29;
+  display: flex; align-items: center; gap: 12px; padding: 10px 14px;
+  background: var(--bg-elevated); border: 1px solid var(--border-strong); border-radius: var(--r-pill);
+  box-shadow: 0 1px 2px rgba(0,0,0,.18), 0 12px 30px -10px rgba(0,0,0,.45);
+  pointer-events: auto; max-width: min(560px, calc(100vw - 48px));
+  animation: selBarIn 240ms var(--ease-reveal) both;
+}
+.proc-dock-stage { font-size: 12.5px; font-weight: 500; color: var(--text-primary); white-space: nowrap; }
+.proc-dock .proc-track {
+  width: 130px; height: 4px; border-radius: 99px; background: var(--bg-hover);
+  overflow: hidden; flex-shrink: 0; display: block;
+}
+.proc-dock .proc-track > i { display: block; height: 100%; background: var(--signal); border-radius: 99px; transition: width .3s; }
+.proc-dock-pct { font-size: 11px; color: var(--text-muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.proc-dock .btn-ghost {
+  padding: 5px 11px; border-radius: var(--r-pill); border: none; background: none;
+  color: var(--text-secondary); font-family: inherit; font-size: 12px; cursor: pointer;
+  transition: background .12s, color .12s;
+}
+.proc-dock .btn-ghost:hover { background: var(--bg-hover); color: var(--text-primary); }
+@media (prefers-reduced-motion: reduce) { .proc-dock { animation: none; } }
+
+/* ============================================================
+   Rotulos del dock: correccion del recorte
+   Los rotulos salian cortados al revelarse ("Gı", "Graba", "Imı") porque los
+   botones se encogian entre ellos para dejar sitio. Tres causas juntas:
+     1. flex-shrink por defecto: los botones cedian ancho entre ellos.
+     2. grid-template-columns:1fr resuelve al espacio DISPONIBLE, no al ancho
+        del contenido; si el contenedor ya no tiene sitio, 1fr queda corto.
+        max-content si mide el texto entero, y sigue animando desde 0fr.
+     3. El propio .rec-dock no declaraba que puede crecer con su contenido.
+   ============================================================ */
+.rec-dock { width: max-content; max-width: calc(100vw - 40px); }
+.rec-actions { flex-wrap: nowrap; }
+.rec-cta, .rec-cta-screen, .dock-import-btn, .dock-mute-btn { flex-shrink: 0; }
+.rec-actions.is-reveal .rec-label-grid { grid-template-columns: 0fr; }
+/* 1fr y no max-content: entre <flex> y max-content el navegador NO interpola,
+   así que con max-content el rótulo aparecería de golpe en vez de crecer. Con
+   los botones ya sin encoger, 1fr resuelve al ancho real del texto. */
+.rec-actions.is-reveal:hover .rec-label-grid,
+.rec-actions.is-reveal:focus-within .rec-label-grid { grid-template-columns: 1fr; }
+.rec-actions.is-reveal .rec-label { white-space: nowrap; }
+
+/* ============================================================
+   Titulo de la reunion en la cabecera del panel
+   La reunion nace con la fecha (preguntar el nombre antes de grabar frenaba el
+   arranque). Poder escribirlo aqui, mientras la reunion pasa, es el momento en
+   que de verdad se sabe de que es.
+   ============================================================ */
+.rec-title {
+  flex: 1; min-width: 0; margin: 0 8px; padding: 5px 10px;
+  border: 1px solid transparent; border-radius: 7px; background: none; cursor: text;
+  color: var(--text-primary); font-family: inherit; font-size: 12.5px; font-weight: 500;
+  text-align: center; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  transition: background .12s, border-color .12s;
+}
+.rec-title:hover { background: var(--bg-hover); border-color: var(--border-subtle); }
+.rec-title-input {
+  flex: 1; min-width: 0; margin: 0 8px; padding: 5px 10px;
+  border: 1px solid var(--border-strong); border-radius: 7px; background: var(--bg-input);
+  color: var(--text-primary); font-family: inherit; font-size: 12.5px; font-weight: 500;
+  text-align: center; outline: none;
+}
+
+/* ---- Notas y Capturar pantalla: icono en reposo, rotulo al pasar el mouse ----
+   Mismo gesto que el dock: el rotulo crece desde cero por el grupo entero, no
+   por cada boton, asi los dos se leen a la vez. */
+.rec-tools { display: flex; align-items: center; gap: 4px; }
+.rec-tool-btn {
+  display: inline-flex; align-items: center; height: 28px; padding: 0 7px; flex-shrink: 0;
+  border: none; border-radius: 6px; background: none; cursor: pointer;
+  color: var(--text-secondary); font-family: inherit; font-size: 12px;
+  transition: background .12s, color .12s, transform 120ms var(--ease-reveal);
+}
+.rec-tool-btn:hover { background: var(--border-strong); color: var(--text-primary); }
+.rec-tool-btn:active { transform: scale(.94); }
+.rec-tool-btn .icon { width: 16px; height: 16px; flex-shrink: 0; }
+.rec-tools.is-reveal .rec-label-grid {
+  display: grid; grid-template-columns: 0fr;
+  transition: grid-template-columns 190ms var(--ease-reveal);
+}
+.rec-tools.is-reveal .rec-label { overflow: hidden; white-space: nowrap; }
+.rec-tools.is-reveal:hover .rec-label-grid,
+.rec-tools.is-reveal:focus-within .rec-label-grid { grid-template-columns: 1fr; }
+.rec-tools.is-reveal:hover .rec-label,
+.rec-tools.is-reveal:focus-within .rec-label { padding-left: 6px; }
+
+@media (prefers-reduced-motion: reduce) {
+  .rec-tools.is-reveal .rec-label-grid { transition: none; }
+  .rec-tool-btn:active { transform: none; }
+}
+
+/* ---- Espacio para que los rotulos de Notas/Captura puedan crecer ----
+   Mismo fallo que tuvo el dock: los botones se encogian entre ellos y el track
+   1fr se quedaba en cero, asi que el rotulo nunca aparecia. El pie no reparte
+   espacio sobrante hasta que se declara quien NO cede.
+   Minimizado el panel mide su contenido, asi que ahi el rotulo entra siempre. */
+.rec-tools, .rec-tool-btn { flex-shrink: 0; }
+.rec-foot-left { flex-shrink: 0; min-width: 0; }
+.rec-foot-right { flex-shrink: 1; min-width: 0; }
+/* El nombre del proyecto y el idioma si pueden encogerse: son informativos y se
+   leen igual recortados, a diferencia de un rotulo que aparece a medias. */
+.rec-panel .rec-pick { min-width: 0; }
+.rec-panel .rec-pick .rec-pick-val { min-width: 0; }

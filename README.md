@@ -1,63 +1,161 @@
 # Helpmeet
 
-App de escritorio que transcribe reuniones de Google Meet, las organiza por *iniciativa*, permite tomar capturas de pantalla y notas ligadas al momento exacto, y exporta todo el contexto en Markdown para Claude Code.
+App de escritorio Windows que transcribe reuniones, las organiza por iniciativa,
+permite capturas y notas ligadas al momento exacto, y exporta contexto en
+Markdown para Claude Code.
 
-> Estado: **Fase 1 funcionando** + mejoras. Ver `docs/superpowers/specs/` (diseño) y `docs/superpowers/plans/` (planes).
+> **Version:** 2.5.0 | **Calidad:** 9.0/10 (auditoria 2026-07-18)
 
-## Características
+## Estructura del proyecto
 
-- Transcripción del audio del sistema ("Los demás") y del micrófono ("Yo"), con **Whisper en la nube (Replicate)** o local (faster-whisper).
-- Organización: Iniciativa → Reunión → Frases + Capturas + Notas, ancladas al minuto exacto.
-- Búsqueda global en todas las reuniones; renombrar/mover con clic derecho.
-- Exportación a Markdown (`contexto.md` + capturas), por reunión o iniciativa completa.
-- Panel de ajustes ⚙️ para la API key y la carpeta de exportación.
+| Carpeta | Responsabilidad |
+|---|---|
+| `helpmeet/` | App Python principal (UI, DB, audio, transcripcion, export) |
+| `helpmeet-licenses/` | Backend FastAPI para gestion de licencias |
+| `admin-panel/` | Panel web de administracion de licencias |
+| `installer/` | Script Inno Setup para generar instalador Windows (.exe) |
+| `scripts/` | Build, checksums, benchmark (`build_release.ps1` genera el .exe) |
+| `tests/` | Tests pytest (27 archivos) |
+| `docs/` | Docs esenciales: manual, specs historicas, legal, ventas |
+| `licenses/` | Licencias de terceros |
+| `recursos/` | Builds de desarrollo por version (`vX.Y.Z/Helpmeet.exe`) |
+| `assets/` | Recursos estaticos (test) |
 
 ## Requisitos
 
 - Windows 10/11
-- Python 3.12 (no usar la versión de Microsoft Store)
-
-## Configuración
-
-La transcripción en la nube usa [Replicate](https://replicate.com). Crea un archivo `.env`
-en la raíz del proyecto con tu token (este archivo **no se sube al repositorio**):
-
-```
-REPLICATE_API_TOKEN=tu_token_aqui
-```
-
-También puedes pegar el token desde el panel de **Ajustes ⚙️** dentro de la app.
+- Python 3.12
 
 ## Puesta en marcha
 
-```powershell
-# 1. Crear el entorno virtual (una sola vez)
+```bash
+# PowerShell
 py -3.12 -m venv .venv
-
-# 2. Activar el entorno
 .\.venv\Scripts\Activate.ps1
 
-# 3. Instalar dependencias
-pip install -r requirements.txt
+# Git Bash / WSL
+# py -3.12 -m venv .venv
+# source .venv/Scripts/activate
+```
 
-# 4. Ejecutar la app
+Con el entorno activado:
+
+```bash
+pip install -r requirements.txt
 python -m helpmeet.main
 ```
+
+## Modo desarrollo (levantar sin compilar)
+
+Todo local. Cero dependencias externas. 3 pasos.
+
+### 1. Instalar (solo la primera vez)
+
+```bash
+source .venv/Scripts/activate
+pip install -r requirements.txt
+cd helpmeet-licenses
+pip install -r requirements.txt
+alembic upgrade head
+python seed_dev.py
+cd ..
+```
+
+`seed_dev.py` imprime dos claves. Guardalas:
+
+```
+Product Key: HM-DEV-XXXXXXXX   <-- para activar la app (escritorio)
+Admin Key:  HM-2WH4-...XXXX   <-- para el panel web (localhost:8095)
+```
+
+### 2. Levantar los 3 servicios
+
+Tres terminales distintas, en este orden:
+
+**Terminal 1 — Backend de licencias**
+```bash
+source .venv/Scripts/activate
+cd helpmeet-licenses
+uvicorn helpmeet_licenses.main:app --reload --port 8001
+```
+
+**Terminal 2 — Panel de administracion**
+```bash
+source .venv/Scripts/activate
+cd admin-panel
+python serve.py
+```
+
+**Terminal 3 — App Helpmeet**
+```bash
+source .venv/Scripts/activate
+python -m helpmeet.main
+```
+
+### 3. Activar
+
+1. En la ventana de Helpmeet, pega la **Product Key** (ej: `HM-DEV-EF7E81CCC9B5E5D4`).
+2. Para entrar al panel web (`http://localhost:8095`), usa la **Admin Key**.
+
+> No confundas: la Product Key activa la app. La Admin Key desbloquea el panel web.
+
+## Generar ejecutable de prueba (desarrollo rapido)
+
+```powershell
+# Solo PyInstaller, sin tests ni instalador. El .exe queda en recursos/v2.5.0/
+.\scripts\build_dev.ps1
+```
+
+El ejecutable se copia a `recursos/v{version}/Helpmeet.exe` listo para probar.
+
+## Generar instalador (.exe)
+
+```powershell
+# Requiere Inno Setup 6 instalado. Pipeline completo: tests + build + firma + instalador
+.\scripts\build_release.ps1 -Version "2.5.0"
+```
+
+El .exe se genera con PyInstaller (`Helpmeet.spec`) y se empaqueta con Inno Setup
+(`installer/Helpmeet.iss`).
+
+## Sistema de licencias
+
+Backend FastAPI en `helpmeet-licenses/`. Dos opciones de base de datos:
+
+**SQLite** (desarrollo rapido, cero configuracion):
+```bash
+cd helpmeet-licenses
+cp .env.example .env            # SQLite por defecto
+alembic upgrade head
+python seed_dev.py
+uvicorn helpmeet_licenses.main:app --reload --port 8001
+```
+
+**PostgreSQL en Docker** (desarrollo completo):
+```bash
+cd helpmeet-licenses
+docker compose up -d             # puerto 5436
+# Cambiar .env: DATABASE_URL=postgresql://helpmeet:helpmeet_dev_2026@localhost:5436/helpmeet_licenses
+alembic upgrade head
+python seed_dev.py
+uvicorn helpmeet_licenses.main:app --reload --port 8001
+```
+
+Panel de administracion en `admin-panel/` (puerto 8095).
 
 ## Pruebas
 
 ```powershell
-pytest -v
+pip install -r requirements-dev.txt
+pytest -v --cov=helpmeet
 ```
 
-## Cómo se organiza el código
+## Transcripcion
 
-| Carpeta | Responsabilidad |
-|---|---|
-| `helpmeet/db/` | Base de datos: modelos, conexión y operaciones (guardar/leer). |
-| `helpmeet/transcription/` | Convierte audio en texto con faster-whisper. |
-| `helpmeet/audio/` | Graba micrófono ("Yo") y audio del sistema ("Los demás"). |
-| `helpmeet/screenshot/` | Captura de pantalla y atajo de teclado global. |
-| `helpmeet/session/` | Orquesta una reunión: graba, transcribe y guarda. |
-| `helpmeet/export/` | Genera la carpeta `.md` + imágenes para Claude Code. |
-| `helpmeet/ui/` | La ventana de la app (pywebview). |
+La app usa **faster-whisper local** (offline, gratuito). La transcripcion cloud
+(Replicate) esta deshabilitada en produccion. El modelo se descarga
+automaticamente la primera vez (~500 MB).
+
+## Licencia
+
+Ver `LICENSE` y `licenses/THIRD_PARTY_LICENSES.md`.

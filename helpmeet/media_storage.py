@@ -59,7 +59,7 @@ def migrate_legacy_tracks(meeting_id: int, video_path) -> list[tuple[str, Path]]
 
 
 def available_tracks(meeting_id: int, video_path=None) -> list[tuple[str, Path]]:
-    """Pistas para Whisper; acepta almacenamiento nuevo y formato antiguo."""
+    """Pistas para transcribir; acepta almacenamiento nuevo y formato antiguo."""
     tracks = []
     for speaker in TRACK_FILENAMES:
         internal = track_path(meeting_id, speaker)

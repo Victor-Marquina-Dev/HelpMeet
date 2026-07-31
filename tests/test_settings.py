@@ -62,7 +62,7 @@ def test_transcription_preferences_are_persistent(monkeypatch, tmp_path):
 
     defaults = settings.get_transcription_settings()
     assert defaults["provider"] == "auto"
-    assert defaults["default_mic_muted"] is False
+    assert defaults["default_mic_muted"] is True
 
     saved = settings.set_transcription_settings({
         "provider": "local",
@@ -84,14 +84,16 @@ def test_rejects_invalid_transcription_provider(monkeypatch, tmp_path):
         pass
 
 
-def test_standard_tier_alias_maps_to_balanced(tmp_path, monkeypatch):
+def test_standard_tier_alias_maps_to_fast(tmp_path, monkeypatch):
+    # "standard"/"balanced" eran niveles del sistema anterior (Whisper, 4
+    # niveles); Vosk solo tiene 2 (fast/accurate) y ambos colapsan a "fast".
     path = tmp_path / "settings.json"
     path.write_text(json.dumps({"transcription_tier": "standard"}), encoding="utf-8")
     monkeypatch.setattr(settings, "SETTINGS_PATH", path)
     settings.invalidate_cache()
 
-    assert settings.get_transcription_tier() == "balanced"
-    assert settings.get_transcription_model() == "small"
+    assert settings.get_transcription_tier() == "fast"
+    assert settings.get_transcription_model() == "vosk-model-small-es-0.42"
 
 
 def test_set_transcription_settings_normalizes_tier_alias(tmp_path, monkeypatch):
@@ -102,5 +104,5 @@ def test_set_transcription_settings_normalizes_tier_alias(tmp_path, monkeypatch)
 
     result = settings.set_transcription_settings({"tier": "standard"})
 
-    assert result["tier"] == "balanced"
-    assert json.loads(path.read_text(encoding="utf-8"))["transcription_tier"] == "balanced"
+    assert result["tier"] == "fast"
+    assert json.loads(path.read_text(encoding="utf-8"))["transcription_tier"] == "fast"

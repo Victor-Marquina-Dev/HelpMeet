@@ -1,6 +1,6 @@
 """Las funciones principales deben funcionar SIN internet (Fase 5).
 
-Solo la descarga inicial del modelo Whisper necesita red; el resto (grabar,
+Solo la descarga inicial del modelo Vosk necesita red; el resto (grabar,
 guardar, exportar, diagnosticar) es totalmente local.
 """
 
@@ -31,6 +31,6 @@ def test_core_and_export_work_offline(session, no_network):
 
 
 def test_diagnostics_work_offline(no_network, tmp_path):
-    report = diagnostics.run_diagnostics(tmp_path, tmp_path / "export", "small")
+    report = diagnostics.run_diagnostics(tmp_path, tmp_path / "export", "vosk-model-small-es-0.42")
     assert report["disk"]["total_gb"] > 0
-    assert "status" in report["whisper"]
+    assert "status" in report["vosk"]

@@ -71,8 +71,9 @@ class Utterance(Base):
     text: Mapped[str] = mapped_column(Text)
     start_time: Mapped[float] = mapped_column(Float)
     end_time: Mapped[float] = mapped_column(Float)
-    highlighted: Mapped[bool] = mapped_column(Boolean, default=False)  # ★ Importante
-    # Asignación manual a un participante concreto; si es NULL se calcula el
+    highlighted: Mapped[bool] = mapped_column(Boolean, default=False)  # * Importante
+    language: Mapped[str] = mapped_column(String(10), default="")     # idioma de esta transcripción
+    # Asignacion manual a un participante concreto; si es NULL se calcula el
     # nombre con las reglas (ver resolución de nombre en repository.py).
     participant_id: Mapped[int | None] = mapped_column(
         ForeignKey("participants.id"), nullable=True

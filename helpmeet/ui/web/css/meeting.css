@@ -1,0 +1,178 @@
+/* ============================================================
+   Helpmeet — REUNIÓN (cabecera, pestañas, transcripción)
+   Portado desde 01-projects/helpmeet/03-diseno/mockup.html — FASE 3.
+
+   > CONTRATO CON EL MOTOR DE TRANSCRIPCIÓN — no romper
+   > Python empuja el texto a la pantalla llamando por nombre a las globales
+   > window.addUtterance y window.setLivePartial, que buscan en el DOM:
+   >   · un contenedor con clase .reading
+   >   · un elemento #previewTyping al final, antes del cual insertan
+   > Por eso el contenedor lleva las DOS clases (.transcript .reading) y la fila
+   > "Escuchando…" lleva el id previewTyping: mismo elemento, dos identidades.
+   > Si se renombran, el motor sigue funcionando pero el texto deja de verse.
+   ============================================================ */
+
+/* ---------- Cabecera ---------- */
+.meeting-header { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 14px; }
+.meeting-header-main { min-width: 0; }
+.meeting-header .page-title { margin: 0; }
+.meeting-header-side { display: flex; align-items: center; gap: 14px; flex-shrink: 0; }
+.meeting-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; color: var(--text-muted); font-size: 12px; margin-bottom: 6px; }
+.meeting-meta .sep { opacity: .5; }
+
+/* Miga de pan hacia el proyecto. */
+.crumb { display: flex; align-items: center; gap: 6px; margin-bottom: 8px; font-size: 12px; color: var(--text-muted); }
+.crumb button {
+  display: flex; align-items: center; gap: 5px; border: none; background: none;
+  color: inherit; font: inherit; font-family: inherit; cursor: pointer; padding: 2px 4px;
+  border-radius: 5px; transition: background .12s, color .12s;
+}
+.crumb button:hover { background: var(--bg-hover); color: var(--text-primary); }
+.crumb .icon { width: 13px; height: 13px; }
+.crumb.static { padding: 2px 4px; }
+
+/* ---------- Pestañas ---------- */
+.tabs-wrap { margin-top: 26px; }
+.tabs-row { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+.segmented-pill { display: flex; flex-wrap: wrap; gap: 8px; }
+.segmented-pill .tab-btn {
+  display: flex; align-items: center; gap: 6px; padding: 4px 12px; border-radius: var(--r-pill);
+  border: 1px solid var(--border-strong); background: none; cursor: pointer;
+  font-family: inherit; font-size: 12px; color: var(--text-secondary);
+  transition: background .12s ease, color .12s ease, border-color .12s ease;
+}
+.segmented-pill .tab-btn:hover { background: var(--bg-hover); color: var(--text-primary); }
+.segmented-pill .tab-btn.active { background: var(--bg-elevated); color: var(--text-primary); font-weight: 600; }
+.segmented-pill .tab-btn svg {
+  width: 14px; height: 14px; stroke: currentColor; fill: none;
+  stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; flex-shrink: 0;
+}
+.tab-panel { display: none; }
+.tab-panel.active { display: block; margin-top: 24px; }
+.tab-panel > .group-label:first-child { margin-top: 0; }
+
+/* ---------- Barra de acciones ----------
+   Un solo componente compartido por Reunión y Proyecto. Los tres botones están
+   SIEMPRE visibles y son solo icono; lo único que se revela al pasar el mouse
+   por el grupo entero es la etiqueta de "Copiar transcripción .md". */
+.action-bar { display: flex; align-items: center; gap: 2px; }
+.action-bar button:disabled { opacity: .35; cursor: not-allowed; }
+.action-bar button:disabled:hover { background: none; color: inherit; }
+.action-reveal-copy { display: flex; align-items: center; justify-content: flex-start; width: auto; padding: 0 7px; }
+/* grid 0fr→1fr: interpola hasta el ancho real de la etiqueta, así el easing se
+   gasta entero en el recorrido visible. Un max-width "generoso" gastaría parte
+   de la curva en un rango invisible y la velocidad percibida no coincidiría. */
+.action-reveal-label-grid { display: grid; grid-template-columns: 0fr; transition: grid-template-columns 200ms var(--ease-reveal); }
+.action-reveal-label { overflow: hidden; min-width: 0; white-space: nowrap; padding-left: 6px; font-size: 12px; }
+/* :hover detrás de (hover:hover) para que un toque no quede "pegado"; el
+   :focus-within NO se limita: con teclado siempre debe poder revelarse. */
+@media (hover: hover) and (pointer: fine) {
+  .action-reveal:hover .action-reveal-label-grid { grid-template-columns: 1fr; }
+}
+.action-reveal:focus-within .action-reveal-label-grid { grid-template-columns: 1fr; }
+.action-reveal .icon-btn { transition: background .12s, color .12s, transform 120ms var(--ease-reveal); }
+.action-reveal .icon-btn:active { transform: scale(.94); }
+.meeting-fav-btn.active { color: var(--text-primary); }
+.meeting-fav-btn.active svg { fill: currentColor; }
+
+/* ---------- Pestaña General ---------- */
+.meeting-general-grid { display: flex; gap: 32px; align-items: flex-start; margin-top: 22px; }
+.meeting-meta-list { display: flex; flex-direction: column; gap: 14px; width: 150px; flex-shrink: 0; }
+.meeting-meta-row { display: flex; flex-direction: column; gap: 3px; }
+.meeting-meta-row .k { font-size: 10px; text-transform: uppercase; letter-spacing: .06em; color: var(--text-muted); }
+.meeting-meta-row .v { font-size: 13px; color: var(--text-primary); }
+.meeting-video-col { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 10px; }
+
+.video-card {
+  display: flex; align-items: center; gap: 12px; padding: 12px 14px;
+  background: var(--bg-elevated); border: 1px solid var(--border-subtle); border-radius: 10px;
+}
+.video-card-play {
+  width: 38px; height: 38px; border-radius: 50%; background: var(--bg-hover); color: var(--text-primary);
+  display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+  border: none; cursor: pointer;
+}
+.video-card-play:hover { background: var(--border-strong); }
+.video-card-play svg { width: 15px; height: 15px; }
+.video-card-info { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.video-card-name { font-size: 13px; color: var(--text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.video-card-file { font-size: 11px; color: var(--text-muted); font-family: var(--font-mono); }
+.video-card-actions { display: flex; gap: 8px; }
+
+.btn-outline {
+  display: inline-flex; align-items: center; gap: 6px; padding: 5px 12px;
+  border: 1px solid var(--border-strong); border-radius: 8px; background: none;
+  color: var(--text-secondary); font-family: inherit; font-size: 12px; cursor: pointer;
+  transition: background .12s, color .12s, border-color .12s;
+}
+.btn-outline:hover { background: var(--bg-hover); color: var(--text-primary); }
+.btn-outline:disabled { opacity: .35; cursor: not-allowed; }
+.btn-outline:disabled:hover { background: none; color: var(--text-secondary); }
+
+/* ---------- Transcripción ----------
+   .transcript es la clase del mockup; .reading es la que busca el motor. */
+.transcript, .reading { display: flex; flex-direction: column; margin-top: 26px; }
+.utt { display: flex; align-items: flex-start; gap: 14px; padding: 7px 6px; border-radius: 8px; }
+.utt:hover { background: var(--bg-hover); }
+.utt-time { width: 40px; flex-shrink: 0; font-family: var(--font-mono); font-size: 10px; color: var(--text-muted); padding-top: 2px; text-align: left; }
+.utt-body { flex: 1; min-width: 0; font-size: 14px; line-height: 1.62; color: var(--text-primary); }
+/* Solo se etiqueta "Yo". Las frases del interlocutor son el caso por defecto —
+   la mayoría del texto— y repetir "Los demás" en cada línea era ruido. "Yo" se
+   marca porque es la excepción, y es justo lo que se busca al releer. */
+.utt-speaker {
+  display: inline-flex; align-items: center; font-weight: 600; margin-right: 8px;
+  font-size: 10px; text-transform: uppercase; letter-spacing: .06em;
+  color: var(--text-primary); background: var(--bg-hover);
+  border-radius: 5px; padding: 1px 6px; vertical-align: 2px;
+}
+.utt-star {
+  width: 22px; flex-shrink: 0; padding-top: 2px; color: var(--text-muted); opacity: .4;
+  border: none; background: none; cursor: pointer; transition: opacity .12s, color .12s;
+}
+.utt-star:hover { opacity: .8; }
+.utt-star.active { opacity: 1; color: var(--text-primary); }
+.utt-star svg { width: 15px; height: 15px; }
+.utt-star.active svg { fill: currentColor; }
+
+/* Capturas y notas intercaladas, sangradas para alinear con .utt-body. */
+.inline-card {
+  display: flex; gap: 12px; align-items: center; margin: 10px 0 14px 52px;
+  background: var(--bg-elevated); border: 1px solid var(--border-subtle);
+  border-radius: 10px; padding: 10px 14px; max-width: 460px;
+}
+.capture-thumb {
+  width: 40px; height: 40px; border-radius: 7px; background: var(--bg-hover);
+  display: flex; align-items: center; justify-content: center; color: var(--text-muted); flex-shrink: 0;
+}
+.inline-card .meta { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.inline-card .meta .k { font-size: 10px; color: var(--text-muted); text-transform: uppercase; letter-spacing: .05em; }
+.inline-card .meta .v { font-size: 12px; color: var(--text-secondary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.note-card .k { display: flex; align-items: center; gap: 6px; }
+.note-card .v { font-style: italic; }
+
+.gap-divider { display: flex; align-items: center; gap: 14px; margin: 22px 0; color: var(--text-muted); font-size: 11px; }
+.gap-divider::before, .gap-divider::after { content: ""; flex: 1; height: 1px; background: var(--border-strong); }
+.end-marker { text-align: center; color: var(--text-muted); font-size: 11px; margin-top: 20px; }
+
+/* Indicador "sigue grabando". Es #previewTyping para el motor. */
+.listening-row { display: flex; align-items: center; gap: 12px; padding: 11px 4px 4px 52px; color: var(--text-muted); flex-wrap: wrap; }
+.dots { display: inline-flex; gap: 4px; }
+.dots span { width: 5px; height: 5px; border-radius: 50%; background: var(--text-muted); animation: bounce 1.1s infinite ease-in-out; }
+.dots span:nth-child(2) { animation-delay: .15s; }
+.dots span:nth-child(3) { animation-delay: .3s; }
+@keyframes bounce {
+  0%, 60%, 100% { opacity: .3; transform: translateY(0); }
+  30% { opacity: 1; transform: translateY(-2px); }
+}
+.listening-label { font-size: 11px; }
+/* Texto parcial de Vosk: se refina mientras se habla, por eso va atenuado y en
+   cursiva — comunica "esto todavía puede cambiar" sin volver a la línea de
+   vista previa que se reemplazaba sola. */
+.preview-partial { font-size: 12px; color: var(--text-muted); font-style: italic; }
+.preview-partial b { font-style: normal; font-weight: 600; margin-right: 5px; color: var(--text-secondary); }
+
+@media (prefers-reduced-motion: reduce) {
+  .dots span { animation: none; }
+  .action-reveal-label-grid { transition: none; }
+  .action-reveal .icon-btn:active { transform: none; }
+}

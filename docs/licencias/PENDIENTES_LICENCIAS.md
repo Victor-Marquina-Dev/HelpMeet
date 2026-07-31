@@ -28,7 +28,7 @@ Cosas decididas que quedan para fases posteriores.
 
 ## Fase 3 — Deploy en producción
 
-- [ ] Elegir hosting: Railway / Render / VPS
+- [x] Elegir hosting: Fly.io
 - [ ] Migrar de SQLite a PostgreSQL gestionado
 - [ ] Configurar HTTPS (dominio propio)
 - [ ] Rate limiting en endpoints de activación y validación

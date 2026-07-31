@@ -355,10 +355,10 @@ def test_push_text_uses_valid_json_for_javascript(session):
     api = _api_with_session(session)
     api._window = FakeWindow()
 
-    api._push_utterance("others", "línea 1\nlínea '2'", 0, 1)
+    api._push_utterance(42, "others", "línea 1\nlínea '2'", 0, 1)
     api._push_status("error:\narchivo 'x'")
 
-    assert api._window.scripts[0].startswith('addUtterance("others", ')
+    assert api._window.scripts[0].startswith('addUtterance(42, "others", ')
     assert "\\n" in api._window.scripts[0]
     assert api._window.scripts[1].startswith('setStatus("error:')
 

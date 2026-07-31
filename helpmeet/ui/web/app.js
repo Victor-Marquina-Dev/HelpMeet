@@ -7,21 +7,20 @@
    2. Capa de API  ........ api.*  (pywebview con fallback MOCK)
    3. Estado central ...... STATE  + setAppState()
    4. Render de vistas .... renderMain(), renderActionBar()
-   5. Sidebar / búsqueda / glosario / archivo / papelera
+   5. Sidebar / búsqueda / glosario / archivados
    6. Modales, toasts, menús contextuales (reemplazan prompt/alert)
    7. Grabación / pantalla / procesamiento / recuperación
    8. Atajos de teclado
    9. Globals que Python llama: addUtterance, setStatus, setProgress
       + adaptadores V2: onAppStateChanged, onJobProgress,
         onAudioLevels, onRecoveryDetected, setScreenPreview
-
+/* ============================================================
    CONVENCIÓN: cada función que necesita un endpoint de backend que
    AÚN NO EXISTE está marcada con  // @pending-python  y el método
    propuesto. Ver PYTHON_API.md para el contrato completo.
    ============================================================ */
 
 'use strict';
-
 /* ============================================================
    1. ICONOS (SVG internos, estilo lineal/redondeado)
    ============================================================ */
@@ -47,6 +46,14 @@ const ICONS = {
   note: '<path d="M12 5v14M5 12h14"/>',
   warn: '<path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/><path d="M12 9v4M12 17h.01"/>',
   play: '<path d="m6 3 14 9-14 9V3z"/>',
+  pause: '<rect x="6" y="4" width="4" height="16" rx="1"/><rect x="14" y="4" width="4" height="16" rx="1"/>',
+  rewind: '<path d="m11 19-9-7 9-7v14z"/><path d="m22 19-9-7 9-7v14z"/>',
+  fastForward: '<path d="m13 19 9-7-9-7v14z"/><path d="m2 19 9-7-9-7v14z"/>',
+  markIn: '<path d="M3 19V5"/><path d="m13 6-6 6 6 6"/><path d="M7 12h14"/>',
+  markOut: '<path d="M21 5v14"/><path d="M3 12h14"/><path d="m11 18 6-6-6-6"/>',
+  expand: '<path d="M15 3h6v6"/><path d="m21 3-7 7"/><path d="m3 21 7-7"/><path d="M9 21H3v-6"/>',
+  external: '<path d="M15 3h6v6"/><path d="M10 14 21 3"/><path d="M21 14v5a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5"/>',
+  shrink: '<path d="M4 14h6v6"/><path d="m10 14-7 7"/><path d="m21 3-7 7"/><path d="M20 10h-6V4"/>',
   check: '<path d="M20 6 9 17l-5-5"/>',
   checkSquare: '<rect width="18" height="18" x="3" y="3" rx="2"/><path d="m9 12 2 2 4-4"/>',
   x: '<path d="M18 6 6 18M6 6l12 12"/>',
@@ -69,6 +76,17 @@ const ICONS = {
   filter: '<path d="M22 3H2l8 9.46V19l4 2v-8.54L22 3z"/>',
   clock: '<circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/>',
   arrowUp: '<path d="M12 19V5M5 12l7-7 7 7"/>',
+  refresh: '<path d="M3 12a9 9 0 0 1 15-6.7L21 8M3 16l3-3 3 3M21 12a9 9 0 0 1-15 6.7L3 16"/>',
+  menu: '<path d="M4 6h16M4 12h16M4 18h16"/>',
+  home: '<path d="M3 10.5 12 3l9 7.5"/><path d="M5 9.5V20a1 1 0 0 0 1 1h4v-6h4v6h4a1 1 0 0 0 1-1V9.5"/>',
+  eye: '<circle cx="12" cy="12" r="3"/><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7z"/>',
+  image: '<rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.6-3.6a2 2 0 0 0-2.8 0L6 21"/>',
+  scan: '<path d="M3 7V5a2 2 0 0 1 2-2h2M17 3h2a2 2 0 0 1 2 2v2M21 17v2a2 2 0 0 1-2 2h-2M7 21H5a2 2 0 0 1-2-2v-2M7 12h10"/>',
+  file: '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/>',
+  md: '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M8 17v-4l2 2.5 2-2.5v4"/>',
+  diamond: '<path d="M12 2l3.5 7L12 22l-3.5-13L12 2z" fill="currentColor" stroke="none"/><path d="M2 10l6-3 3.5 13-6-5L2 10z" fill="currentColor" fill-opacity=".35" stroke="none"/><path d="M22 10l-6-3-3.5 13 6-5L22 10z" fill="currentColor" fill-opacity=".55" stroke="none"/>',
+  sun: '<circle cx="12" cy="12" r="5"/><path d="M12 1v2M12 21v2M4.2 4.2l1.4 1.4M18.4 18.4l1.4 1.4M1 12h2M21 12h2M4.2 19.8l1.4-1.4M18.4 5.6l1.4-1.4"/>',
+  moon: '<path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/>',
 };
 function svg(name, size) {
   size = size || 15;
@@ -77,6 +95,38 @@ function svg(name, size) {
 }
 function ico(name, size) { return `<span class="ico">${svg(name, size)}</span>`; }
 
+// Iniciales de 2 letras a partir del nombre del proyecto (para el avatar).
+// Dos palabras → primera letra de cada una; una palabra → sus 2 primeras;
+// vacío → "·".
+function initialsFor(name) {
+  const s = (name || '').trim();
+  if (!s) return '·';
+  const parts = s.split(/\s+/).filter(Boolean);
+  if (parts.length >= 2) return (parts[0][0] + parts[1][0]).toUpperCase();
+  return s.slice(0, 2).toUpperCase();
+}
+
+// Icono del origen de una reunión (audio grabado, pantalla grabada o
+// vídeo importado) para la línea de metadatos de su tarjeta.
+function _kindIcon(m) {
+  // Mismos iconos que la barra de acciones (Grabar reunión / Grabar
+  // pantalla / Importar video) para que se reconozcan al instante.
+  const k = m && m.source;
+  if (k === 'audio')  return `<span class="rc-kind" title="Audio de reunión">${svg('mic', 12)}</span>`;
+  if (k === 'screen') return `<span class="rc-kind" title="Grabación de pantalla">${svg('monitorDot', 12)}</span>`;
+  if (k === 'import') return `<span class="rc-kind" title="Vídeo importado">${svg('upload', 12)}</span>`;
+  return '';
+}
+
+// Color estable derivado del nombre (paleta tipo Google Material).
+// El mismo nombre da siempre el mismo color.
+function avatarColorFor(name) {
+  const palette = ['#1a73e8', '#188038', '#a142f4', '#e8710a', '#12a4af', '#d93025', '#9334e6', '#1e8e3e'];
+  const s = (name || '');
+  let h = 0;
+  for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) >>> 0;
+  return palette[h % palette.length];
+}
 /* ============================================================
    2. CAPA DE API
    Usa window.pywebview.api en producción; cae a MOCK en el navegador.
@@ -101,11 +151,13 @@ async function call(method, ...args) {
 const api = {
   // ---- Contrato ACTUAL (sección 7) ----
   listInitiatives: () => call('list_initiatives'),
+  syncInitiativesWithFolders: () => call('sync_initiatives_with_folders'),
   toggleInitiativePin: (id) => call('toggle_initiative_pin', id),
   createInitiative: (name, color) => call('create_initiative', name, color),
   renameInitiative: (id, name) => call('rename_initiative', id, name),
   setInitiativeColor: (id, color) => call('set_initiative_color', id, color),
   renameMeeting: (id, title) => call('rename_meeting', id, title),
+  setMeetingDate: (id, date) => call('set_meeting_date', id, date),
   setMeetingContext: (id, text) => call('set_meeting_context', id, text),
   addMeetingNote: (id, text) => call('add_meeting_note', id, text),
   addNotePost: (mid, text) => call('add_note_post', mid, text),
@@ -116,17 +168,20 @@ const api = {
   checkLicense: () => call('check_license'),
   activateLicense: (key) => call('activate_license', key),
   getLicenseInfo: () => call('get_license_info'),
+  getPlanFeatures: () => call('get_plan_features'),
   deactivateLicense: () => call('deactivate_license'),
+  reportVideoUsage: (seconds) => call('report_video_usage', seconds),
   search: (q) => call('search', q),
   getTranscript: (mid) => call('get_transcript', mid),
   startRecording: (iid, title) => call('start_recording', iid, title),
   stopRecording: () => call('stop_recording'),
   listMonitors: () => call('list_monitors'),
+  getMonitorThumbnails: () => call('get_monitor_thumbnails'),
   takeCapture: (idx) => call('take_capture', idx),
   addNote: (text) => call('add_note', text),
   toggleMeetingMicMute: (muted) => call('toggle_meeting_mic_mute', muted),
   importMedia: (iid) => call('import_media', iid),
-  importMediaMultiple: (iid) => call('import_media_multiple', iid),
+  importMediaMultiple: (iid, kind) => call('import_media_multiple', iid, kind),
   importVideoForMeeting: (mid) => call('import_video_for_meeting', mid),
   exportMeetingById: (mid) => call('export_meeting_by_id', mid),
   exportTranscriptTxt: (mid) => call('export_transcript_txt', mid),
@@ -138,14 +193,17 @@ const api = {
   exportInitiativeTo: (iid) => call('export_initiative_to', iid),
   setInitiativeDescription: (iid, d) => call('set_initiative_description', iid, d),
   copyInitiativeContext: (iid) => call('copy_initiative_context', iid),
-  copyMeetingContext: (mid) => call('copy_meeting_context', mid),
+  copyMeetingContext: (mid, lang) => call('copy_meeting_context', mid, lang || null),
   getCaptureImage: (cid) => call('get_capture_image', cid),
   getCaptureThumbnail: (cid) => call('get_capture_thumbnail', cid),
+  getMeetingThumbnail: (mid) => call('get_meeting_thumbnail', mid),
   getBackgroundJobs: () => call('get_background_jobs'),
   setAiInstructions: (t) => call('set_ai_instructions', t),
   openMeetingFolder: (mid) => call('open_meeting_folder', mid),
   openPath: (p) => call('open_path', p),
   getSettings: () => call('get_settings'),
+  getUiLanguage: () => call('get_ui_language'),
+  setUiLanguage: (lang) => call('set_ui_language', lang),
   getDiagnostics: () => call('get_diagnostics'),
   getRecordingPreflight: (kind, monitor) => call('get_recording_preflight', kind, monitor),
   backupDatabase: () => call('backup_database'),
@@ -154,10 +212,27 @@ const api = {
   setApiToken: (t) => call('set_api_token', t),
   chooseExportDir: () => call('choose_export_dir'),
 
+  // ---- Documentos → Markdown ----
+  listDocumentInitiatives: () => call('list_document_initiatives'),
+  pickAndConvertDocuments: (iid, ocr, imgs) => call('pick_and_convert_documents', iid, ocr, !!imgs),
+  listDocuments: (iid) => call('list_documents', iid),
+  openDocument: (iid, name) => call('open_document', iid, name),
+  openDocumentOriginal: (iid, name) => call('open_document_original', iid, name),
+  openDocumentsFolder: (iid) => call('open_documents_folder', iid),
+  openDocumentImages: (iid, name) => call('open_document_images', iid, name),
+  deleteDocument: (iid, name) => call('delete_document', iid, name),
+  listAllDocuments: () => call('list_all_documents'),
+  readDocument: (iid, name) => call('read_document', iid, name),
+  saveUploadedDocument: (iid, name, b64, ocr, imgs) => call('save_uploaded_document', iid, name, b64, ocr, !!imgs),
+
   // ---- Grabación de pantalla + biblioteca (backend REAL, ya implementado) ----
   startScreenRecording: (iid, idx) => call('start_screen_recording', iid, idx),
   stopScreenRecording: () => call('stop_screen_recording'),
-  transcribeMeetingVideo: (mid, force) => call('transcribe_meeting_video', mid, !!force),
+  transcribeMeetingVideo: (mid, force, clipSegments) => call('transcribe_meeting_video', mid, !!force, clipSegments || null),
+  getVideoThumbnails: (mid, count) => call('get_video_thumbnails', mid, count || 12),
+  getMediaVideoUrl: (mid) => call('get_media_video_url', mid),
+  checkForUpdate: () => call('check_for_update'),
+  openUrl: (u) => call('open_url', u),
   toggleScreenMicMute: (m) => call('toggle_screen_mic_mute', m),
   setScreenMonitor: (idx) => call('set_screen_monitor', idx),
   setScreenScaleMode: (mode) => call('set_screen_scale_mode', mode),
@@ -176,30 +251,31 @@ const api = {
   // Cada uno hace fallback a un comportamiento de UI honesto (no finge éxito de datos).
   v2: {
     getAppState: () => call('get_app_state'),                       // @pending-python
-    cancelCurrentJob: () => call('cancel_current_job'),             // @pending-python
-    listRecoverable: () => call('list_recoverable_recordings'),     // @pending-python
-    recoverRecording: (id) => call('recover_recording', id),        // @pending-python
-    discardRecoverable: (id) => call('discard_recoverable_recording', id), // @pending-python
+    cancelCurrentJob: () => call('cancel_meeting_job'),
+    listRecoverable: () => call('list_recoverable_recordings'),
+    recoverRecording: (id) => call('recover_recording', id),
+    discardRecoverable: (id) => call('discard_recoverable_recording', id),
     getAudioDevices: () => call('get_audio_devices'),               // @pending-python
     testAudioDevices: (cfg) => call('test_audio_devices', cfg),     // @pending-python
-    startScreenRecording: (iid, idx) => call('start_screen_recording', iid, idx), // @pending-python
-    stopScreenRecording: () => call('stop_screen_recording'),       // @pending-python
-    updateUtterance: (id, ch) => call('update_utterance', id, ch),  // @pending-python
+    startScreenRecording: (iid, idx) => call('start_screen_recording', iid, idx),
+    stopScreenRecording: () => call('stop_screen_recording'),
+    updateUtterance: (id, ch) => call('update_utterance', id, ch),
     splitUtterance: (id, pos) => call('split_utterance', id, pos),  // @pending-python
     mergeUtterances: (a, b) => call('merge_utterances', a, b),      // @pending-python
-    deleteUtterance: (id) => call('delete_utterance', id),          // @pending-python
-    toggleHighlight: (id) => call('toggle_utterance_highlight', id),// @pending-python
+    deleteUtterance: (id) => call('delete_utterance', id),
+    toggleHighlight: (id) => call('toggle_utterance_highlight', id),
     listMeetingAssets: (mid) => call('list_meeting_assets', mid),   // @pending-python
-    updateNote: (id, t) => call('update_note', id, t),              // @pending-python
+    updateNote: (id, t) => call('update_note', id, t),
+    deleteNote: (id) => call('delete_note', id),
     deleteCapture: (id) => call('delete_capture', id),              // @pending-python
     generateSummary: (mid) => call('generate_meeting_summary', mid),// @pending-python
     getInsights: (mid) => call('get_meeting_insights', mid),        // @pending-python
     updateInsights: (mid, d) => call('update_meeting_insights', mid, d), // @pending-python
     deleteMeeting: (id) => call('delete_meeting', id),              // @pending-python
-    archiveInitiative: (id) => call('archive_initiative', id),      // @pending-python
+    archiveInitiative: (id) => call('archive_item', 'initiative', id),
     searchAdvanced: (q, f) => call('search_advanced', q, f),        // @pending-python
-    getTranscriptionSettings: () => call('get_transcription_settings'),   // @pending-python
-    setTranscriptionSettings: (d) => call('set_transcription_settings', d), // @pending-python
+    getTranscriptionSettings: () => call('get_transcription_settings'),
+    setTranscriptionSettings: (d) => call('set_transcription_settings', d),
     listParticipants: (iid) => call('list_participants', iid),
     addParticipants: (iid, names) => call('add_participants', iid, names),
     renameParticipant: (id, name) => call('rename_participant', id, name),
@@ -207,22 +283,53 @@ const api = {
     setMeParticipant: (iid, pid) => call('set_me_participant', iid, pid),
     assignUtteranceParticipant: (uid, pid) => call('assign_utterance_participant', uid, pid),
     cancelMeetingJob: (mid) => call('cancel_meeting_job', mid),
-    runSetup: () => call('run_setup'),                               // @pending-python
+    runSetup: () => call('run_setup'),
+    clearVoskCache: () => call('clear_vosk_cache'),
   },
   // Controles de ventana frameless
   winMinimize: () => call('win_minimize'),
   winMaximize: () => call('win_maximize'),
   winClose: () => call('win_close'),
+  winRefreshTheme: (dark) => call('win_refresh_theme', !!dark),
   winIsMaximized: () => call('win_is_maximized'),
   winStartResize: (dir) => call('win_start_resize', dir),
   winStartMove: () => call('win_start_move'),
 };
 
+// ─── Plan feature gating ──────────────────────────────────────
+
+const _PLAN_UPGRADE_LABELS = {
+  zip_export: 'Exportar ZIP',
+  participants: 'Gestionar participantes',
+  glossary: 'Glosario de terminos',
+  recovery: 'Recuperar grabaciones',
+  video_unlimited: 'Video ilimitado',
+};
+
+function hasFeature(key) {
+  const pf = window._planFeatures;
+  if (!pf) return true;  // si no se cargo aun, no bloquear
+  return !!pf[key];
+}
+
+function upgradeLabel(key) {
+  return _PLAN_UPGRADE_LABELS[key] || key;
+}
+
+function proBadge(key) {
+  if (hasFeature(key)) return '';
+  return `<span class="pro-badge" title="Disponible en Helpmeet Pro">${svg('diamond', 10)} PRO</span>`;
+}
+
+function showUpgradeToast(key) {
+  const label = upgradeLabel(key);
+  toast('warn', `${label} — Disponible en Helpmeet Pro`);
+}
+
 // ¿Está disponible un método V2 en el backend real?
 function v2Available(pyMethod) {
   return HAS_PYWEBVIEW() && typeof window.pywebview.api[pyMethod] === 'function';
 }
-
 /* ============================================================
    2b. DATOS MOCK — solo para el navegador (sin pywebview).
    Permiten ver/probar el rediseño sin backend. Nunca se usan
@@ -251,7 +358,7 @@ const MOCK = (() => {
   };
   const transcripts = {
     m1: {
-      id: 'm1', title: 'Kick-off con diseño', started_at: '2026-06-20T10:00:00', duration: '45:12',
+      id: 'm1', title: 'Kick-off con diseño', started_at: '2026-06-20T10:00:00', duration: '45:12', video_duration: '45:12', video_path: 'C:\Helpmeet\export\grabacion.mp4',
       context: 'Reunión inicial para alinear al equipo de diseño con los objetivos del rediseño. Se revisaron los pain points del flujo actual y se definieron los primeros entregables.',
       notes: [
         { id: 'n1', text: 'Revisar paleta de colores con marketing antes del viernes', created_at: '2026-06-20T10:32:00' },
@@ -296,8 +403,16 @@ const MOCK = (() => {
   let mctr = 100;
   return {
     list_initiatives: () => wait(inits.slice()),
-    create_initiative: (name, color) => { const it = { id: 'i' + (++mctr), name, color: color || '#aacfbf', created_at: new Date().toISOString() }; inits.push(it); meetings[it.id] = []; return wait(it); },
-    rename_initiative: (id, name) => { const it = inits.find(x => x.id === id); if (it) it.name = name; return wait({ ok: true }); },
+    create_initiative: (name, color) => {
+      name = (name || '').trim();
+      if (inits.some(x => (x.name || '').trim().toLowerCase() === name.toLowerCase())) return wait({ error: 'duplicate_name' });
+      const it = { id: 'i' + (++mctr), name, color: color || '#aacfbf', created_at: new Date().toISOString() }; inits.push(it); meetings[it.id] = []; return wait(it);
+    },
+    rename_initiative: (id, name) => {
+      name = (name || '').trim();
+      if (inits.some(x => x.id !== id && (x.name || '').trim().toLowerCase() === name.toLowerCase())) return wait({ ok: false, error: 'duplicate_name' });
+      const it = inits.find(x => x.id === id); if (it) it.name = name; return wait({ ok: true });
+    },
     rename_meeting: (id, title) => { for (const k in meetings) { const m = meetings[k].find(x => x.id === id); if (m) m.title = title; } return wait({ ok: true }); },
     set_meeting_context: (id, context) => { if (transcripts[id]) transcripts[id].context = context; return wait({ ok: true, context }); },
     add_meeting_note: (id, text) => {
@@ -351,11 +466,16 @@ const MOCK = (() => {
     },
     start_recording: (iid, title) => wait({ id: 'm' + (++mctr), title: title || 'Reunión sin título', initiative_id: iid, live: true }),
     stop_recording: () => wait({ status: 'ok', duration: '12:48', utterances: 24 }, 400),
-    list_monitors: () => wait([{ index: 0, width: 2560, height: 1440 }, { index: 1, width: 1920, height: 1080 }]),
+    list_monitors: () => wait([{ index: 1, width: 2560, height: 1440 }, { index: 2, width: 1920, height: 1080 }]),
+    get_monitor_thumbnails: () => wait([{ index: 1, left: 0, top: 0, width: 2560, height: 1440, thumbnail: '' }, { index: 2, left: 2560, top: 0, width: 1920, height: 1080, thumbnail: '' }]),
     take_capture: () => wait({ ok: true }),
     add_note: () => wait({ ok: true }),
     import_media: (iid) => wait({ id: 'm' + (++mctr), title: 'Vídeo importado', initiative_id: iid, utterances: 30 }, 600),
     import_video_for_meeting: (mid) => wait({ ok: true, queued: true, meeting_id: mid, filename: 'grabacion.mp4' }, 400),
+    get_meeting_thumbnail: (mid) => {
+      const svg = `<svg xmlns='http://www.w3.org/2000/svg' width='160' height='90'><rect width='160' height='90' fill='#3a5a52'/><circle cx='80' cy='45' r='22' fill='#fff' fill-opacity='.85'/><polygon points='72,32 72,58 96,45' fill='#3a5a52'/></svg>`;
+      return wait({ ok: true, data_url: 'data:image/svg+xml;utf8,' + encodeURIComponent(svg) }, 250);
+    },
     export_meeting_by_id: () => wait({ path: 'C:\\Helpmeet\\export' }, 500),
     export_transcript_txt: () => wait({ ok: true, path: 'C:\\Helpmeet\\transcripcion.txt' }, 500),
     export_transcript_package: () => wait({ ok: true, path: 'C:\\Helpmeet\\transcripcion.zip', captures: 2, files: 1 }, 500),
@@ -371,7 +491,7 @@ const MOCK = (() => {
     choose_export_dir: () => wait({ ok: true, path: 'C:\\Helpmeet\\export' }),
     // V2 mock (para previsualizar la UI en navegador)
     get_app_state: () => wait({ state: 'idle', job: null, recoverable: [] }),
-    cancel_current_job: () => wait({ ok: true }),
+    cancel_meeting_job: () => wait({ ok: true }),
     list_recoverable_recordings: () => wait([]),
     get_audio_devices: () => wait({ inputs: [{ id: 'mic1', name: 'Realtek HD Audio' }], outputs: [{ id: 'spk1', name: 'Altavoces (loopback)' }] }),
     get_recording_preflight: (kind) => wait({ kind, title: kind === 'screen' ? 'Antes de grabar la pantalla' : 'Antes de grabar la reunión', action: 'Continuar', can_start: true, checks: [] }),
@@ -390,24 +510,49 @@ const MOCK = (() => {
 
 const TIER_LABEL = { fast: 'Mínimo', balanced: 'Pequeño', accurate: 'Mediano', max: 'Grande' };
 
+/* Preferencia de micrófono silenciado, persistida en el navegador.
+   Por defecto silenciado (como antes): ante la duda, no grabar tu voz. */
+const MIC_KEY = 'hm.mic-muted';
+function _leerMicMuted() {
+  try {
+    const v = localStorage.getItem(MIC_KEY);
+    return v == null ? true : v === '1';
+  } catch { return true; }
+}
+function _guardarMicMuted(m) {
+  try { localStorage.setItem(MIC_KEY, m ? '1' : '0'); } catch { /* modo privado */ }
+}
+
 /* ============================================================
    3. ESTADO CENTRAL
    ============================================================ */
 const STATE = {
   appState: 'idle',     // idle | recording | recording-local | recording-cloud | screen-recording | processing
-  screen: 'welcome',    // welcome | initiative | meeting | search | glossary | archive | trash | meetings
+  screen: 'welcome',    // welcome | initiative | meeting | search | glossary | archive | trash | meetings | docs
   sidebarOpen: load('hm.sidebar', '1') === '1',
+  /* La vista semanal es la que abre el calendario: en la mensual las reuniones
+     de un día caben de a tres y el resto queda detrás de un "+N más", y con el
+     uso real (varias por día) eso es la mayoría. La semana muestra el título
+     entero y la duración, que es lo que se viene a mirar. */
   cal: { y: null, m: null, view: 'week', filter: 'all', weekStart: null },  // estado del calendario de Reuniones
+  docsDest: null,        // iniciativa destino para subir/convertir documentos (rediseño v2)
+  docsFilter: 'all',     // filtro de proyecto en la lista global ('all' o id de iniciativa)
+  docsQuery: '',         // texto de búsqueda en la lista global de documentos
+  docsOcr: 'auto',       // modo OCR al convertir: 'auto' | 'force' | 'off'
+  docsExtractImages: false, // extraer imágenes embebidas al convertir documentos
   initiatives: [],
   meetingsByInit: {},    // cache
   openInits: {},         // id -> bool expandido
   selInit: null,
   selMeeting: null,
   transcript: null,
-  activeTab: 'transcript',
+  activeTab: 'general',
+  _txLang: '',           // idioma seleccionado en el filtro de transcripcion
+  _txApply: null,        // funcion de busqueda en transcripcion
   provider: 'auto',      // auto | local | replicate (V2)
   monitors: [],
-  monitorIdx: 0,
+  monitorIdx: 1,
+  monitorThumbnails: {},
   screenScaleMode: load('hm.screenScaleMode', 'fit'),
   recElapsed: 0,
   recStartedAt: 0,
@@ -417,7 +562,13 @@ const STATE = {
   jobDeterminate: false,
   jobStartedAt: 0,
   jobClock: null,
-  micMuted: false,
+  /* Silenciar el micrófono sobrevive al cierre de la app: es una decisión sobre
+     la privacidad de quien graba, y volver a arrancar con el micrófono abierto
+     porque nadie guardó el estado es la clase de sorpresa que se descubre
+     demasiado tarde. Se guarda en localStorage además de intentarlo en el
+     backend (setTranscriptionSettings), porque esa ruta depende de `api.v2` y
+     si no está montada no persistía nada. Ver _leerMicMuted. */
+  micMuted: _leerMicMuted(),
   meetingMicMuted: false,
   screenPanelCollapsed: false,
   settings: { export_dir: '', token_set: false },
@@ -430,6 +581,16 @@ function save(k, v) { try { localStorage.setItem(k, v); } catch (e) {} }
 
 // Migración única: sidebar abierto por defecto desde v74
 if (!load('hm.sidebar-default-v74', '')) { save('hm.sidebar', '1'); save('hm.sidebar-default-v74', '1'); }
+// Tema: claro por defecto; 'dark' activa el modo oscuro calido (Ajustes -> Apariencia)
+if (load('hm.theme', 'light') === 'dark') document.body.dataset.theme = 'dark';
+// Favicon: version oscura en modo oscuro
+(function updateFavicon() {
+  const isDark = load('hm.theme', 'light') === 'dark';
+  const png = document.getElementById('faviconPng');
+  const ico = document.getElementById('faviconIco');
+  if (png) png.href = isDark ? 'assets/helpmeet-favicon.png' : 'assets/helpmeet-favicon.png';
+  if (ico) ico.href = isDark ? 'assets/helpmeet-dark.ico' : 'assets/helpmeet.ico';
+})();
 
 function setAppState(s) {
   STATE.appState = s;
@@ -440,7 +601,6 @@ function setAppState(s) {
   refreshSidebarJobs();   // refleja grabación/transcripción en el árbol al cambiar de estado
   // adaptador opcional para el backend (no obligatorio)
 }
-
 /* ============================================================
    4. RENDER
    ============================================================ */
@@ -476,28 +636,72 @@ function emptyState({ icon = 'info', title = '', text = '', action } = {}) {
 }
 function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
 
+/* ── Fechas: una sola fuente para toda la app ──────────────────
+   Antes estos arrays y la lógica de semanas estaban copiados en varios
+   sitios y los bugs (semanas duplicadas) había que arreglarlos copia
+   por copia. Cualquier cambio de formato de fechas se hace AQUÍ. */
+const DIAS_CORTOS  = ['dom', 'lun', 'mar', 'mié', 'jue', 'vie', 'sáb'];
+const MESES_CORTOS = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
+const MESES_LARGOS = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
+
+// Hora local "HH:MM" de una fecha ISO ('' si no es válida).
+function hhmmOf(iso) {
+  const d = new Date(iso);
+  return isNaN(d) ? '' : `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+}
+
+// Semana (lunes–domingo) a la que pertenece una fecha: claves con fecha
+// LOCAL (no UTC) y el mes tomado del JUEVES de la semana (convención ISO),
+// para que una semana a caballo entre dos meses no se duplique.
+// La usan el árbol lateral, la vista de proyecto y la tabla de Proyectos.
+function weekInfoOf(iso) {
+  if (!iso) return null;
+  const d = new Date(iso); if (isNaN(d)) return null;
+  const day = d.getDay();
+  const mon = new Date(d); mon.setDate(d.getDate() - (day === 0 ? 6 : day - 1));
+  mon.setHours(0, 0, 0, 0);
+  const sun = new Date(mon); sun.setDate(mon.getDate() + 6);
+  const thu = new Date(mon); thu.setDate(mon.getDate() + 3);
+  const fmt = dt => `${dt.getDate()} ${MESES_CORTOS[dt.getMonth()]}`;
+  return {
+    wKey: `${mon.getFullYear()}-${String(mon.getMonth() + 1).padStart(2, '0')}-${String(mon.getDate()).padStart(2, '0')}`,
+    mKey: `${thu.getFullYear()}-${String(thu.getMonth() + 1).padStart(2, '0')}`,
+    wLabel: `${fmt(mon)} – ${fmt(sun)}`,
+    mLabel: `${MESES_LARGOS[thu.getMonth()]} ${thu.getFullYear()}`,
+  };
+}
+
+// Markup de un waveform en vivo. n = nº de barras. cls = clase extra (p.ej. 'hm-wave--tx').
+// Arranca en modo 'idle' (animación de fallback); onAudioLevels lo vuelve reactivo.
+function waveMarkup(n = 7, cls = '') {
+  let bars = '';
+  for (let i = 0; i < n; i++) bars += '<i></i>';
+  const extra = (cls ? ' ' + cls : '') + (STATE.micMuted ? ' muted' : '');
+  return `<span class="hm-wave idle${extra}" aria-hidden="true">${bars}</span>`;
+}
+
 function renderTopStatus() {
   const root = $('#topbarStatus');
   const s = STATE.appState;
   if (s === 'recording' || s === 'recording-local' || s === 'recording-cloud') {
-    root.innerHTML = `<div class="status-rec"><span class="rdot"></span>Grabando reunión · <span class="mono">${fmt(STATE.recElapsed)}</span></div>`;
+    // Icono de origen: micrófono = solo audio
+    root.innerHTML = `<div class="status-rec"><span class="rdot"></span><span class="rec-kind">${svg('mic', 12)}</span>Grabando reunión · <span class="mono">${fmt(STATE.recElapsed)}</span>${waveMarkup()}</div>`;
   } else if (s === 'screen-recording') {
-    root.innerHTML = `<div class="status-rec"><span class="rdot"></span>REC pantalla · <span class="mono">${fmt(STATE.recElapsed)}</span></div>`;
+    // Icono de origen: pantalla
+    root.innerHTML = `<div class="status-rec"><span class="rdot"></span><span class="rec-kind">${svg('monitorDot', 12)}</span>REC pantalla · <span class="mono">${fmt(STATE.recElapsed)}</span>${waveMarkup()}</div>`;
   } else if (s === 'processing') {
     const progressText = STATE.jobDeterminate ? Math.round(STATE.jobProgress) + '%' : processingElapsed();
     root.innerHTML = `<div class="status-proc"><span class="spinner"></span>${esc(STATE.jobStage)} · ${progressText}</div>`;
   } else {
-    // Reposo: pastilla de contexto (dónde estás: iniciativa › reunión)
-    const it = STATE.initiatives.find(x => x.id === STATE.selInit);
-    let ctx;
-    if (STATE.screen === 'meeting' && STATE.transcript) {
-      ctx = `<span class="ctx-init">${esc(it ? it.name : '')}</span>${svg('chevron', 12)}<span class="ctx-meet">${esc(STATE.transcript.title)}</span>`;
-    } else if (it) {
-      ctx = `<span class="ctx-meet">${esc(it.name)}</span>`;
-    } else {
-      ctx = null;   // sin iniciativa seleccionada: no se muestra la miga de pan
-    }
-    root.innerHTML = ctx ? `<div class="context-pill"><span class="dot-ok"></span>${ctx}</div>` : '';
+    /* En reposo la barra de título va VACÍA, como el mockup. Antes mostraba una
+       pastilla con el proyecto y la reunión abiertos, pero eso ya se sabe: el
+       proyecto está resaltado en el panel lateral y el título de la reunión es
+       lo más grande de la pantalla. Repetirlo arriba no añadía nada y llenaba
+       una barra que el rediseño deja despejada.
+       El hueco sigue usándose cuando SÍ hay algo que no se ve en otro sitio: el
+       estado de la grabación en curso y el del trabajo en segundo plano — las
+       tres ramas de arriba. */
+    root.innerHTML = '';
   }
   updateMicChip();
 }
@@ -507,44 +711,209 @@ function renderTopStatus() {
    - En reposo: queda como preferencia para la próxima grabación. */
 async function toggleMic() {
   STATE.micMuted = !STATE.micMuted;
+  _guardarMicMuted(STATE.micMuted);
   updateMicChip();
+  _medidorMic();          // corta o abre el medidor según el estado nuevo
   const s = STATE.appState;
   try {
     if (s === 'screen-recording') await api.toggleScreenMicMute(STATE.micMuted);
     else if (s === 'recording' || s === 'recording-local' || s === 'recording-cloud') await api.toggleMeetingMicMute(STATE.micMuted);
     else if (api.v2 && api.v2.setTranscriptionSettings) await api.v2.setTranscriptionSettings({ default_mic_muted: STATE.micMuted });
   } catch (e) { /* no romper la UI por el guardado */ }
-  toast('info', STATE.micMuted ? 'Micrófono silenciado' : 'Micrófono activo');
+  toast('info', STATE.micMuted ? t('recording.micMuted') : t('recording.micActive'));
 }
 function updateMicChip() {
+  /* Antes del guard: esta función se llama en cada render de estado, así que es
+     el punto natural para abrir el medidor cuando aparece el dock y cerrarlo
+     cuando desaparece. El guard de abajo sale si no hay botón, y ahí justamente
+     hay que cortar el stream. */
+  _medidorMic();
   const b = $('#btnMic'); if (!b) return;
-  b.classList.toggle('muted', !!STATE.micMuted);
-  b.setAttribute('aria-pressed', STATE.micMuted ? 'true' : 'false');
-  b.setAttribute('aria-label', STATE.micMuted ? 'Activar micrófono' : 'Silenciar micrófono');
-  b.setAttribute('title', STATE.micMuted ? 'Activar micrófono' : 'Silenciar micrófono');
-  const i = b.querySelector('.mic-ico'); if (i) i.innerHTML = svg(STATE.micMuted ? 'headerMicOff' : 'headerMic', 16);
+  const m = !!STATE.micMuted;
+  /* Dos clases: .muted era la del diseño anterior y .is-muted la del dock nuevo
+     (donde el micrófono tachado se tiñe de rojo). Se ponen las dos para que el
+     estado se vea sea cual sea el markup que esté montado — al portar el dock,
+     esta función seguía poniendo solo la vieja y buscando un .mic-ico que ya no
+     existía: el estado cambiaba de verdad pero no se veía. */
+  b.classList.toggle('muted', m);
+  b.classList.toggle('is-muted', m);
+  b.setAttribute('aria-pressed', m ? 'true' : 'false');
+  const lbl = m ? 'Empezar con el micrófono activo' : 'Empezar con el micrófono silenciado';
+  b.setAttribute('aria-label', lbl);
+  b.setAttribute('title', lbl);
+  // Markup nuevo: el icono es un <use> del sprite.
+  const u = b.querySelector('svg use');
+  if (u) u.setAttribute('href', m ? '#i-mic-off' : '#i-mic');
+  // Markup viejo, mientras siga existiendo en alguna pantalla.
+  const i = b.querySelector('.mic-ico');
+  if (i) i.innerHTML = svg(m ? 'headerMicOff' : 'headerMic', 16);
+  // Los waveforms en vivo siguen al micrófono, en los dos componentes.
+  document.querySelectorAll('.hm-wave').forEach(w => w.classList.toggle('muted', m));
+  document.querySelectorAll('.waveform.live').forEach(w => w.classList.toggle('is-muted', m));
 }
-function openSearch() { const s = $('#search'); if (!s) return; s.classList.add('expanded'); $('#searchInput').focus(); }
+/* ---- Buscador global (Ctrl+K) ----
+   Hasta el rediseño esto era código muerto: openSearch() buscaba un #search
+   que nunca existió en index.html, y runSearch() no la llamaba nadie — el
+   backend api.search() estaba hecho y probado pero era inalcanzable.
+   Ahora vive en un <dialog> (patrón del mockup): filtra proyectos y reuniones
+   al instante en local, y Enter lanza la búsqueda dentro de las
+   transcripciones, que es lo que api.search() sabe hacer y el mockup no. */
+const SO = { cursor: -1, rows: [] };
+
+/* "29 jul" — mismo formato corto que usa el mockup en la columna de la derecha. */
+function soFecha(iso) {
+  if (!iso) return '';
+  const d = new Date(iso);
+  if (isNaN(d)) return '';
+  return d.toLocaleDateString('es', { day: '2-digit', month: 'short' }).replace('.', '');
+}
+
+function openSearch() {
+  const dlg = $('#searchOverlay'); if (!dlg || dlg.open) return;
+  const ico = $('#soIcon'); if (ico && !ico.innerHTML) ico.innerHTML = svg('search', 17);
+  const input = $('#searchInput');
+  if (input) input.value = '';
+  renderSearchOverlay('');
+  dlg.showModal();
+  requestAnimationFrame(() => dlg.classList.add('show'));
+  if (input) input.focus();
+}
+function closeSearchOverlay() {
+  const dlg = $('#searchOverlay'); if (!dlg || !dlg.open) return;
+  dlg.classList.remove('show');
+  dlg.close();
+}
+
+/* Índices locales: se leen del estado ya cargado, sin ir al backend. */
+function soProjects(q) {
+  const items = STATE.initiatives || [];
+  if (!q) return items.slice(0, 6);
+  return items.filter(i => (i.name || '').toLowerCase().includes(q)).slice(0, 8);
+}
+function soMeetings(q) {
+  const out = [];
+  const byInit = STATE.meetingsByInit || {};
+  Object.keys(byInit).forEach(iid => {
+    const ini = (STATE.initiatives || []).find(x => String(x.id) === String(iid));
+    (byInit[iid] || []).forEach(m => {
+      if (!q || (m.title || '').toLowerCase().includes(q) || (ini?.name || '').toLowerCase().includes(q)) {
+        out.push({ m, ini });
+      }
+    });
+  });
+  out.sort((a, b) => String(b.m.started_at || '').localeCompare(String(a.m.started_at || '')));
+  return out.slice(0, q ? 8 : 6);
+}
+
+function soRow({ ico, dot, title, sub, time, onClick }) {
+  const b = el('button', 'so-row'); b.type = 'button';
+  const icoHtml = dot
+    ? `<span class="so-dot" style="background:${esc(dot)}"></span>`
+    : svg(ico || 'file', 15);
+  b.innerHTML = `<span class="so-row-ico">${icoHtml}</span>` +
+    `<span class="so-row-main"><span class="so-row-title">${esc(title)}</span>` +
+    (sub ? `<span class="so-row-sub">${sub}</span>` : '') + `</span>` +
+    (time ? `<span class="so-row-time">${esc(time)}</span>` : '');
+  b.onclick = () => { closeSearchOverlay(); onClick(); };
+  return b;
+}
+
+function renderSearchOverlay(query, contentHits) {
+  const list = $('#searchOverlayResults'); if (!list) return;
+  const q = (query || '').trim().toLowerCase();
+  list.replaceChildren();
+  SO.rows = [];
+  SO.cursor = -1;
+
+  const addGroup = (label) => {
+    const h = el('div', 'search-overlay-group-label'); h.textContent = label; list.appendChild(h);
+  };
+  const addRow = (row) => { list.appendChild(row); SO.rows.push(row); };
+
+  const projs = soProjects(q);
+  if (projs.length) {
+    addGroup('Proyectos');
+    projs.forEach(p => addRow(soRow({
+      dot: p.color || 'var(--text-muted)',
+      title: p.name,
+      sub: `${(STATE.meetingsByInit?.[p.id] || []).length} reuniones`,
+      onClick: () => selectInitiative(p.id),
+    })));
+  }
+
+  const meets = soMeetings(q);
+  if (meets.length) {
+    addGroup('Reuniones');
+    meets.forEach(({ m, ini }) => addRow(soRow({
+      ico: m.source === 'screen' ? 'monitorDot' : 'mic',
+      title: m.title || 'Sin título',
+      sub: esc(ini?.name || ''),
+      time: soFecha(m.started_at),
+      onClick: () => openMeeting(m.id),
+    })));
+  }
+
+  if (contentHits && contentHits.length) {
+    addGroup('En las transcripciones');
+    contentHits.slice(0, 12).forEach(r => addRow(soRow({
+      ico: 'search',
+      title: r.meeting_title || r.meeting || 'Reunión',
+      sub: highlight(r.text || '', query.trim()),
+      time: r.date || '',
+      onClick: () => { if (r.meeting_id) openMeeting(r.meeting_id); },
+    })));
+  }
+
+  if (!SO.rows.length) {
+    const e = el('div', 'search-overlay-empty');
+    e.textContent = q ? `Sin resultados para “${query.trim()}”` : 'Escribe para buscar.';
+    list.appendChild(e);
+  } else if (q && !contentHits) {
+    const hint = el('div', 'search-overlay-hint');
+    hint.textContent = 'Enter para buscar también dentro de las transcripciones';
+    list.appendChild(hint);
+  }
+}
+
+/* Flechas + Enter: navegar sin soltar el teclado. */
+function soMoveCursor(delta) {
+  if (!SO.rows.length) return;
+  if (SO.cursor >= 0) SO.rows[SO.cursor]?.classList.remove('is-cursor');
+  SO.cursor = (SO.cursor + delta + SO.rows.length) % SO.rows.length;
+  const row = SO.rows[SO.cursor];
+  row.classList.add('is-cursor');
+  row.scrollIntoView({ block: 'nearest' });
+}
 
 function renderMain() {
   const main = $('#main');
   document.body.setAttribute('data-screen', STATE.screen);
-  // Estado activo del nav lateral (Reuniones vs. Iniciativas)
+  // Estado activo del nav lateral (Calendario vs. Proyectos)
   const onMeetings  = STATE.screen === 'meetings';
   const onFavorites = STATE.screen === 'favorites';
+  const onArchive = STATE.screen === 'archive';
+  const onHome = STATE.screen === 'welcome';
+  const onDocs = STATE.screen === 'docs';
+  $('#navHome')?.classList.toggle('active', onHome);
   $('#navMeetings')?.classList.toggle('active', onMeetings);
   $('#navFavorites')?.classList.toggle('active', onFavorites);
-  $('#navInitiatives')?.classList.toggle('active', !onMeetings && !onFavorites);
+  $('#navDocs')?.classList.toggle('active', onDocs);
+  $('#btnArchive')?.classList.toggle('active', onArchive);
+  // Papelera queda marcada en las dos: Archivados vive dentro de esa pantalla.
+  $('#btnTrash')?.classList.toggle('active', STATE.screen === 'trash' || STATE.screen === 'archive');
+  $('#navInitiatives')?.classList.toggle('active', !onMeetings && !onFavorites && !onArchive && !onHome && !onDocs);
   switch (STATE.screen) {
     case 'welcome': return main.replaceChildren(viewWelcome());
     case 'meetings': return main.replaceChildren(viewMeetings());
     case 'favorites': return main.replaceChildren(viewFavorites());
+    case 'docs': return main.replaceChildren(viewDocs());
     case 'initiatives-list': return main.replaceChildren(viewAllInitiatives());
     case 'initiative': return main.replaceChildren(viewInitiative());
     case 'meeting': return main.replaceChildren(viewMeeting());
     case 'search': return main.replaceChildren(viewSearch());
     case 'glossary': return main.replaceChildren(viewGlossary());
     case 'archive':
+    case 'allnotes': return main.replaceChildren(viewAllNotes());
     case 'trash': return main.replaceChildren(viewArchiveTrash(STATE.screen));
     case 'settings': return main.replaceChildren(viewSettings());
     default: return main.replaceChildren(viewWelcome());
@@ -553,6 +922,9 @@ function renderMain() {
 
 /* ---- Vistas ---- */
 function viewWelcome() {
+  // Con proyectos ya creados, Inicio muestra la actividad reciente
+  // (estilo Gmail); la bienvenida solo aparece recién instalado.
+  if ((STATE.initiatives || []).length) return viewHomeFeed();
   const w = el('div', 'empty');
   w.innerHTML = `
     <div class="empty-watermark" aria-hidden="true">
@@ -562,8 +934,8 @@ function viewWelcome() {
     <div class="empty-inner">
       <div class="empty-logo"><img src="assets/helpmeet-symbol.svg" alt=""></div>
       <h2 class="empty-title">Helpmeet</h2>
-      <p>Listo para capturar contexto. Crea una nueva iniciativa o usa la barra de acciones de abajo para empezar a grabar.</p>
-      <button class="btn btn-welcome" id="wNew">${svg('plus', 18)} Nueva iniciativa</button>
+      <p>${t('welcome.subtitle')}. ${t('welcome.newProjectHint')}</p>
+      <button class="btn btn-welcome" id="wNew">${svg('plus', 18)} ${t('welcome.newProject')}</button>
       <button class="empty-diag" id="wDiag">Diagnóstico del sistema</button>
     </div>`;
   w.querySelector('#wNew').onclick = promptNewInitiative;
@@ -571,10 +943,228 @@ function viewWelcome() {
   return w;
 }
 
+// Inicio con actividad reciente: reuniones de todos los proyectos
+// agrupadas por día (Hoy / Ayer / fecha), con acción rápida.
+/* ---- Patrón de fila de reunión (FASE 2) ----
+   Es la pieza más reutilizada del mockup: Inicio, la pestaña Reuniones de cada
+   proyecto y Favoritos usan exactamente esta anatomía. Los hijos son hermanos y
+   no van anidados dentro de .row a propósito: .row sigue siendo el <button> de
+   navegación, y un botón no puede contener limpiamente otros controles.
+   opts: { showProject, showDate, onMore } */
+function meetingRow(m, it, opts) {
+  opts = opts || {};
+  const favs = _getMeetingFavs();
+  const esFav = favs.has(m.id);
+  const esPantalla = m.source === 'screen' || m.source === 'import';
+  const color = it ? (it.color || avatarColorFor(it.name)) : 'var(--text-faint)';
+
+  const wrap = el('div', 'row-wrap');
+  wrap.dataset.mid = m.id;
+
+  // Casilla de selección
+  const slot = el('label', 'row-select-slot');
+  slot.title = 'Seleccionar';
+  slot.innerHTML =
+    `<input type="checkbox" class="row-checkbox" aria-label="Seleccionar ${esc(m.title || 'reunión')}">` +
+    `<svg class="row-check-mark" aria-hidden="true"><use href="#i-check"/></svg>`;
+
+  // Icono de tipo: la verdad la fija si hay vídeo, igual que en el mockup.
+  const tipo = el('span', 'row-doc-icon');
+  tipo.title = esPantalla ? 'Grabación de pantalla' : 'Grabación de audio';
+  tipo.innerHTML = `<svg class="icon" aria-hidden="true"><use href="#i-${esPantalla ? 'monitor' : 'audiowave'}"/></svg>`;
+
+  // Contenido navegable
+  const sub = _subtituloReunion(m);
+  const ubic = _ubicacionReunion(m, it);
+  const nav = el('button', 'row');
+  nav.type = 'button';
+  nav.innerHTML =
+    `<span class="row-main">` +
+      `<span class="row-title">${esc(_fmtMeetingLabel(m))}</span>` +
+      `<span class="row-sub">` +
+        `<svg class="icon row-sub-ico" aria-hidden="true"><use href="#i-clock"/></svg>${esc(sub)}` +
+        `<span class="row-folder-chip" title="${esc(ubic.titulo)}">` +
+          `<svg class="icon" aria-hidden="true"><use href="#i-folder"/></svg>` +
+          `<span class="row-folder-chip-name">${esc(ubic.nombre)}</span>` +
+        `</span>` +
+      `</span>` +
+    `</span>`;
+  nav.onclick = () => { if (it) STATE.selInit = it.id; openMeeting(m.id); };
+
+  // Estrella
+  const fav = el('button', 'row-fav-btn' + (esFav ? ' active' : ''));
+  fav.type = 'button';
+  fav.setAttribute('aria-pressed', esFav ? 'true' : 'false');
+  fav.title = esFav ? 'Quitar de favoritos' : 'Marcar como favorita';
+  fav.innerHTML = '<svg aria-hidden="true"><use href="#i-star"/></svg>';
+  fav.onclick = (e) => {
+    e.stopPropagation();
+    const ahora = _toggleMeetingFav(m.id);
+    fav.classList.toggle('active', ahora);
+    fav.setAttribute('aria-pressed', ahora ? 'true' : 'false');
+    fav.title = ahora ? 'Quitar de favoritos' : 'Marcar como favorita';
+    const favEl = $('#favCount');
+    if (favEl) { const n = _getMeetingFavs().size; favEl.textContent = n || ''; }
+  };
+
+  wrap.append(slot, tipo, nav, fav);
+
+  // Proyecto: solo donde la lista mezcla varios. Dentro de un proyecto todas
+  // las filas son del mismo y el indicador sería ruido.
+  /* Indicador de ubicación: el proyecto y, si la reunión está dentro de una
+     carpeta del usuario, también la carpeta — "Mi bolsillo / Alquiler". Es la
+     ruta real donde vive, que es lo que se quiere saber al mirar la lista; con
+     solo el proyecto no se distingue una reunión suelta de una archivada en su
+     carpeta. El icono se tiñe con el color del proyecto. */
+  if (opts.showProject && it) {
+    const proj = el('span', 'row-proj-icon');
+    proj.style.color = color;
+    proj.title = 'Proyecto: ' + it.name;
+    proj.setAttribute('aria-label', proj.title);
+    proj.innerHTML = `<svg class="icon" aria-hidden="true"><use href="#i-folder"/></svg>` +
+      `<span class="row-proj-name-grid"><span class="row-proj-name">${esc(it.name)}</span></span>`;
+    wrap.appendChild(proj);
+  }
+
+  // [hora][···]
+  const acciones = el('span', 'row-actions-slot');
+  const hora = opts.showDate ? `${soFecha(m.started_at)} · ${m.time || ''}` : (m.time || hhmmOf(m.started_at) || '');
+  const meta = el('span', 'row-meta');
+  meta.innerHTML = `<span class="row-time">${esc(hora)}</span>`;
+  const more = el('button', 'row-more-btn');
+  more.type = 'button';
+  more.title = 'Más acciones';
+  more.setAttribute('aria-label', 'Más acciones de ' + (m.title || 'la reunión'));
+  more.innerHTML = '<svg class="icon icon-sm" aria-hidden="true"><use href="#i-more"/></svg>';
+  more.onclick = (e) => {
+    e.stopPropagation();
+    if (opts.onMore) opts.onMore(e, m, it);
+    /* m.id y no m: openMeetingMenu recibe el ID de la reunión. Al pasarle el
+       objeto, todo lo que compara con el id fallaba en silencio —
+       promptMoveMeetingToFolder buscaba 'x.id === {objeto}', no encontraba el
+       proyecto y salía sin hacer nada; lo mismo el favorito y el archivar. */
+    else openMeetingMenu(e, m.id);
+  };
+  acciones.append(meta, more);
+  wrap.appendChild(acciones);
+
+  return wrap;
+}
+
+/* Subtítulo de la fila: duración cuando la hay, y si no el estado real.
+   El recuento de frases se añade acá porque salió del título: como nombre no
+   servía —cambia solo mientras se transcribe—, pero como dato sí dice algo que
+   la fila no dice en ningún otro sitio: cuánto contenido tiene. */
+function _subtituloReunion(m) {
+  if (m.status === 'processing') return 'Transcribiendo…';
+  const n = m.frases || 0;
+  const frases = n ? ` · ${n} ${n === 1 ? 'frase' : 'frases'}` : '';
+  const d = _duracionReunion(m);
+  if (d) return d + frases;
+  if (m.has_video) return 'Sin transcribir' + frases;
+  return 'Pendiente';
+}
+
+/* Solo la duración, sin el recuento de frases: la usan las celdas del
+   calendario, donde el ancho es de una columna de siete y "1 min · 330 frases"
+   sale cortado a media palabra. */
+function _duracionReunion(m) {
+  if (!m.dur || m.dur === '—') return '';
+  const [mm, ss] = String(m.dur).split(':').map(x => parseInt(x, 10) || 0);
+  const total = mm + (ss >= 30 ? 1 : 0);
+  return total >= 60 ? `${Math.floor(total / 60)} h ${total % 60} min` : `${total || 1} min`;
+}
+
+/* Minutos reales de una reunión, para los contadores de la tarjeta del día. */
+function _minutosDe(m) {
+  if (!m.dur || m.dur === '—') return 0;
+  const [mm, ss] = String(m.dur).split(':').map(n => parseInt(n, 10) || 0);
+  return mm + ss / 60;
+}
+
+function viewHomeFeed() {
+  const wrap = el('div', 'content-scroll scroll');
+  const inner = el('div', 'content-inner');
+
+  const items = [];
+  for (const [iid, ms] of Object.entries(STATE.meetingsByInit || {})) {
+    const it = (STATE.initiatives || []).find(x => x.id === Number(iid));
+    for (const m of (ms || [])) items.push({ m, it });
+  }
+  items.sort((a, b) => String(b.m.started_at || '').localeCompare(String(a.m.started_at || '')));
+
+  const titulo = el('h1', 'page-title'); titulo.textContent = 'Inicio';
+  inner.appendChild(titulo);
+
+  // ---- Tarjeta del día ----
+  const hoy = new Date();
+  const deHoy = items.filter(({ m }) => {
+    const d = new Date(m.started_at);
+    return !isNaN(d) && d.toDateString() === hoy.toDateString();
+  });
+  const minutos = deHoy.reduce((s, { m }) => s + _minutosDe(m), 0);
+  const frases = deHoy.reduce((s, { m }) => s + (m.frases || 0), 0);
+  const durTxt = minutos >= 60
+    ? `${Math.floor(minutos / 60)} h ${Math.round(minutos % 60)} m`
+    : `${Math.round(minutos)} m`;
+
+  const card = el('div', 'today-card');
+  card.innerHTML =
+    `<div class="today-num-wrap">` +
+      `<div class="today-num">${hoy.getDate()}<span class="today-dot" aria-hidden="true"></span></div>` +
+      `<div class="today-labels">` +
+        `<span class="cap">${hoy.toLocaleDateString('es', { month: 'long' })}</span>` +
+        `<span class="cap">${hoy.toLocaleDateString('es', { weekday: 'long' })}</span>` +
+      `</div>` +
+    `</div>` +
+    `<div class="today-stats">` +
+      `<div class="tstat"><span class="tstat-val">${deHoy.length}</span><span class="tstat-lbl">grabadas hoy</span></div>` +
+      `<span class="tstat-sep" aria-hidden="true"></span>` +
+      `<div class="tstat"><span class="tstat-val">${durTxt}</span><span class="tstat-lbl">de audio</span></div>` +
+      `<span class="tstat-sep" aria-hidden="true"></span>` +
+      `<div class="tstat"><span class="tstat-val">${frases}</span><span class="tstat-lbl">frases</span></div>` +
+    `</div>`;
+  inner.appendChild(card);
+
+  // ---- Lista agrupada por día ----
+  if (!items.length) {
+    const vacio = el('div', 'empty-state');
+    vacio.innerHTML =
+      `<svg class="icon icon-lg" aria-hidden="true"><use href="#i-pages"/></svg>` +
+      `<div class="l1">Sin actividad todavía</div>` +
+      `<div class="l2">Graba una reunión, graba la pantalla o importa un video desde la barra de abajo.</div>`;
+    inner.appendChild(vacio);
+  } else {
+    const ayer = new Date(); ayer.setDate(hoy.getDate() - 1);
+    const etiquetaDia = (iso) => {
+      const d = new Date(iso);
+      if (isNaN(d)) return 'Sin fecha';
+      if (d.toDateString() === hoy.toDateString()) return 'Hoy';
+      if (d.toDateString() === ayer.toDateString()) return 'Ayer';
+      return d.toLocaleDateString('es', { day: 'numeric', month: 'long' });
+    };
+
+    let dia = null, lista = null;
+    items.slice(0, 30).forEach(({ m, it }) => {
+      const et = etiquetaDia(m.started_at);
+      if (et !== dia) {
+        const g = el('div', 'group-label'); g.textContent = et;
+        inner.appendChild(g);
+        lista = el('div', 'list');
+        inner.appendChild(lista);
+        dia = et;
+      }
+      lista.appendChild(meetingRow(m, it, { showProject: true }));
+    });
+  }
+
+  wrap.appendChild(inner);
+  return wrap;
+}
 /* ============================================================
-   Vista de Reuniones · Calendario (estilo Stitch)
+   Vista de Calendario (estilo Stitch)
    ============================================================ */
-const CAL_MONTHS = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
+const CAL_MONTHS = MESES_LARGOS;
 const CAL_MONTHS_SHORT = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
 const CAL_DOW = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
 
@@ -584,7 +1174,7 @@ function _startOfWeek(d) { const x = new Date(d.getFullYear(), d.getMonth(), d.g
 // Paleta de colores para iniciativas (tonos suaves que encajan con el tema oscuro).
 const INIT_COLORS = ['#aacfbf', '#e8c17b', '#e0857b', '#86b5e0', '#a98fd6', '#8fc99b', '#e093c0', '#7fcdd0'];
 function _initColor(it) { return (it && it.color) || '#aacfbf'; }
-// '#rrggbb' -> 'rgba(r,g,b,a)' para fondos translúcidos del color de la iniciativa.
+// '#rrggbb' -> 'rgba(r,g,b,a)' para fondos translúcidos del color de el proyecto.
 function _hexA(hex, a) {
   let h = String(hex || '#aacfbf').replace('#', '');
   if (h.length === 3) h = h.split('').map(c => c + c).join('');
@@ -602,6 +1192,12 @@ function openMeetingsView() {
   STATE.screen = 'meetings';
   STATE.selInit = null; STATE.selMeeting = null;
   renderSidebar(); renderMain();
+}
+
+function openDocsView() {
+  STATE.screen = 'docs';
+  STATE.selInit = null; STATE.selMeeting = null;
+  renderSidebar(); renderMain(); renderTopStatus();
 }
 
 // Todas las reuniones (de todas las iniciativas) como lista plana, aplicando el filtro activo.
@@ -645,7 +1241,7 @@ function _calDurMin(dur) {
 }
 
 // Evento dentro de una celda del MES (estilo Notion: punto + hora + título).
-// El punto toma el color de la iniciativa; pendiente = punto hueco.
+// El punto toma el color de el proyecto; pendiente = punto hueco.
 function _calEvent(m, it) {
   const time = _calFmtTime((m.started_at || '').substring(11, 16));
   const color = _initColor(it);
@@ -653,181 +1249,209 @@ function _calEvent(m, it) {
   const ev = el('div', 'cal-ev' + (pending ? ' pending' : ''));
   ev.title = `${esc(m.title)} · ${esc(it.name)}`;
   const dotStyle = pending ? `border:1.5px solid ${color};background:transparent` : `background:${color}`;
-  ev.innerHTML = `<span class="cal-ev-dot" style="${dotStyle}"></span>${time ? `<span class="cal-ev-time">${esc(time)}</span>` : ''}<span class="cal-ev-title">${esc(m.title)}</span>`;
+  ev.innerHTML = `<span class="cal-ev-dot" style="${dotStyle}"></span>${time ? `<span class="cal-ev-time">${esc(time)}</span>` : ''}<span class="cal-ev-title">${esc(_fmtMeetingLabel(m, { enCalendario: true }))}</span>`;
   ev.onclick = (e) => { e.stopPropagation(); _calOpenMeeting(m, it); };
   return ev;
 }
 
 function viewFavorites() {
-  const wrap = el('div'); wrap.style.cssText = 'display:flex;flex-direction:column;flex:1;min-height:0;overflow:hidden';
-  // Contar favoritas para mostrar en el header
-  const favIds = _getMeetingFavs();
-  const favList = [];
+  const favs = _getMeetingFavs();
+  const wrap = el('div', 'content-scroll scroll');
+  const inner = el('div', 'content-inner');
+
+  // Todas las favoritas, agrupadas por proyecto.
+  const porProy = new Map();
   for (const [iid, ms] of Object.entries(STATE.meetingsByInit || {})) {
-    for (const m of (ms || [])) {
-      if (favIds.has(m.id)) {
-        const it = (STATE.initiatives || []).find(x => x.id === Number(iid));
-        favList.push({ m, it });
-      }
-    }
-  }
-
-  const head = el('div', 'mhead');
-  head.style.cssText = 'border-bottom:none;background:transparent';
-  head.innerHTML = `<div class="mhead-row"><h1 class="mtitle-h">Favoritas</h1></div>`;
-  const content = el('div', 'content');
-
-  if (!favList.length) {
-    content.appendChild(emptyState({
-      icon: 'star',
-      title: 'Sin favoritas aún',
-      text: 'Usa el botón ☆ en cada reunión o el menú ⋯ para marcarla como favorita.',
-    }));
-  } else {
-    const list = el('div', 'fav-list');
-    // Agrupar por iniciativa
-    const byInit = new Map();
-    favList.forEach(({ m, it }) => {
-      const key = it ? it.id : 'none';
-      if (!byInit.has(key)) byInit.set(key, { it, meetings: [] });
-      byInit.get(key).meetings.push(m);
+    const it = (STATE.initiatives || []).find(x => x.id === Number(iid));
+    (ms || []).filter(m => favs.has(m.id)).forEach(m => {
+      const k = it ? it.id : 0;
+      if (!porProy.has(k)) porProy.set(k, { it, ms: [] });
+      porProy.get(k).ms.push(m);
     });
-    // Solo inicializar una vez (no reiniciar en cada re-render)
-    if (!STATE._favOpen) {
-      STATE._favOpen = new Set();
-      if (byInit.size > 0) STATE._favOpen.add(byInit.keys().next().value);
-    }
+  }
+  const total = [...porProy.values()].reduce((s, g) => s + g.ms.length, 0);
 
-    byInit.forEach(({ it, meetings }, key) => {
-      const mColor = it ? _initColor(it) : 'var(--text-muted)';
-      const initName = it ? it.name : 'Sin iniciativa';
-      const isOpen = STATE._favOpen.has(key);
-      // Cabecera de iniciativa (colapsable)
-      const ihdr = el('div', 'fav-init-hdr' + (isOpen ? ' open' : ''));
-      ihdr.innerHTML = `<span class="fav-chev">${svg('chevron', 10)}</span><span class="fav-init-dot" style="background:${mColor}"></span><span class="fav-init-name">${esc(initName)}</span><span class="fav-init-cnt">${meetings.length}</span>`;
-      ihdr.onclick = () => {
-        STATE._favOpen.has(key) ? STATE._favOpen.delete(key) : STATE._favOpen.add(key);
-        renderMain();
-      };
-      list.appendChild(ihdr);
-      if (!isOpen) return; // colapsado: no renderizar cards
-      // Cards de reunión
-      meetings.forEach(m => {
-        const { day, mon } = parseMeetingDate(m.date || m.started_at);
-        const c = el('div', 'row-card done fav-card');
-        c.innerHTML = `
-          <div class="rc-date"><span class="rc-mon">${mon}</span><span class="rc-day">${day}</span></div>
-          <div class="rc-body">
-            <div class="rc-title">${esc(m.title)}</div>
-            <div class="rc-meta">${m.dur ? esc(m.dur) : ''}${m.time ? '<span class="rc-size">' + esc(m.time) + '</span>' : ''}</div>
-          </div>
-          <div class="rc-right">
-            <div class="rc-actions">
-              <button class="icon-btn sm rc-act-btn fav-on" data-act="unfav" title="Quitar de favoritas">${svg('star',13)}</button>
-            </div>
-            <span class="pill pill-done"><span class="pd"></span>Finalizada</span>
-          </div>`;
-        c.onclick = () => { if (it) STATE.selInit = it.id; openMeeting(m.id); };
-        c.oncontextmenu = (e) => { e.preventDefault(); openMeetingMenu(e, m.id); };
-        c.querySelector('[data-act="unfav"]').onclick = (e) => {
-          e.stopPropagation();
-          _toggleMeetingFav(m.id);
-          c.remove();
-          if (!list.querySelector('.fav-card')) renderMain();
-        };
-        list.appendChild(c);
+  const head = el('div', 'fav-head');
+  head.innerHTML =
+    `<h1 class="page-title">Favoritos</h1>` +
+    `<span class="fav-count">${total} ${total === 1 ? 'reunión' : 'reuniones'}</span>`;
+  if (total) {
+    const limpiar = el('button', 'btn-outline fav-clear');
+    limpiar.type = 'button';
+    limpiar.textContent = 'Quitar todas';
+    limpiar.onclick = () => confirmModal('Quitar todas las favoritas',
+      'Se desmarcan todas. Las reuniones no se borran.', 'Quitar', () => {
+        _setMeetingFavs(new Set());
+        renderSidebar(); renderMain();
       });
-    });
-    content.appendChild(list);
+    head.appendChild(limpiar);
   }
-  wrap.replaceChildren(head, content);
+  inner.appendChild(head);
+
+  if (!total) {
+    const v = el('div', 'empty-state');
+    v.innerHTML =
+      `<svg class="icon icon-lg"><use href="#i-star"/></svg>` +
+      `<div class="l1">Sin favoritos todavía</div>` +
+      `<div class="l2">Marcá una reunión con la estrella y la vas a encontrar acá.</div>`;
+    inner.appendChild(v);
+    wrap.appendChild(inner);
+    return wrap;
+  }
+
+  const cont = el('div');
+  cont.id = 'favGroups';
+  // El primer grupo arranca abierto y el resto cerrados: con muchos proyectos,
+  // abrirlos todos convierte la pantalla en una lista larguísima sin jerarquía.
+  let primero = true;
+  porProy.forEach(({ it, ms }) => {
+    const abierto = primero; primero = false;
+    const g = el('section', 'fav-group' + (abierto ? ' is-open' : ''));
+
+    const hdr = el('div', 'fav-group-hdr');
+    const tog = el('button', 'fav-group-toggle');
+    tog.type = 'button';
+    tog.setAttribute('aria-expanded', abierto ? 'true' : 'false');
+    tog.innerHTML =
+      `<svg class="fav-chev"><use href="#i-chevright"/></svg>` +
+      `<span class="fav-group-dot" style="background:${esc(_initColor(it) || 'var(--text-muted)')}"></span>` +
+      `<span class="fav-group-name">${esc(it ? it.name : 'Sin proyecto')}</span>` +
+      `<span class="fav-group-cnt">${ms.length}</span>`;
+
+    const body = el('div', 'fav-group-body fav-list');
+    if (!abierto) body.hidden = true;
+    const lista = el('div', 'list');
+    ms.forEach(m => lista.appendChild(meetingRow(m, it, { showProject: true, showDate: true })));
+    body.appendChild(lista);
+
+    tog.onclick = () => {
+      const ahora = g.classList.toggle('is-open');
+      tog.setAttribute('aria-expanded', ahora ? 'true' : 'false');
+      body.hidden = !ahora;
+    };
+
+    // Hermano del toggle, no hijo: un button dentro de otro es HTML inválido.
+    const vaciar = el('button', 'icon-btn fav-group-clear');
+    vaciar.type = 'button';
+    vaciar.title = `Quitar las favoritas de ${it ? it.name : 'este grupo'}`;
+    vaciar.innerHTML = '<svg class="icon icon-sm"><use href="#i-close"/></svg>';
+    vaciar.onclick = () => {
+      const s = _getMeetingFavs();
+      ms.forEach(m => s.delete(m.id));
+      _setMeetingFavs(s);
+      renderSidebar(); renderMain();
+    };
+
+    hdr.append(tog, vaciar);
+    g.append(hdr, body);
+    cont.appendChild(g);
+  });
+  inner.appendChild(cont);
+
+  wrap.appendChild(inner);
   return wrap;
 }
 
 function viewMeetings() {
-  const wrap = el('div'); wrap.style.cssText = 'display:flex;flex-direction:column;flex:1;min-height:0';
   const C = STATE.cal;
-  const today = new Date(); const todayKey = _dkey(today);
+  const hoy = new Date(); const hoyKey = _dkey(hoy);
 
-  // Agrupa reuniones por día (YYYY-MM-DD).
-  const byDay = {};
+  // Reuniones agrupadas por día (YYYY-MM-DD).
+  const porDia = {};
   for (const { m, it } of _calMeetings()) {
     const k = (m.started_at || '').substring(0, 10);
     if (!k) continue;
-    (byDay[k] = byDay[k] || []).push({ m, it });
+    (porDia[k] = porDia[k] || []).push({ m, it });
   }
-  for (const k in byDay) byDay[k].sort((a, b) => (a.m.started_at || '').localeCompare(b.m.started_at || ''));
+  for (const k in porDia) porDia[k].sort((a, b) => (a.m.started_at || '').localeCompare(b.m.started_at || ''));
 
-  // ---- Cabecera ----
-  const head = el('div', 'mhead cal-head');
-  let titleMain, titleSub;
+  const wrap = el('div', 'content-scroll scroll');
+  const inner = el('div', 'content-inner cal-head');
+  inner.style.maxWidth = '980px';
+
+  const h1 = el('h1', 'page-title'); h1.textContent = 'Calendario';
+  inner.appendChild(h1);
+
+  // ---- Barra: filtro · modo · navegación ----
+  const barra = el('div', 'cal-bar');
+  const montaFiltro = el('span');
+  barra.appendChild(montaFiltro);
+
+  const modos = el('div', 'cal-modes');
+  modos.setAttribute('role', 'group');
+  [['month', 'Mes'], ['week', 'Semana']].forEach(([id, txt]) => {
+    const b = el('button', 'cal-mode' + (C.view === id ? ' is-on' : ''));
+    b.type = 'button'; b.textContent = txt;
+    b.onclick = () => { C.view = id; renderMain(); };
+    modos.appendChild(b);
+  });
+  barra.appendChild(modos);
+
+  // Etiqueta del periodo visible.
+  let etiqueta;
   if (C.view === 'week') {
     const ws = new Date(C.weekStart + 'T00:00:00');
     const we = new Date(ws); we.setDate(we.getDate() + 6);
-    const sameMonth = ws.getMonth() === we.getMonth();
-    titleMain = sameMonth
+    etiqueta = ws.getMonth() === we.getMonth()
       ? `${ws.getDate()} – ${we.getDate()} ${CAL_MONTHS_SHORT[ws.getMonth()]}`
       : `${ws.getDate()} ${CAL_MONTHS_SHORT[ws.getMonth()]} – ${we.getDate()} ${CAL_MONTHS_SHORT[we.getMonth()]}`;
-    titleSub = `${we.getFullYear()}`;
   } else {
-    titleMain = CAL_MONTHS[C.m];
-    titleSub = `${C.y}`;
+    etiqueta = `${CAL_MONTHS[C.m]} ${C.y}`;
   }
 
-  head.innerHTML = `
-    <div class="cal-head-left">
-      <h1 class="cal-title"><span class="cal-title-main">${esc(titleMain)}</span><span class="cal-title-sub">${esc(titleSub)}</span></h1>
-      <div class="cal-nav">
-        <button class="cal-nav-today" id="calToday">Hoy</button>
-        <button class="cal-nav-btn" id="calPrev" title="Anterior" aria-label="Anterior">${svg('chevron', 15)}</button>
-        <button class="cal-nav-btn" id="calNext" title="Siguiente" aria-label="Siguiente">${svg('chevron', 15)}</button>
-      </div>
-    </div>
-    <div class="cal-head-right">
-      <span id="calFilterMount"></span>
-      <div class="cal-toggle">
-        <button class="${C.view === 'month' ? 'active' : ''}" id="calViewMonth">Mes</button>
-        <button class="${C.view === 'week' ? 'active' : ''}" id="calViewWeek">Semana</button>
-      </div>
-    </div>`;
-
-  // Filtro por iniciativa con dropdown personalizado (tema oscuro)
-  const filterItems = [{ value: 'all', label: 'Todas las iniciativas' }]
-    .concat(STATE.initiatives.map(it => ({ value: it.id, label: it.name, color: _initColor(it) })));
-  const filterEl = customSelect({
-    value: C.filter, items: filterItems, icon: 'filter', className: 'cal-filter', minWidth: 200,
-    onChange: (v) => { C.filter = v; renderMain(); },
-  });
-  head.querySelector('#calFilterMount').replaceWith(filterEl);
-
-  // ---- Cuerpo ----
-  const body = el('div', 'cal-body');
-
-  if (C.view === 'week') {
-    body.appendChild(_calWeekGrid(C.weekStart, byDay, todayKey));
-  } else {
-    body.appendChild(_calMonth(C.y, C.m, byDay, todayKey));
-  }
-
-  // ---- Estado vacío sutil (solo en mes; en semana la rejilla habla por sí sola) ----
-  if (!Object.keys(byDay).length && C.view === 'month') {
-    const hint = el('div', 'cal-empty');
-    hint.innerHTML = `${svg('calendar', 18)} <span>No hay reuniones${C.filter !== 'all' ? ' en esta iniciativa' : ''} en este periodo.</span>`;
-    body.appendChild(hint);
-  }
-
-  // ---- Handlers ----
-  head.querySelector('#calPrev').onclick = () => { _calShift(-1); renderMain(); };
-  head.querySelector('#calNext').onclick = () => { _calShift(1); renderMain(); };
-  head.querySelector('#calToday').onclick = () => {
+  const nav = el('div', 'cal-nav');
+  const bPrev = el('button', 'icon-btn');
+  bPrev.type = 'button'; bPrev.title = 'Anterior'; bPrev.setAttribute('aria-label', 'Anterior');
+  bPrev.innerHTML = '<svg class="icon"><use href="#i-chevleft"/></svg>';
+  bPrev.onclick = () => { _calShift(-1); renderMain(); };
+  const lbl = el('div', 'cal-month'); lbl.textContent = etiqueta;
+  const bNext = el('button', 'icon-btn');
+  bNext.type = 'button'; bNext.title = 'Siguiente'; bNext.setAttribute('aria-label', 'Siguiente');
+  bNext.innerHTML = '<svg class="icon"><use href="#i-chevright"/></svg>';
+  bNext.onclick = () => { _calShift(1); renderMain(); };
+  const bHoy = el('button', 'cal-today-btn');
+  bHoy.type = 'button'; bHoy.textContent = 'Hoy';
+  bHoy.onclick = () => {
     const n = new Date();
     C.y = n.getFullYear(); C.m = n.getMonth(); C.weekStart = _dkey(_startOfWeek(n));
     renderMain();
   };
-  head.querySelector('#calViewMonth').onclick = () => { C.view = 'month'; renderMain(); };
-  head.querySelector('#calViewWeek').onclick = () => { C.view = 'week'; renderMain(); };
+  nav.append(bPrev, lbl, bNext, bHoy);
+  barra.appendChild(nav);
+  inner.appendChild(barra);
 
-  wrap.append(head, body);
+  // Filtro por proyecto (componente ya existente en la app).
+  const filtro = customSelect({
+    value: C.filter,
+    items: [{ value: 'all', label: 'Todos los espacios' }]
+      .concat(STATE.initiatives.map(it => ({ value: it.id, label: it.name, color: _initColor(it) }))),
+    icon: 'filter', className: 'cal-filter', minWidth: 190,
+    onChange: (v) => { C.filter = v; renderMain(); },
+  });
+  montaFiltro.replaceWith(filtro);
+
+  // ---- Cuerpo ----
+  if (C.view === 'week') {
+    inner.appendChild(_calWeekGrid(C.weekStart, porDia, hoyKey));
+  } else {
+    const dows = el('div', 'cal-dows');
+    // Semana que empieza en lunes: el domingo de CAL_DOW se manda al final.
+    ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'].forEach(d => {
+      const c = el('div', 'cal-dow'); c.textContent = d; dows.appendChild(c);
+    });
+    inner.appendChild(dows);
+    inner.appendChild(_calMonth(C.y, C.m, porDia, hoyKey));
+  }
+
+  // Estado vacío: se calcula contra el filtro activo, así que un mes con
+  // reuniones pero ninguna del proyecto filtrado también sale vacío.
+  if (!Object.keys(porDia).length) {
+    const v = el('div', 'cal-empty-month');
+    v.textContent = `No grabaste nada${C.filter !== 'all' ? ' en este proyecto' : ''} en este periodo.`;
+    inner.appendChild(v);
+  }
+
+  wrap.appendChild(inner);
   return wrap;
 }
 
@@ -848,125 +1472,118 @@ function _calShift(dir) {
 
 // Rejilla mensual estilo Notion: número a la derecha, badge rojo de hoy,
 // prefijo del mes el día 1, eventos como punto + hora + título.
-function _calMonth(y, m, byDay, todayKey) {
+/* Rejilla del mes, con la semana empezando en lunes. Las líneas de 1px las
+   dibuja el gap sobre un fondo del color del borde: así no se doblan a dos
+   píxeles entre celda y celda. */
+function _calMonth(y, m, porDia, hoyKey) {
   const grid = el('div', 'cal-grid');
-  const first = new Date(y, m, 1);
-  const firstDow = first.getDay();
-  const daysInMonth = new Date(y, m + 1, 0).getDate();
-  const rows = Math.ceil((firstDow + daysInMonth) / 7);
-  grid.style.gridTemplateRows = `auto repeat(${rows}, minmax(0, 1fr))`;
+  const primero = new Date(y, m, 1);
+  const offset = (primero.getDay() + 6) % 7;   // lunes = 0
+  const dias = new Date(y, m + 1, 0).getDate();
+  const celdas = Math.ceil((offset + dias) / 7) * 7;
+  const hoy = new Date(); hoy.setHours(0, 0, 0, 0);
+  const MAX = 3;
 
-  const todayDow = new Date().getDay();
-  CAL_DOW.forEach((d, i) => {
-    grid.appendChild(el('div', 'cal-dow' + (i === todayDow ? ' today' : ''), d));
-  });
+  for (let i = 0; i < celdas; i++) {
+    const n = i - offset + 1;
+    const cell = el('div', 'cal-cell');
+    if (n < 1 || n > dias) { cell.classList.add('is-out'); grid.appendChild(cell); continue; }
 
-  const start = new Date(y, m, 1 - firstDow);
-  for (let i = 0; i < rows * 7; i++) {
-    const date = new Date(start.getFullYear(), start.getMonth(), start.getDate() + i);
-    const inMonth = date.getMonth() === m;
-    const key = _dkey(date);
-    const isToday = key === todayKey;
-    const dn = date.getDate();
-    const cell = el('div', 'cal-cell' + (inMonth ? '' : ' other') + (isToday ? ' today' : ''));
-    const monPrefix = dn === 1 ? `<span class="cal-mon">${CAL_MONTHS[date.getMonth()]}</span> ` : '';
-    const evs = byDay[key] || [];
-    const countBadge = evs.length ? `<span class="cal-day-count">${evs.length}</span>` : '';
-    cell.innerHTML = `<div class="cal-daynum">${monPrefix}<span class="cal-dnum">${dn}</span>${countBadge}</div>`;
+    const fecha = new Date(y, m, n);
+    const k = _dkey(fecha);
+    if (k === hoyKey) cell.classList.add('is-today');
+    if (fecha > hoy) cell.classList.add('is-future');
+
+    const num = el('div', 'cal-num'); num.textContent = n;
+    cell.appendChild(num);
+
+    const evs = (porDia[k] || []);
     if (evs.length) {
-      const list = el('div', 'cal-events');
-      const max = 3;
-      evs.slice(0, max).forEach(({ m: mm, it }) => list.appendChild(_calEvent(mm, it)));
-      if (evs.length > max) list.appendChild(el('div', 'cal-more', `+${evs.length - max}`));
-      cell.appendChild(list);
+      const cont = el('div', 'cal-evs');
+      evs.slice(0, MAX).forEach(({ m: mt, it }) => {
+        const b = el('button', 'cal-ev');
+        b.type = 'button';
+        b.title = `${_fmtMeetingLabel(mt)}${it ? ' · ' + it.name : ''}`;
+        b.innerHTML =
+          `<span class="cal-ev-dot" style="background:${esc(_initColor(it) || 'var(--text-muted)')}"></span>` +
+          `<span class="cal-ev-time">${esc(_hora24(mt.started_at))}</span>` +
+          `<span class="cal-ev-title">${esc(_fmtMeetingLabel(mt, { enCalendario: true }))}</span>`;
+        b.onclick = () => { if (it) STATE.selInit = it.id; openMeeting(mt.id); };
+        cont.appendChild(b);
+      });
+      if (evs.length > MAX) {
+        const mas = el('button', 'cal-more');
+        mas.type = 'button';
+        mas.textContent = `+${evs.length - MAX} más`;
+        mas.onclick = () => { STATE.cal.view = 'week'; STATE.cal.weekStart = _dkey(_startOfWeek(fecha)); renderMain(); };
+        cont.appendChild(mas);
+      }
+      cell.appendChild(cont);
     }
-    // Click fuera de un evento → ir a vista semana de ese día
-    cell.addEventListener('click', (e) => {
-      if (e.target.closest('.cal-event, .cal-tg-more')) return;
-      const C = STATE.cal;
-      const dow = date.getDay();
-      const ws = new Date(date.getFullYear(), date.getMonth(), date.getDate() - dow);
-      C.weekStart = _dkey(ws);
-      C.view = 'week';
-      renderMain();
-    });
     grid.appendChild(cell);
   }
   return grid;
+}
+
+/* Hora en 24 h: dentro de la celda el sufijo "a. m./p. m." cuesta seis
+   caracteres por evento, y sin él "5:20" no se distingue de las cinco de la
+   mañana. */
+function _hora24(iso) {
+  const d = new Date(iso);
+  if (isNaN(d)) return '';
+  return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
 }
 
 const CAL_HOUR_PX = 48;   // alto de cada hora en la rejilla semanal
 
 // Vista semanal estilo Notion: eje de horas, fila "Todo el día", columnas
 // iguales y línea roja de la hora actual.
-function _calWeekGrid(weekStartKey, byDay, todayKey) {
-  const ws = new Date(weekStartKey + 'T00:00:00');
-  const days = [];
-  for (let i = 0; i < 7; i++) days.push(new Date(ws.getFullYear(), ws.getMonth(), ws.getDate() + i));
-  const todayIdx = days.findIndex(d => _dkey(d) === todayKey);
+/* Semana: siete columnas altas con la lista del día, no una rejilla con eje
+   horario. Estas reuniones duran de 1 a 45 minutos; sobre doce horas de eje la
+   mitad serían bloques de dos píxeles. Lo que sí aporta el modo semana es
+   espacio para leer el título entero y la duración. */
+function _calWeekGrid(weekStartKey, porDia, hoyKey) {
+  const cont = el('div', 'cal-week');
+  const inicio = new Date(weekStartKey + 'T00:00:00');
+  const hoy = new Date(); hoy.setHours(0, 0, 0, 0);
+  const DOW = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'];
 
-  const tg = el('div', 'cal-tg');
+  for (let i = 0; i < 7; i++) {
+    const fecha = new Date(inicio); fecha.setDate(inicio.getDate() + i);
+    const k = _dkey(fecha);
+    const col = el('div', 'cal-wday');
+    if (fecha > hoy) col.classList.add('is-future');
 
-  // Cabecera con los 7 días
-  const head = el('div', 'cal-tg-head');
-  head.appendChild(el('div', 'cal-tg-corner', `<span class="cal-tg-tz">${_calTzAbbr()}</span>`));
-  days.forEach((d, i) => {
-    const isToday = i === todayIdx;
-    const dh = el('div', 'cal-tg-dh' + (isToday ? ' today' : ''));
-    dh.innerHTML = `<span class="cal-tg-dow">${CAL_DOW[i]}</span> <span class="cal-tg-dnum">${d.getDate()}</span>`;
-    head.appendChild(dh);
-  });
-  tg.appendChild(head);
+    const cab = el('div', 'cal-wday-head');
+    const num = el('div', 'cal-num' );
+    num.textContent = fecha.getDate();
+    if (k === hoyKey) { col.classList.add('is-today'); num.style.cssText = 'background:var(--recording);color:#fff;border-radius:50%;font-weight:600'; }
+    const dow = el('div', 'cal-wday-dow'); dow.textContent = DOW[i];
+    cab.append(num, dow);
+    col.appendChild(cab);
 
-  // Zona horaria con scroll
-  const scroll = el('div', 'cal-tg-scroll');
-  const cols = el('div', 'cal-tg-cols');
-
-  // Columna de horas (eje)
-  const times = el('div', 'cal-tg-times');
-  times.style.height = `${24 * CAL_HOUR_PX}px`;
-  for (let h = 0; h < 24; h++) {
-    const hl = el('div', 'cal-tg-hl');
-    hl.style.top = `${h * CAL_HOUR_PX}px`;
-    if (h > 0) hl.textContent = _calFmtHourAxis(h);
-    times.appendChild(hl);
+    const evs = porDia[k] || [];
+    if (evs.length) {
+      const lista = el('div', 'cal-wday-evs');
+      evs.forEach(({ m: mt, it }) => {
+        const b = el('button', 'cal-wev');
+        b.type = 'button';
+        b.title = `${_fmtMeetingLabel(mt)}${it ? ' · ' + it.name : ''}`;
+        b.innerHTML =
+          `<span class="cal-wev-top">` +
+            `<span class="cal-ev-dot" style="background:${esc(_initColor(it) || 'var(--text-muted)')}"></span>` +
+            `<span class="cal-ev-time">${esc(_hora24(mt.started_at))}</span>` +
+            `<span class="cal-wev-dur">${esc(_duracionReunion(mt))}</span>` +
+          `</span>` +
+          `<span class="cal-wev-title">${esc(_fmtMeetingLabel(mt, { enCalendario: true }))}</span>`;
+        b.onclick = () => { if (it) STATE.selInit = it.id; openMeeting(mt.id); };
+        lista.appendChild(b);
+      });
+      col.appendChild(lista);
+    }
+    cont.appendChild(col);
   }
-  cols.appendChild(times);
-
-  // 7 columnas de día con sus eventos posicionados por hora
-  days.forEach((d, i) => {
-    const col = el('div', 'cal-tg-col' + (i === todayIdx ? ' today' : '') + (i === 0 || i === 6 ? ' weekend' : ''));
-    col.style.height = `${24 * CAL_HOUR_PX}px`;
-    const evs = byDay[_dkey(d)] || [];
-    _calRenderColEvents(col, evs);
-    cols.appendChild(col);
-  });
-
-  // Línea de hora actual (solo si hoy está en la semana)
-  if (todayIdx >= 0) {
-    const now = new Date();
-    const mins = now.getHours() * 60 + now.getMinutes();
-    const top = (mins / 60) * CAL_HOUR_PX;
-    const nowLine = el('div', 'cal-tg-now');
-    nowLine.style.top = `${top}px`;
-    const badge = el('div', 'cal-tg-now-badge', _calFmtTime(`${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`).replace(' ', ''));
-    badge.style.top = `${top}px`;
-    cols.appendChild(badge);
-    cols.appendChild(nowLine);
-  }
-
-  scroll.appendChild(cols);
-  tg.appendChild(scroll);
-
-  // Auto-scroll: a la hora actual si es esta semana, o a las 7AM si no.
-  setTimeout(() => {
-    const target = todayIdx >= 0
-      ? Math.max(0, ((new Date().getHours() * 60 + new Date().getMinutes()) / 60) * CAL_HOUR_PX - 140)
-      : 7 * CAL_HOUR_PX;
-    scroll.scrollTop = target;
-  }, 0);
-
-  return tg;
+  return cont;
 }
 
 // Agrupa eventos solapados y los renderiza en columna: máx. 2 visibles + badge "+N".
@@ -989,7 +1606,12 @@ function _calRenderColEvents(col, evs) {
     const extra = n - 2;
     show.forEach((ev, idx) => {
       const node = _calTgEvent(ev.m, ev.it);
-      if (n > 1) { node.style.left = idx === 0 ? '4px' : '51%'; node.style.right = idx === 0 ? '51%' : '4px'; }
+      if (n > 1) {
+        node.style.left = idx === 0 ? '4px' : '51%';
+        node.style.right = idx === 0 ? '51%' : '4px';
+        // Apiladas: el clic muestra el panel pequeño con todas las del grupo
+        node.onclick = (e) => { e.stopPropagation(); _calShowGroupPicker(e, g.items); };
+      }
       col.appendChild(node);
     });
     if (extra > 0) {
@@ -997,10 +1619,83 @@ function _calRenderColEvents(col, evs) {
       const badge = el('div', 'cal-tg-more');
       badge.style.top = `${topPx}px`;
       badge.textContent = `+${extra}`;
-      badge.title = g.items.slice(2).map(ev => ev.m.title).join(', ');
+      badge.title = 'Ver las ' + n + ' reuniones';
+      // Clic: mini-panel con TODAS las reuniones del grupo para elegir cuál abrir
+      badge.onclick = (e) => { e.stopPropagation(); _calShowGroupPicker(e, g.items); };
       col.appendChild(badge);
     }
   }
+}
+
+// Panel flotante con las reuniones de un dia en el calendario mensual
+function _calShowDayPicker(e, date, evs) {
+  closeMenu();
+  const panel = el('div', 'cdrop-panel cal-pick-panel');
+  const dayLabel = `${date.getDate()} de ${CAL_MONTHS[date.getMonth()]}`;
+  const hdr = el('div'); hdr.style.cssText = 'padding:6px 12px;font-size:11px;font-weight:700;color:var(--text-muted);border-bottom:1px solid var(--border-subtle)';
+  hdr.textContent = dayLabel;
+  panel.appendChild(hdr);
+  if (!evs.length) {
+    const empty = el('div', 'cdrop-opt');
+    empty.style.cssText = 'color:var(--text-faint);font-style:italic';
+    empty.textContent = 'Sin reuniones este dia';
+    panel.appendChild(empty);
+  } else {
+    evs.forEach(({ m, it }) => {
+      const hhmm = (m.started_at || '').substring(11, 16);
+      const o = el('div', 'cdrop-opt');
+      o.innerHTML = `<span class="cdrop-dot" style="background:${_initColor(it)}"></span>`
+        + `<span class="cdrop-opt-label">${esc(_fmtMeetingLabel(m))}</span>`
+        + `<span class="cal-pick-time">${esc(_calFmtTime(hhmm))}</span>`;
+      o.onclick = (ev2) => { ev2.stopPropagation(); closeMenu(); _calOpenMeeting(m, it); };
+      panel.appendChild(o);
+    });
+  }
+  // Link para ir a la vista semanal
+  const foot = el('div'); foot.style.cssText = 'padding:4px 12px;border-top:1px solid var(--border-subtle)';
+  foot.innerHTML = `<button class="btn sm" style="width:100%;justify-content:center;font-size:10px">Ver semana completa</button>`;
+  foot.querySelector('button').onclick = () => {
+    closeMenu();
+    const C = STATE.cal;
+    const dow = date.getDay();
+    const ws = new Date(date.getFullYear(), date.getMonth(), date.getDate() - dow);
+    C.weekStart = _dkey(ws);
+    C.view = 'week';
+    renderMain();
+  };
+  panel.appendChild(foot);
+  document.body.appendChild(panel);
+  let left = e.clientX + 4, top = e.clientY + 4;
+  if (left + panel.offsetWidth > window.innerWidth - 10) left = window.innerWidth - panel.offsetWidth - 10;
+  if (top + panel.offsetHeight > window.innerHeight - 10) top = e.clientY - panel.offsetHeight - 4;
+  panel.style.left = Math.max(10, left) + 'px';
+  panel.style.top = Math.max(10, top) + 'px';
+  _ctxOpen = panel;
+  setTimeout(() => document.addEventListener('click', closeMenu, { once: true }), 0);
+}
+
+// Panel flotante con las reuniones solapadas de un grupo del calendario:
+// se elige una y se abre (antes el "+N" no dejaba llegar a las ocultas).
+function _calShowGroupPicker(e, items) {
+  closeMenu();
+  const panel = el('div', 'cdrop-panel cal-pick-panel');
+  items.forEach(({ m, it }) => {
+    const hhmm = (m.started_at || '').substring(11, 16);
+    const o = el('div', 'cdrop-opt');
+    o.innerHTML = `<span class="cdrop-dot" style="background:${_initColor(it)}"></span>`
+      + `<span class="cdrop-opt-label">${esc(_fmtMeetingLabel(m))}</span>`
+      + `<span class="cal-pick-time">${esc(_calFmtTime(hhmm))}</span>`;
+    o.onclick = (ev2) => { ev2.stopPropagation(); closeMenu(); _calOpenMeeting(m, it); };
+    panel.appendChild(o);
+  });
+  document.body.appendChild(panel);
+  let left = e.clientX + 4, top = e.clientY + 4;
+  if (left + panel.offsetWidth > window.innerWidth - 10) left = window.innerWidth - panel.offsetWidth - 10;
+  if (top + panel.offsetHeight > window.innerHeight - 10) top = e.clientY - panel.offsetHeight - 4;
+  panel.style.left = Math.max(10, left) + 'px';
+  panel.style.top = Math.max(10, top) + 'px';
+  _ctxOpen = panel;
+  setTimeout(() => document.addEventListener('click', closeMenu, { once: true }), 0);
 }
 
 // Bloque de evento en la rejilla horaria (posicionado por hora de inicio y duración).
@@ -1017,7 +1712,7 @@ function _calTgEvent(m, it) {
   ev.style.background = _hexA(color, warn ? 0.1 : 0.18);
   ev.style.boxShadow = `inset 3px 0 0 ${color}`;
   ev.title = `${esc(m.title)} · ${esc(it.name)}`;
-  ev.innerHTML = `<span class="cal-tg-ev-title">${esc(m.title)}</span><span class="cal-tg-ev-time" style="color:${color}">${esc(_calFmtTime(hhmm))}</span>`;
+  ev.innerHTML = `<span class="cal-tg-ev-title">${esc(_fmtMeetingLabel(m, { enCalendario: true }))}</span><span class="cal-tg-ev-time" style="color:${color}">${esc(_calFmtTime(hhmm))}</span>`;
   ev.onclick = (e) => { e.stopPropagation(); _calOpenMeeting(m, it); };
   return ev;
 }
@@ -1030,274 +1725,453 @@ function _calTzAbbr() {
 
 function viewInitiative() {
   const it = STATE.initiatives.find(x => x.id === STATE.selInit);
-  const ms = STATE.meetingsByInit[STATE.selInit] || [];
-  const wrap = el('div');
-  wrap.style.cssText = 'display:flex;flex-direction:column;flex:1;min-height:0';
+  const allMs = STATE.meetingsByInit[STATE.selInit] || [];
+  const color = (it && it.color) || avatarColorFor(it ? it.name : '');
+  STATE.initTab = STATE.initTab || 'reuniones';
 
-  let selectMode = false;
-  const selected = new Set();
-  let row = null;
+  const wrap = el('div', 'content-scroll scroll');
+  const inner = el('div', 'content-inner');
 
-  const head = el('div', 'mhead init-head');
-  const last = ms[0];
+  /* ---- Cabecera: punto de color + nombre, contador debajo, acciones a la
+     derecha. "Exportar" va fuera del grupo que se revela: es la acción
+     principal de la pantalla y no debe esconderse. ---- */
+  const head = el('div', 'proj-header');
+  const main = el('div', 'proj-header-main');
+  const carpetas = _getFolders(STATE.selInit);
+  const meta = allMs.length
+    ? `${allMs.length} ${allMs.length === 1 ? 'reunión' : 'reuniones'}` +
+      (carpetas.length ? ` · ${carpetas.length} ${carpetas.length === 1 ? 'carpeta' : 'carpetas'}` : '')
+    : 'Sin reuniones todavía';
+  main.innerHTML =
+    `<h1 class="page-title"><span class="accent-dot" style="background:${esc(color)}"></span>${esc(it ? it.name : '')}</h1>` +
+    `<div class="proj-meta">${esc(meta)}</div>`;
 
-  const initCreatedStr = it && it.created_at
-    ? formatDateShort(it.created_at)
-    : '';
+  const acciones = el('div', 'proj-header-actions');
+  const bar = el('div', 'action-bar action-reveal');
+  bar.id = 'initActions';
 
-  head.innerHTML = `
-    <div class="init-status-row">
-      <div class="init-title-group">
-        <h1 class="mtitle-h title-lg">${esc(it ? it.name : '')}</h1>
-        ${initCreatedStr ? `<span class="init-created">${esc(initCreatedStr)}</span>` : ''}
-      </div>
-      <div class="init-actions" id="initActions">
-        <button class="init-copy-md init-actions-rest ${ms.length ? '' : 'is-disabled'}" id="initCopyMd" title="${ms.length ? 'Copiar transcripción en Markdown' : 'Aún no hay reuniones que copiar'}">${svg('copy', 14)}<span>Copiar transcripción .md</span></button>
-        <span class="init-actions-sep init-actions-rest"></span>
-        <button class="icon-btn ${ms.length ? '' : 'is-disabled'}" id="initSearchBtn" title="Buscar en esta iniciativa">${svg('search', 15)}</button>
-        <div class="init-actions-searchbox" id="initActionsSearchbox" hidden>
-          <input id="initSearch" type="search" class="init-inline-input" placeholder="Buscar en esta iniciativa…" aria-label="Buscar en esta iniciativa" autocomplete="off">
-          <span class="tx-count" id="initSearchCount"></span>
-          <button class="icon-btn sm" id="initSearchClear" title="Limpiar" aria-label="Limpiar" hidden>${svg('x', 13)}</button>
-        </div>
-        <span class="init-actions-sep init-actions-rest"></span>
-        <button class="icon-btn init-actions-rest ${ms.length ? '' : 'is-disabled'}" id="initSelectBtn" title="Seleccionar reuniones para eliminar">${svg('checkSquare', 15)}</button>
-        <button class="icon-btn init-actions-rest" id="initOpenFolder" title="Abrir la carpeta completa de la iniciativa">${svg('folder', 15)}</button>
-        <button class="icon-btn init-actions-rest" id="initMenu" aria-label="Más acciones de la iniciativa">${svg('dots', 16)}</button>
-      </div>
-    </div>`;
+  const bCopy = el('button', 'icon-btn action-reveal-copy');
+  bCopy.type = 'button'; bCopy.id = 'initCopyMd';
+  bCopy.disabled = !allMs.length;
+  bCopy.title = allMs.length ? 'Copiar transcripción en Markdown' : 'Aún no hay reuniones que copiar';
+  bCopy.innerHTML = `<svg class="icon icon-sm"><use href="#i-copy"/></svg>` +
+    `<span class="action-reveal-label-grid"><span class="action-reveal-label">Copiar transcripción .md</span></span>`;
+  bCopy.onclick = (e) => copyInitiativeContext(STATE.selInit, e.currentTarget);
 
-  // Objetivo / contexto: editable, estilo bloque descripción (sin etiqueta ni pista).
-  const objBox = el('div', 'obj-box');
-  objBox.innerHTML = `<textarea id="initObjetivo" class="obj-text" rows="2"
-    placeholder="Contexto de la iniciativa"></textarea>`;
-  const ta = objBox.querySelector('#initObjetivo');
-  ta.value = (it && it.description) || '';
-  const _resizeObj = () => { ta.style.height = 'auto'; ta.style.height = Math.min(120, ta.scrollHeight) + 'px'; };
-  ta.addEventListener('input', _resizeObj);
-  setTimeout(_resizeObj, 0);
-  ta.onblur = async () => {
-    const val = ta.value.trim();
-    if (it && val === ((it.description) || '')) return;
-    await api.setInitiativeDescription(STATE.selInit, val);
-    if (it) it.description = val;
-    toast('ok', 'Objetivo guardado');
-  };
-  head.appendChild(objBox);
+  const bFolder = el('button', 'icon-btn');
+  bFolder.type = 'button'; bFolder.id = 'initOpenFolder';
+  bFolder.title = 'Abrir la carpeta completa del proyecto';
+  bFolder.innerHTML = '<svg class="icon"><use href="#i-folder"/></svg>';
+  bFolder.onclick = (e) => doOpenFolder(e.currentTarget);
 
-  const scroll = el('div', 'content');
-  const recents = el('div');
-  // El buscador vive en la barra de acciones del header (ver initActionsSearchbox)
+  const bMenu = el('button', 'icon-btn');
+  bMenu.type = 'button'; bMenu.id = 'initMenu';
+  bMenu.title = 'Más acciones del proyecto';
+  bMenu.setAttribute('aria-label', 'Más acciones del proyecto');
+  bMenu.innerHTML = '<svg class="icon"><use href="#i-more"/></svg>';
+  bMenu.onclick = (e) => openInitiativeMenu(e, STATE.selInit);
 
-  const listWrapper = el('div');
-  if (!ms.length) {
-    const p = el('p');
-    p.innerHTML = '<span style="color:var(--text-muted);font-size:13px">Aún no hay reuniones. Pulsa <b>Grabar reunión</b> o <b>Importar video</b> para empezar.</span>';
-    listWrapper.appendChild(p);
-  } else {
-    row = el('div', 'list');
+  bar.append(bCopy, bFolder, bMenu);
 
-    // Función que crea y añade una card de reunión al contenedor dado
-    const _appendCard = (m, container) => {
-      const c = el('div', 'row-card' + (m.status === 'pending' ? ' warn' : m.status === 'done' ? ' done' : ''));
-      const { day, mon } = parseMeetingDate(m.date || m.started_at);
-      const pill = m.status === 'done'
-        ? '<span class="pill pill-done"><span class="pd"></span>Finalizada</span>'
-        : m.status === 'processing'
-        ? '<span class="pill pill-proc"><span class="spinner sm"></span>Transcribiendo…</span>'
-        : m.status === 'error'
-        ? '<span class="pill pill-error"><span class="pd"></span>Error</span>'
-        : '<span class="pill pill-pending"><span class="pd"></span>Pendiente</span>';
-      const isFav = _isMeetingFav(m.id);
-      c.innerHTML = `
-        <div class="rc-sel"><span class="rc-cb"></span></div>
-        <div class="rc-date"><span class="rc-mon">${mon}</span><span class="rc-day">${day}</span></div>
-        <div class="rc-body"><div class="rc-title">${esc(m.title)}</div><div class="rc-meta">${m.dur ? esc(m.dur) : ''}${m.size ? '<span class="rc-size">' + esc(m.size) + '</span>' : ''}</div></div>
-        <div class="rc-right">
-          <div class="rc-actions">
-            <button class="icon-btn sm rc-act-btn${isFav ? ' fav-on' : ''}" data-act="fav" title="${isFav ? 'Quitar de favoritas' : 'Marcar como favorita'}">${svg('star', 13)}</button>
-            <button class="icon-btn sm rc-act-btn" data-act="rename" title="Renombrar">${svg('edit', 13)}</button>
-            <button class="icon-btn sm rc-act-btn rc-act-danger" data-act="trash" title="Enviar a la papelera">${svg('trash', 13)}</button>
-          </div>
-          ${pill}
-        </div>`;
-      c.onclick = () => {
-        if (selectMode) {
-          if (selected.has(m.id)) { selected.delete(m.id); c.classList.remove('sel'); }
-          else { selected.add(m.id); c.classList.add('sel'); }
-          updateBar();
-        } else openMeeting(m.id);
-      };
-      c.querySelectorAll('.rc-act-btn').forEach(btn => {
-        btn.addEventListener('click', e => {
-          e.stopPropagation();
-          if (btn.dataset.act === 'rename') {
-            const titleEl = c.querySelector('.rc-title');
-            const input = document.createElement('input');
-            input.type = 'text'; input.value = m.title; input.className = 'rc-title-input';
-            titleEl.replaceWith(input); input.focus(); input.select();
-            input.addEventListener('click', ev => ev.stopPropagation());
-            let done = false;
-            const commit = async (save) => {
-              if (done) return; done = true;
-              const val = input.value.trim();
-              if (save && val && val !== m.title) {
-                await api.renameMeeting(m.id, val);
-                for (const k in STATE.meetingsByInit) { const x = STATE.meetingsByInit[k].find(x => x.id === m.id); if (x) x.title = val; }
-                m.title = val;
-                if (STATE.transcript && STATE.transcript.id === m.id) STATE.transcript.title = val;
-                toast('ok', 'Reunión renombrada');
-              }
-              input.replaceWith(el('div', 'rc-title', esc(m.title)));
-            };
-            input.addEventListener('keydown', e => {
-              if (e.key === 'Enter') { e.preventDefault(); commit(true); }
-              if (e.key === 'Escape') { e.preventDefault(); commit(false); }
-            });
-            input.addEventListener('blur', () => commit(true));
-          } else if (btn.dataset.act === 'archive') archiveMeeting(m.id);
-          else if (btn.dataset.act === 'fav') {
-            _toggleMeetingFav(m.id);
-            const nowFav = _isMeetingFav(m.id);
-            btn.classList.toggle('fav-on', nowFav);
-            btn.title = nowFav ? 'Quitar de favoritas' : 'Marcar como favorita';
-            renderSidebar();
-          } else if (btn.dataset.act === 'trash') deleteMeeting(m.id);
-        });
-      });
-      container.appendChild(c);
-    };
+  const bExport = el('button', 'btn-pill-secondary');
+  bExport.type = 'button';
+  bExport.innerHTML = '<svg class="icon icon-sm"><use href="#i-download"/></svg>Exportar';
+  bExport.onclick = () => exportInitiativeTo(STATE.selInit);
 
-    // Agrupar por mes → semana y renderizar con headers colapsables
-    const _IV_MS  = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
-    const _IV_MES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
-    const _ivWeekOf = (iso) => {
-      if (!iso) return null;
-      const d = new Date(iso); if (isNaN(d)) return null;
-      const day = d.getDay();
-      const mon2 = new Date(d); mon2.setDate(d.getDate() - (day === 0 ? 6 : day - 1));
-      const sun2 = new Date(mon2); sun2.setDate(mon2.getDate() + 6);
-      const fmt = dt => `${dt.getDate()} ${_IV_MS[dt.getMonth()]}`;
-      return { mKey:`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`, wKey:mon2.toISOString().slice(0,10), wLabel:`${fmt(mon2)} – ${fmt(sun2)}`, mLabel:`${_IV_MES[d.getMonth()]} ${d.getFullYear()}` };
-    };
-    const _ivMOrder=[], _ivMMap=new Map(), _ivWMap=new Map();
-    ms.forEach(m => {
-      const g = _ivWeekOf(m.started_at) || {mKey:'none',wKey:'none',wLabel:'—',mLabel:'Sin fecha'};
-      if (!_ivMMap.has(g.mKey)) { _ivMMap.set(g.mKey,{mLabel:g.mLabel,wkKeys:[]}); _ivMOrder.push(g.mKey); }
-      const mk=`${g.mKey}|${g.wKey}`;
-      if (!_ivWMap.has(mk)) { _ivWMap.set(mk,{wLabel:g.wLabel,items:[]}); _ivMMap.get(g.mKey).wkKeys.push(mk); }
-      _ivWMap.get(mk).items.push(m);
-    });
-    if (!STATE._ivWeeks) STATE._ivWeeks = {};
-    if (!STATE._ivWeeks[STATE.selInit]) {
-      const fw = _ivMOrder.length ? _ivMMap.get(_ivMOrder[0]).wkKeys[0] : null;
-      STATE._ivWeeks[STATE.selInit] = new Set(fw ? [fw] : []);
-    }
-    const _ivOpen = STATE._ivWeeks[STATE.selInit];
+  acciones.append(bar, bExport);
+  head.append(main, acciones);
+  inner.appendChild(head);
 
-    _ivMOrder.forEach(mKey => {
-      const {mLabel, wkKeys} = _ivMMap.get(mKey);
-      const mhdr = el('div', 'list-month-hdr', esc(mLabel));
-      row.appendChild(mhdr);
-      wkKeys.forEach(mk => {
-        const {wLabel, items} = _ivWMap.get(mk);
-        const isOpen = _ivOpen.has(mk);
-        const whdr = el('div', 'list-week-hdr' + (isOpen ? ' open' : ''));
-        whdr.innerHTML = `<span class="tw-chev">${svg('chevron',10)}</span><span class="lw-label">${esc(wLabel)}</span><span class="lw-cnt">${items.length}</span>`;
-        whdr.onclick = () => { _ivOpen.has(mk) ? _ivOpen.delete(mk) : _ivOpen.add(mk); renderMain(); };
-        row.appendChild(whdr);
-        if (isOpen) items.forEach(m => _appendCard(m, row));
-      });
-    });
+  // ---- Pestañas ----
+  const tabsWrap = el('div', 'tabs-wrap');
+  const pills = el('div', 'segmented-pill');
+  pills.setAttribute('role', 'tablist');
+  [
+    { id: 'reuniones', label: 'Reuniones', icon: 'i-doc' },
+    { id: 'archivos',  label: 'Archivos',  icon: 'i-layers' },
+    { id: 'carpetas',  label: 'Carpetas',  icon: 'i-folder' },
+  ].forEach(tab => {
+    const b = el('button', 'tab-btn' + (STATE.initTab === tab.id ? ' active' : ''));
+    b.type = 'button'; b.setAttribute('role', 'tab');
+    b.innerHTML = `<svg><use href="#${tab.icon}"/></svg>${tab.label}`;
+    b.onclick = () => { STATE.initTab = tab.id; renderMain(); };
+    pills.appendChild(b);
+  });
+  tabsWrap.appendChild(pills);
 
-    listWrapper.appendChild(row);
-  }
-  recents.appendChild(listWrapper);
+  const panel = el('div', 'tab-panel active');
+  if (STATE.initTab === 'reuniones') _panelReuniones(panel, it, allMs);
+  else if (STATE.initTab === 'archivos') _panelArchivos(panel, it, allMs);
+  else _panelCarpetasExport(panel, it, allMs);
+  tabsWrap.appendChild(panel);
+  inner.appendChild(tabsWrap);
 
-  const results = el('div', 'list'); results.hidden = true;
-  recents.appendChild(results);
-  scroll.appendChild(recents);
-
-  // Barra de selección múltiple (sticky arriba de la lista, animada)
-  const selBar = el('div', 'sel-bar');
-  selBar.innerHTML = `<span class="sel-info" id="selBarCount">0 seleccionadas</span><div class="spacer"></div><button class="btn btn-ghost" id="selCancel">Cancelar</button><button class="btn btn-danger" id="selDelete" disabled>Eliminar</button>`;
-  scroll.insertBefore(selBar, recents);
-
-  const updateBar = () => {
-    const n = selected.size;
-    selBar.querySelector('#selBarCount').textContent = n === 1 ? '1 seleccionada' : `${n} seleccionadas`;
-    selBar.querySelector('#selDelete').disabled = n === 0;
-  };
-  const enterSelectMode = () => {
-    selectMode = true;
-    if (row) row.classList.add('selecting');
-    selBar.classList.add('open');
-    head.querySelector('#initSelectBtn')?.classList.add('active');
-    updateBar();
-  };
-  const exitSelectMode = () => {
-    selectMode = false;
-    selected.clear();
-    if (row) { row.classList.remove('selecting'); row.querySelectorAll('.row-card.sel').forEach(c => c.classList.remove('sel')); }
-    selBar.classList.remove('open');
-    head.querySelector('#initSelectBtn')?.classList.remove('active');
-  };
-
-  if (ms.length) {
-    const searchbox = head.querySelector('#initActionsSearchbox');
-    const actionsEl = head.querySelector('#initActions');
-    const restEls = head.querySelectorAll('.init-actions-rest');
-    let _initOutside = null;
-    const closeSearch = () => {
-      searchbox.hidden = true;
-      actionsEl.classList.remove('searching');
-      restEls.forEach(e => { e.style.display = ''; });
-      head.querySelector('#initSearchBtn').classList.remove('active');
-      const input = head.querySelector('#initSearch');
-      if (input.value) { input.value = ''; head.querySelector('#initSearchClear').click(); }
-      if (_initOutside) { document.removeEventListener('mousedown', _initOutside, true); _initOutside = null; }
-    };
-
-    wireInitiativeSearch(searchbox, listWrapper, results, ms);
-
-    const initSearchBtn = head.querySelector('#initSearchBtn');
-    initSearchBtn.onclick = () => {
-      const willOpen = searchbox.hidden;
-      searchbox.hidden = !willOpen;
-      actionsEl.classList.toggle('searching', willOpen);
-      restEls.forEach(e => { e.style.display = willOpen ? 'none' : ''; });
-      initSearchBtn.classList.toggle('active', willOpen);
-      if (willOpen) {
-        head.querySelector('#initSearch').focus();
-        _initOutside = (e) => { if (!searchbox.contains(e.target) && e.target !== initSearchBtn) closeSearch(); };
-        document.addEventListener('mousedown', _initOutside, true);
-      } else closeSearch();
-    };
-    head.querySelector('#initSearchClear').addEventListener('click', closeSearch);
-
-    const selectBtn = head.querySelector('#initSelectBtn');
-    if (selectBtn) selectBtn.onclick = () => selectMode ? exitSelectMode() : enterSelectMode();
-    selBar.querySelector('#selCancel').onclick = exitSelectMode;
-    selBar.querySelector('#selDelete').onclick = () => {
-      const n = selected.size; if (!n) return;
-      confirmModal(
-        `Enviar ${n} reunión${n > 1 ? 'es' : ''} a la papelera`,
-        'Se moverán a la Papelera. Podrás restaurarlas desde allí.',
-        'Mover a papelera',
-        async () => {
-          for (const mid of [...selected]) await api.trashItem('meeting', mid);
-          toast('ok', `${n} reunión${n > 1 ? 'es' : ''} movida${n > 1 ? 's' : ''} a la papelera`);
-          exitSelectMode(); refreshAll(); updateLibraryCounts();
-        }
-      );
-    };
-  }
-
-  head.querySelector('#initMenu').onclick = (e) => openInitiativeMenu(e, STATE.selInit);
-  head.querySelector('#initCopyMd').onclick = (e) => ms.length && copyInitiativeContext(STATE.selInit, e.currentTarget);
-  head.querySelector('#initOpenFolder').onclick = (e) => openInitiativeFolder(STATE.selInit, e.currentTarget);
-  wrap.replaceChildren(head, scroll);
+  wrap.appendChild(inner);
   return wrap;
+}
+
+/* ---- Pestaña Reuniones: carpetas del usuario arriba, sueltas debajo ----
+   Es el orden de cualquier explorador de archivos. La agrupación por mes se
+   queda solo para las sueltas: dentro de una carpeta el orden ya lo puso quien
+   la llenó, y volver a partirla por meses la haría ilegible. */
+function _panelReuniones(panel, it, allMs) {
+  const carpetas = _getFolders(STATE.selInit);
+
+  if (carpetas.length || allMs.length) {
+    const fila = el('div', 'group-label-row');
+    fila.innerHTML = '<span class="group-label" style="margin:0">Carpetas</span>';
+    const nueva = el('button', 'btn-newfolder');
+    nueva.type = 'button';
+    nueva.innerHTML = '<svg class="icon icon-sm"><use href="#i-plus"/></svg>Nueva carpeta';
+    nueva.onclick = () => promptCreateFolder(STATE.selInit);
+    fila.appendChild(nueva);
+    panel.appendChild(fila);
+  }
+
+  carpetas.forEach(f => {
+    const dentro = allMs.filter(m => _getMeetingFolder(m.id) === f.id);
+    const uf = el('div', 'ufolder');
+    const cab = el('div', 'ufolder-head');
+    const tog = el('button', 'ufolder-toggle');
+    tog.type = 'button';
+    tog.setAttribute('aria-expanded', 'false');
+    tog.innerHTML =
+      `<svg class="ufolder-chev icon icon-sm"><use href="#i-chevright"/></svg>` +
+      `<svg class="ufolder-ico icon icon-sm"><use href="#i-folder"/></svg>` +
+      `<span class="ufolder-name">${esc(f.name)}</span>` +
+      `<span class="ufolder-count">${dentro.length} ${dentro.length === 1 ? 'reunión' : 'reuniones'}</span>`;
+    /* Un solo hijo directo (.ufolder-inner) porque el plegado va con
+       grid-template-rows 0fr→1fr, y esa técnica necesita exactamente un hijo
+       que lleve el overflow:hidden. Ver .ufolder-children en content.css. */
+    const hijos = el('div', 'ufolder-children');
+    const caja = el('div', 'ufolder-inner');
+    const lista = el('div', 'list');
+    dentro.forEach(m => lista.appendChild(meetingRow(m, it, { showProject: true, showDate: true })));
+    if (!dentro.length) {
+      const v = el('div', 'ufolder-empty');
+      v.textContent = 'Carpeta vacía';
+      caja.appendChild(v);
+    }
+    caja.appendChild(lista);
+    hijos.appendChild(caja);
+    tog.onclick = () => {
+      const abierta = uf.classList.toggle('open');
+      hijos.classList.toggle('open', abierta);
+      tog.setAttribute('aria-expanded', abierta ? 'true' : 'false');
+    };
+    const mas = el('button', 'icon-btn ufolder-more');
+    mas.type = 'button';
+    mas.title = 'Acciones de la carpeta';
+    mas.innerHTML = '<svg class="icon icon-sm"><use href="#i-more"/></svg>';
+    mas.onclick = (e) => openMenu(e, [
+      { label: 'Renombrar carpeta', icon: 'edit', onClick: () =>
+        formModal('Renombrar carpeta', 'Nombre de la carpeta', f.name, 'Guardar', (nv) => {
+          if (!nv.trim()) return;
+          _saveFolders(STATE.selInit, _getFolders(STATE.selInit).map(x => x.id === f.id ? { ...x, name: nv.trim() } : x));
+          renderMain(); renderSidebar();
+        }) },
+      { sep: true },
+      // Eliminar la carpeta NO borra las reuniones: vuelven al proyecto.
+      { label: 'Eliminar carpeta', icon: 'trash', danger: true, onClick: () =>
+        confirmModal('Eliminar carpeta',
+          `Se elimina la carpeta «${f.name}». Las reuniones que tenía no se borran, solo quedan sin carpeta.`,
+          'Eliminar', () => {
+            _deleteFolder(STATE.selInit, f.id);
+            if (_getSelFolder(STATE.selInit) === f.id) _setSelFolder(STATE.selInit, null);
+            toast('ok', 'Carpeta eliminada');
+            renderMain(); renderSidebar();
+          }) },
+    ]);
+    cab.append(tog, mas);
+    uf.append(cab, hijos);
+    panel.appendChild(uf);
+  });
+
+  // Reuniones sueltas, agrupadas por mes.
+  const sueltas = allMs.filter(m => _getMeetingFolder(m.id) == null);
+  if (!sueltas.length && !carpetas.length) {
+    const vacio = el('div', 'empty-state');
+    vacio.innerHTML =
+      `<svg class="icon icon-lg"><use href="#i-pages"/></svg>` +
+      `<div class="l1">Aún no hay reuniones aquí</div>` +
+      `<div class="l2">Graba tu primera reunión de ${esc(it ? it.name : 'este proyecto')} para verla aquí.</div>`;
+    panel.appendChild(vacio);
+    return;
+  }
+
+  let mes = null, lista = null;
+  sueltas.forEach(m => {
+    const etiqueta = m.month_label || 'Sin fecha';
+    if (etiqueta !== mes) {
+      const g = el('div', 'group-label'); g.textContent = etiqueta;
+      panel.appendChild(g);
+      lista = el('div', 'list');
+      panel.appendChild(lista);
+      mes = etiqueta;
+    }
+    lista.appendChild(meetingRow(m, it, { showProject: true, showDate: true }));
+  });
+}
+
+/* ---- Pestaña Archivos: vídeos y documentos del proyecto ----
+   Filas planas a propósito (.row y no .row-wrap): un vídeo o un .md no se
+   selecciona en lote ni se marca como favorito, así que no llevan casilla ni
+   estrella — solo abrir. */
+function _panelArchivos(panel, it, allMs) {
+  const videos = allMs.filter(m => m.has_video);
+
+  const gv = el('div', 'group-label-row');
+  gv.innerHTML = '<span class="group-label" style="margin:0">Videos</span>';
+  const bImp = el('button', 'btn-pill-secondary');
+  bImp.type = 'button';
+  bImp.innerHTML = '<svg class="icon icon-sm"><use href="#i-plus"/></svg>Importar video';
+  bImp.onclick = () => _importVideosToInit(STATE.selInit);
+  gv.appendChild(bImp);
+  panel.appendChild(gv);
+
+  if (videos.length) {
+    const lv = el('div', 'list');
+    videos.forEach(m => {
+      const r = el('button', 'row');
+      r.type = 'button';
+      const tipo = m.source === 'screen' ? 'Grabación de pantalla' : 'Grabación de audio';
+      r.innerHTML =
+        `<span class="row-icon"><svg class="icon"><use href="#i-video"/></svg></span>` +
+        `<span class="row-main">` +
+          `<span class="row-title">${esc(_fmtMeetingLabel(m))}</span>` +
+          `<span class="row-sub">${esc(tipo)} · ${esc(_subtituloReunion(m))}</span>` +
+        `</span>` +
+        `<span class="row-meta"><span class="row-time">${esc(m.size || '')}</span></span>`;
+      r.onclick = () => openMeeting(m.id);
+      lv.appendChild(r);
+    });
+    panel.appendChild(lv);
+  } else {
+    const v = el('div', 'empty-state compact');
+    v.innerHTML = `<svg class="icon icon-lg"><use href="#i-video"/></svg><div class="l1">Sin videos todavía</div>`;
+    panel.appendChild(v);
+  }
+
+  // Documentos convertidos a .md, servidos por el backend.
+  const gd = el('div', 'group-label-row');
+  gd.innerHTML = '<span class="group-label" style="margin:0">Documentos <span class="arrow-suffix">→ .md</span></span>';
+  const bDoc = el('button', 'btn-pill-secondary');
+  bDoc.type = 'button';
+  bDoc.innerHTML = '<svg class="icon icon-sm"><use href="#i-plus"/></svg>Importar documento';
+  bDoc.onclick = openDocsView;
+  gd.appendChild(bDoc);
+  panel.appendChild(gd);
+
+  const ld = el('div', 'list');
+  panel.appendChild(ld);
+  api.listDocuments(STATE.selInit).then(docs => {
+    docs = docs || [];
+    if (!docs.length) {
+      const v = el('div', 'empty-state compact');
+      v.innerHTML = `<svg class="icon icon-lg"><use href="#i-pages"/></svg><div class="l1">Sin documentos todavía</div>`;
+      ld.replaceWith(v);
+      return;
+    }
+    docs.forEach(d => {
+      const r = el('div', 'row doc-row');
+      const fmt = (d.source_ext || d.ext || '').replace('.', '').toUpperCase();
+      r.innerHTML =
+        `<span class="row-icon"><svg class="icon"><use href="#i-doc"/></svg></span>` +
+        `<span class="row-main">` +
+          `<span class="row-title">${esc(d.name || d.md_name || '')}</span>` +
+          `<span class="row-sub">${esc(fmt)}${d.ocr ? ' · OCR' : ''}${d.images ? ' · ' + d.images + ' imágenes' : ''}</span>` +
+        `</span>`;
+      ld.appendChild(r);
+    });
+  }).catch(() => {});
+}
+
+/* ---- Pestaña Carpetas: la estructura que el exportador crea en disco ----
+   No es una carpeta del usuario: es lo que exporter.py escribe (proyecto → mes
+   → carpeta por reunión con transcripción.md, capturas/ y el audio). Se muestra
+   para que se vea qué se va a encontrar al abrir la carpeta del proyecto. */
+function _panelCarpetasExport(panel, it, allMs) {
+  if (!allMs.length) {
+    const v = el('div', 'empty-state');
+    v.innerHTML =
+      `<svg class="icon icon-lg"><use href="#i-folder"/></svg>` +
+      `<div class="l1">Aún no hay carpetas exportadas</div>` +
+      `<div class="l2">Cada reunión transcrita crea su carpeta al exportarse.</div>`;
+    panel.appendChild(v);
+    return;
+  }
+
+  const arbol = el('div', 'folder-tree');
+  const raiz = el('div', 'folder-row folder-row-root');
+  raiz.innerHTML = `<svg class="icon icon-sm"><use href="#i-folder"/></svg>` +
+    `<span class="folder-name">${esc(_slugProyecto(it ? it.name : ''))}/</span>`;
+  arbol.appendChild(raiz);
+
+  /* Dos niveles de agrupación, los dos plegables. El mes es carpeta real en
+     disco; la semana es agrupación de lectura (el exportador no la crea), y por
+     eso su fila lleva calendario en vez de carpeta y no termina en "/".
+     El mes se toma de la fecha de CADA reunión, no del jueves de su semana como
+     hace weekInfoOf: en disco manda el día propio, así que una semana a caballo
+     entre julio y agosto sale en las dos ramas, con sus reuniones en cada una. */
+  const meses = new Map();
+  allMs.forEach(m => {
+    const d = new Date(m.started_at);
+    const mKey = isNaN(d) ? 'sin-fecha'
+      : `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+    if (!meses.has(mKey)) meses.set(mKey, { label: _slugMes(m.started_at), semanas: new Map() });
+    const mes = meses.get(mKey);
+    const w = weekInfoOf(m.started_at);
+    const wKey = w ? w.wKey : 'sin-fecha';
+    if (!mes.semanas.has(wKey)) mes.semanas.set(wKey, { label: _rotuloSemana(m.started_at), ms: [] });
+    mes.semanas.get(wKey).ms.push(m);
+  });
+
+  /* Abierto de entrada: solo el mes y la semana más recientes (allMs llega
+     ordenado de nuevo a viejo). Lo de esta semana se ve sin tocar nada y el
+     historial no obliga a bajar treinta filas para llegar a él. */
+  const hijosRaiz = el('div', 'folder-children');
+  let primerMes = true;
+  meses.forEach(mes => {
+    let nMes = 0;
+    mes.semanas.forEach(s => { nMes += s.ms.length; });
+    const [filaMes, cajaMes] = _grupoCarpeta('folder', mes.label + '/', nMes, primerMes);
+    hijosRaiz.append(filaMes, cajaMes);
+    const dentroMes = cajaMes.firstChild;
+    let primeraSem = true;
+    mes.semanas.forEach(sem => {
+      const [filaSem, cajaSem] = _grupoCarpeta(
+        'calendar', 'Semana ' + sem.label, sem.ms.length, primerMes && primeraSem, 'folder-week');
+      dentroMes.append(filaSem, cajaSem);
+      const dentroSem = cajaSem.firstChild;
+      sem.ms.forEach(m => dentroSem.appendChild(_carpetaReunion(m)));
+      primeraSem = false;
+    });
+    primerMes = false;
+  });
+
+  arbol.appendChild(hijosRaiz);
+  panel.appendChild(arbol);
+}
+
+/* Fila de grupo del árbol (mes o semana): el rótulo con su contador, y la caja
+   plegable que le corresponde, como HERMANA y no anidada — así el
+   `.folder-item.open .folder-toggle-arrow` de la hoja de estilos no alcanza a
+   las flechas de los niveles de abajo y cada una gira por su cuenta. */
+let _fgSeq = 0;
+function _grupoCarpeta(icono, nombre, n, abierto, clase) {
+  const id = 'fg-' + (++_fgSeq);
+  const fila = el('div', 'folder-item folder-item-group' +
+    (clase ? ' ' + clase : '') + (abierto ? ' open' : ''));
+  const tog = el('button', 'folder-toggle');
+  tog.type = 'button';
+  tog.setAttribute('aria-expanded', abierto ? 'true' : 'false');
+  tog.setAttribute('aria-controls', id);
+  tog.innerHTML =
+    `<svg class="folder-toggle-arrow icon icon-sm"><use href="#i-chevright"/></svg>` +
+    `<svg class="icon icon-sm"><use href="#i-${icono}"/></svg>` +
+    `<span class="folder-name">${esc(nombre)}</span>` +
+    `<span class="folder-count">${n} ${n === 1 ? 'reunión' : 'reuniones'}</span>`;
+  fila.appendChild(tog);
+
+  const caja = el('div', 'folder-group-children' + (abierto ? ' open' : ''));
+  caja.id = id;
+  caja.appendChild(el('div', 'folder-group-inner'));
+  tog.onclick = () => {
+    const ab = !fila.classList.contains('open');
+    fila.classList.toggle('open', ab);
+    caja.classList.toggle('open', ab);
+    tog.setAttribute('aria-expanded', ab ? 'true' : 'false');
+  };
+  return [fila, caja];
+}
+
+/* Carpeta de una reunión, con los nombres REALES que escribe exporter.py.
+   Antes la lista era inventada a medias (el título en el nombre, acentos en los
+   ficheros, y solo tres hijos): la pestaña existe justamente para saber qué se
+   va a encontrar en disco, así que si miente no sirve para nada. */
+function _carpetaReunion(m) {
+  const item = el('div', 'folder-item');
+  const tog = el('button', 'folder-toggle');
+  tog.type = 'button';
+  tog.setAttribute('aria-expanded', 'false');
+  tog.innerHTML =
+    `<svg class="folder-toggle-arrow icon icon-sm"><use href="#i-chevright"/></svg>` +
+    `<svg class="icon icon-sm"><use href="#i-folder"/></svg>` +
+    `<span class="folder-name">${esc(_slugCarpeta(m))}/</span>`;
+  const hojas = el('div', 'folder-meeting-children');
+  hojas.innerHTML =
+    `<div class="folder-leaf-inner">` +
+      `<div class="folder-leaf"><svg class="icon icon-sm"><use href="#i-doc"/></svg>transcripcion.md</div>` +
+      `<div class="folder-leaf"><svg class="icon icon-sm"><use href="#i-doc"/></svg>transcripcion.txt</div>` +
+      `<div class="folder-leaf"><svg class="icon icon-sm"><use href="#i-doc"/></svg>transcripcion.tsv</div>` +
+      `<div class="folder-leaf"><svg class="icon icon-sm"><use href="#i-folder"/></svg>capturas/</div>` +
+      `<div class="folder-leaf"><svg class="icon icon-sm"><use href="#i-mic"/></svg>${m.has_video ? 'grabacion.mp4' : 'grabacion.wav'}</div>` +
+    `</div>`;
+  tog.onclick = () => {
+    const abierta = item.classList.toggle('open');
+    hojas.classList.toggle('open', abierta);
+    tog.setAttribute('aria-expanded', abierta ? 'true' : 'false');
+  };
+  item.append(tog, hojas);
+  return item;
+}
+
+/* Nombre de carpeta que produce el exportador (meeting_folder_name):
+   fecha_hora-con-segundos_id-a-cuatro-cifras. NO lleva el título: acá lo
+   llevaba, y en disco no existe. */
+function _slugCarpeta(m) {
+  const d = new Date(m.started_at);
+  const p = (n) => String(n).padStart(2, '0');
+  const fecha = isNaN(d) ? '0000-00-00_00-00-00'
+    : `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}_` +
+      `${p(d.getHours())}-${p(d.getMinutes())}-${p(d.getSeconds())}`;
+  return `${fecha}_${String(m.id == null ? 0 : m.id).padStart(4, '0')}`;
+}
+
+/* Carpeta de mes del exportador (month_folder_name): "2026-07 Julio". */
+function _slugMes(iso) {
+  const d = new Date(iso);
+  if (isNaN(d)) return 'sin-fecha';
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')} ${MESES_LARGOS[d.getMonth()]}`;
+}
+
+/* Mismo slug que exporter.py::_slug para la carpeta del proyecto.
+   \p{L}\p{N} y no \w: el \w de Python es unicode y conserva los acentos, el de
+   JavaScript es ASCII y los borrar\u00eda \u2014 el mismo nombre saldr\u00eda escrito de dos
+   maneras distintas en la misma pantalla. */
+function _slugProyecto(nombre) {
+  const limpio = String(nombre || '').replace(/[^\p{L}\p{N}_\s-]/gu, '').trim().toLowerCase();
+  const slug = limpio.replace(/[\s_-]+/g, '-').replace(/^-+|-+$/g, '');
+  if (!slug || slug.startsWith('.') || slug.includes('..')) return 'sin-nombre';
+  return slug.slice(0, 120);
+}
+
+/* R\u00f3tulo de la semana, RECORTADO al mes en el que est\u00e1 anidada: la semana va de
+   lunes a domingo y puede cruzar el cambio de mes, pero dentro de "2026-07
+   Julio" no puede anunciar d\u00edas de agosto \u2014 esas reuniones est\u00e1n en la rama de
+   agosto. Con el recorte, los dos extremos caen siempre en el mismo mes. */
+function _rotuloSemana(iso) {
+  const w = weekInfoOf(iso);
+  const d = new Date(iso);
+  if (!w || isNaN(d)) return 'sin fecha';
+  const lun = new Date(w.wKey + 'T00:00:00');
+  const dom = new Date(lun); dom.setDate(lun.getDate() + 6);
+  const ini = lun.getMonth() === d.getMonth() ? lun : new Date(d.getFullYear(), d.getMonth(), 1);
+  const fin = dom.getMonth() === d.getMonth() ? dom : new Date(d.getFullYear(), d.getMonth() + 1, 0);
+  return `${ini.getDate()} \u2013 ${fin.getDate()} ${MESES_CORTOS[fin.getMonth()]}`;
+}
+
+/* Subcarpeta donde la reuni\u00f3n est\u00e1 guardada, para el box del subt\u00edtulo de la
+   fila. Prioridad: la carpeta del usuario si est\u00e1 archivada en una; si no, la
+   carpeta de mes del exportador. Las dos contestan "\u00bfd\u00f3nde est\u00e1?" \u2014 una dentro
+   de la app, la otra en disco. */
+function _ubicacionReunion(m, it) {
+  const fid = _getMeetingFolder(m.id);
+  const carpeta = (it && fid != null) ? (_getFolders(it.id) || []).find(f => f.id === fid) : null;
+  if (carpeta) return { nombre: carpeta.name, titulo: `Carpeta: ${carpeta.name}` };
+  const mes = _slugMes(m.started_at);
+  const raiz = it ? _slugProyecto(it.name) + '/' : '';
+  return { nombre: mes, titulo: `Carpeta en disco: ${raiz}${mes}/` };
 }
 
 // Formatea un ISO timestamp a "dd/mm/aa" para mostrar en la UI.
@@ -1388,7 +2262,7 @@ function wireInitiativeSearch(bar, list, results, ms) {
     list.hidden = true; results.hidden = false; results.replaceChildren();
     countEl.textContent = total ? `${total} resultado${total > 1 ? 's' : ''}` : 'Sin resultados';
     if (!total) {
-      results.innerHTML = '<p style="color:var(--text-muted);font-size:13px">Sin resultados en esta iniciativa.</p>';
+      results.innerHTML = '<p style="color:var(--text-muted);font-size:13px">Sin resultados en este proyecto.</p>';
       return;
     }
     // — Sección: reuniones por nombre —
@@ -1421,14 +2295,14 @@ function wireInitiativeSearch(bar, list, results, ms) {
   clearBtn.onclick = () => { input.value = ''; reset(); input.focus(); };
 }
 
-/* Copia el contexto.md completo de la iniciativa al portapapeles (para pegarlo
+/* Copia el contexto.md completo de el proyecto al portapapeles (para pegarlo
    directo en Claude Code). Refresca antes el export para llevar lo último. */
 async function copyInitiativeContext(iid, btn) {
   if (btn) btn.classList.add('is-loading');
   try {
     const r = await api.copyInitiativeContext(iid);
     if (!r || !r.text || !r.text.trim()) {
-      toast('info', 'Aún no hay nada que copiar en esta iniciativa.');
+      toast('info', 'Aún no hay nada que copiar en este proyecto.');
       return;
     }
     const ok = await copyText(r.text);
@@ -1443,16 +2317,42 @@ async function copyInitiativeContext(iid, btn) {
 
 /* Copia el contexto de UNA reunión (con cabecera para la IA) al portapapeles. */
 async function copyMeetingContext(mid, btn) {
+  const t = STATE.transcript;
+  const langs = t ? _deriveLanguages(t.utterances || []) : [];
+  // Si hay multiples idiomas, mostrar selector antes de copiar
+  if (langs.length > 1) {
+    if (btn) btn.classList.add('is-loading');
+    const LANG_LABELS = { es: 'Espanol', en: 'English', pt: 'Portugues', fr: 'Francais', de: 'Deutsch', it: 'Italiano', ja: '日本語', zh: '中文', ko: '한국어' };
+    const menuItems = langs.map(l => ({
+      label: (LANG_LABELS[l.code] || l.code.toUpperCase()) + ' (' + l.count + ' frases)',
+      icon: 'copy',
+      onClick: () => _doCopyMeetingContext(mid, btn, l.code),
+    }));
+    // Agregar opcion "Todos"
+    menuItems.unshift({
+      label: 'Todos los idiomas (' + t.utterances.filter(u => u.kind === 'utterance').length + ' frases)',
+      icon: 'copy',
+      onClick: () => _doCopyMeetingContext(mid, btn, null),
+    });
+    openMenu({ clientX: btn.getBoundingClientRect().left, clientY: btn.getBoundingClientRect().bottom + 4 }, menuItems);
+    if (btn) btn.classList.remove('is-loading');
+    return;
+  }
+  return _doCopyMeetingContext(mid, btn, null);
+}
+
+async function _doCopyMeetingContext(mid, btn, language) {
   if (btn) btn.classList.add('is-loading');
   try {
-    const r = await api.copyMeetingContext(mid);
+    const r = await api.copyMeetingContext(mid, language);
     if (!r || !r.text || !r.text.trim()) {
-      toast('info', 'Esta reunión aún no tiene contenido que copiar.');
+      toast('info', 'Esta reunion aun no tiene contenido que copiar.');
       return;
     }
     const ok = await copyText(r.text);
     const kb = Math.max(1, Math.round(r.text.length / 1024));
-    toast(ok ? 'ok' : 'err', ok ? `Transcripción .md copiada (~${kb} KB) · pégala en Claude` : 'No se pudo copiar al portapapeles');
+    const langLabel = language ? ` (${language})` : '';
+    toast(ok ? 'ok' : 'err', ok ? `Transcripcion .md copiada${langLabel} (~${kb} KB) · pegala en Claude` : 'No se pudo copiar al portapapeles');
   } catch (e) {
     toast('err', 'No se pudo preparar el contexto');
   } finally {
@@ -1466,7 +2366,7 @@ async function exportInitiativeNow(iid, btn) {
     const r = await api.exportInitiativeById(iid);
     if (r && r.path) { await api.openPath(r.path); toast('ok', 'Contexto exportado · carpeta abierta'); }
     else toast('err', 'La exportación no devolvió una carpeta.');
-  } catch (e) { toast('err', 'No se pudo exportar la iniciativa'); }
+  } catch (e) { toast('err', 'No se pudo exportar el proyecto'); }
   finally { if (btn) btn.classList.remove('is-loading'); }
 }
 
@@ -1474,10 +2374,10 @@ async function openInitiativeFolder(iid, btn) {
   if (btn) btn.classList.add('is-loading');
   try {
     const r = await api.openInitiativeFolder(iid);
-    if (r && r.ok) toast('ok', 'Carpeta de la iniciativa abierta');
-    else toast('err', 'No se pudo abrir la carpeta de la iniciativa');
+    if (r && r.ok) toast('ok', 'Carpeta del proyecto abierta');
+    else toast('err', 'No se pudo abrir la carpeta de el proyecto');
   } catch (e) {
-    toast('err', 'No se pudo abrir la carpeta de la iniciativa');
+    toast('err', 'No se pudo abrir la carpeta de el proyecto');
   } finally {
     if (btn) btn.classList.remove('is-loading');
   }
@@ -1547,6 +2447,12 @@ function refreshMeetingTitleJob() {
   if (!group) return;
   const job = currentMeetingJob();
   group.classList.toggle('is-processing', !!job);
+  // Los botones de transcribir del panel de vídeo no deben quedar activos
+  // mientras ya hay una transcripción en curso para esta misma reunión.
+  document.querySelectorAll('.video-file .rec-actions .btn').forEach(b => {
+    b.disabled = !!job; b.classList.toggle('is-disabled', !!job);
+    b.title = job ? 'Ya se está transcribiendo esta reunión…' : '';
+  });
   let spin = group.querySelector('.meeting-title-spinner');
   if (job && !spin) {
     spin = el('span', 'spinner sm meeting-title-spinner');
@@ -1554,15 +2460,16 @@ function refreshMeetingTitleJob() {
   } else if (!job && spin) {
     spin.remove();
   }
-  const copy = group.querySelector('.meeting-title-copy');
-  const old = group.querySelector('[data-meeting-job]');
-  if (!copy) return;
+  // La barra de progreso vive bajo los tabs (#meetingJobRow), no en el título.
+  const row = document.querySelector('#meetingJobRow');
+  if (!row) return;
+  const old = row.querySelector('[data-meeting-job]');
   if (job) {
     const tmp = el('div');
     tmp.innerHTML = meetingJobMarkup(job);
     const fresh = tmp.firstElementChild;
     _wireJobCancel(fresh);
-    if (old) old.replaceWith(fresh); else copy.appendChild(fresh);
+    if (old) old.replaceWith(fresh); else row.appendChild(fresh);
   } else if (old) old.remove();
 }
 
@@ -1581,123 +2488,196 @@ function _wireJobCancel(el) {
 function viewMeeting() {
   const t = STATE.transcript;
   const it = STATE.initiatives.find(x => x.id === STATE.selInit);
-  const wrap = el('div'); wrap.style.cssText = 'display:flex;flex-direction:column;flex:1;min-height:0';
-  const head = el('div', 'mhead init-head meeting-head');
-  // Sin transcripción (p. ej. vídeo aún sin transcribir) no hay nada que copiar,
-  // exportar ni a quién asignar: esos botones se atenúan y desactivan.
   const fraseCount = t && t.utterances ? t.utterances.filter(u => !u.kind || u.kind === 'utterance').length : 0;
   const transcribed = fraseCount > 0;
-  const txOff = transcribed ? '' : ' is-disabled';
-  const txTip = transcribed ? '' : 'Disponible cuando transcribas el vídeo';
-  const meetingDateStr = t && t.started_at ? formatDateShort(t.started_at) : '';
+  const esFav = _isMeetingFav(t ? t.id : 0);
   const meetingJob = currentMeetingJob();
-  // Duración del vídeo: va junto a la fecha, en la línea del título.
-  // Ya no mostramos "Sin transcripción" ni el recuento de frases.
-  const videoDur = t && t.video_duration
-    ? `<span class="meeting-video-dur"><span class="mvd-ico">${svg('play', 11)}</span>${esc(t.video_duration)}</span>`
-    : t && t.duration && !t.video_path
-    ? `<span class="meeting-video-dur"><span class="mvd-ico">${svg('mic', 11)}</span>${esc(t.duration)}</span>`
-    : '';
-  head.innerHTML = `
-    <div class="init-status-row meeting-status-row">
-      <div class="init-title-group meeting-title-group ${meetingJob ? 'is-processing' : ''}">
-        ${meetingJob ? '<span class="spinner sm meeting-title-spinner"></span>' : ''}
-        <div class="meeting-title-copy">
-          <div class="meeting-title-line">
-            <h1 class="mtitle-h title-lg">${esc(t ? t.title : 'Reunión')}</h1>
-            ${meetingDateStr ? `<span class="init-created">${esc(meetingDateStr)}</span>` : ''}
-            ${videoDur}
-          </div>
-          ${meetingJobMarkup(meetingJob)}
-        </div>
-      </div>
-      <div class="init-actions meeting-actions" id="meetingActions">
-        <button class="init-copy-md${txOff} mact-rest" id="mCopy" title="${txTip || 'Copiar la transcripción en Markdown'}">${svg('copy', 14)}<span>Copiar transcripción .md</span></button>
-        <span class="init-actions-sep mact-rest" id="mSearchSep"></span>
-        <button class="icon-btn${txOff}" id="mSearch" title="${txTip || 'Buscar en la transcripción'}">${svg('search', 15)}</button>
-        <div class="init-actions-searchbox" id="mSearchBox" hidden>
-          <input id="mSearchInput" type="search" class="init-inline-input" placeholder="Buscar en la transcripción…" autocomplete="off">
-          <span class="tx-count" id="mSearchCount"></span>
-          <button class="icon-btn sm" id="mSearchClear" hidden>${svg('x', 13)}</button>
-        </div>
-        <span class="init-actions-sep mact-rest"></span>
-        <button class="icon-btn mact-rest" id="mOpen" title="Abrir la carpeta de la reunión">${svg('folder', 15)}</button>
-        <button class="icon-btn mact-rest" id="mMenu" aria-label="Más acciones de la reunión">${svg('dots', 16)}</button>
-      </div>
-    </div>
-    <div class="tabs" role="tablist">
-      ${['transcript', 'notas', 'archivos'].map(tab => {
-        const label = { transcript: 'Transcripción', notas: 'Notas', archivos: 'Archivos' }[tab];
-        return `<button class="tab ${STATE.activeTab === tab ? 'active' : ''}" data-tab="${tab}" role="tab">${label}</button>`;
-      }).join('')}
-    </div>`;
-  const content = el('div', 'content');
-  if (STATE.activeTab === 'notas') content.classList.add('notes-mode');
-  content.appendChild(renderTab(STATE.activeTab, t));
-  // Wire botón cancelar si hay trabajo activo al renderizar la vista
-  _wireJobCancel(head.querySelector('[data-meeting-job]'));
-  // eventos
-  head.querySelector('#mCopy').onclick = (e) => copyMeetingContext(STATE.selMeeting, e.currentTarget);
-  head.querySelector('#mOpen').onclick = (e) => doOpenFolder(e.currentTarget);
-  head.querySelector('#mMenu').onclick = (e) => openMeetingMenu(e, STATE.selMeeting);
-  {
-    const mSearchBtn = head.querySelector('#mSearch');
-    const mSearchBox = head.querySelector('#mSearchBox');
-    const mSearchInput = head.querySelector('#mSearchInput');
-    const mSearchCount = head.querySelector('#mSearchCount');
-    const mSearchClear = head.querySelector('#mSearchClear');
-    const restEls = head.querySelectorAll('.mact-rest');
-    let _mOutside = null;
-    const close = () => {
-      mSearchBox.hidden = true; mSearchBtn.classList.remove('active');
-      restEls.forEach(e => { e.style.display = ''; });
-      head.querySelector('#meetingActions').classList.remove('searching');
-      mSearchInput.value = ''; mSearchCount.textContent = '';
-      if (STATE._txApply) STATE._txApply('');
-      if (_mOutside) { document.removeEventListener('mousedown', _mOutside, true); _mOutside = null; }
-    };
-    const openMSearch = () => {
-      mSearchBox.hidden = false; mSearchBtn.classList.add('active');
-      restEls.forEach(e => { e.style.display = 'none'; });
-      head.querySelector('#meetingActions').classList.add('searching');
-      setTimeout(() => mSearchInput.focus(), 0);
-      _mOutside = (e) => { if (!mSearchBox.contains(e.target) && e.target !== mSearchBtn) close(); };
-      document.addEventListener('mousedown', _mOutside, true);
-    };
-    mSearchBtn.onclick = () => {
-      if (!transcribed) return;
-      if (STATE.activeTab !== 'transcript') { STATE.activeTab = 'transcript'; renderMain(); return; }
-      mSearchBox.hidden ? openMSearch() : close();
-    };
-    let deb;
-    mSearchInput.addEventListener('input', () => {
-      clearTimeout(deb); deb = setTimeout(() => {
-        const q = mSearchInput.value.trim();
-        mSearchClear.hidden = !q;
-        const n = STATE._txApply ? STATE._txApply(q) : 0;
-        mSearchCount.textContent = q ? (n ? `${n} resultado${n > 1 ? 's' : ''}` : 'Sin resultados') : '';
-      }, 180);
-    });
-    mSearchInput.addEventListener('keydown', e => { if (e.key === 'Escape') close(); });
-    mSearchClear.onclick = () => close();
+
+  const wrap = el('div', 'content-scroll scroll');
+  const inner = el('div', 'content-inner');
+
+  /* Cabecera: miga → título → "···". El buscador dentro de la transcripción
+     (#mSearch) se retiró de esta pantalla por decisión del dueño registrada en
+     diseno.md; la búsqueda global de Ctrl+K ya mira dentro de las
+     transcripciones, así que la capacidad no se pierde. */
+  const head = el('div', 'meeting-header');
+  const main = el('div', 'meeting-header-main');
+  if (it) {
+    const crumb = el('div', 'crumb');
+    crumb.innerHTML = `<button type="button"><svg class="icon"><use href="#i-chevleft"/></svg>${esc(it.name)}</button>`;
+    crumb.querySelector('button').onclick = () => selectInitiative(it.id);
+    main.appendChild(crumb);
   }
-  head.querySelectorAll('.tab').forEach(b => b.onclick = () => { STATE.activeTab = b.dataset.tab; renderMain(); });
-  wrap.replaceChildren(head, content);
+  const h1 = el('h1', 'page-title');
+  h1.textContent = t ? _fmtMeetingLabel(t) : 'Reunión';
+  main.appendChild(h1);
+
+  const side = el('div', 'meeting-header-side');
+  const btnMenu = el('button', 'icon-btn');
+  btnMenu.type = 'button';
+  btnMenu.title = 'Más acciones de la reunión';
+  btnMenu.setAttribute('aria-label', 'Más acciones de la reunión');
+  btnMenu.innerHTML = '<svg class="icon"><use href="#i-more"/></svg>';
+  btnMenu.onclick = (e) => openMeetingMenu(e, STATE.selMeeting);
+  side.appendChild(btnMenu);
+  head.append(main, side);
+  inner.appendChild(head);
+
+  // Fila de trabajo en curso (transcripción en segundo plano).
+  const jobRow = el('div', 'meeting-job-row');
+  jobRow.id = 'meetingJobRow';
+  jobRow.innerHTML = meetingJobMarkup(meetingJob);
+  inner.appendChild(jobRow);
+  _wireJobCancel(jobRow.querySelector('[data-meeting-job]'));
+
+  /* Fila de pestañas: píldoras a la izquierda, barra de acciones a la derecha.
+     Los tres botones están siempre visibles; solo la etiqueta de "Copiar" se
+     revela al pasar el mouse por el grupo entero. */
+  const tabsWrap = el('div', 'tabs-wrap');
+  const tabsRow = el('div', 'tabs-row');
+
+  const TABS = [
+    { id: 'transcript', label: 'Transcripcion' },
+    { id: 'general',    label: 'General' },
+    { id: 'notas',      label: 'Notas' },
+    { id: 'archivos',   label: 'Archivos' },
+  ];
+  const pills = el('div', 'segmented-pill');
+  pills.setAttribute('role', 'tablist');
+  TABS.forEach(tab => {
+    const b = el('button', 'tab-btn' + (STATE.activeTab === tab.id ? ' active' : ''));
+    b.type = 'button'; b.dataset.tab = tab.id; b.setAttribute('role', 'tab');
+    b.textContent = tab.label;
+    b.onclick = () => { STATE.activeTab = tab.id; renderMain(); };
+    pills.appendChild(b);
+  });
+
+  const bar = el('div', 'action-bar action-reveal');
+  bar.id = 'meetingActions';
+
+  const btnCopy = el('button', 'icon-btn action-reveal-copy');
+  btnCopy.type = 'button'; btnCopy.id = 'mCopy';
+  btnCopy.disabled = !transcribed;
+  btnCopy.title = transcribed ? 'Copiar la transcripción en Markdown' : 'Disponible cuando transcribas el vídeo';
+  btnCopy.innerHTML = `<svg class="icon icon-sm"><use href="#i-copy"/></svg>` +
+    `<span class="action-reveal-label-grid"><span class="action-reveal-label">Copiar transcripción .md</span></span>`;
+  btnCopy.onclick = (e) => copyMeetingContext(STATE.selMeeting, e.currentTarget);
+
+  const btnFav = el('button', 'icon-btn meeting-fav-btn' + (esFav ? ' active' : ''));
+  btnFav.type = 'button'; btnFav.id = 'mFav';
+  btnFav.setAttribute('aria-pressed', esFav ? 'true' : 'false');
+  btnFav.title = esFav ? 'Quitar de favoritos' : 'Añadir a favoritos';
+  btnFav.innerHTML = '<svg class="icon"><use href="#i-star"/></svg>';
+  if (t) btnFav.onclick = () => {
+    _toggleMeetingFav(t.id);
+    const ahora = _isMeetingFav(t.id);
+    btnFav.classList.toggle('active', ahora);
+    btnFav.setAttribute('aria-pressed', ahora ? 'true' : 'false');
+    btnFav.title = ahora ? 'Quitar de favoritos' : 'Añadir a favoritos';
+    renderSidebar();
+    toast(ahora ? 'ok' : 'info', ahora ? 'Añadida a favoritos' : 'Quitada de favoritos');
+  };
+
+  const btnOpen = el('button', 'icon-btn');
+  btnOpen.type = 'button'; btnOpen.id = 'mOpen';
+  btnOpen.title = 'Abrir la carpeta de la reunión';
+  btnOpen.innerHTML = '<svg class="icon"><use href="#i-folder"/></svg>';
+  btnOpen.onclick = (e) => doOpenFolder(e.currentTarget);
+
+  bar.append(btnCopy, btnFav, btnOpen);
+  tabsRow.append(pills, bar);
+  tabsWrap.appendChild(tabsRow);
+
+  const panel = el('div', 'tab-panel active');
+  panel.dataset.tabPanel = STATE.activeTab;
+  if (STATE.activeTab === 'notas') panel.classList.add('notes-mode');
+  panel.appendChild(renderTab(STATE.activeTab, t));
+  tabsWrap.appendChild(panel);
+  inner.appendChild(tabsWrap);
+
+  wrap.appendChild(inner);
   return wrap;
 }
 
 function renderTab(tab, t) {
+  if (tab === 'general') return renderGeneral(t);
   if (tab === 'archivos') return renderFiles();
   if (tab === 'notas') return renderNotes();
-  return renderTranscript(t);  // por defecto, la transcripción
+  return renderTranscript(t);  // transcript
+}
+
+function renderGeneral(t) {
+  const r = el('div', 'meeting-general');
+  const hasVideo = !!(t && t.video_path);
+  const transcribed = !!(t && t.utterances && t.utterances.filter(u => !u.kind || u.kind === 'utterance').length > 0);
+
+  // ── Info + Video lado a lado ──
+  const row = el('div', 'general-row');
+
+  // Info
+  const info = el('div', 'general-info');
+  const dur = (t && t.video_duration) || (t && t.audio_duration) || (t && t.duration) || '—';
+  const fechaHora = t && t.date ? t.date : (t && t.started_at ? new Date(t.started_at).toLocaleString('es', { day:'numeric', month:'long', year:'numeric', hour:'2-digit', minute:'2-digit' }) : '—');
+  info.innerHTML = `
+    <div class="general-info-row"><span class="general-info-label">Fecha</span><span>${esc(fechaHora)}</span></div>
+    <div class="general-info-row"><span class="general-info-label">Duracion</span><span>${esc(dur)}</span></div>
+    <div class="general-info-row"><span class="general-info-label">Frases</span><span>${t && t.utterances ? t.utterances.filter(u => !u.kind || u.kind === 'utterance').length : 0}</span></div>`;
+  row.appendChild(info);
+
+  // Video compacto al costado
+  if (hasVideo) {
+    const vp = videoPanel(t);
+    vp.classList.add('video-panel--compact');
+    row.appendChild(vp);
+  }
+
+  r.appendChild(row);
+  return r;
 }
 
 function renderTranscript(t) {
-  const r = el('div', 'reading');
-  // Grabación de pantalla: agrupa panel + input de contexto en un bloque visual.
-  const videoSection = (t && t.video_path) ? el('div', 'video-section') : null;
-  if (videoSection) { videoSection.appendChild(videoPanel(t)); r.appendChild(videoSection); }
-  const us = (t && t.utterances) || [];
+  /* Dos clases a propósito: .transcript es la del mockup (la que trae los
+     estilos nuevos) y .reading es la que busca window.addUtterance para saber
+     dónde insertar cada frase que llega en vivo. Mismo elemento, dos
+     identidades — si se quita .reading, el motor sigue transcribiendo pero el
+     texto deja de aparecer en pantalla. */
+  const r = el('div', 'transcript reading');
+  const allUs = (t && t.utterances) || [];
+  const availableLangs = _deriveLanguages(allUs);
+
+  /* Selector de idioma: solo cuando hay MÁS DE UNO que elegir. Con un idioma
+     (o sin dato de idioma) mostraba un chip "Transcripcion · N" que repetía lo
+     que ya dice la pestaña y añadía una fila de ruido antes del texto. */
+  const hasUtterances = allUs.filter(u => u.kind === 'utterance').length > 0;
+  if (hasUtterances && availableLangs.length > 1) {
+    STATE._txLang = STATE._txLang || (availableLangs.length > 0 ? availableLangs[0].code : '');
+    const langBar = el('div', 'lang-bar');
+    const LANG_LABELS = { es: 'Espanol', en: 'English', pt: 'Portugues', fr: 'Francais', de: 'Deutsch', it: 'Italiano', ja: '日本語', zh: '中文', ko: '한국어' };
+    let chips;
+    if (availableLangs.length === 0) {
+      // Sin datos de idioma: mostrar chip unico con el total
+      const total = allUs.filter(u => u.kind === 'utterance').length;
+      chips = [{ code: '', count: total }];
+    } else if (availableLangs.length === 1) {
+      chips = availableLangs;
+    } else {
+      chips = [{ code: '', count: allUs.filter(u => u.kind === 'utterance').length }].concat(availableLangs);
+    }
+    langBar.innerHTML = chips.map(l => {
+      const label = l.code ? (LANG_LABELS[l.code] || l.code.toUpperCase()) : (availableLangs.length === 0 ? 'Transcripcion' : 'Todos');
+      const active = STATE._txLang === l.code ? ' active' : '';
+      return `<button class="lang-chip${active}" data-lang="${l.code}">${esc(label)} <span class="lang-chip-count">${l.count}</span></button>`;
+    }).join('');
+    langBar.querySelectorAll('.lang-chip').forEach(btn => {
+      btn.onclick = () => { STATE._txLang = btn.dataset.lang; renderMain(); };
+    });
+    r.appendChild(langBar);
+  } else {
+    STATE._txLang = '';
+  }
+
+  const selectedLang = STATE._txLang || '';
+  const us = selectedLang ? allUs.filter(u => (u.language || '') === selectedLang || u.kind !== 'utterance') : allUs;
   const fraseCount = us.filter(u => !u.kind || u.kind === 'utterance').length;
   const transcribed = fraseCount > 0;
 
@@ -1822,7 +2802,7 @@ function renderTranscript(t) {
   if (!recording && t && transcribed) {
     const tools = el('div', 'meeting-tools');
     const context = el('div', 'meeting-context');
-    context.innerHTML = `<textarea id="meetingContext" rows="1" maxlength="2000" placeholder="Añadir contexto" aria-label="Añadir contexto"></textarea>
+    context.innerHTML = `<textarea id="meetingContext" rows="1" maxlength="2000" placeholder="Anadir contexto (Enter para guardar)" aria-label="Anadir contexto"></textarea>
       <span class="meeting-context-state" id="meetingContextState"></span>`;
     const contextInput = context.querySelector('#meetingContext');
     const contextState = context.querySelector('#meetingContextState');
@@ -1833,28 +2813,25 @@ function renderTranscript(t) {
     const addToTranscript = async () => {
       const text = contextInput.value.trim();
       if (!text) return;
-      contextState.textContent = 'Añadiendo…';
-      const r = await api.addMeetingNote(STATE.selMeeting, text);
-      if (r && r.ok && r.note) {
+      contextState.textContent = 'Guardando...';
+      const r2 = await api.addMeetingNote(STATE.selMeeting, text);
+      if (r2 && r2.ok && r2.note) {
         contextInput.value = ''; resizeContext(); contextState.textContent = '';
-        // Reflejar en memoria (al principio) para que persista al cambiar de pestaña.
         if (STATE.transcript) {
           STATE.transcript.utterances = STATE.transcript.utterances || [];
-          STATE.transcript.utterances.unshift(r.note);
+          STATE.transcript.utterances.unshift(r2.note);
         }
-        // Insertar el nodo ARRIBA del todo (antes de la primera entrada).
         const reading = document.querySelector('.reading');
         if (reading) {
-          const node = contextEvent(r.note);
+          const node = contextEvent(r2.note);
           const firstItem = reading.querySelector('.utterance');
           if (firstItem) reading.insertBefore(node, firstItem); else reading.appendChild(node);
           node.scrollIntoView({ block: 'nearest' });
         }
-        toast('ok', 'Añadido como contexto');
+        toast('ok', 'Contexto guardado');
       } else { contextState.textContent = 'Error'; }
     };
     contextInput.addEventListener('input', resizeContext);
-    // Enter = añadir a la transcripción. Shift+Enter = línea nueva.
     contextInput.addEventListener('keydown', (e) => {
       if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); addToTranscript(); }
     });
@@ -1877,24 +2854,40 @@ function renderTranscript(t) {
     } else {
       STATE._txApply = null;
     }
-    (videoSection || r).appendChild(tools);
+    r.appendChild(tools);
   }
 
+
+  if (recording) {
+    // En grabación las frases llegan YA REALES y persistidas en vivo
+    // (window.addUtterance, transcripción progresiva): se pintan todas con
+    // sus acciones normales. El indicador de "escuchando" se queda fijo al
+    // final de la lista; todo el bloque desaparece solo al dejar de grabar
+    // (este código deja de ejecutarse en el siguiente renderMain()).
+    us.forEach(u => { const it = buildItem(u); items.push(it); r.appendChild(it.node); });
+    /* Indicador de escucha, con la forma del mockup (.listening-row): tres
+       puntos animados + "Escuchando…". Comunica "sigue grabando" sin fingir
+       que hay texto pendiente de aparecer.
+       Conserva id="previewTyping" porque window.setLivePartial escribe aquí el
+       texto parcial de Vosk, y window.addUtterance inserta cada frase cerrada
+       JUSTO ANTES de este elemento. Renombrarlo rompe las dos cosas. */
+    const typing = el('div', 'listening-row preview-typing');
+    typing.id = 'previewTyping';
+    typing.innerHTML = '<span class="dots"><span></span><span></span><span></span></span>' +
+      '<span class="listening-label">Escuchando…</span>';
+    r.appendChild(typing);
+    return r;
+  }
 
   if (!us.length && !(t && t.video_path)) {
     r.appendChild(el('p', null, '<span style="color:var(--text-muted)">Sin transcripción todavía.</span>'));
     return r;
   }
 
-  if (recording) {
-    // En grabación las frases llegan en vivo (window.addUtterance): se pintan todas.
-    us.forEach(u => { const it = buildItem(u); items.push(it); r.appendChild(it.node); });
-  } else {
-    r.appendChild(bulkBar);   // sticky arriba, antes de las frases
-    r.appendChild(moreBtn);
-    moreBtn.onclick = () => drawBatch(PAGE);
-    drawBatch(PAGE);
-  }
+  r.appendChild(bulkBar);   // sticky arriba, antes de las frases
+  r.appendChild(moreBtn);
+  moreBtn.onclick = () => drawBatch(PAGE);
+  drawBatch(PAGE);
   return r;
 }
 
@@ -1902,14 +2895,34 @@ function renderTranscript(t) {
 // el usuario decide cuándo abrirlo en su reproductor habitual.
 function videoPanel(t) {
   const hasTx = !!(t.utterances && t.utterances.some(u => !u.kind || u.kind === 'utterance'));
+  const mid = t.meeting_id || t.id || STATE.selMeeting;
+  const busy = meetingIsTranscribing(mid);
   const wrap = el('div', 'video-panel');
+  wrap.dataset.videoMid = String(mid);
   const name = String(t.video_path || '').split(/[\\/]/).pop() || 'grabacion.mp4';
   wrap.innerHTML = `<div class="video-file">
-    <button class="video-file-icon" title="Reproducir vídeo">${svg('play', 15)}</button>
-    <div class="video-file-copy"><b>Grabación de pantalla</b><small>${esc(name)}</small></div>
+    <button class="video-file-icon" title="Reproducir video">${svg('play', 15)}</button>
+    <div class="video-file-copy"><b>Grabacion de pantalla</b><small>${esc(name)}</small></div>
     <div class="rec-actions"></div>
+  </div>
+  <div class="video-player-wrap">
+    <video class="video-player" controls preload="metadata" muted playsinline></video>
+    <div class="video-player-overlay">
+      <button class="video-player-big-play" title="Reproducir">${svg('play', 28)}</button>
+    </div>
   </div>`;
-  wrap.querySelector('.video-file-icon').onclick = () => api.openPath(t.video_path);
+  const playerWrap = wrap.querySelector('.video-player-wrap');
+  const player = wrap.querySelector('.video-player');
+  const bigPlay = wrap.querySelector('.video-player-big-play');
+  const playIcon = wrap.querySelector('.video-file-icon');
+  // Cargar URL del video inmediatamente (sin autoplay)
+  api.getMediaVideoUrl(mid).then(url => { if (url) { player.src = url; player.load(); } }).catch(() => {});
+  const startPlayback = () => { player.muted = false; player.play().catch(() => {}); playerWrap.classList.add('is-playing'); };
+  const pausePlayback = () => { player.pause(); playerWrap.classList.remove('is-playing'); };
+  bigPlay.onclick = (e) => { e.stopPropagation(); startPlayback(); };
+  player.onplay = () => { playerWrap.classList.add('is-playing'); };
+  player.onpause = () => { playerWrap.classList.remove('is-playing'); };
+  playIcon.onclick = () => { if (player.paused) startPlayback(); else pausePlayback(); };
   const actions = el('div', 'rec-actions');
   const folderPath = String(t.video_path).replace(/[/\\][^/\\]*$/, '');
   const open = el('button', 'icon-btn');
@@ -1917,53 +2930,460 @@ function videoPanel(t) {
   open.title = 'Abrir carpeta';
   open.onclick = () => api.openPath(folderPath);
   actions.appendChild(open);
-  const bt = el('button', hasTx ? 'btn' : 'btn btn-primary', hasTx ? 'Retranscribir' : 'Transcribir');
-  if (hasTx) bt.title = 'Volver a transcribir este vídeo';
-  bt.onclick = () => {
-    if (hasTx) {
-      confirmModal('Retranscribir', 'Se reemplazará la transcripción actual usando el motor de mayor calidad disponible.', 'Retranscribir', () => transcribeScreenVideo(STATE.selMeeting, true));
-    } else transcribeScreenVideo(STATE.selMeeting, false);
-  };
+  const bt = el('button', hasTx ? 'btn' : 'btn btn-primary', hasTx ? 'Retranscribir' : 'Recortar y transcribir');
+  bt.dataset.txBtn = 'clip';
+  bt.dataset.txLabel = bt.textContent;
+  bt.onclick = () => openClipEditor(wrap, t, hasTx);
   actions.appendChild(bt);
+  // Transcribir directo, sin pasar por el recortador (vídeo completo)
+  const btNow = el('button', 'btn', hasTx ? 'Retranscribir todo' : 'Transcribir ahora');
+  btNow.dataset.txBtn = 'now';
+  btNow.dataset.txLabel = btNow.textContent;
+  btNow.onclick = () => transcribeScreenVideo(mid, hasTx, null);
+  actions.appendChild(btNow);
   wrap.querySelector('.rec-actions').replaceWith(actions);
+  applyVideoPanelTranscribing(wrap, mid);
   return wrap;
 }
 
-async function transcribeScreenVideo(mid, force) {
+function applyVideoPanelTranscribing(wrap, mid) {
+  const busy = meetingIsTranscribing(mid);
+  wrap.classList.toggle('is-transcribing', busy);
+  if (busy) wrap.style.display = 'none';
+  else wrap.style.display = '';
+  wrap.querySelectorAll('[data-tx-btn]').forEach(b => {
+    b.disabled = busy;
+    b.classList.toggle('is-disabled', busy);
+    b.textContent = busy ? 'Transcribiendo...' : (b.dataset.txLabel || b.textContent);
+  });
+}
+
+// ── Idiomas disponibles (fallback si el API no los devuelve) ──
+function _deriveLanguages(utterances) {
+  const map = {};
+  for (const u of utterances) {
+    if (u.kind !== 'utterance') continue;
+    const lang = u.language || '';
+    if (lang) map[lang] = (map[lang] || 0) + 1;
+  }
+  const langs = Object.entries(map).map(([code, count]) => ({ code, count }));
+  langs.sort((a, b) => b.count - a.count);
+  return langs;
+}
+
+function refreshVideoPanelButtons() {
+  document.querySelectorAll('.video-panel[data-video-mid]').forEach(wrap => {
+    applyVideoPanelTranscribing(wrap, wrap.dataset.videoMid);
+  });
+}
+
+// Recortador estilo CapCut: reproductor + línea de tiempo con miniaturas + manijas.
+async function openClipEditor(wrap, t, isRetx) {
+  const existing = wrap.querySelector('.clip-editor');
+  if (existing) {
+    existing.remove();
+    document.querySelectorAll('.clip-backdrop').forEach(b => b.remove());
+    return;
+  }
+  const mid = t.meeting_id || STATE.selMeeting;
+  const url = await api.getMediaVideoUrl(mid);
+  const ed = el('div', 'clip-editor');
+  ed.innerHTML = `
+    <video class="clip-video" src="${esc(url || '')}" preload="metadata"></video>
+    <div class="clip-ctrl">
+      <button class="clip-cbtn clip-skip" data-d="-10" title="Retroceder 10 segundos">${svg('rewind', 14)}<span class="clip-cnum">10</span></button>
+      <button class="clip-cbtn clip-play" title="Reproducir la sección seleccionada">${svg('play', 16)}</button>
+      <button class="clip-cbtn clip-skip" data-d="10" title="Avanzar 10 segundos"><span class="clip-cnum">10</span>${svg('fastForward', 14)}</button>
+      <span class="clip-ctrl-sep"></span>
+      <button class="clip-cbtn clip-mark-a" title="La sección empieza aquí (posición actual del vídeo)">${svg('markIn', 14)}</button>
+      <button class="clip-cbtn clip-mark-b" title="La sección termina aquí (posición actual del vídeo)">${svg('markOut', 14)}</button>
+      <span class="clip-time">0:00 / 0:00</span>
+      <button class="clip-cbtn clip-max" title="Ampliar en ventana grande">${svg('expand', 14)}</button>
+    </div>
+    <div class="clip-tl">
+      <div class="clip-thumbs"></div>
+      <div class="clip-section-marks"></div>
+      <div class="clip-sel"><span class="clip-h l"></span><span class="clip-h r"></span></div>
+      <div class="clip-cursor"></div>
+    </div>
+    <div class="clip-scale"><span>0:00</span><span class="clip-dur">--:--</span></div>
+    <div class="clip-segs"></div>
+    <div class="clip-foot">
+      <div class="clip-total">Carga el video para crear la primera sección</div>
+      <div class="clip-actions">
+        <button class="btn clip-cancel">Cancelar</button>
+        <button class="btn btn-primary clip-go" disabled>Transcribir selección →</button>
+      </div>
+    </div>`;
+  wrap.appendChild(ed);
+  if (!url) {
+    ed.querySelector('.clip-total').textContent = 'No se pudo cargar el vídeo';
+    return;
+  }
+
+  const video = ed.querySelector('.clip-video');
+  const tl = ed.querySelector('.clip-tl');
+  const sel = ed.querySelector('.clip-sel');
+  const cursor = ed.querySelector('.clip-cursor');
+  const segsBox = ed.querySelector('.clip-segs');
+  const marksBox = ed.querySelector('.clip-section-marks');
+  const totalEl = ed.querySelector('.clip-total');
+  const goBtn = ed.querySelector('.clip-go');
+  const state = { dur: 0, a: 0, b: 0, segs: [], active: 0 };
+  const fmt = s => `${Math.floor(s/60)}:${String(Math.floor(s%60)).padStart(2,'0')}`;
+
+  api.getVideoThumbnails(mid, 12).then(thumbs => {
+    ed.querySelector('.clip-thumbs').innerHTML = (thumbs || []).map(th =>
+      `<i style="background-image:url(data:image/jpeg;base64,${th.thumb})"></i>`).join('');
+  });
+
+  function sortedSegs() {
+    return state.segs.map((s, i) => ({ ...s, i })).sort((a, b) => a.start - b.start || a.end - b.end);
+  }
+  function currentSeg() {
+    return state.segs[state.active] || null;
+  }
+  function syncActiveSection() {
+    const seg = currentSeg();
+    if (!seg) return;
+    seg.start = state.a;
+    seg.end = state.b;
+  }
+  function totalSelected() {
+    let total = 0;
+    let cursor = null;
+    for (const s of sortedSegs()) {
+      if (cursor === null || s.start > cursor) {
+        total += Math.max(0, s.end - s.start);
+        cursor = s.end;
+      } else if (s.end > cursor) {
+        total += s.end - cursor;
+        cursor = s.end;
+      }
+    }
+    return Math.min(state.dur || total, total);
+  }
+  function isFullyCovered() {
+    if (!state.dur || !state.segs.length) return false;
+    let cursor = 0;
+    for (const s of sortedSegs()) {
+      if (s.start > cursor + 0.15) return false;
+      cursor = Math.max(cursor, s.end);
+      if (cursor >= state.dur - 0.15) return true;
+    }
+    return false;
+  }
+  function spaceNextToActive() {
+    const cur = currentSeg();
+    if (!cur || !state.dur) return null;
+    const sorted = sortedSegs();
+    const pos = sorted.findIndex(s => s.i === state.active);
+    const rightLimit = pos >= 0 && sorted[pos + 1] ? sorted[pos + 1].start : state.dur;
+    if (rightLimit - cur.end >= 0.5) {
+      return { start: cur.end, end: Math.min(rightLimit, cur.end + Math.min(5, rightLimit - cur.end)) };
+    }
+    const leftLimit = pos > 0 ? sorted[pos - 1].end : 0;
+    if (cur.start - leftLimit >= 0.5) {
+      return { start: Math.max(leftLimit, cur.start - Math.min(5, cur.start - leftLimit)), end: cur.start };
+    }
+    return null;
+  }
+  function activateSection(index) {
+    const seg = state.segs[index];
+    if (!seg) return;
+    state.active = index;
+    state.a = seg.start;
+    state.b = seg.end;
+    paintSel();
+    paintSegs();
+  }
+  function paintSel() {
+    if (!state.dur) return;
+    sel.style.left = (state.a / state.dur * 100) + '%';
+    sel.style.width = ((state.b - state.a) / state.dur * 100) + '%';
+    syncActiveSection();
+    const secs = totalSelected();
+    totalEl.innerHTML = `Se transcribirá <b>${fmt(secs)}</b> de ${fmt(state.dur)} <span class="clip-range">· Sección ${state.active + 1}: ${fmt(state.a)} – ${fmt(state.b)}</span>`;
+    updateGo();
+  }
+  function paintSegs() {
+    const canAdd = !!spaceNextToActive() && !isFullyCovered();
+    marksBox.innerHTML = state.segs.map((s, i) => {
+      if (!state.dur || i === state.active) return '';
+      const left = s.start / state.dur * 100;
+      const width = (s.end - s.start) / state.dur * 100;
+      return `<button type="button" class="clip-section-mark" data-i="${i}" style="left:${left}%;width:${width}%" title="Sección ${i + 1}"></button>`;
+    }).join('');
+    marksBox.querySelectorAll('.clip-section-mark').forEach(mark => mark.onclick = e => {
+      e.stopPropagation();
+      activateSection(+mark.dataset.i);
+    });
+    const addLabel = canAdd ? '+ añadir sección'
+      : (isFullyCovered() ? 'Todo el video está cubierto' : 'Sin espacio junto a la sección activa');
+    segsBox.innerHTML = state.segs.map((s, i) =>
+      `<button type="button" class="clip-pill${i === state.active ? ' is-active' : ''}" data-i="${i}">Sección ${i+1} · ${fmt(s.start)}–${fmt(s.end)} <span class="x" title="Eliminar sección">×</span></button>`
+    ).join('') + `<button type="button" class="clip-add" ${canAdd ? '' : 'disabled'}>${addLabel}</button>`;
+    segsBox.querySelectorAll('.clip-pill').forEach(p => p.onclick = e => {
+      if (e.target.closest('.x')) return;
+      activateSection(+p.dataset.i);
+    });
+    segsBox.querySelectorAll('.x').forEach(x => x.onclick = e => {
+      const idx = +e.target.closest('.clip-pill').dataset.i;
+      state.segs.splice(idx, 1);
+      if (!state.segs.length) {
+        state.segs.push({ start: 0, end: state.dur });
+        state.active = 0;
+      } else {
+        state.active = Math.max(0, Math.min(state.active > idx ? state.active - 1 : state.active, state.segs.length - 1));
+      }
+      const seg = currentSeg();
+      state.a = seg.start; state.b = seg.end;
+      paintSel(); paintSegs(); updateGo();
+    });
+    segsBox.querySelector('.clip-add').onclick = () => {
+      const next = spaceNextToActive();
+      if (!next || isFullyCovered()) return;
+      const insertAt = state.active + 1;
+      state.segs.splice(insertAt, 0, next);
+      activateSection(insertAt);
+    };
+  }
+  function updateGo() {
+    goBtn.disabled = !state.segs.some(s => (s.end - s.start) >= 0.5);
+  }
+
+  // Controles de reproducción: play/pausa y saltos de ±10 s.
+  const playBtn = ed.querySelector('.clip-play');
+  const timeEl = ed.querySelector('.clip-time');
+  let playingClip = false;   // reproduciendo la sección → pausa al llegar a su fin
+  playBtn.onclick = () => {
+    if (video.paused) {
+      // Play arranca en el INICIO de la sección si el cursor está fuera de ella;
+      // si pausaste a mitad de la sección, reanuda donde ibas.
+      if (state.dur && (video.currentTime < state.a - 0.05 || video.currentTime >= state.b - 0.05)) {
+        video.currentTime = state.a;
+      }
+      playingClip = true;
+      video.play();
+    } else {
+      video.pause();
+    }
+  };
+  video.addEventListener('click', () => playBtn.onclick());
+  video.addEventListener('play', () => { playBtn.innerHTML = svg('pause', 16); playBtn.title = 'Pausa'; });
+  video.addEventListener('pause', () => { playBtn.innerHTML = svg('play', 16); playBtn.title = 'Reproducir la sección seleccionada'; });
+  ed.querySelectorAll('.clip-skip').forEach(b => b.onclick = () => {
+    if (!state.dur) return;
+    playingClip = false;   // navegación libre: no auto-pausar en el fin de la sección
+    video.currentTime = Math.min(state.dur, Math.max(0, video.currentTime + Number(b.dataset.d)));
+  });
+
+  // Marcar la sección viendo el vídeo: fija inicio/fin en la posición actual.
+  ed.querySelector('.clip-mark-a').onclick = () => {
+    if (!state.dur) return;
+    state.a = Math.max(0, Math.min(video.currentTime, state.b - 0.2));
+    paintSel(); paintSegs();
+  };
+  ed.querySelector('.clip-mark-b').onclick = () => {
+    if (!state.dur) return;
+    state.b = Math.min(state.dur, Math.max(video.currentTime, state.a + 0.2));
+    paintSel(); paintSegs();
+  };
+
+  // Modo ventana grande: el editor pasa a un modal amplio dentro de la app
+  // (no pantalla completa del sistema). Conserva el estado: vídeo y selección.
+  const maxBtn = ed.querySelector('.clip-max');
+  const backdrop = el('div', 'clip-backdrop');
+  let maximized = false;
+  const onKey = e => { if (e.key === 'Escape' && maximized) maxBtn.onclick(); };
+  maxBtn.onclick = () => {
+    maximized = !maximized;
+    ed.classList.toggle('clip-editor--max', maximized);
+    if (maximized) {
+      document.body.appendChild(backdrop);
+      backdrop.onclick = () => maxBtn.onclick();
+      document.addEventListener('keydown', onKey);
+    } else {
+      backdrop.remove();
+      document.removeEventListener('keydown', onKey);
+    }
+    maxBtn.innerHTML = svg(maximized ? 'shrink' : 'expand', 14);
+    maxBtn.title = maximized ? 'Volver al panel (Esc)' : 'Ampliar en ventana grande';
+  };
+
+  function closeEditor() {
+    backdrop.remove();
+    document.removeEventListener('keydown', onKey);
+    ed.remove();
+  }
+
+  video.addEventListener('loadedmetadata', () => {
+    state.dur = video.duration || 0;
+    state.a = 0; state.b = state.dur;
+    state.segs = [{ start: 0, end: state.dur }];
+    state.active = 0;
+    ed.querySelector('.clip-dur').textContent = fmt(state.dur);
+    timeEl.textContent = `0:00 / ${fmt(state.dur)}`;
+    paintSel(); paintSegs();
+  });
+  video.addEventListener('timeupdate', () => {
+    if (!state.dur) return;
+    cursor.style.left = (video.currentTime / state.dur * 100) + '%';
+    timeEl.textContent = `${fmt(video.currentTime)} / ${fmt(state.dur)}`;
+    // Vista previa de la sección: al llegar a su fin, pausa (queda listo para replay).
+    if (playingClip && !video.paused && video.currentTime >= state.b - 0.03) {
+      video.pause(); playingClip = false;
+    }
+  });
+
+  // Arrastre con eventos de RATÓN a nivel de documento — el mismo patrón del
+  // redimensionado del sidebar, que funciona de forma fiable en este WebView2.
+  // Bordes → mover esa manija (GRAB_PX de tolerancia); interior → mover el
+  // bloque entero de la selección; fuera → clic para posicionar el vídeo.
+  const GRAB_PX = 16;
+  let clickSuppressed = false;
+
+  function sideAt(ev) {
+    if (!state.dur) return null;
+    const rect = tl.getBoundingClientRect();
+    const xA = rect.left + (state.a / state.dur) * rect.width;
+    const xB = rect.left + (state.b / state.dur) * rect.width;
+    const dA = Math.abs(ev.clientX - xA), dB = Math.abs(ev.clientX - xB);
+    if (Math.min(dA, dB) > GRAB_PX) return null;
+    return dA <= dB ? 'a' : 'b';
+  }
+  function insideSel(ev) {
+    if (!state.dur) return false;
+    const rect = tl.getBoundingClientRect();
+    const t2 = (ev.clientX - rect.left) / rect.width * state.dur;
+    return t2 > state.a && t2 < state.b;
+  }
+
+  // Evita que un arrastre nativo (drag & drop del navegador) robe el ratón.
+  ed.addEventListener('dragstart', e => e.preventDefault());
+
+  tl.addEventListener('mousedown', e => {
+    if (e.button !== 0 || !state.dur) return;
+    const h = e.target.closest('.clip-h');
+    let mode = h ? (h.classList.contains('l') ? 'a' : 'b') : sideAt(e);
+    if (!mode && insideSel(e)) mode = 'move';
+    if (!mode) return;                  // clic normal → lo maneja el click (seek)
+    e.preventDefault();
+    const startX = e.clientX;
+    const a0 = state.a, b0 = state.b;
+    const onMove = ev => {
+      clickSuppressed = true;           // hubo arrastre → el click posterior no busca
+      const rect = tl.getBoundingClientRect();
+      if (mode === 'move') {
+        // Desplaza el bloque completo manteniendo su duración.
+        const dt = (ev.clientX - startX) / rect.width * state.dur;
+        const len = b0 - a0;
+        const na = Math.max(0, Math.min(a0 + dt, state.dur - len));
+        state.a = na; state.b = na + len;
+      } else {
+        const frac = Math.min(1, Math.max(0, (ev.clientX - rect.left) / rect.width));
+        const t2 = frac * state.dur;
+        if (mode === 'a') state.a = Math.max(0, Math.min(t2, state.b - 0.2));
+        else state.b = Math.min(state.dur, Math.max(t2, state.a + 0.2));
+      }
+      paintSel();
+    };
+    const onUp = () => {
+      document.removeEventListener('mousemove', onMove);
+      document.removeEventListener('mouseup', onUp);
+      paintSegs();
+    };
+    document.addEventListener('mousemove', onMove);
+    document.addEventListener('mouseup', onUp);
+  });
+
+  // Feedback del cursor: ↔ en las manijas, "agarrar" dentro del bloque.
+  tl.addEventListener('mousemove', e => {
+    if (e.buttons & 1) return;   // durante un arrastre lo gestiona document
+    tl.style.cursor = sideAt(e) ? 'ew-resize' : (insideSel(e) ? 'grab' : 'pointer');
+  });
+
+  tl.addEventListener('click', e => {
+    if (clickSuppressed) { clickSuppressed = false; return; }
+    playingClip = false;
+    const rect = tl.getBoundingClientRect();
+    video.currentTime = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width)) * state.dur;
+  });
+
+  ed.querySelector('.clip-cancel').onclick = () => closeEditor();
+  goBtn.onclick = async () => {
+    syncActiveSection();
+    const all = state.segs.filter(s => (s.end - s.start) >= 0.5);
+    if (!all.length) return;
+    goBtn.disabled = true; goBtn.textContent = 'Transcribiendo…';
+    closeEditor();
+    await transcribeScreenVideo(mid, isRetx, all);
+  };
+}
+
+async function transcribeScreenVideo(mid, force, clipSegments) {
+  // Verificar limite de horas de video para plan Personal
+  if (!hasFeature('video_unlimited')) {
+    const pf = window._planFeatures || {};
+    const maxH = pf.video_hours || 10;
+    const usedH = pf.video_hours_used || 0;
+    if (usedH >= maxH) {
+      toast('warn', `Límite de ${maxH}h de video alcanzado (${usedH.toFixed(1)}h usadas) — Disponible en Helpmeet Pro`);
+      return;
+    }
+  }
   // La transcripción del vídeo va en SEGUNDO PLANO: puedes seguir grabando otro.
   let f = null;
-  try { f = await api.transcribeMeetingVideo(mid, force); }
+  try { f = await api.transcribeMeetingVideo(mid, force, clipSegments || null); }
   catch (e) { f = { ok: false, error: e && e.message }; }
   if (f && f.already) { toast('info', 'Este vídeo ya está transcrito'); return; }
   if (f && f.ok) {
+    // Actualizar contador local de horas (el backend también lo hace)
+    if (!hasFeature('video_unlimited') && window._planFeatures) {
+      const durH = (f.video_duration_seconds || 0) / 3600;
+      window._planFeatures.video_hours_used = (window._planFeatures.video_hours_used || 0) + durH;
+    }
     await refreshMeetings(STATE.selInit);
     if (STATE.screen === 'meeting' && STATE.selMeeting === mid) await openMeeting(mid, true);
     toast('ok', 'Se transcribe en segundo plano · puedes seguir grabando');
   } else {
-    toast('err', (f && f.error) || 'No se pudo transcribir el vídeo');
+    toast('err', errMsg(f && f.error, 'No se pudo transcribir el vídeo'));
   }
 }
 
+/* Fila de frase con el markup del mockup: [hora mm:ss] [texto] [estrella].
+   La construye también window.addUtterance en cada frase que llega en vivo, así
+   que su forma es parte del contrato con el motor de transcripción.
+   Solo se etiqueta "Yo": las frases del interlocutor son el caso por defecto —
+   la mayoría del texto— y repetir "Los demás" en cada línea era ruido. */
 function utterance(u) {
-  const d = el('div', 'utterance turn' + (u.speaker === 'me' ? ' me' : '') + (u.highlighted ? ' highlighted' : ''));
+  const d = el('div', 'utt utterance turn' + (u.speaker === 'me' ? ' me' : '') + (u.highlighted ? ' highlighted' : ''));
   d.tabIndex = 0;
   d.dataset.id = u.id;
-  const who = esc(u.display_name || (u.speaker === 'me' ? 'Yo' : 'Los demás'));
-  d.innerHTML = `
-    <div class="u-check" aria-hidden="true"><span class="u-cb"></span></div>
-    <div class="u-side">
-      <span class="u-who">${who}</span>
-      <span class="u-time mono">${esc(u.time)}</span>
-    </div>
-    <div class="u-body">
-      <p class="u-text">${esc(u.text)}</p>
-    </div>
-    <div class="u-actions">
-      <button class="u-act${u.highlighted ? ' on' : ''}" data-act="star" title="Marcar como importante" aria-label="Marcar como importante">${svg('star', 14)}</button>
-      <button class="u-act" data-act="edit" title="Editar" aria-label="Editar">${svg('edit', 14)}</button>
-      <button class="u-act danger" data-act="del" title="Eliminar" aria-label="Eliminar">${svg('trash', 14)}</button>
-    </div>`;
-  d.querySelectorAll('.u-act').forEach(b => b.onclick = () => utteranceAction(b.dataset.act, u, d));
+  const esYo = u.speaker === 'me';
+  const quien = u.display_name || (esYo ? 'Yo' : '');
+  d.innerHTML =
+    `<div class="utt-time mono">${esc(u.time || '')}</div>` +
+    `<div class="utt-body u-body">` +
+      (quien && esYo ? `<span class="utt-speaker me">${esc(quien)}</span>` : '') +
+      `<span class="u-text">${esc(u.text)}</span>` +
+    `</div>` +
+    `<button class="utt-star${u.highlighted ? ' active' : ''}" type="button" data-act="star" ` +
+      `title="${u.highlighted ? 'Quitar de importantes' : 'Marcar como importante'}" ` +
+      `aria-label="${u.highlighted ? 'Quitar de importantes' : 'Marcar como importante'}">` +
+      `<svg aria-hidden="true"><use href="#i-star"/></svg></button>`;
+  d.querySelector('.utt-star').onclick = () => utteranceAction('star', u, d);
+  // Editar y eliminar pasan al menú contextual de la frase: el mockup deja la
+  // fila con un solo control visible para que la lectura corrida no se corte.
+  d.oncontextmenu = (e) => {
+    e.preventDefault();
+    openMenu(e, [
+      { label: u.highlighted ? 'Quitar de importantes' : 'Marcar como importante', icon: 'star', onClick: () => utteranceAction('star', u, d) },
+      { label: 'Editar frase', icon: 'edit', onClick: () => utteranceAction('edit', u, d) },
+      { sep: true },
+      { label: 'Eliminar frase', icon: 'trash', danger: true, onClick: () => utteranceAction('del', u, d) },
+    ]);
+  };
   return d;
 }
 function captureEvent(u) {
@@ -1980,7 +3400,12 @@ function noteEvent(u) {
   d.dataset.id = u.id;
   d.innerHTML = `
     <div class="u-side"><span class="u-tag">Nota</span>${u.time ? `<span class="u-time mono">${esc(u.time)}</span>` : ''}</div>
-    <div class="u-body"><p class="u-text">${esc(u.text || '')}</p></div>`;
+    <div class="u-body"><p class="u-text">${esc(u.text || '')}</p></div>
+    <div class="u-actions">
+      <button class="u-act" data-act="edit" title="Editar nota" aria-label="Editar nota">${svg('edit', 14)}</button>
+      <button class="u-act danger" data-act="del" title="Eliminar nota" aria-label="Eliminar nota">${svg('trash', 14)}</button>
+    </div>`;
+  d.querySelectorAll('.u-act').forEach(b => b.onclick = () => noteContextAction(b.dataset.act, u, d));
   return d;
 }
 function contextEvent(u) {
@@ -1988,8 +3413,34 @@ function contextEvent(u) {
   d.dataset.id = u.id;
   d.innerHTML = `
     <div class="u-side"><span class="u-tag">Contexto</span>${u.time ? `<span class="u-time mono">${esc(u.time)}</span>` : ''}</div>
-    <div class="u-body"><p class="u-text">${esc(u.text || '')}</p></div>`;
+    <div class="u-body"><p class="u-text">${esc(u.text || '')}</p></div>
+    <div class="u-actions">
+      <button class="u-act" data-act="edit" title="Editar contexto" aria-label="Editar contexto">${svg('edit', 14)}</button>
+      <button class="u-act danger" data-act="del" title="Eliminar contexto" aria-label="Eliminar contexto">${svg('trash', 14)}</button>
+    </div>`;
+  d.querySelectorAll('.u-act').forEach(b => b.onclick = () => noteContextAction(b.dataset.act, u, d));
   return d;
+}
+
+function noteContextAction(act, u, node) {
+  if (act === 'del') {
+    confirmModal('Eliminar entrada', 'Se eliminara permanentemente.', 'Eliminar', async () => {
+      const r = await api.v2.deleteNote(u.id);
+      if (r && r.ok) { node.remove(); toast('ok', 'Entrada eliminada'); }
+      else toast('err', 'No se pudo eliminar');
+    });
+  } else if (act === 'edit') {
+    const body = node.querySelector('.u-body');
+    const orig = u.text;
+    body.innerHTML = `<textarea class="field" placeholder="Editar..." maxlength="5000" style="height:auto;min-height:60px;padding:9px;resize:vertical">${esc(orig)}</textarea>
+      <div style="display:flex;gap:8px;margin-top:8px"><button class="btn btn-primary" data-s>Guardar</button><button class="btn" data-c>Cancelar</button></div>`;
+    body.querySelector('[data-c]').onclick = () => openMeeting(STATE.selMeeting, true);
+    body.querySelector('[data-s]').onclick = async () => {
+      const v = body.querySelector('textarea').value.trim();
+      await api.v2.updateNote(u.id, { text: v }); toast('ok', 'Cambios guardados'); openMeeting(STATE.selMeeting, true);
+    };
+    body.querySelector('textarea').focus();
+  }
 }
 
 // V2 — edición de intervención
@@ -2023,7 +3474,7 @@ function utteranceAction(act, u, node) {
 function inlineEdit(u, node) {
   const body = node.querySelector('.u-body');
   const orig = u.text;
-  body.innerHTML = `<textarea class="field" style="height:auto;min-height:60px;padding:9px;resize:vertical">${esc(orig)}</textarea>
+  body.innerHTML = `<textarea class="field" placeholder="Editar frase..." maxlength="5000" style="height:auto;min-height:60px;padding:9px;resize:vertical">${esc(orig)}</textarea>
     <div style="display:flex;gap:8px;margin-top:8px"><button class="btn btn-primary" data-s>Guardar</button><button class="btn" data-c>Cancelar</button><span style="margin-left:auto;font-size:11px;color:var(--text-muted);align-self:center">tiempo original conservado</span></div>`;
   body.querySelector('[data-c]').onclick = () => openMeeting(STATE.selMeeting, true);
   body.querySelector('[data-s]').onclick = async () => {
@@ -2044,7 +3495,7 @@ function participantsModal(t) {
     <div class="modal-head"><h3>Participantes</h3><button class="icon-btn sm" data-x aria-label="Cerrar">${svg('x', 14)}</button></div>
     <div class="modal-body">
       <label>Añadir participantes</label>
-      <textarea id="partAdd" class="field" style="height:auto;min-height:54px;padding:9px" placeholder="Un nombre completo por línea (ej. Víctor Marquina)"></textarea>
+      <textarea id="partAdd" class="field" maxlength="2000" style="height:auto;min-height:54px;padding:9px" placeholder="Un nombre completo por linea (ej. Victor Marquina)"></textarea>
       <div class="row-inline" style="margin:8px 0 16px"><div class="help" style="flex:1">Escribe o pega varios, uno por línea. Usa nombre y apellido para no confundir a personas con el mismo nombre.</div><button class="btn btn-primary" id="partAddBtn">Añadir</button></div>
       <label>Lista · marca con el círculo quién eres tú</label>
       <div id="partList" style="display:flex;flex-direction:column;gap:6px;margin-top:8px"></div>
@@ -2056,7 +3507,7 @@ function participantsModal(t) {
     parts.forEach(p => {
       const row = el('div', 'part-row');
       row.innerHTML = `<label class="part-me" title="Soy yo (mi micrófono)"><input type="radio" name="me" ${p.is_me ? 'checked' : ''}><span>tú</span></label>
-        <input class="field part-name" value="${esc(p.name)}">
+        <input class="field part-name" placeholder="Nombre del participante" maxlength="100" value="${esc(p.name)}">
         <button class="icon-btn sm part-del" title="Eliminar" aria-label="Eliminar">${svg('x', 13)}</button>`;
       row.querySelector('input[type=radio]').onclick = async () => { await api.v2.setMeParticipant(iid, p.id); dirty = true; reload(); };
       const nameInput = row.querySelector('.part-name');
@@ -2080,7 +3531,7 @@ function participantsModal(t) {
   $('#overlayRoot').onclick = (e) => { if (e.target === $('#overlayRoot')) close(); };
 }
 
-/* Selector de hablante: lista los participantes de la iniciativa para asignar la
+/* Selector de hablante: lista los participantes de el proyecto para asignar la
    frase a uno concreto (o dejarla "Sin asignar / Los demás"). */
 function speakerMenu(u, node) {
   const parts = (STATE.transcript && STATE.transcript.participants) || [];
@@ -2227,8 +3678,41 @@ function renderNotes() {
     item.innerHTML = `
       <div class="note-item-body">
         <p class="note-item-text">${esc(n.text)}</p>
-        ${displayTime ? `<span class="note-item-time">${esc(displayTime)}</span>` : ''}
+        <div class="note-item-meta">
+          ${displayTime ? `<span class="note-item-time">${esc(displayTime)}</span>` : '<span></span>'}
+          <div class="note-item-actions">
+            <button class="u-act" data-act="edit" title="Editar nota" aria-label="Editar nota">${svg('edit', 12)}</button>
+            <button class="u-act danger" data-act="del" title="Eliminar nota" aria-label="Eliminar nota">${svg('trash', 12)}</button>
+          </div>
+        </div>
       </div>`;
+    item.querySelector('[data-act="edit"]').onclick = () => {
+      const body = item.querySelector('.note-item-body');
+      const orig = n.text;
+      body.innerHTML = `<textarea class="field" style="height:auto;min-height:60px;padding:8px;resize:vertical;width:100%">${esc(orig)}</textarea>
+        <div style="display:flex;gap:6px;margin-top:6px"><button class="btn btn-primary btn-sm" data-s>Guardar</button><button class="btn btn-sm" data-c>Cancelar</button></div>`;
+      body.querySelector('[data-c]').onclick = () => { STATE.activeTab = 'notas'; renderMain(); };
+      body.querySelector('[data-s]').onclick = async () => {
+        const v = body.querySelector('textarea').value.trim();
+        await api.v2.updateNote(n.id, { text: v }); toast('ok', 'Nota actualizada');
+        STATE.activeTab = 'notas'; renderMain();
+      };
+      body.querySelector('textarea').focus();
+    };
+    item.querySelector('[data-act="del"]').onclick = () => {
+      confirmModal('Eliminar nota', 'Se eliminara permanentemente.', 'Eliminar', async () => {
+        const r = await api.v2.deleteNote(n.id);
+        if (r && r.ok) {
+          item.remove();
+          // Quitar del estado
+          if (STATE.transcript && STATE.transcript.assets && STATE.transcript.assets.notes) {
+            STATE.transcript.assets.notes = STATE.transcript.assets.notes.filter(x => x.id !== n.id);
+          }
+          if (!list.querySelector('.note-item')) list.innerHTML = `<div class="notes-empty">${svg('note', 20)}<p>Aun no hay notas.</p></div>`;
+          toast('ok', 'Nota eliminada');
+        } else toast('err', 'No se pudo eliminar');
+      });
+    };
     list.appendChild(item);
     return item;
   }
@@ -2299,6 +3783,18 @@ async function loadCaptureThumb(ph, captureId) {
   } catch (e) { /* sin imagen: queda el marcador por defecto */ }
 }
 
+// Miniatura del video en la cabecera de la reunión: mismo patrón que
+// loadCaptureThumb (carga aparte, cae en silencio si no hay video/falla).
+async function loadMeetingThumb(btn, meetingId) {
+  try {
+    const r = await api.getMeetingThumbnail(meetingId);
+    if (!r || !r.data_url) return;
+    btn.classList.remove('is-empty');
+    btn.style.backgroundImage = `url("${r.data_url}")`;
+    btn.onclick = () => openLightbox(r.data_url);
+  } catch (e) { /* sin miniatura: el botón queda oculto (is-empty) */ }
+}
+
 function openLightbox(dataUrl) {
   const m = el('div', 'lightbox');
   m.innerHTML = `<img src="${dataUrl}" alt="Captura ampliada">`;
@@ -2314,14 +3810,15 @@ function viewSearch() {
     <div class="mhead-row"><h1 class="mtitle-h">Resultados</h1><div class="spacer"></div><button class="btn btn-ghost" id="clearSearch">Limpiar y volver al árbol</button></div>
     <div class="search-head"><span style="font-size:12px;color:var(--text-muted)"><b style="color:#e6eaf2" id="resCount">0</b> resultados para “<span id="resQuery"></span>”</span>${advanced ? '' : '<span class="pending-badge">FILTROS · PENDIENTE · PYTHON</span>'}</div>
     <div class="filters">
-      <button class="chip">Iniciativa ▾</button><button class="chip">Fecha ▾</button><button class="chip">Hablante ▾</button>
+      <button class="chip">Proyecto ▾</button><button class="chip">Fecha ▾</button><button class="chip">Hablante ▾</button>
       <span class="seg"><span class="on">Frase</span><span>Nota</span></span>
     </div>
     <div style="height:14px"></div>`;
   const content = el('div', 'content');
   const list = el('div'); list.id = 'searchResults';
   content.appendChild(list);
-  head.querySelector('#clearSearch').onclick = () => { $('#searchInput').value = ''; backToTree(); };
+  // El input vive en el <dialog> del buscador y puede no estar montado: opcional.
+  head.querySelector('#clearSearch').onclick = () => { const i = $('#searchInput'); if (i) i.value = ''; backToTree(); };
   wrap.replaceChildren(head, content);
   return wrap;
 }
@@ -2347,41 +3844,69 @@ function viewGlossary() {
 
 function viewArchiveTrash(which) {
   const isTrash = which === 'trash';
-  const wrap = el('div'); wrap.style.cssText = 'display:flex;flex-direction:column;flex:1;min-height:0';
-  const head = el('div', 'mhead');
-  head.style.cssText = 'border-bottom:none;background:transparent';
-  head.innerHTML = `<div class="mhead-row"><h1 class="mtitle-h">${isTrash ? 'Papelera' : 'Archivo'}</h1></div>`;
+  const wrap = el('div', 'content-scroll scroll');
+  const head = el('div', 'content-inner');
+
+  const h1 = el('h1', 'page-title');
+  h1.textContent = isTrash ? 'Papelera' : 'Archivados';
+  head.appendChild(h1);
+
+  /* Conmutador Papelera / Archivados. Archivados salió del pie del sidebar para
+     que el riel colapsado quede con dos iconos como el mockup; vive acá porque
+     las dos son la misma idea —cosas retiradas de la vista— y comparten la
+     misma pantalla y las mismas acciones (restaurar, eliminar). */
+  const tabs = el('div', 'segmented-pill');
+  tabs.setAttribute('role', 'tablist');
+  tabs.style.marginBottom = '18px';
+  [['trash', 'Papelera', 'i-trash'], ['archive', 'Archivados', 'i-archive']].forEach(([id, txt, ico]) => {
+    const b = el('button', 'tab-btn' + ((id === 'trash') === isTrash ? ' active' : ''));
+    b.type = 'button'; b.setAttribute('role', 'tab');
+    b.innerHTML = `<svg><use href="#${ico}"/></svg>${txt}`;
+    b.onclick = () => { STATE.screen = id; renderMain(); renderTopStatus(); };
+    tabs.appendChild(b);
+  });
+  head.appendChild(tabs);
+
   if (isTrash) {
-    const emptyBtn = el('button', 'btn btn-danger sm');
+    const emptyBtn = el('button', 'btn-outline');
     emptyBtn.id = 'emptyTrash';
-    emptyBtn.style.marginLeft = 'auto';
-    emptyBtn.innerHTML = svg('trash', 13) + ' Vaciar papelera';
-    head.querySelector('.mhead-row').appendChild(emptyBtn);
+    emptyBtn.type = 'button';
+    emptyBtn.innerHTML = '<svg class="icon icon-sm"><use href="#i-trash"/></svg>Vaciar la papelera';
+    tabs.parentNode.insertBefore(emptyBtn, tabs.nextSibling);
   }
   const content = el('div', 'content');
-  const list = el('div'); list.style.maxWidth = '640px';
+  const list = el('div'); list.style.cssText = 'max-width:640px;margin:0 auto';
   content.appendChild(list);
 
   api.listLibrary(isTrash ? 'trash' : 'archive').then(items => {
     items = items || [];
     list.replaceChildren();
     if (!items.length) {
-      list.appendChild(el('p', null, `<span style="color:var(--text-muted);font-size:13px">${isTrash ? 'La papelera está vacía.' : 'No hay nada archivado.'}</span>`));
+      list.appendChild(el('p', null, `<span style="color:var(--text-muted);font-size:13px">No hay nada archivado.</span>`));
       return;
     }
     items.forEach(x => {
-      const type = x.kind === 'initiative' ? 'INICIATIVA' : 'REUNIÓN';
+      const type = x.kind === 'initiative' ? 'PROYECTO' : 'REUNIÓN';
       const sub = x.kind === 'initiative' ? ((x.meeting_count || 0) + ' reuniones') : ('en ' + (x.initiative || '—'));
       const c = el('div', 'row-card'); c.style.cursor = 'default';
       c.innerHTML = `<span style="flex:none;font-size:10px;font-weight:700;letter-spacing:.4px;color:var(--text-secondary);border:1px solid var(--border-strong);border-radius:5px;padding:3px 7px">${type}</span>
         <div class="rc-body"><div class="rc-title">${esc(x.title)}</div><div class="rc-meta">${esc(sub)}${x.date ? ' · ' + esc(x.date) : ''}</div></div>
-        <div style="display:flex;gap:7px"><button class="btn" data-restore>Restaurar</button>${isTrash ? '<button class="btn btn-danger" data-del>Eliminar</button>' : '<button class="btn" data-trash>A papelera</button>'}</div>`;
-      c.querySelector('[data-restore]').onclick = async () => { await api.restoreItem(x.kind, x.id); toast('ok', 'Restaurado'); reloadLibrary(which); refreshAll(); };
-      if (isTrash) {
-        c.querySelector('[data-del]').onclick = () => confirmModal('Eliminar permanentemente', 'Esta acción no se puede deshacer. Se borrará «' + x.title + '»' + (x.kind === 'initiative' ? ' y todas sus reuniones.' : '.'), 'Eliminar para siempre', async () => { await api.permanentlyDeleteItem(x.kind, x.id); toast('ok', 'Eliminado permanentemente'); reloadLibrary(which); });
-      } else {
-        c.querySelector('[data-trash]').onclick = async () => { await api.trashItem(x.kind, x.id); toast('ok', 'Movido a la papelera'); reloadLibrary(which); };
-      }
+        <div style="display:flex;gap:7px"><button class="btn" data-restore>Restaurar</button><button class="btn btn-danger" data-del>Eliminar</button></div>`;
+      c.querySelector('[data-restore]').onclick = async () => {
+        const r = await api.restoreItem(x.kind, x.id);
+        if (r && r.ok === false) { toast('err', errMsg(r.error, 'No se pudo restaurar')); return; }
+        toast('ok', 'Restaurado'); reloadLibrary(which); refreshAll(); updateLibraryCounts();
+      };
+      c.querySelector('[data-del]').onclick = () => confirmModal(
+        'Eliminar permanentemente',
+        'Esta acción no se puede deshacer. Se borrará «' + x.title + '»' + (x.kind === 'initiative' ? ' y toda su carpeta archivada.' : ' y su carpeta archivada.'),
+        'Eliminar para siempre',
+        async () => {
+          const r = await api.permanentlyDeleteItem(x.kind, x.id);
+          if (r && r.ok === false) { toast('err', errMsg(r.error, 'No se pudo eliminar')); return; }
+          toast('ok', 'Eliminado permanentemente'); reloadLibrary(which); refreshAll(); updateLibraryCounts();
+        }
+      );
       list.appendChild(c);
     });
   });
@@ -2406,59 +3931,100 @@ function renderActionBar() {
   const bar = $('#actionbar');
   const s = STATE.appState;
   const canRecord = !!STATE.selInit;
-  bar.classList.toggle('actionbar--dock', s === 'idle');
+  // La clase .actionbar--dock se retiró con la Fase 7: era la que ponía
+  // pointer-events:none en el contenedor, y al reemplazar .dock por .rec-dock
+  // dejó de haber quien lo reactivara — el dock se veía pero no se podía pulsar.
   if (s === 'idle') {
-    const dis = canRecord ? '' : 'is-disabled';
-    const recTitle = canRecord ? 'Grabar reunión' : 'Selecciona una iniciativa';
+    // Siempre habilitados: sin proyecto elegido, el clic abre el modal
+    // "¿En qué proyecto?" y la acción continúa sola al elegir/crear uno.
+    /* Dock en reposo (mockup): píldora compacta anclada donde después entra el
+       panel de grabación, así uno sustituye al otro sin que la vista salte.
+       Los dos modos van como icono y despliegan su nombre al pasar el mouse por
+       el GRUPO entero, no por cada botón: así se leen los dos a la vez y se
+       pueden comparar antes de elegir. */
     bar.innerHTML = `
-      <div class="dock">
-        <button class="audio-chip dock-mic${STATE.micMuted ? ' muted' : ''}" id="btnMic" aria-pressed="${STATE.micMuted}" aria-label="${STATE.micMuted ? 'Activar micrófono' : 'Silenciar micrófono'}" title="${STATE.micMuted ? 'Activar micrófono' : 'Silenciar micrófono'}">
-          <span class="mic-ico">${svg(STATE.micMuted ? 'headerMicOff' : 'headerMic', 16)}</span>
-          <span class="eq mini" aria-hidden="true"><i></i><i></i><i></i></span>
-        </button>
-        <span class="dock-sep"></span>
-        <button class="dock-btn ${dis}" id="abRecord" title="${recTitle}"><span class="dock-ico dock-ico--rec">${svg('mic', 18)}</span>Grabar reunión</button>
-        <span class="dock-sep"></span>
-        <button class="dock-btn ${dis}" id="abScreen"><span class="dock-ico dock-ico--screen">${svg('monitorDot', 18)}</span>Grabar pantalla</button>
-        <span class="dock-sep"></span>
-        <button class="dock-btn ${dis}" id="abUpload"><span class="dock-ico">${svg('upload', 18)}</span>Importar video</button>
+      <div class="rec-dock">
+        <div class="rec-actions is-reveal">
+          <button class="rec-cta" id="abRecord" type="button" title="Grabar reunión (audio)" aria-label="Grabar reunión (audio)">
+            <svg class="icon"><use href="#i-audiowave"/></svg>
+            <span class="rec-label-grid"><span class="rec-label">Grabar</span></span>
+          </button>
+          <button class="rec-cta-screen" id="abScreen" type="button" title="Grabar pantalla" aria-label="Grabar pantalla">
+            <svg class="icon"><use href="#i-monitor"/></svg>
+            <span class="rec-label-grid"><span class="rec-label">Grabar pantalla</span></span>
+          </button>
+          <span class="rec-foot-sep" aria-hidden="true"></span>
+          <button class="dock-import-btn" id="abUpload" type="button" aria-haspopup="true" aria-expanded="false" title="Importar audio o vídeo" aria-label="Importar audio o vídeo">
+            <svg class="icon"><use href="#i-upload"/></svg>
+            <span class="rec-label-grid"><span class="rec-label">Importar</span></span>
+            <svg class="icon rec-import-chev"><use href="#i-chevup"/></svg>
+          </button>
+          <span class="rec-foot-sep" aria-hidden="true"></span>
+          <button class="dock-mute-btn${STATE.micMuted ? ' is-muted' : ''}" id="btnMic" type="button" aria-pressed="${STATE.micMuted}"
+                  title="${STATE.micMuted ? 'Empezar con el micrófono activo' : 'Empezar con el micrófono silenciado'}"
+                  aria-label="${STATE.micMuted ? 'Empezar con el micrófono activo' : 'Empezar con el micrófono silenciado'}">
+            <svg class="icon"><use href="#i-mic${STATE.micMuted ? '-off' : ''}"/></svg>
+          </button>
+        </div>
       </div>`;
+    // Sin proyecto seleccionado: modal para elegir/crear uno y seguir con la acción
+    const needProject = (cont) => pickInitiativeModal((iid) => { selectInitiative(iid); cont(); });
+    const _rec = () => withRecordingConsent(() => startMeetingRecording());
+    const _scr = () => withRecordingConsent(() => openScreenPanel());
+    const _imp = (kind) => confirmImportDestination(STATE.selInit, kind,
+      (folderId) => doImport(document.getElementById('abUpload'), kind, folderId));
     bar.querySelector('#btnMic').onclick = toggleMic;
-    bar.querySelector('#abRecord').onclick = () => canRecord && withRecordingConsent(() => startMeetingRecording());
-    bar.querySelector('#abScreen').onclick = () => canRecord && withRecordingConsent(() => openScreenPanel());
-    bar.querySelector('#abUpload').onclick = () => canRecord && doImport(bar.querySelector('#abUpload'));
+    /* Los dos modos son botones directos, no un desplegable: son las dos
+       acciones principales de la app y esconderlas tras un menú añadía un clic
+       a lo que más se usa.
+       Tampoco pasan por needProject: el destino lo resuelve proyectoDestino()
+       —último usado, o "General" creado al vuelo— sin abrir ningún diálogo. */
+    bar.querySelector('#abRecord').onclick = _rec;
+    bar.querySelector('#abScreen').onclick = _scr;
+    bar.querySelector('#abUpload').onclick = (e) => _openRecordPicker(e.currentTarget, [
+      { icon: 'upload', label: 'Importar video', run: () => canRecord ? _imp('video') : needProject(() => _imp('video')) },
+      { icon: 'upload', label: 'Importar audio', run: () => canRecord ? _imp('audio') : needProject(() => _imp('audio')) },
+    ]);
+    // El dock se acaba de reconstruir: si había una selección en curso, vuelve
+    // a apartarse — las dos barras ocupan el mismo punto de la pantalla.
+    if (typeof refrescarSeleccion === 'function') refrescarSeleccion();
   } else if (s === 'recording' || s === 'recording-local' || s === 'recording-cloud') {
-    bar.innerHTML = `
-      <button class="btn btn-stop" id="abStop"><span class="sq"></span>Detener grabación</button>
-      <button class="btn btn-lg ab-appear" id="abCapture" style="animation-delay:.04s">${svg('camera', 15)}Captura</button>
-      <button class="btn btn-lg ab-appear" id="abNote" style="animation-delay:.08s">${svg('note', 15)}Añadir nota</button>
-      <button class="btn btn-lg ${STATE.meetingMicMuted ? 'btn-danger' : ''}" id="abMic">${STATE.meetingMicMuted ? 'Activar mi audio' : 'Silenciar mi audio'}</button>`;
-    bar.querySelector('#abStop').onclick = stopMeetingRecording;
-    bar.querySelector('#abCapture').onclick = doCapture;
-    bar.querySelector('#abNote').onclick = promptNote;
-    bar.querySelector('#abMic').onclick = toggleMeetingMic;
+    // Grabación de solo audio: sin botón "Captura" (capturar pantalla
+    // solo tiene sentido cuando se está grabando la pantalla).
+    // El panel flotante reemplaza a la barra de botones (FASE 7).
+    bar.replaceChildren(recPanel({ modo: 'audio' }));
   } else if (s === 'processing') {
-    const canCancel = v2Available('cancel_current_job');
-    bar.innerHTML = `<div class="proc-bar">
-      <span class="spinner"></span>
-      <div style="font-size:13px;font-weight:600">${esc(STATE.jobStage)}</div>
-      <div class="proc-track"><i id="procFill" class="${STATE.jobDeterminate ? '' : 'indeterminate'}" style="width:${STATE.jobDeterminate ? STATE.jobProgress : 35}%"></i></div>
-      <div class="mono" id="procPct" style="font-size:12px;color:var(--text-secondary)">${STATE.jobDeterminate ? Math.round(STATE.jobProgress) + '%' : processingElapsed()}</div>
-      ${canCancel ? '<button class="btn" id="abCancel">Cancelar</button>' : ''}</div>`;
-    const cancel = bar.querySelector('#abCancel'); if (cancel) cancel.onclick = cancelJob;
+    /* Transcribiendo en segundo plano: píldora flotante en el mismo punto que el
+       dock y el panel. Antes era una franja a lo ancho; con el contenedor en
+       display:contents se desarmaba en botones sueltos apilados. */
+    bar.replaceChildren(procPanel());
   } else if (s === 'screen-recording') {
-    bar.innerHTML = `
-      <button class="btn btn-stop" id="abScStop"><span class="sq"></span>Detener vídeo</button>
-      <button class="btn btn-lg ${STATE.micMuted ? 'btn-danger' : ''}" id="abScMic">${svg(STATE.micMuted ? 'headerMicOff' : 'headerMic', 15)}${STATE.micMuted ? 'Activar micro' : 'Silenciar micro'}</button>
-      <button class="btn btn-lg" id="abScCap">${svg('camera', 15)}Captura</button>
-      <button class="btn btn-lg" id="abScNote">${svg('note', 15)}Nota</button>
-      ${STATE.screenPanelCollapsed ? '<div class="ab-spacer"></div><button class="btn btn-lg" id="abScExpand">' + svg('monitor', 15) + 'Ver panel</button>' : ''}`;
-    bar.querySelector('#abScStop').onclick = stopScreenRecording;
-    bar.querySelector('#abScMic').onclick = () => { STATE.micMuted = !STATE.micMuted; api.toggleScreenMicMute(STATE.micMuted); renderActionBar(); };
-    bar.querySelector('#abScCap').onclick = () => api.takeCapture(STATE.monitorIdx).then(() => toast('ok', 'Captura guardada'));
-    bar.querySelector('#abScNote').onclick = () => promptNote();
-    const exp = bar.querySelector('#abScExpand'); if (exp) exp.onclick = () => { STATE.screenPanelCollapsed = false; showScreenPanel(); };
+    // Mismo panel que en audio: la única diferencia real es que en pantalla hay
+    // monitor que elegir, área que recortar y captura que tomar.
+    bar.replaceChildren(recPanel({ modo: 'screen' }));
+  } else {
+    bar.replaceChildren();
   }
+}
+
+/* Píldora de "transcribiendo en segundo plano". */
+function procPanel() {
+  const p = el('div', 'proc-dock');
+  const pct = STATE.jobDeterminate ? Math.round(STATE.jobProgress) + '%' : processingElapsed();
+  p.innerHTML =
+    `<span class="spinner"></span>` +
+    `<span class="proc-dock-stage">${esc(STATE.jobStage || 'Transcribiendo…')}</span>` +
+    `<span class="proc-track"><i class="${STATE.jobDeterminate ? '' : 'indeterminate'}" ` +
+      `style="width:${STATE.jobDeterminate ? STATE.jobProgress : 35}%"></i></span>` +
+    `<span class="proc-dock-pct mono">${esc(pct)}</span>`;
+  if (v2Available('cancel_meeting_job')) {
+    const b = el('button', 'btn-ghost');
+    b.type = 'button';
+    b.textContent = 'Cancelar';
+    b.onclick = cancelJob;
+    p.appendChild(b);
+  }
+  return p;
 }
 // Dropdown personalizado de selección de pantalla (reemplaza el <select> nativo).
 function monitorSelectEl() {
@@ -2470,508 +4036,703 @@ function monitorSelectEl() {
     onChange: (v) => { STATE.monitorIdx = +v; },
   });
 }
+/* ============================================================
+   4a-bis. VISTA: DOCUMENTOS → MARKDOWN
+   ============================================================ */
+// Icono + etiqueta de tipo de archivo a partir del nombre original.
+function fileKind(name) {
+  const e = (name || '').toLowerCase().split('.').pop();
+  if (e === 'pdf') return { cls: 'pdf', lbl: 'PDF' };
+  if (e === 'docx' || e === 'doc') return { cls: 'doc', lbl: 'DOCX' };
+  if (e === 'pptx' || e === 'ppt') return { cls: 'ppt', lbl: 'PPTX' };
+  if (e === 'html' || e === 'htm') return { cls: 'html', lbl: 'HTML' };
+  return { cls: 'txt', lbl: (e || 'TXT').toUpperCase().slice(0, 4) };
+}
+
+// Tamaño en bytes → texto corto (B / KB / MB) para las tarjetas de documento.
+function fmtKB(bytes) {
+  const n = Number(bytes) || 0;
+  if (n < 1024) return n + ' B';
+  const kb = n / 1024;
+  if (kb < 1024) return Math.round(kb) + ' KB';
+  return (kb / 1024).toFixed(1) + ' MB';
+}
+
+// Copia el Markdown CRUDO (sin renderizar) de un documento al portapapeles.
+async function copyDocMd(d) {
+  const res = await api.readDocument(d.initiative_id, d.name);
+  if (res && res.ok) { await copyText(res.text); toast('ok', 'Markdown copiado'); }
+  else toast('err', 'No se pudo leer el documento');
+}
+
+// Conversor Markdown → HTML minimalista para el modal "Ver" (encabezados #/##/###,
+// listas -/*, **negrita**, *cursiva*, `código`, --- y párrafos). Escapa SIEMPRE el
+// texto de origen antes de aplicar el formato, así que el resultado es seguro para innerHTML.
+function mdToHtml(src) {
+  const esc2 = s => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  const lines = esc2(src).split(/\r?\n/); let html = ''; let inList = false;
+  const inline = s => s.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>').replace(/\*([^*]+)\*/g, '<em>$1</em>').replace(/`([^`]+)`/g, '<code>$1</code>');
+  for (let ln of lines) {
+    if (/^\s*---\s*$/.test(ln)) { if (inList) { html += '</ul>'; inList = false; } html += '<hr>'; continue; }
+    const h = ln.match(/^(#{1,3})\s+(.*)$/);
+    if (h) { if (inList) { html += '</ul>'; inList = false; } const n = h[1].length; html += '<h' + n + '>' + inline(h[2]) + '</h' + n + '>'; continue; }
+    const li = ln.match(/^\s*[-*]\s+(.*)$/);
+    if (li) { if (!inList) { html += '<ul>'; inList = true; } html += '<li>' + inline(li[1]) + '</li>'; continue; }
+    if (inList) { html += '</ul>'; inList = false; }
+    if (ln.trim() === '') continue;
+    html += '<p>' + inline(ln) + '</p>';
+  }
+  if (inList) html += '</ul>';
+  return html;
+}
+
+// Modal "Ver": primero la carpeta del documento (original/.md/imágenes), luego el .md ya convertido a HTML.
+async function openDocModal(d) {
+  const res = await api.readDocument(d.initiative_id, d.name);
+  const text = (res && res.ok) ? res.text : '';
+  const k = fileKind(d.original_name);
+  const hasImages = (d.images || 0) > 0;
+  const m = el('div', 'modal docs-modal');
+  m.setAttribute('role', 'dialog'); m.setAttribute('aria-label', d.name);
+  m.innerHTML = `
+    <div class="docs-mhead">
+      <span class="docs-mftype ${k.cls}">${k.lbl}</span>
+      <span class="docs-mtitle">${esc(d.name)}</span>
+      <button class="btn sm" data-copy>${svg('copy', 14)} Copiar .md</button>
+      <button class="btn sm" data-open>${svg('external', 14)} Abrir .md</button>
+      <button class="icon-btn sm" data-x aria-label="Cerrar">${svg('x', 14)}</button>
+    </div>
+    <div class="docs-mbody">
+      <div class="docs-files">
+        <div class="docs-files-h">Carpeta del documento</div>
+        <div class="docs-frow">${svg('file', 15)}<span>${esc(d.original_name || '')}</span><span class="fsub">· original</span></div>
+        <div class="docs-frow">${svg('md', 15)}<span>${esc(d.name)}</span><span class="fsub">· texto para la IA${d.ocr ? ' (OCR)' : ''}</span></div>
+        ${hasImages ? `<div class="docs-frow">${svg('folder', 15)}<span>imagenes/</span><span class="fsub">· ${d.images} imagen${d.images === 1 ? '' : 'es'}</span><button type="button" class="fopen" data-open-imgs>Abrir</button></div>` : ''}
+      </div>
+      <div class="md"></div>
+    </div>
+    <div class="docs-mfoot">Original: ${esc(d.original_name || '')} · ${formatDateShort(d.created_at)} · ${fmtKB(d.size)}</div>`;
+  m.querySelector('.md').innerHTML = (res && res.ok) ? mdToHtml(text) : 'No se pudo leer el documento.';
+  m.querySelector('[data-copy]').onclick = async () => {
+    if (!(res && res.ok)) { toast('err', 'No se pudo leer el documento'); return; }
+    await copyText(text); toast('ok', 'Markdown copiado');
+  };
+  m.querySelector('[data-open]').onclick = () => api.openDocument(d.initiative_id, d.name);
+  const openImgsBtn = m.querySelector('[data-open-imgs]');
+  if (openImgsBtn) openImgsBtn.onclick = () => api.openDocumentImages(d.initiative_id, d.name);
+  m.querySelector('[data-x]').onclick = closeModal;
+  openModal(m);
+}
+
+// Tarjeta de un documento en la lista global de "Documentos → .md".
+function buildDocCard(d, onChanged) {
+  const k = fileKind(d.original_name);
+  const card = el('div', 'docs-card');
+  const tags = [];
+  if (d.ocr) tags.push(`<span class="docs-tag ocr">${svg('scan', 12)}OCR</span>`);
+  if ((d.images || 0) > 0) tags.push(`<span class="docs-tag img">${svg('image', 12)}${d.images}</span>`);
+  card.innerHTML = `
+    <span class="docs-ftype ${k.cls}">${k.lbl}</span>
+    <div class="docs-cbody">
+      <div class="docs-cname">${esc(d.name)}</div>
+      <div class="docs-cmeta">
+        <span class="docs-badge"><span class="dot" style="background:${esc(d.color || '#aacfbf')}"></span>${esc(d.initiative_name || '')}</span>
+        ${tags.join('')}
+        <span>${esc(d.original_name || '')}</span>
+        <span>${formatDateShort(d.created_at)}</span>
+        <span>${fmtKB(d.size)}</span>
+      </div>
+    </div>
+    <div class="docs-cactions">
+      <button class="docs-view" data-act="view">${svg('eye', 14)} Ver</button>
+      <button class="docs-ico" data-act="copy" aria-label="Copiar .md" title="Copiar .md">${svg('copy', 15)}</button>
+      <button class="docs-ico" data-act="orig" aria-label="Original" title="Original">${svg('folder', 15)}</button>
+      <button class="docs-ico danger" data-act="del" aria-label="Eliminar" title="Eliminar">${svg('trash', 15)}</button>
+    </div>`;
+  card.querySelector('[data-act="view"]').onclick = () => openDocModal(d);
+  card.querySelector('[data-act="copy"]').onclick = () => copyDocMd(d);
+  card.querySelector('[data-act="orig"]').onclick = () => api.openDocumentOriginal(d.initiative_id, d.name);
+  card.querySelector('[data-act="del"]').onclick = () => confirmModal(
+    'Eliminar documento',
+    `Se borrarán el .md, el original y las imágenes de "${d.name}". ¿Seguro?`,
+    'Eliminar',
+    async () => {
+      const r = await api.deleteDocument(d.initiative_id, d.name);
+      if (r && r.ok === false) { toast('err', errMsg(r.error, 'No se pudo eliminar')); return; }
+      toast('ok', 'Documento eliminado');
+      await onChanged();
+    },
+    true
+  );
+  return card;
+}
+
+// Lee un File del navegador como base64 puro (sin el prefijo data:...;base64,).
+function _readFileAsBase64(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const result = String(reader.result || '');
+      const i = result.indexOf(',');
+      resolve(i >= 0 ? result.slice(i + 1) : result);
+    };
+    reader.onerror = () => reject(reader.error || new Error('No se pudo leer el archivo'));
+    reader.readAsDataURL(file);
+  });
+}
+
+// Recarga en curso de la lista global (la fija viewDocs para que handleDrop pueda refrescar tras soltar archivos).
+let _docsRefreshList = null;
+
+// Maneja el drop de archivos sobre la lista (zona de arrastre): sube y convierte cada uno al proyecto destino.
+async function handleDrop(ev) {
+  const files = Array.from((ev.dataTransfer && ev.dataTransfer.files) || []);
+  if (!files.length) return;
+  if (STATE.docsDest == null) { toast('err', 'Elige antes un proyecto de destino'); return; }
+  let okN = 0; const failedNames = [];
+  for (const file of files) {
+    try {
+      const b64 = await _readFileAsBase64(file);
+      const r = await api.saveUploadedDocument(STATE.docsDest, file.name, b64, STATE.docsOcr, STATE.docsExtractImages);
+      if (r && r.ok) okN++; else failedNames.push((r && r.name) || file.name);
+    } catch (e) {
+      failedNames.push(file.name);
+    }
+  }
+  let msg = `${okN} convertido${okN === 1 ? '' : 's'}`;
+  if (failedNames.length) msg += ` · ${failedNames.length} sin convertir (${failedNames.join(', ')})`;
+  toast(failedNames.length && !okN ? 'err' : 'ok', msg);
+  if (_docsRefreshList) await _docsRefreshList();
+}
+
+function viewDocs() {
+  STATE.docsFilter = STATE.docsFilter || 'all';
+  STATE.docsOcr = STATE.docsOcr || 'auto';
+  if (STATE.docsImages === undefined) STATE.docsImages = false;
+
+  const wrap = el('div', 'content-scroll scroll');
+  const inner = el('div', 'content-inner');
+  inner.style.maxWidth = '760px';
+
+  // ---- Cabecera ----
+  const head = el('div', 'docs-head');
+  head.innerHTML =
+    `<h1 class="page-title">Documentos <span class="docs-arrow">→</span> .md</h1>` +
+    `<p class="docs-sub">Convierte PDF, Word, PowerPoint y hojas de cálculo a Markdown ` +
+    `para pegárselo a una IA. El original se guarda intacto junto al .md.</p>`;
+  inner.appendChild(head);
+
+  // ---- Barra: espacio · OCR · extraer imágenes · importar ----
+  const barra = el('div', 'docs-bar');
+
+  const pickEspacio = _docsPick(
+    STATE.docsFilter === 'all' ? 'Todos los espacios'
+      : (STATE.initiatives.find(x => x.id === STATE.docsFilter)?.name || 'Todos los espacios'),
+    'i-folder',
+    (e) => openMenu(e, [{ label: 'Todos los espacios', onClick: () => { STATE.docsFilter = 'all'; renderMain(); } }]
+      .concat(STATE.initiatives.map(it => ({
+        label: it.name, onClick: () => { STATE.docsFilter = it.id; renderMain(); },
+      }))))
+  );
+
+  const OCR_TXT = { auto: 'OCR: Automático', force: 'OCR: Forzar', off: 'OCR: Desactivado' };
+  const pickOcr = _docsPick(OCR_TXT[STATE.docsOcr], 'i-scan', (e) => openMenu(e,
+    Object.keys(OCR_TXT).map(k => ({
+      label: OCR_TXT[k], onClick: () => { STATE.docsOcr = k; renderMain(); },
+    }))));
+
+  // Casilla nativa oculta + caja dibujada: el teclado y el clic sobre el texto
+  // funcionan sin JS.
+  const chkImgs = el('label', 'rec-pick docs-check');
+  chkImgs.innerHTML =
+    `<input type="checkbox" class="docs-check-input" id="docsExtractImages"${STATE.docsImages ? ' checked' : ''}>` +
+    `<span class="docs-check-box"><svg class="icon"><use href="#i-check"/></svg></span>` +
+    `<span>Extraer imágenes</span>`;
+  chkImgs.querySelector('input').onchange = (e) => { STATE.docsImages = e.target.checked; };
+
+  const bImport = el('button', 'btn-pill-secondary docs-import');
+  bImport.type = 'button';
+  bImport.innerHTML = '<svg class="icon icon-sm"><use href="#i-upload"/></svg>Importar documentos';
+  bImport.onclick = () => _docsImportar();
+
+  barra.append(pickEspacio, pickOcr, chkImgs, bImport);
+  inner.appendChild(barra);
+
+  // ---- Grupos por espacio ----
+  const grupos = el('div', 'doc-groups');
+  grupos.innerHTML = '<div class="empty-state compact"><div class="l1">Cargando…</div></div>';
+  inner.appendChild(grupos);
+
+  api.listAllDocuments().then(docs => {
+    docs = docs || [];
+    grupos.replaceChildren();
+
+    const visibles = STATE.docsFilter === 'all'
+      ? docs : docs.filter(d => d.initiative_id === STATE.docsFilter);
+
+    if (!visibles.length) {
+      const v = el('div', 'empty-state');
+      v.innerHTML =
+        `<svg class="icon icon-lg"><use href="#i-pages"/></svg>` +
+        `<div class="l1">Sin documentos convertidos</div>` +
+        `<div class="l2">Importá un PDF, Word o PowerPoint y lo vas a encontrar acá como .md.</div>`;
+      grupos.appendChild(v);
+      return;
+    }
+
+    // Agrupados por espacio, ordenados por actividad reciente (no por el orden
+    // del menú): lo que se tocó último va arriba.
+    const porEsp = {};
+    visibles.forEach(d => {
+      const k = d.initiative_id;
+      (porEsp[k] = porEsp[k] || { nombre: d.initiative_name, color: d.color, docs: [] }).docs.push(d);
+    });
+
+    Object.keys(porEsp).forEach((k, i) => {
+      const g = porEsp[k];
+      const sec = el('section', 'doc-group' + (i === 0 ? ' is-first' : ''));
+      sec.innerHTML =
+        `<div class="doc-group-label">` +
+          `<span class="doc-group-dot" style="background:${esc(g.color || 'var(--text-muted)')}"></span>` +
+          `${esc(g.nombre)}<span class="doc-group-count">${g.docs.length}</span>` +
+        `</div>`;
+      const lista = el('div', 'doc-list');
+      g.docs.forEach(d => lista.appendChild(_docRow(d)));
+      sec.appendChild(lista);
+      grupos.appendChild(sec);
+    });
+  }).catch(() => {
+    grupos.replaceChildren();
+    const v = el('div', 'empty-state compact');
+    v.innerHTML = '<div class="l1">No se pudieron cargar los documentos.</div>';
+    grupos.appendChild(v);
+  });
+
+  wrap.appendChild(inner);
+  return wrap;
+}
+
+/* Importar: pide el proyecto destino si se está viendo "Todos los espacios",
+   porque un documento siempre se convierte dentro de uno concreto. */
+async function _docsImportar() {
+  let destino = STATE.docsFilter;
+  if (destino === 'all') {
+    if (!(STATE.initiatives || []).length) { toast('err', 'Creá un proyecto primero'); return; }
+    destino = await new Promise(res => pickInitiativeModal(iid => res(iid)));
+    if (!destino) return;
+  }
+  const r = await api.pickAndConvertDocuments(destino, STATE.docsOcr, STATE.docsImages).catch(() => null);
+  if (r && r.ok === false && r.error) { toast('err', r.error); return; }
+  const n = (r && (r.converted || r.count)) || 0;
+  if (n) toast('ok', `${n} ${n === 1 ? 'documento convertido' : 'documentos convertidos'}`);
+  renderMain();
+}
+
+/* Píldora con el valor elegido + chevron. */
+function _docsPick(valor, icono, onClick) {
+  const b = el('button', 'rec-pick');
+  b.type = 'button';
+  b.innerHTML =
+    `<svg class="icon"><use href="#${icono}"/></svg>` +
+    `<span>${esc(valor)}</span>` +
+    `<svg class="icon rec-pick-chev"><use href="#i-chevdown-fallback"/></svg>`;
+  // El sprite no trae chevron hacia abajo: se usa el derecho rotado.
+  const chev = b.querySelector('.rec-pick-chev use');
+  chev.setAttribute('href', '#i-chevright');
+  b.querySelector('.rec-pick-chev').style.transform = 'rotate(90deg)';
+  b.onclick = onClick;
+  return b;
+}
+
+/* Fila de documento. Las acciones aparecen al pasar el mouse; el mensaje de
+   error se ve siempre, porque es estado y no una acción a descubrir. */
+function _docRow(d) {
+  const r = el('div', 'doc-row');
+  const base = String(d.name || '').replace(/\.md$/i, '');
+  const ext = (d.original_name || '').split('.').pop().toUpperCase();
+  const fecha = d.created_at ? soFecha(d.created_at) : '';
+
+  const insignias = [];
+  if (fecha) insignias.push(`<span class="doc-badge date">${esc(fecha)}</span>`);
+  if (ext) insignias.push(`<span class="doc-badge">${esc(ext)}</span>`);
+  if (d.ocr) insignias.push(`<span class="doc-badge ocr"><svg class="icon"><use href="#i-scan"/></svg>OCR</span>`);
+  if (d.images) insignias.push(`<span class="doc-badge"><svg class="icon"><use href="#i-image"/></svg>${d.images} ${d.images === 1 ? 'imagen' : 'imágenes'}</span>`);
+
+  r.innerHTML =
+    `<span class="doc-ico"><svg class="icon"><use href="#i-doc"/></svg></span>` +
+    `<div class="doc-main">` +
+      `<span class="doc-name">${esc(d.name || '')}</span>` +
+      `<span class="doc-badges">${insignias.join('')}</span>` +
+    `</div>`;
+
+  const acciones = el('div', 'doc-actions');
+
+  const bVer = el('button', 'doc-view');
+  bVer.type = 'button';
+  bVer.innerHTML = '<svg class="icon"><use href="#i-eye"/></svg>Ver';
+  bVer.onclick = () => openDocModal(d);
+  acciones.appendChild(bVer);
+
+  const bCopiar = el('button', 'doc-act');
+  bCopiar.type = 'button'; bCopiar.title = 'Copiar el .md al portapapeles';
+  bCopiar.innerHTML = '<svg class="icon"><use href="#i-copy"/></svg>';
+  bCopiar.onclick = async () => {
+    const res = await api.readDocument(d.initiative_id, d.name).catch(() => null);
+    if (res && res.ok) { await navigator.clipboard.writeText(res.text || ''); toast('ok', 'Markdown copiado'); }
+    else toast('err', 'No se pudo leer el documento');
+  };
+  acciones.appendChild(bCopiar);
+
+  const bCarpeta = el('button', 'doc-act');
+  bCarpeta.type = 'button'; bCarpeta.title = 'Abrir la carpeta del documento';
+  bCarpeta.innerHTML = '<svg class="icon"><use href="#i-folder"/></svg>';
+  bCarpeta.onclick = () => api.openPath(d.folder_path);
+  acciones.appendChild(bCarpeta);
+
+  const bBorrar = el('button', 'doc-act doc-del');
+  bBorrar.type = 'button'; bBorrar.title = 'Eliminar el documento';
+  bBorrar.innerHTML = '<svg class="icon"><use href="#i-trash"/></svg>';
+  bBorrar.onclick = () => confirmModal('Eliminar documento',
+    `Se elimina «${base}» y su original. No se puede deshacer.`, 'Eliminar', async () => {
+      await api.deleteDocument(d.initiative_id, d.name).catch(() => {});
+      toast('ok', 'Documento eliminado');
+      renderMain();
+    });
+  acciones.appendChild(bBorrar);
+
+  r.appendChild(acciones);
+  return r;
+}
 
 /* ============================================================
    4b. VISTA: TODAS LAS INICIATIVAS
    ============================================================ */
+const _initNotesKey = id => `hm.initNote.${id}`;
+function _getInitNote(id) { return localStorage.getItem(_initNotesKey(id)) || ''; }
+function _setInitNote(id, val) { val ? localStorage.setItem(_initNotesKey(id), val) : localStorage.removeItem(_initNotesKey(id)); }
+
 function viewAllInitiatives() {
-  let _filter = 'all'; // all | pinned | active | paused | closed
-  let _search = '';
-  let _sortBy = 'activity'; // activity | name | meetings
-  let _selId = null;
-  const _expandedInits = new Set();
+  const wrap = el('div', 'content-scroll scroll');
+  const inner = el('div', 'content-inner');
+  inner.style.maxWidth = '860px';
 
-  const wrap = el('div', 'init-hub-wrap');
+  const inis = STATE.initiatives || [];
+  const head = el('div', 'esp-head');
+  head.innerHTML =
+    `<h1 class="page-title">Espacios</h1>` +
+    `<span class="esp-count">${inis.length} ${inis.length === 1 ? 'espacio' : 'espacios'}</span>`;
+  inner.appendChild(head);
 
-  // ── Toolbar ───────────────────────────────────────────────
-  const toolbar = el('div', 'init-hub-toolbar');
-
-  // Fila 1: título + botón nuevo
-  const topRow = el('div', 'init-hub-top-row');
-  topRow.innerHTML = `<h1 class="title-lg">Iniciativas</h1>`;
-  const newBtn = el('button', 'btn btn-primary');
-  newBtn.innerHTML = `${svg('plus', 13)} Nueva iniciativa`;
-  newBtn.onclick = promptNewInitiative;
-  topRow.appendChild(newBtn);
-  toolbar.appendChild(topRow);
-
-  // Fila 2: chips simplificados
-  const filtersRow = el('div', 'init-hub-filters-row');
-  const chips = el('div', 'init-hub-chips');
-  const chipDefs = [
-    { key: 'all', label: 'Todas' },
-    { key: 'pinned', label: 'Fijadas' },
-  ];
-  const renderChips = () => {
-    chips.replaceChildren();
-    chipDefs.forEach(c => {
-      const chip = el('button', 'init-hub-chip' + (_filter === c.key ? ' is-active' : ''), c.label);
-      chip.onclick = () => { _filter = c.key; renderChips(); redrawList(); };
-      chips.appendChild(chip);
-    });
-  };
-  renderChips();
-  filtersRow.appendChild(chips);
-  toolbar.appendChild(filtersRow);
-  wrap.appendChild(toolbar);
-
-  // ── Cuerpo: tabla + panel ─────────────────────────────────
-  const body = el('div', 'init-hub-body');
-
-  // Anchos de columna redimensionables (px). fixed=true = no se pueden cambiar.
-  const _cols = [
-    { fixed: true,  w: 20,  min: 20  },  // chevron
-    { fixed: true,  w: 22,  min: 22  },  // pin
-    { fixed: false, w: 220, min: 110 },  // nombre
-    { fixed: false, w: 80,  min: 60  },  // estado
-    { fixed: false, w: 130, min: 80  },  // actividad
-    { fixed: false, w: 70,  min: 50  },  // reuniones
-    { fixed: false, w: 130, min: 80  },  // pendientes
-    { fixed: true,  w: 34,  min: 34  },  // menú
-  ];
-  const _gridTpl = () => _cols.map(c => c.w + 'px').join(' ');
-  const _applyWidths = () => {
-    const tpl = _gridTpl();
-    thead.style.gridTemplateColumns = tpl;
-    tbody.querySelectorAll('.init-hub-row, .init-hub-meeting-row')
-         .forEach(r => { r.style.gridTemplateColumns = tpl; });
-  };
-
-  const tableWrap = el('div', 'init-hub-table');
-  const thead = el('div', 'init-hub-thead');
-
-  const colLabels = ['', '', 'Iniciativa', 'Estado', 'Última actividad', 'Reuniones', 'Pendientes', ''];
-  _cols.forEach((col, i) => {
-    const cell = el('div', 'iht');
-    cell.textContent = colLabels[i];
-    if (i === 2) { // solo columna "Iniciativa" es redimensionable
-      const handle = el('span', 'col-resizer');
-      handle.addEventListener('mousedown', (e) => {
-        e.preventDefault(); e.stopPropagation();
-        handle.classList.add('is-dragging');
-        const startX = e.clientX, startW = col.w;
-        const onMove = (e) => {
-          col.w = Math.max(col.min, startW + e.clientX - startX);
-          _applyWidths();
-        };
-        const onUp = () => {
-          handle.classList.remove('is-dragging');
-          document.removeEventListener('mousemove', onMove);
-          document.removeEventListener('mouseup', onUp);
-        };
-        document.addEventListener('mousemove', onMove);
-        document.addEventListener('mouseup', onUp);
-      });
-      cell.appendChild(handle);
-    }
-    thead.appendChild(cell);
-  });
-  tableWrap.appendChild(thead);
-
-  const tbody = el('div', 'init-hub-tbody');
-  tableWrap.appendChild(tbody);
-  body.appendChild(tableWrap);
-
-  const panel = el('div', 'init-hub-panel');
-  panel.hidden = true;
-  body.appendChild(panel);
-  wrap.appendChild(body);
-
-  // ── Helpers ───────────────────────────────────────────────
-  function _fmtActivity(it) {
-    const ms = STATE.meetingsByInit[it.id];
-    if (!ms) return '…';
-    if (!ms.length) return '—';
-    const m = ms[0];
-    if (!m.started_at) return m.time || m.month_label || '—';
-    const d = new Date(m.started_at), now = new Date();
-    const t = d.toLocaleTimeString('es', { hour: '2-digit', minute: '2-digit' });
-    if (d.toDateString() === now.toDateString()) return `Hoy · ${t}`;
-    if (d.toDateString() === new Date(now - 86400000).toDateString()) return `Ayer · ${t}`;
-    return `${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}/${String(d.getFullYear()).slice(-2)}`;
+  if (!inis.length) {
+    const v = el('div', 'empty-state');
+    v.innerHTML =
+      `<svg class="icon icon-lg"><use href="#i-folder"/></svg>` +
+      `<div class="l1">Todavía no hay espacios</div>` +
+      `<div class="l2">Creá el primero para empezar a grabar reuniones dentro.</div>`;
+    inner.appendChild(v);
+    wrap.appendChild(inner);
+    return wrap;
   }
 
-  function _pendingCount(it) {
-    const ms = STATE.meetingsByInit[it.id];
-    return ms ? ms.filter(m => m.status === 'pending' || m.status === 'processing').length : null;
-  }
+  const caja = el('div', 'esp-table-wrap');
+  const tabla = el('table', 'esp-table');
+  tabla.innerHTML =
+    `<thead><tr>` +
+      `<th>Espacio</th><th>Última actividad</th>` +
+      `<th class="esp-num">Reuniones</th><th class="esp-num">Duración</th><th>Pendientes</th>` +
+    `</tr></thead>`;
+  const tbody = el('tbody');
 
-  function _getFiltered() {
-    let list = [...STATE.initiatives];
-    if (_search) list = list.filter(it =>
-      it.name.toLowerCase().includes(_search) ||
-      (it.description || '').toLowerCase().includes(_search));
-    if (_filter === 'pinned') list = list.filter(it => it.pinned);
-    if (_filter === 'fav') list = list.filter(it => it.pinned);
-    if (_sortBy === 'name') list.sort((a, b) => a.name.localeCompare(b.name, 'es'));
-    else if (_sortBy === 'meetings') {
-      list.sort((a, b) => (STATE.meetingsByInit[b.id] || []).length - (STATE.meetingsByInit[a.id] || []).length);
-    } else { // activity: pinned first, then newest
-      list.sort((a, b) => {
-        if (a.pinned !== b.pinned) return b.pinned ? 1 : -1;
-        const aD = STATE.meetingsByInit[a.id]?.[0]?.started_at;
-        const bD = STATE.meetingsByInit[b.id]?.[0]?.started_at;
-        return (bD ? new Date(bD) : 0) - (aD ? new Date(aD) : 0);
-      });
-    }
-    return list;
-  }
-
-  function redrawList() {
-    tbody.replaceChildren();
-    const list = _getFiltered();
-    if (!list.length) {
-      tbody.appendChild(el('p', 'files-empty', _search ? 'Sin iniciativas que coincidan.' : 'Aún no hay iniciativas.'));
-    } else {
-      list.forEach(it => tbody.appendChild(renderRow(it)));
-    }
-    _applyWidths();
-  }
-
-  function renderRow(it) {
-    const isExpanded = _expandedInits.has(it.id);
-    const ms = STATE.meetingsByInit[it.id];
-    const pending = _pendingCount(it);
-    const wrapper = el('div', 'init-hub-item');
-
-    const row = el('div', 'init-hub-row' + (_selId === it.id ? ' is-selected' : '') + (isExpanded ? ' is-expanded' : ''));
-    row.innerHTML = `
-      <span class="ihr-chev">${svg('chevron', 10)}</span>
-      <span class="ihr-pin${it.pinned ? ' is-pinned' : ''}" title="${it.pinned ? 'Desfijar' : 'Fijar'}">${svg('pin', 11)}</span>
-      <div class="ihr-name-cell">
-        <span class="ihr-dot" style="background:${_initColor(it)}"></span>
-        <div class="ihr-info">
-          <span class="ihr-name">${esc(it.name)}</span>
-          ${it.description ? `<span class="ihr-desc">${esc(it.description.slice(0,55))}${it.description.length > 55 ? '…' : ''}</span>` : ''}
-        </div>
-      </div>
-      <span class="ihr-status"><span class="init-status-chip active">Activa</span></span>
-      <span class="ihr-activity">${_fmtActivity(it)}</span>
-      <span class="ihr-meetings">${ms === undefined ? '…' : ms.length}</span>
-      <span class="ihr-pending${pending > 0 ? ' has-pending' : ''}">${pending === null ? '…' : pending > 0 ? `${pending} por transcribir` : ''}</span>`;
-    const menuBtn = el('button', 'icon-btn ihr-menu-btn');
-    menuBtn.innerHTML = svg('dots', 14);
-    menuBtn.onclick = (e) => { e.stopPropagation(); openInitiativeMenu(e, it.id); };
-    row.appendChild(menuBtn);
-    row.oncontextmenu = (e) => { e.preventDefault(); openInitiativeMenu(e, it.id); };
-
-    row.onclick = (e) => {
-      if (e.target.closest('.ihr-menu-btn') || e.target.closest('.ihr-pin')) return;
-      const alreadyOpen = _selId === it.id && _expandedInits.has(it.id);
-      if (alreadyOpen) {
-        // 2.º click: cierra panel y colapsa
-        _selId = null;
-        _expandedInits.delete(it.id);
-      } else {
-        // 1.er click: abre panel y despliega reuniones
-        _selId = it.id;
-        _expandedInits.add(it.id);
-        if (!STATE.meetingsByInit[it.id]) {
-          api.listMeetings(it.id).then(r => { STATE.meetingsByInit[it.id] = r || []; redrawList(); });
-        }
-      }
-      redrawList();
-      redrawPanel();
-    };
-
-    row.querySelector('.ihr-pin').onclick = async (e) => {
-      e.stopPropagation();
-      await api.toggleInitiativePin(it.id).catch(() => {});
-      it.pinned = !it.pinned;
-      redrawList();
-    };
-    wrapper.appendChild(row);
-
-    if (isExpanded) {
-      const sub = el('div', 'init-hub-sub');
-      const msList = ms || [];
-      if (!msList.length) {
-        sub.appendChild(el('p', 'files-empty', STATE.meetingsByInit[it.id] ? 'Sin reuniones aún.' : 'Cargando…'));
-      } else {
-        const MS2 = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
-        const MES  = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
-        // Calcula lunes de la semana a partir de una fecha ISO (fuente de verdad = started_at)
-        const _weekOf = (iso) => {
-          if (!iso) return { mKey: 'none', wKey: 'none', wLabel: '—', mLabel: 'Sin fecha' };
-          const d = new Date(iso); if (isNaN(d)) return { mKey: 'none', wKey: 'none', wLabel: '—', mLabel: 'Sin fecha' };
-          const day = d.getDay();
-          const mon = new Date(d); mon.setDate(d.getDate() - (day === 0 ? 6 : day - 1));
-          const sun = new Date(mon); sun.setDate(mon.getDate() + 6);
-          const fmt = dt => `${dt.getDate()} ${MS2[dt.getMonth()]}`;
-          return {
-            mKey:   `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`,
-            wKey:   mon.toISOString().slice(0,10),
-            wLabel: `${fmt(mon)} – ${fmt(sun)}`,
-            mLabel: `${MES[d.getMonth()]} ${d.getFullYear()}`,
-          };
-        };
-
-        // Pre-agrupar por mes → semana usando started_at como única fuente de verdad
-        const monthOrder = []; // mantiene orden de inserción
-        const monthMap2  = new Map(); // mKey → { mLabel, wkKeys[] }
-        const weekMap2   = new Map(); // mKey|wKey → { wLabel, ms[] }
-        msList.forEach(m => {
-          const { mKey, wKey, wLabel, mLabel } = _weekOf(m.started_at);
-          if (!monthMap2.has(mKey)) { monthMap2.set(mKey, { mLabel, wkKeys: [] }); monthOrder.push(mKey); }
-          const mapKey = `${mKey}|${wKey}`;
-          if (!weekMap2.has(mapKey)) { weekMap2.set(mapKey, { wLabel, ms: [] }); monthMap2.get(mKey).wkKeys.push(mapKey); }
-          weekMap2.get(mapKey).ms.push(m);
-        });
-
-        // Estado de semanas abiertas (solo la primera por defecto)
-        if (!STATE._hubWeeks) STATE._hubWeeks = {};
-        if (!STATE._hubWeeks[it.id]) {
-          const firstWk = monthOrder.length ? monthMap2.get(monthOrder[0]).wkKeys[0] : null;
-          STATE._hubWeeks[it.id] = new Set(firstWk ? [firstWk] : []);
-        }
-        const openHubWeeks = STATE._hubWeeks[it.id];
-        const mc = _initColor(it);
-
-        monthOrder.forEach(mKey => {
-          const { mLabel, wkKeys } = monthMap2.get(mKey);
-          // Mes
-          const mhdr = el('div', 'ihm-month-hdr');
-          mhdr.innerHTML = `<span></span><span class="ihm-month-label">${esc(mLabel)}</span>`;
-          sub.appendChild(mhdr);
-          // Semanas
-          wkKeys.forEach(mapKey => {
-            const { wLabel, ms: wms } = weekMap2.get(mapKey);
-            const isOpen = openHubWeeks.has(mapKey);
-            const whdr = el('div', 'ihm-week-hdr' + (isOpen ? ' open' : ''));
-            whdr.innerHTML = `<span class="tw-chev">${svg('chevron', 9)}</span><span class="ihm-week-label">${esc(wLabel)}</span><span class="ihm-week-cnt">${wms.length}</span>`;
-            whdr.onclick = (e) => { e.stopPropagation(); openHubWeeks.has(mapKey) ? openHubWeeks.delete(mapKey) : openHubWeeks.add(mapKey); redrawList(); };
-            sub.appendChild(whdr);
-            if (isOpen) {
-              wms.forEach(m => {
-                const mr = el('div', 'init-hub-meeting-row');
-                const st = m.status || 'done';
-                const ds = st === 'pending' ? `border:1.5px solid ${mc};background:transparent` : `background:${mc}`;
-                mr.innerHTML = `<div class="ihm-info"><span class="stat ${st}" style="${ds}"></span><span class="ihm-title">${esc(m.title)}</span></div><span class="ihm-date">${m.time || ''}</span>`;
-                mr.onclick = (e) => { e.stopPropagation(); STATE.selInit = it.id; openMeeting(m.id); };
-                mr.oncontextmenu = (e) => { e.preventDefault(); e.stopPropagation(); openMeetingMenu(e, m.id); };
-                sub.appendChild(mr);
-              });
-            }
-          });
-        });
-      }
-      wrapper.appendChild(sub);
-    }
-    return wrapper;
-  }
-
-  function redrawPanel() {
-    if (!_selId) { panel.classList.remove('is-visible'); return; }
-    const it = STATE.initiatives.find(x => x.id === _selId);
-    if (!it) { panel.classList.add('is-visible'); panel.innerHTML = ''; return; }
-    panel.classList.add('is-visible');
+  inis.forEach(it => {
     const ms = STATE.meetingsByInit[it.id] || [];
-    const pending = ms.filter(m => m.status === 'pending' || m.status === 'processing').length;
+    const ordenadas = [...ms].sort((a, b) => String(b.started_at || '').localeCompare(String(a.started_at || '')));
+    const ultima = ordenadas[0];
+    const minutos = ms.reduce((s, m) => s + _minutosDe(m), 0);
+    const durTxt = minutos >= 60
+      ? `${Math.floor(minutos / 60)} h ${Math.round(minutos % 60)} m`
+      : `${Math.round(minutos)} m`;
+    const pendientes = ms.filter(m => m.status !== 'done').length;
 
-    panel.innerHTML = `
-      <div class="ihp-head">
-        <span class="ihp-dot" style="background:${_initColor(it)}"></span>
-        <span class="ihp-name">${esc(it.name)}</span>
-        <button class="icon-btn ihp-pin${it.pinned ? ' is-pinned' : ''}" title="${it.pinned ? 'Desfijar' : 'Fijar'}">${svg('pin', 13)}</button>
-        <button class="icon-btn ihp-more" title="Más acciones">${svg('dots', 14)}</button>
-        <button class="icon-btn ihp-close" title="Cerrar">${svg('x', 14)}</button>
-      </div>
-      ${it.description ? `<p class="ihp-desc">${esc(it.description)}</p>` : ''}
-      <div class="ihp-stats">
-        <div class="ihp-stat">${svg('calendar', 12)}<span>${ms.length} reuniones</span></div>
-        ${pending > 0 ? `<div class="ihp-stat is-pending">${svg('warn', 12)}<span>${pending} pendientes por transcribir</span></div>` : ''}
-        <div class="ihp-stat">${svg('clock', 12)}<span>Última actividad: ${_fmtActivity(it)}</span></div>
-        ${it.created_at ? `<div class="ihp-stat">${svg('info', 12)}<span>Creada el ${new Date(it.created_at).toLocaleDateString('es')}</span></div>` : ''}
-      </div>
-      <div class="ihp-actions-title">Acciones rápidas</div>
-      <div class="ihp-actions">
-        <button class="ihp-act ihp-open">${svg('folder', 13)}<span>Abrir iniciativa</span></button>
-        <button class="ihp-act ihp-pin-act">${svg('pin', 13)}<span>${it.pinned ? 'Desfijar' : 'Fijar'}</span></button>
-        <button class="ihp-act ihp-edit">${svg('edit', 13)}<span>Editar</span></button>
-        <button class="ihp-act ihp-export">${svg('download', 13)}<span>Exportar contexto</span></button>
-        <button class="ihp-act ihp-archive is-danger">${svg('archive', 13)}<span>Archivar</span></button>
-      </div>`;
+    const tr = el('tr');
 
-    const closePanel = () => { _selId = null; panel.classList.remove('is-visible'); redrawList(); };
-    panel.querySelector('.ihp-close').onclick = closePanel;
-    panel.querySelector('.ihp-open').onclick = () => selectInitiative(it.id);
-    panel.querySelector('.ihp-pin').onclick = () => panel.querySelector('.ihp-pin-act').click();
-    panel.querySelector('.ihp-pin-act').onclick = async () => {
-      await api.toggleInitiativePin(it.id).catch(() => {});
-      it.pinned = !it.pinned;
-      redrawList(); redrawPanel();
+    const tdNombre = el('td', 'esp-name');
+    const inner2 = el('div', 'esp-name-inner');
+    const tog = el('button', 'esp-toggle');
+    tog.type = 'button';
+    tog.setAttribute('aria-expanded', 'false');
+    tog.setAttribute('aria-label', 'Ver las reuniones de ' + it.name);
+    tog.innerHTML = '<svg><use href="#i-chevright"/></svg>';
+    const punto = el('span', 'dot');
+    punto.style.background = _initColor(it) || 'var(--text-muted)';
+    const txt = el('span', 'esp-name-txt');
+    txt.textContent = it.name; txt.title = it.name;
+    inner2.append(tog, punto, txt);
+    tdNombre.appendChild(inner2);
+
+    const tdAct = el('td');
+    tdAct.textContent = ultima ? `${soFecha(ultima.started_at)} · ${ultima.time || ''}` : '—';
+    const tdN = el('td', 'esp-num'); tdN.textContent = ms.length;
+    const tdDur = el('td', 'esp-num'); tdDur.textContent = ms.length ? durTxt : '—';
+
+    const tdPend = el('td');
+    if (pendientes) {
+      const p = el('button', 'esp-pend');
+      p.type = 'button';
+      p.textContent = `${pendientes} por transcribir`;
+      p.title = 'Abrir el espacio para transcribirlas';
+      p.onclick = (e) => { e.stopPropagation(); selectInitiative(it.id); };
+      tdPend.appendChild(p);
+    } else {
+      const ok = el('span', 'esp-ok'); ok.textContent = ms.length ? 'Al día' : '—';
+      tdPend.appendChild(ok);
+    }
+
+    tr.append(tdNombre, tdAct, tdN, tdDur, tdPend);
+    // Clic en la fila (fuera del desplegable) abre el espacio.
+    tr.onclick = (e) => { if (!e.target.closest('.esp-toggle, .esp-pend')) selectInitiative(it.id); };
+    tbody.appendChild(tr);
+
+    // Fila de detalle: las reuniones del espacio, agrupadas por mes.
+    const trDet = el('tr', 'esp-detail');
+    trDet.hidden = true;
+    const tdDet = el('td'); tdDet.colSpan = 5;
+    const sub = el('div', 'esp-sub');
+    if (!ordenadas.length) {
+      const v = el('div', 'esp-sub-empty'); v.textContent = 'Sin reuniones todavía';
+      sub.appendChild(v);
+    } else {
+      let mes = null;
+      ordenadas.slice(0, 12).forEach(m => {
+        const et = m.month_label || 'Sin fecha';
+        if (et !== mes) {
+          const g = el('div', 'esp-sub-month'); g.textContent = et;
+          sub.appendChild(g); mes = et;
+        }
+        const f = el('button', 'esp-sub-row');
+        f.type = 'button';
+        f.innerHTML =
+          `<svg class="icon"><use href="#i-${m.source === 'screen' ? 'monitor' : 'audiowave'}"/></svg>` +
+          `<span class="esp-sub-title">${esc(_fmtMeetingLabel(m))}</span>` +
+          `<span class="esp-sub-dur">${esc(_subtituloReunion(m))}</span>` +
+          `<span class="esp-sub-time">${esc(m.time || '')}</span>`;
+        f.onclick = () => { STATE.selInit = it.id; openMeeting(m.id); };
+        sub.appendChild(f);
+      });
+    }
+    tdDet.appendChild(sub);
+    trDet.appendChild(tdDet);
+    tbody.appendChild(trDet);
+
+    tog.onclick = (e) => {
+      e.stopPropagation();
+      const abierta = trDet.hidden;
+      trDet.hidden = !abierta;
+      tog.setAttribute('aria-expanded', abierta ? 'true' : 'false');
     };
-    panel.querySelector('.ihp-more').onclick = (e) => openInitiativeMenu(e, it.id);
-    panel.querySelector('.ihp-edit').onclick = (e) => openInitiativeMenu(e, it.id);
-    panel.querySelector('.ihp-export').onclick = () => exportInitiativeTo(it.id);
-    panel.querySelector('.ihp-archive').onclick = (e) => openInitiativeMenu(e, it.id);
-  }
-
-  // Cerrar panel al hacer click fuera de filas y del panel
-  body.addEventListener('click', (e) => {
-    if (_selId && !e.target.closest('.init-hub-row') && !e.target.closest('.init-hub-meeting-row') && !e.target.closest('.init-hub-panel')) {
-      _selId = null; panel.classList.remove('is-visible'); redrawList();
-    }
   });
 
-  // Render inicial + carga de reuniones en 2.º plano
-  redrawList();
-  STATE.initiatives.forEach(async it => {
-    if (!STATE.meetingsByInit[it.id]) {
-      STATE.meetingsByInit[it.id] = await api.listMeetings(it.id) || [];
-      redrawList();
-      if (_selId === it.id) redrawPanel();
-    }
-  });
+  tabla.appendChild(tbody);
+  caja.appendChild(tabla);
 
+  const nuevo = el('button', 'esp-new');
+  nuevo.type = 'button';
+  nuevo.innerHTML = '<svg class="icon"><use href="#i-plus"/></svg>Nuevo espacio';
+  nuevo.onclick = promptNewInitiative;
+  caja.appendChild(nuevo);
+
+  inner.appendChild(caja);
+  wrap.appendChild(inner);
   return wrap;
 }
-
 /* ============================================================
    5. SIDEBAR
    ============================================================ */
 let _sidebarSearch = '';
 
+// Etiqueta de reunión estilo "vie 04 Jul" (día en minúscula, mes con mayúscula inicial).
+// Solo reformatea los títulos autogenerados por fecha (empiezan por DD/MM/YY);
+// respeta los nombres que el usuario haya puesto a mano.
+function _fmtMeetingLabel(m, opts) {
+  const t = (m && m.title) || '';
+  const d = m && m.started_at ? new Date(m.started_at) : null;
+  /* Título por defecto (la fecha dd/mm/aa que pone el grabador): se muestra
+     como "vie 31 Jul 1:22 PM" — día, fecha y hora.
+
+     Antes acá devolvía "Reunión de N frases" y era peor por dos razones. Una,
+     **no es un nombre**: cambia solo a medida que avanza la transcripción, así
+     que la misma reunión se llama distinto según cuándo la mires. Dos, tres
+     reuniones seguidas sin nombre quedaban como "Reunión de 5 / 6 / 7 frases",
+     que no distingue nada — la hora sí. El recuento no se pierde: bajó al
+     subtítulo, junto a la duración, que es donde vive lo medible. */
+  if (/^\d{2}\/\d{2}\/\d{2}$/.test(t.trim()) && d && !isNaN(d)) {
+    /* En el calendario NO: la celda ya está dentro de su columna de día y trae
+       su propia hora al lado, así que el nombre-fecha repetiría lo mismo tres
+       veces en la misma tarjeta. Ahí dice "Sin nombre", y lo que distingue una
+       reunión de otra dentro del mismo día es la hora, que está justo encima.
+       El recuento de frases tampoco entra: la celda mide una columna de siete y
+       "1 min · 330 frases" sale cortado a media palabra. */
+    if (opts && opts.enCalendario) return 'Sin nombre';
+    const hhmm = (m.started_at || '').substring(11, 16);
+    const time = hhmm ? ' ' + _calFmtTime(hhmm) : '';
+    return `${DIAS_CORTOS[d.getDay()]} ${d.getDate()} ${MESES_CORTOS[d.getMonth()]}${time}`;
+  }
+  // Si es el nuevo formato por defecto "Reunion mie 8 Jul 21:53", mostrar corto
+  if (/^Reunion (lun|mar|mie|jue|vie|sab|dom) \d{1,2} (Ene|Feb|Mar|Abr|May|Jun|Jul|Ago|Sep|Oct|Nov|Dic) \d{2}:\d{2}$/.test(t.trim())) {
+    return t.replace('Reunion ', '');
+  }
+  return t || 'Sin titulo';
+}
+
+/* ---- Fila de proyecto del sidebar (FASE 1 del rediseño) ----
+   Markup del mockup: contenedor .projitem.nested con dos objetivos de clic
+   independientes — el nombre navega, el "···" abre el menú. La versión
+   anterior era un árbol desplegable que mostraba las reuniones y las carpetas
+   dentro del propio sidebar; el mockup lo aplana a propósito: las reuniones
+   viven en la pantalla del proyecto y las carpetas dentro de su pestaña
+   Reuniones, no en el panel lateral. */
 function _renderInitRow(tree, it) {
-  const open = !!STATE.openInits[it.id];
-  const ms = STATE.meetingsByInit[it.id] || [];
   const isSelected = STATE.selInit === it.id && STATE.screen === 'initiative';
-  const row = el('div', 'tree-initiative' + (open ? ' open' : '') + (isSelected ? ' selected' : ''));
+  const pcolor = it.color || avatarColorFor(it.name);
+
+  const row = el('div', 'projitem nested' + (isSelected ? ' active' : '') + (it.pinned ? ' pinned' : ''));
   row.dataset.iid = it.id;
-  row.title = it.name || '';
-  row.innerHTML = `<span class="chev">${svg('chevron', 12)}</span><span class="init-dot" style="background:${_initColor(it)}"></span><span class="name">${esc(it.name)}</span>${it.pinned ? '<span class="pin-ind">' + svg('pin', 10) + '</span>' : ''}<span class="count">${ms.length || ''}</span>`;
-  row.onclick = () => selectInitiative(it.id);
+
+  const nav = el('button', 'proj-row-nav');
+  nav.type = 'button';
+  nav.title = it.name || '';
+  nav.innerHTML =
+    `<svg class="icon icon-sm" style="color:${esc(pcolor)}"><use href="#i-folder"/></svg>` +
+    `<span class="label-text">${esc(it.name)}</span>` +
+    `<svg class="proj-pin"><use href="#i-star"/></svg>`;
+  nav.onclick = () => selectInitiative(it.id);
+
+  const menuBtn = el('button', 'proj-row-menu-btn');
+  menuBtn.type = 'button';
+  menuBtn.setAttribute('aria-label', 'Más acciones para ' + (it.name || ''));
+  menuBtn.setAttribute('aria-haspopup', 'true');
+  menuBtn.innerHTML = '<svg class="icon icon-sm"><use href="#i-more"/></svg>';
+  menuBtn.onclick = (e) => { e.stopPropagation(); openInitiativeMenu(e, it.id); };
+
+  row.append(nav, menuBtn);
+  // Clic derecho en cualquier punto de la fila: mismo menú.
   row.oncontextmenu = (e) => { e.preventDefault(); openInitiativeMenu(e, it.id); };
   tree.appendChild(row);
-  if (open) {
-    const sub = el('div', 'tree-meetings');
-    const MS = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
-
-    const _monKey = (iso) => {
-      const d = new Date(iso); if (isNaN(d)) return null;
-      const day = d.getDay();
-      const mon = new Date(d); mon.setDate(d.getDate() - (day === 0 ? 6 : day - 1));
-      const sun = new Date(mon); sun.setDate(mon.getDate() + 6);
-      const fmt = dt => `${dt.getDate()} ${MS[dt.getMonth()]}`;
-      return { key: mon.toISOString().slice(0,10), label: `${fmt(mon)} – ${fmt(sun)}` };
-    };
-
-    // Pre-agrupar: mes → semana → reuniones (sin duplicados)
-    const monthMap = new Map();   // month_label → [{weekKey,weekLabel,ms:[]}]
-    const weekMap  = new Map();   // month|weekKey → weekGroup
-    ms.forEach(m => {
-      const month = m.month_label || 'Sin fecha';
-      const wk = m.started_at ? _monKey(m.started_at) : null;
-      const wkKey = wk ? wk.key : 'none';
-      const wkLabel = wk ? wk.label : '—';
-      if (!monthMap.has(month)) monthMap.set(month, []);
-      const mapKey = `${month}|${wkKey}`;
-      if (!weekMap.has(mapKey)) {
-        const g = { weekKey: wkKey, weekLabel: wkLabel, ms: [] };
-        weekMap.set(mapKey, g);
-        monthMap.get(month).push(g);
-      }
-      weekMap.get(mapKey).ms.push(m);
-    });
-
-    // Estado de semanas abiertas persistido en STATE (solo la más reciente por defecto)
-    if (!STATE._openWeeks) STATE._openWeeks = {};
-    if (!STATE._openWeeks[it.id]) {
-      // Abrir la primera semana (más reciente) por defecto
-      const firstMonth = monthMap.keys().next().value;
-      const firstWeek = firstMonth && monthMap.get(firstMonth)[0];
-      STATE._openWeeks[it.id] = new Set(firstWeek ? [`${firstMonth}|${firstWeek.weekKey}`] : []);
-    }
-    const openWeeks = STATE._openWeeks[it.id];
-
-    const mColor = _initColor(it);
-    monthMap.forEach((weeks, month) => {
-      sub.appendChild(el('div', 'tree-month', esc(month)));
-      weeks.forEach(({ weekKey, weekLabel, ms: wms }) => {
-        const wkId = `${month}|${weekKey}`;
-        const isWkOpen = openWeeks.has(wkId);
-
-        // Encabezado de semana colapsable
-        const wkHdr = el('div', 'tree-week' + (isWkOpen ? ' open' : ''));
-        wkHdr.innerHTML = `<span class="tw-chev">${svg('chevron', 9)}</span><span class="tw-label">${esc(weekLabel)}</span><span class="tw-cnt">${wms.length}</span>`;
-        wkHdr.onclick = (e) => {
-          e.stopPropagation();
-          openWeeks.has(wkId) ? openWeeks.delete(wkId) : openWeeks.add(wkId);
-          renderSidebar();
-        };
-        sub.appendChild(wkHdr);
-
-        if (isWkOpen) {
-          wms.forEach(m => {
-            const st = m.status || 'done';
-            const recording = meetingIsRecording(m.id);
-            const transcribing = !recording && (st === 'processing' || meetingIsTranscribing(m.id));
-            const mr = el('div', 'tree-meeting' + (STATE.selMeeting === m.id ? ' selected' : '') + (recording ? ' recording' : '') + (transcribing ? ' transcribing' : ''));
-            mr.dataset.mid = m.id;
-            mr.title = m.title || '';
-            const dotStyle = st === 'pending' ? ` style="border:1.5px solid ${mColor};background:transparent"` : st === 'done' ? ` style="background:${mColor}"` : '';
-            mr.innerHTML = `<span class="stat ${st}"${dotStyle}></span><span class="mtitle">${esc(m.title)}</span>${m.time ? '<span class="mtime">' + esc(m.time) + '</span>' : ''}`;
-            mr.onclick = (e) => { e.stopPropagation(); openMeeting(m.id); };
-            mr.oncontextmenu = (e) => { e.preventDefault(); e.stopPropagation(); openMeetingMenu(e, m.id); };
-            sub.appendChild(mr);
-          });
-        }
-      });
-    });
-    if (!ms.length) sub.appendChild(el('div', 'tree-meeting', '<span style="color:var(--text-faint);font-size:12px">Sin reuniones</span>'));
-    tree.appendChild(sub);
-  }
 }
 
 function renderSidebar() {
   const tree = $('#sidebarTree');
+  if (!tree) return;
   tree.replaceChildren();
 
-  const all = STATE.initiatives;
+  /* "Todas mis notas" primero: la vista agregada de las reuniones de todos los
+     proyectos. No es un proyecto —no existe en la base, no se renombra ni se
+     borra, y no aparece como destino al guardar— así que va sin punto de color
+     ni menú "···", que es lo que la distingue de las filas de abajo. */
+  {
+    const total = Object.values(STATE.meetingsByInit || {}).reduce((s, ms) => s + (ms || []).length, 0);
+    const fila = el('div', 'projitem nested proj-all' + (STATE.screen === 'allnotes' ? ' active' : ''));
+    const nav = el('button', 'proj-row-nav');
+    nav.type = 'button';
+    nav.title = 'Las reuniones de todos los proyectos';
+    nav.innerHTML =
+      `<svg class="icon icon-sm"><use href="#i-layers"/></svg>` +
+      `<span class="label-text">Todas mis notas</span>` +
+      (total ? `<span class="proj-all-count">${total}</span>` : '');
+    nav.onclick = () => {
+      STATE.screen = 'allnotes'; STATE.selInit = null; STATE.selMeeting = null;
+      renderSidebar(); renderMain(); renderTopStatus();
+    };
+    fila.appendChild(nav);
+    tree.appendChild(fila);
+  }
+
+  // Contadores de los accesos directos (vacíos cuando son cero).
+  const favEl = $('#favCount');
+  if (favEl) { const n = _getMeetingFavs().size; favEl.textContent = n || ''; }
+
+  const all = STATE.initiatives || [];
+  // Anclados arriba, el resto después. Sin cabeceras de sección: el mockup
+  // retiró ese nivel — la estrella de .proj-pin ya marca cuál está anclado.
   const pinned = all.filter(it => it.pinned);
   const rest = all.filter(it => !it.pinned);
-  const MAX = 5;
 
-  // ── Fijadas ───────────────────────────────────────────────
-  if (pinned.length) {
-    const grpLabel = el('div', 'sidebar-group-label');
-    grpLabel.innerHTML = `<span>${svg('pin', 10)} Fijadas</span><span class="sgr-count">${pinned.length}</span>`;
-    tree.appendChild(grpLabel);
-    pinned.slice(0, MAX).forEach(it => _renderInitRow(tree, it));
-    if (pinned.length > MAX) {
-      const more = el('button', 'sidebar-see-more', `Ver más (${pinned.length - MAX})`);
-      more.onclick = () => { MAX === 5 ? pinned.forEach(it => _renderInitRow(tree, it)) : null; /* simple toggle */ };
-      tree.appendChild(more);
-    }
+  pinned.forEach(it => _renderInitRow(tree, it));
+
+  // Corte "Mostrar todo" para listas largas. El proyecto seleccionado nunca
+  // queda escondido por el corte.
+  const VISIBLE_LIMIT = 12;
+  const showAll = !!STATE.showAllProjects;
+  const visible = showAll ? rest : rest.slice(0, VISIBLE_LIMIT);
+  if (!showAll) {
+    const sel = rest.find(it => it.id === STATE.selInit);
+    if (sel && !visible.includes(sel)) visible.push(sel);
+  }
+  visible.forEach(it => _renderInitRow(tree, it));
+
+  if (!showAll && rest.length > VISIBLE_LIMIT) {
+    const more = el('div', 'projitem nested');
+    more.innerHTML = `<button class="proj-row-nav" type="button">` +
+      `<svg class="icon icon-sm"><use href="#i-chevright"/></svg>` +
+      `<span class="label-text">Mostrar todo (${rest.length})</span></button>`;
+    more.onclick = () => { STATE.showAllProjects = true; renderSidebar(); };
+    tree.appendChild(more);
   }
 
-  // ── Activas (no fijadas) ──────────────────────────────────
-  if (rest.length) {
-    const grpLabel2 = el('div', 'sidebar-group-label');
-    grpLabel2.innerHTML = `<span>Activas</span><span class="sgr-count">${rest.length}</span>`;
-    tree.appendChild(grpLabel2);
-    rest.slice(0, MAX).forEach(it => _renderInitRow(tree, it));
-    if (rest.length > MAX) {
-      const more2 = el('button', 'sidebar-see-more', `Ver más (${rest.length - MAX})`);
-      let expanded = false;
-      more2.onclick = () => {
-        if (!expanded) {
-          expanded = true; more2.remove();
-          rest.slice(MAX).forEach(it => _renderInitRow(tree, it));
-        }
-      };
-      tree.appendChild(more2);
-    }
+  if (!all.length) {
+    const vacio = el('div', 'projitem nested');
+    vacio.innerHTML = '<span class="label-text" style="padding:6px 8px;color:var(--text-faint)">Sin proyectos</span>';
+    tree.appendChild(vacio);
   }
+}
 
-  if (!all.length) tree.appendChild(el('div', 'tree-meeting', `<span style="color:var(--text-faint);font-size:11px">${q ? 'Sin resultados' : 'Sin iniciativas'}</span>`));
+/* ============================================================
+   PROYECTO DESTINO — sin preguntar
+   Grabar no debe abrir un diálogo de "¿en qué proyecto?": cuando la reunión ya
+   empezó, cada clic de más es tiempo perdido. Se resuelve solo:
+     1. el proyecto abierto en ese momento, si hay uno;
+     2. el último que se usó (queda guardado);
+     3. el primero de la lista;
+     4. y si no hay ninguno, se crea "General" al vuelo.
+   El destino siempre se puede cambiar —antes desde el sidebar, durante la
+   grabación desde el selector del pie del panel— así que elegir por defecto no
+   encierra a nadie.
+   ============================================================ */
+const PROYECTO_POR_DEFECTO = 'General';
+
+function _recordarProyecto(iid) { if (iid) save('hm.ultimoProyecto', String(iid)); }
+function _proyectoRecordado() {
+  const v = parseInt(load('hm.ultimoProyecto', ''), 10);
+  return Number.isNaN(v) ? null : v;
+}
+
+async function proyectoDestino() {
+  const inis = STATE.initiatives || [];
+  if (STATE.selInit && inis.some(i => i.id === STATE.selInit)) return STATE.selInit;
+
+  const ultimo = _proyectoRecordado();
+  if (ultimo && inis.some(i => i.id === ultimo)) return ultimo;
+
+  if (inis.length) return inis[0].id;
+
+  // Ninguno todavía: se crea el de por defecto sin molestar al usuario.
+  const r = await api.createInitiative(PROYECTO_POR_DEFECTO, INIT_COLORS ? INIT_COLORS[0] : '').catch(() => null);
+  STATE.initiatives = await api.listInitiatives() || [];
+  renderSidebar();
+  const creado = (r && (r.id || (r.initiative && r.initiative.id))) ||
+    (STATE.initiatives.find(i => i.name === PROYECTO_POR_DEFECTO) || {}).id;
+  if (creado) toast('info', `Se guardará en «${PROYECTO_POR_DEFECTO}»`);
+  return creado || null;
 }
 
 async function selectInitiative(id) {
   STATE.selInit = id;
+  // El último proyecto abierto es el destino por defecto de la próxima grabación.
+  _recordarProyecto(id);
   const wasOpen = !!STATE.openInits[id];
   STATE.openInits = {};
   STATE.openInits[id] = !wasOpen;
+  // Al abrir una iniciativa: enrollar sus semanas y dejar solo la más reciente.
+  if (STATE._openWeeks) delete STATE._openWeeks[id];
   STATE.screen = 'initiative';
   if (!STATE.meetingsByInit[id]) STATE.meetingsByInit[id] = await api.listMeetings(id) || [];
   renderSidebar(); renderMain(); renderActionBar(); renderTopStatus();
@@ -2980,28 +4741,39 @@ async function selectInitiative(id) {
 async function openMeeting(mid, keepTab) {
   STATE.selMeeting = mid;
   STATE.screen = 'meeting';
-  if (!keepTab) STATE.activeTab = 'transcript';
+  if (!keepTab) STATE.activeTab = 'general';
   try {
     STATE.transcript = await api.getTranscript(mid);
     renderSidebar(); renderMain(); renderTopStatus();
   } catch (err) {
     STATE.screen = STATE.selInit ? 'initiative' : 'welcome';
-    toast('err', 'Error al abrir la reunión: ' + (err && err.message ? err.message : String(err)));
+    toast('err', errMsg(err, 'No se pudo abrir la reunión'));
     renderSidebar(); renderMain();
   }
 }
 
 function backToTree() { STATE.screen = STATE.selMeeting ? 'meeting' : (STATE.selInit ? 'initiative' : 'welcome'); renderMain(); renderTopStatus(); }
 
+/* Colapsar el panel = cambiar su ancho, no cambiar de elemento.
+   Antes había dos <aside> (.sidebar y .sidebar-rail) y se alternaba su display,
+   lo que obligaba a mantener dos juegos de botones con los mismos destinos.
+   El mockup usa uno solo con .shell.collapsed; el atributo data-sidebar se
+   conserva porque varias reglas de las hojas viejas todavía lo consultan. */
 function applySidebar() {
   document.body.setAttribute('data-sidebar', STATE.sidebarOpen ? 'open' : 'collapsed');
+  $('#shell')?.classList.toggle('collapsed', !STATE.sidebarOpen);
   save('hm.sidebar', STATE.sidebarOpen ? '1' : '0');
 }
 
 // ---- Sidebar redimensionable ----
 (function initSidebarResize() {
-  const SIDEBAR_MIN = 160, SIDEBAR_MAX = 480, SNAP_THRESHOLD = 130;
-  const saved = parseInt(load('hm.sidebar-w', ''), 10);
+  /* Rango del rediseno: el panel mide 190px por defecto y no tiene sentido que
+     llegue a 480 como en el diseno anterior — a partir de ~280 la linea divisoria
+     queda lejisimos del contenido, que es lo que se veia "muy separado".
+     Clave de almacenamiento nueva (hm.sidebar-w2) para IGNORAR los anchos
+     guardados con el diseno viejo, que seguian pisando los 190px. */
+  const SIDEBAR_MIN = 168, SIDEBAR_MAX = 280, SNAP_THRESHOLD = 130;
+  const saved = parseInt(load('hm.sidebar-w2', ''), 10);
   if (saved && saved >= SIDEBAR_MIN && saved <= SIDEBAR_MAX) {
     document.documentElement.style.setProperty('--sidebar-w', saved + 'px');
   }
@@ -3042,7 +4814,7 @@ function applySidebar() {
     if (!dragging) return;
     const finalW = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--sidebar-w'), 10);
     stopDrag();
-    save('hm.sidebar-w', String(finalW));
+    save('hm.sidebar-w2', String(finalW));
   });
 })();
 
@@ -3075,7 +4847,7 @@ function applySidebar() {
     document.body.classList.remove('rail-expanding');
     document.body.style.userSelect = '';
     const finalW = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--sidebar-w'), 10);
-    save('hm.sidebar-w', String(finalW));
+    save('hm.sidebar-w2', String(finalW));
   });
 })();
 
@@ -3087,7 +4859,6 @@ document.querySelectorAll('.wr[data-dir]').forEach(h => {
     api.winStartResize(h.dataset.dir);
   });
 });
-
 /* ============================================================
    6. MODALES / TOASTS / MENÚS  (reemplazan prompt/alert)
    ============================================================ */
@@ -3110,15 +4881,17 @@ function closeModal() {
 
 function formModal(title, fieldLabel, value, okLabel, onOk, opts) {
   opts = opts || {};
+  const ph = opts.placeholder ? ` placeholder="${esc(opts.placeholder)}"` : '';
+  const ml = opts.maxlength ? ` maxlength="${opts.maxlength}"` : '';
   const m = el('div', 'modal');
   m.setAttribute('role', 'dialog'); m.setAttribute('aria-label', title);
   m.innerHTML = `
     <div class="modal-head"><h3>${esc(title)}</h3><button class="icon-btn sm" data-x aria-label="Cerrar">${svg('x', 14)}</button></div>
     <div class="modal-body">
-      <div><label>${esc(fieldLabel)}</label>${opts.textarea ? `<textarea class="field" style="height:auto;min-height:70px;padding:9px"></textarea>` : `<input class="field" type="text" value="${esc(value || '')}">`}
+      <div><label>${esc(fieldLabel)}</label>${opts.textarea ? `<textarea class="field" style="height:auto;min-height:70px;padding:9px"${ph}${ml}>${esc(value || '')}</textarea>` : `<input class="field" type="text" value="${esc(value || '')}"${ph}${ml}>`}
       <div class="field-error"></div></div>
     </div>
-    <div class="modal-foot"><button class="btn" data-c>Cancelar<kbd>Esc</kbd></button><button class="btn btn-primary" data-ok>${esc(okLabel)}<kbd>⏎</kbd></button></div>`;
+    <div class="modal-foot"><button class="btn" data-c>Cancelar</button><button class="btn btn-primary" data-ok>${esc(okLabel)}</button></div>`;
   const input = m.querySelector('.field'); const err = m.querySelector('.field-error');
   const submit = async () => {
     const v = input.value.trim();
@@ -3145,6 +4918,36 @@ function confirmModal(title, body, okLabel, onOk, danger) {
   openModal(m);
 }
 
+// Traduce errores del backend a mensajes cortos en español.
+// Códigos conocidos → texto fijo; frases ya en español → tal cual;
+// tecnicismos (códigos snake_case, excepciones en inglés) → el mensaje genérico.
+const ERR_ES = {
+  'no_license':                    'No hay licencia activa.',
+  'license_not_found':             'Key no encontrada. Revísala e inténtalo de nuevo.',
+  'invalid_key':                   'Key inválida. Revísala e inténtalo de nuevo.',
+  'license_already_activated':     'Esta key ya está en uso en otro equipo.',
+  'already_activated_this_device': 'Este equipo ya está activado con esta licencia.',
+  'license_revoked':               'Esta licencia fue revocada.',
+  'license_expired':               'Esta licencia expiró.',
+  'license_device_limit':          'Esta licencia ya no admite más equipos.',
+  'device_limit_reached':          'Esta licencia ya no admite más equipos.',
+  'license_server_requires_https': 'No se pudo conectar de forma segura al servidor.',
+  'offline_expired':               'Sin conexión con el servidor de licencias.',
+  'new_version':                   'Nueva versión instalada: vuelve a activar tu licencia.',
+};
+function errMsg(raw, fallback) {
+  let s = String(raw == null ? '' : (raw.message || raw)).trim();
+  s = s.replace(/^error[:\s]+/i, '').trim();
+  if (!s) return fallback;
+  const code = s.toLowerCase();
+  if (ERR_ES[code]) return ERR_ES[code];
+  // Un código técnico o una excepción en inglés no se enseñan tal cual
+  if (/^[a-z0-9_.\-]+$/i.test(s)) return fallback;
+  if (/(traceback|exception|errno|winerror|timed? ?out|failed|cannot|unable|refused|denied|argument|nonetype|keyerror|typeerror)/i.test(s)) return fallback;
+  if (s.length > 140) return fallback;
+  return s;
+}
+
 function toast(kind, msg, action, onAction) {
   const t = el('div', 'toast ' + (kind || 'info'));
   const i = kind === 'err' ? svg('x', 12) : svg('check', 12);
@@ -3162,15 +4965,21 @@ function toast(kind, msg, action, onAction) {
 }
 
 let _ctxOpen = null;
+let _ctxOpenAt = 0;  // timestamp: ignora clicks cercanos al open
 function openMenu(e, items) {
+  e.stopPropagation();
   closeMenu();
   const menu = el('div', 'ctx-menu');
   items.forEach(it => {
     if (it.sep) { menu.appendChild(el('div', 'ctx-sep')); return; }
     const mi = el('div', 'ctx-item' + (it.danger ? ' danger' : ''));
+    /* La etiqueta se escapa con esc(), asi que NO puede traer HTML: proBadge()
+       devolvia un <span> y salia impreso como texto crudo en el menu. Los
+       distintivos van como banderas y se construyen aca. */
     mi.innerHTML = (it.icon ? svg(it.icon, 14) : '') + '<span>' + esc(it.label) + '</span>';
-    if (it.pending) mi.innerHTML += '<span class="pending-badge" style="margin-left:auto">V2</span>';
-    mi.onclick = () => { closeMenu(); it.onClick && it.onClick(); };
+    if (it.pro) mi.innerHTML += '<span class="ctx-badge" title="Disponible en Helpmeet Pro">PRO</span>';
+    if (it.pending) mi.innerHTML += '<span class=\"pending-badge\" style=\"margin-left:auto\">V2</span>';
+    mi.onclick = (ev) => { ev.stopPropagation(); closeMenu(); it.onClick && it.onClick(); };
     menu.appendChild(mi);
   });
   document.body.appendChild(menu);
@@ -3178,9 +4987,46 @@ function openMenu(e, items) {
   const y = Math.min(e.clientY, window.innerHeight - menu.offsetHeight - 10);
   menu.style.left = x + 'px'; menu.style.top = y + 'px';
   _ctxOpen = menu;
-  setTimeout(() => document.addEventListener('click', closeMenu, { once: true }), 0);
+  _ctxOpenAt = Date.now();
+  setTimeout(() => {
+    const handler = (ev) => { if (Date.now() - _ctxOpenAt > 100) closeMenu(); };
+    document.addEventListener('click', handler, { once: true });
+  }, 50);
 }
 function closeMenu() { if (_ctxOpen) { if (_ctxOpen._owner) _ctxOpen._owner.setAttribute('aria-expanded', 'false'); _ctxOpen.remove(); _ctxOpen = null; } }
+
+// Popover del botón "Grabar" del dock: audio o pantalla. Se abre hacia arriba
+// (el dock vive pegado abajo) igual que openCustomSelectPanel, pero sin
+// marcar ninguna opción como "seleccionada" — siempre vuelve a preguntar.
+function _openRecordPicker(anchor, options) {
+  if (_ctxOpen && _ctxOpen._owner === anchor) { closeMenu(); return; }
+  closeMenu();
+  const panel = el('div', 'cdrop-panel rec-pick-panel');
+  panel._owner = anchor;
+  anchor.setAttribute('aria-expanded', 'true');
+  options.forEach((opt, i) => {
+    const o = el('div', 'cdrop-opt rec-pick-opt');
+    o.style.animationDelay = (i * 0.035) + 's';
+    o.innerHTML = `<span class=\"cdrop-ico dock-ico--${opt.icon === 'mic' ? 'rec' : 'screen'}\">${svg(opt.icon, 15)}</span><span class=\"cdrop-opt-label\">${esc(opt.label)}</span>`;
+    o.onclick = (e) => { e.stopPropagation(); closeMenu(); opt.run(); };
+    panel.appendChild(o);
+  });
+  document.body.appendChild(panel);
+  const r = anchor.getBoundingClientRect();
+  panel.style.minWidth = Math.max(r.width, 200) + 'px';
+  let left = r.left;
+  let top = r.top - panel.offsetHeight - 6;
+  if (top < 10) top = r.bottom + 6;
+  if (left + panel.offsetWidth > window.innerWidth - 10) left = window.innerWidth - panel.offsetWidth - 10;
+  panel.style.left = Math.max(10, left) + 'px';
+  panel.style.top = Math.max(10, top) + 'px';
+  _ctxOpen = panel;
+  _ctxOpenAt = Date.now();
+  setTimeout(() => {
+    const handler = (ev) => { if (Date.now() - _ctxOpenAt > 100) closeMenu(); };
+    document.addEventListener('click', handler, { once: true });
+  }, 50);
+}
 
 /* ---- Dropdown personalizado (reemplaza <select> nativos para respetar el tema) ----
    opts: { value, items:[{value,label,color?}], onChange, icon?, className?, minWidth? } */
@@ -3218,9 +5064,10 @@ function openCustomSelectPanel(anchor, items, curVal, minWidth, onPick) {
   items.forEach(it => {
     const o = el('div', 'cdrop-opt' + (it.value === curVal ? ' on' : ''));
     o.innerHTML =
-      (it.color ? `<span class="cdrop-dot" style="background:${it.color}"></span>` : '') +
-      `<span class="cdrop-opt-label">${esc(it.label)}</span>` +
-      (it.value === curVal ? `<span class="cdrop-check">${svg('check', 13)}</span>` : '');
+      (it.color ? `<span class=\"cdrop-dot\" style=\"background:${it.color}\"></span>` : '') +
+      `<span class=\"cdrop-opt-label\">${esc(it.label)}</span>` +
+      (it.value === curVal ? `<span class=\"cdrop-check\">${svg('check', 13)}</span>` : '');
+    o.title = it.label;
     o.onclick = (e) => { e.stopPropagation(); closeMenu(); onPick(it); };
     panel.appendChild(o);
   });
@@ -3234,30 +5081,113 @@ function openCustomSelectPanel(anchor, items, curVal, minWidth, onPick) {
   panel.style.left = Math.max(10, left) + 'px';
   panel.style.top = Math.max(10, top) + 'px';
   _ctxOpen = panel;
-  setTimeout(() => document.addEventListener('click', closeMenu, { once: true }), 0);
+  _ctxOpenAt = Date.now();
+  setTimeout(() => {
+    const handler = (ev) => { if (Date.now() - _ctxOpenAt > 100) closeMenu(); };
+    document.addEventListener('click', handler, { once: true });
+  }, 50);
 }
 
-// ── Carpetas de iniciativa (almacenadas localmente) ──────────
+// ── Carpetas de proyecto (agrupan reuniones; guardadas localmente) ──
 function _getFolders(iid) { try { return JSON.parse(localStorage.getItem('hm.folders.' + iid) || '[]'); } catch { return []; } }
 function _saveFolders(iid, folders) { localStorage.setItem('hm.folders.' + iid, JSON.stringify(folders)); }
+// Reunión que se está arrastrando hacia una pestaña de carpeta (o null)
+let _dragMeetingId = null;
+// Carpeta seleccionada por proyecto: persiste entre sesiones. Si la
+// carpeta guardada ya no existe (se eliminó), vuelve a "Todas".
+function _getSelFolder(iid) {
+  const v = localStorage.getItem('hm.fsel.' + iid);
+  if (!v) return null;
+  const fid = +v;
+  return _getFolders(iid).some(f => f.id === fid) ? fid : null;
+}
+function _setSelFolder(iid, fid) {
+  if (fid == null) localStorage.removeItem('hm.fsel.' + iid);
+  else localStorage.setItem('hm.fsel.' + iid, String(fid));
+}
+function _createFolder(iid, name) {
+  const folders = _getFolders(iid);
+  const f = { id: Date.now(), name: name.trim() };
+  folders.push(f);
+  _saveFolders(iid, folders);
+  return f;
+}
+function _deleteFolder(iid, fid) { _saveFolders(iid, _getFolders(iid).filter(f => f.id !== fid)); }
+// Carpeta asignada a una reunión (o null): la carpeta vive dentro del
+// proyecto, así que si ya no existe (se borró) la reunión queda "sin carpeta".
+function _getMeetingFolder(mid) {
+  const v = localStorage.getItem('hm.mfolder.' + mid);
+  return v ? +v : null;
+}
+function _setMeetingFolder(mid, fid) {
+  if (fid == null) localStorage.removeItem('hm.mfolder.' + mid);
+  else localStorage.setItem('hm.mfolder.' + mid, String(fid));
+}
 function promptCreateFolder(iid) {
   formModal('Nueva carpeta', 'Nombre de la carpeta', '', 'Crear', (name) => {
     if (!name.trim()) return;
-    const folders = _getFolders(iid);
-    folders.push({ id: Date.now(), name: name.trim() });
-    _saveFolders(iid, folders);
+    _createFolder(iid, name);
     toast('ok', `Carpeta «${name.trim()}» creada`);
     if (STATE.screen === 'initiative' && STATE.selInit === iid) renderMain();
+    renderSidebar();
+  }, { placeholder: 'Ej: Reuniones 2026', maxlength: 80 });
+}
+// Modal "Mover a carpeta": lista las carpetas del proyecto de la reunión
+// (con "Sin carpeta" y "+ Nueva carpeta"), igual patrón que pickInitiativeModal.
+function promptMoveMeetingToFolder(mid) {
+  let iid = null;
+  for (const k in STATE.meetingsByInit) {
+    if (STATE.meetingsByInit[k].some(x => x.id === mid)) { iid = k; break; }
+  }
+  if (iid == null) return;
+  const folders = _getFolders(iid);
+  const current = _getMeetingFolder(mid);
+  const apply = (fid, okMsg) => {
+    _setMeetingFolder(mid, fid);
+    closeModal();
+    toast('ok', okMsg);
+    if (STATE.screen === 'initiative') renderMain();
+  };
+  const m = el('div', 'modal pick-init-modal');
+  m.setAttribute('role', 'dialog'); m.setAttribute('aria-label', 'Mover a carpeta');
+  m.innerHTML = `
+    <div class="modal-head"><h3>Mover a carpeta</h3><button class="icon-btn sm" data-x aria-label="Cerrar">${svg('x', 14)}</button></div>
+    <div class="modal-body">
+      <div class="pick-init-list">
+        <button type="button" class="pick-init-row${current == null ? ' on' : ''}" data-fid="none">
+          <span class="pick-init-name">Sin carpeta</span>
+        </button>
+        ${folders.map(f => `
+        <button type="button" class="pick-init-row${current === f.id ? ' on' : ''}" data-fid="${f.id}">
+          <span class="pick-init-name">${esc(f.name)}</span>
+        </button>`).join('')}
+      </div>
+      <button type="button" class="btn pick-init-new">${svg('plus', 13)} Nueva carpeta</button>
+    </div>`;
+  m.querySelectorAll('.pick-init-row').forEach(b => b.onclick = () => {
+    const fid = b.dataset.fid === 'none' ? null : Number(b.dataset.fid);
+    apply(fid, fid == null ? 'Reunión sin carpeta' : 'Reunión movida de carpeta');
   });
+  m.querySelector('.pick-init-new').onclick = () => {
+    closeModal();
+    formModal('Nueva carpeta', 'Nombre de la carpeta', '', 'Crear', (name) => {
+      if (!name.trim()) return;
+      const f = _createFolder(iid, name);
+      apply(f.id, `Movida a «${name.trim()}»`);
+    }, { placeholder: 'Ej: Reuniones 2026', maxlength: 80 });
+  };
+  m.querySelector('[data-x]').onclick = closeModal;
+  openModal(m);
 }
 
 async function _importVideosToInit(iid) {
   const it = STATE.initiatives.find(x => x.id === iid);
-  const name = it ? it.name : 'la iniciativa';
+  const name = it ? it.name : 'el proyecto';
   const r = await api.importMediaMultiple(iid).catch(() => null);
   if (!r || r.cancelled) return;
-  if (r.error) { toast('err', r.error); return; }
+  if (r.error) { toast('err', errMsg(r.error, 'No se pudieron importar los vídeos')); return; }
   if (r.ok) {
+    toast('info', `Registrando ${r.count} video${r.count !== 1 ? 's' : ''}…`);
     await refreshMeetings(iid);
     toast('ok', `${r.count} video${r.count !== 1 ? 's' : ''} importado${r.count !== 1 ? 's' : ''} en «${name}» · transcribiendo en 2.º plano`);
   }
@@ -3285,18 +5215,21 @@ function openInitiativeMenu(e, iid) {
   const ms = STATE.meetingsByInit[iid] || [];
   const favs = _getMeetingFavs();
   const allFav = ms.length > 0 && ms.every(m => favs.has(m.id));
+  const canGlossary = hasFeature('glossary');
+  const empty = ms.length === 0;
   openMenu(e, [
-    { label: pinned ? 'Desanclar iniciativa' : 'Anclar iniciativa', icon: 'pin', onClick: () => toggleInitiativePin(iid) },
-    { label: allFav ? 'Quitar de favoritas' : 'Añadir todas a favoritas', icon: 'star', onClick: () => _initAllFav(iid) },
-    { label: 'Ver glosario', icon: 'search', onClick: () => openGlossary(iid) },
-    { label: 'Renombrar iniciativa', icon: 'edit', onClick: () => promptRenameInitiative(iid) },
+    { label: pinned ? 'Desanclar proyecto' : 'Anclar proyecto', icon: 'pin', onClick: () => toggleInitiativePin(iid) },
+    { label: allFav ? 'Quitar de favoritas' : 'Anadir todas a favoritas', icon: 'star', onClick: () => _initAllFav(iid) },
+    { label: 'Renombrar proyecto', icon: 'edit', onClick: () => promptRenameInitiative(iid) },
     { label: 'Cambiar color', icon: 'palette', onClick: () => pickInitiativeColor(iid) },
     { sep: true },
     { label: 'Importar videos', icon: 'upload', onClick: () => _importVideosToInit(iid) },
     { sep: true },
     { label: 'Exportar a otra carpeta', icon: 'download', onClick: () => exportInitiativeTo(iid) },
     { sep: true },
-    { label: 'Enviar a la papelera', icon: 'trash', danger: true, onClick: () => deleteInitiative(iid) },
+    { label: 'Archivar proyecto', icon: 'archive', onClick: () => archiveInitiative(iid) },
+    { sep: true },
+    { label: 'Eliminar proyecto', icon: 'trash', danger: true, onClick: () => permanentlyDeleteInitiative(iid) },
   ]);
 }
 
@@ -3305,7 +5238,7 @@ function pickInitiativeColor(iid) {
   const current = _initColor(it);
   const m = el('div', 'modal-card color-picker-modal');
   m.innerHTML = `
-    <div class="modal-head"><span class="modal-title">Color de la iniciativa</span><button class="icon-btn" data-x>✕</button></div>
+    <div class="modal-head"><span class="modal-title">Color del proyecto</span><button class="icon-btn" data-x>✕</button></div>
     <div class="modal-body">
       <div class="color-swatches" id="colorSwatches"></div>
     </div>`;
@@ -3327,28 +5260,41 @@ function pickInitiativeColor(iid) {
   openModal(m);
 }
 function _getMeetingFavs() { try { return new Set(JSON.parse(localStorage.getItem('hm.favMeetings') || '[]')); } catch { return new Set(); } }
-function _toggleMeetingFav(mid) { const s = _getMeetingFavs(); s.has(mid) ? s.delete(mid) : s.add(mid); localStorage.setItem('hm.favMeetings', JSON.stringify([...s])); }
+function _setMeetingFavs(s) { localStorage.setItem('hm.favMeetings', JSON.stringify([...s])); }
+function _toggleMeetingFav(mid) { const s = _getMeetingFavs(); s.has(mid) ? s.delete(mid) : s.add(mid); _setMeetingFavs(s); return s.has(mid); }
 function _isMeetingFav(mid) { return _getMeetingFavs().has(mid); }
+
+async function _ensureAllMeetingsLoaded() {
+  const pending = (STATE.initiatives || []).filter(it => !STATE.meetingsByInit[it.id]);
+  if (!pending.length) return false;
+  await Promise.all(pending.map(async it => {
+    STATE.meetingsByInit[it.id] = await api.listMeetings(it.id).catch(() => []) || [];
+  }));
+  return true;
+}
 
 function openMeetingMenu(e, mid) {
   const isFav = _isMeetingFav(mid);
+  const canParticipants = hasFeature('participants');
   openMenu(e, [
     { label: isFav ? 'Quitar de favoritos' : 'Marcar como favorita', icon: 'star', onClick: () => { _toggleMeetingFav(mid); renderSidebar(); renderMain(); } },
     { sep: true },
-    { label: 'Participantes', icon: 'users', onClick: () => { if (STATE.transcript) participantsModal(STATE.transcript); } },
+    { label: 'Participantes', pro: !canParticipants, icon: 'users', onClick: () => { if (canParticipants) { if (STATE.transcript) participantsModal(STATE.transcript); } else showUpgradeToast('participants'); } },
     { label: 'Importar video y transcribir…', icon: 'upload', onClick: () => doImportVideoForMeeting(mid) },
     { sep: true },
     { label: 'Renombrar reunión', icon: 'edit', onClick: () => promptRenameMeeting(mid) },
-    { label: 'Mover a otra iniciativa', icon: 'folder', onClick: () => promptMoveMeeting(mid) },
+    { label: 'Cambiar fecha', icon: 'calendar', onClick: () => promptChangeMeetingDate(mid) },
+    { label: 'Mover a otro proyecto', icon: 'folder', onClick: () => promptMoveMeeting(mid) },
+    { label: 'Mover a carpeta', icon: 'folder', onClick: () => promptMoveMeetingToFolder(mid) },
     { sep: true },
-    { label: 'Enviar a la papelera', icon: 'trash', danger: true, onClick: () => deleteMeeting(mid) },
+    { label: 'Archivar reunión', icon: 'archive', onClick: () => archiveMeeting(mid) },
   ]);
 }
 
 async function doImportVideoForMeeting(mid) {
   const r = await api.importVideoForMeeting(mid);
   if (!r || r.cancelled) return;
-  if (r.error) { toast('err', 'No se pudo importar: ' + r.error); return; }
+  if (r.error) { toast('err', errMsg(r.error, 'No se pudo importar el archivo')); return; }
   if (r.ok) {
     toast('ok', `«${r.filename || 'video'}» importado · transcribiendo en segundo plano`);
     try { renderBgJobs(await api.getBackgroundJobs()); } catch (e) {}
@@ -3356,28 +5302,73 @@ async function doImportVideoForMeeting(mid) {
     renderMain();
   }
 }
-
 /* ============================================================
    7. ACCIONES (contrato actual)
    ============================================================ */
-function promptNewInitiative() {
-  let color = INIT_COLORS[0];
-  const m = el('div', 'modal');
-  m.setAttribute('role', 'dialog'); m.setAttribute('aria-label', 'Nueva iniciativa');
+// Modal "Elige un proyecto": lista los existentes y permite crear uno nuevo.
+// Al elegir o crear, llama a onPick(iid) para continuar la acción pendiente
+// (p. ej. iniciar una grabación). El modal ya se cierra solo antes de onPick.
+function pickInitiativeModal(onPick) {
+  const items = STATE.initiatives || [];
+  const m = el('div', 'modal pick-init-modal');
+  m.setAttribute('role', 'dialog'); m.setAttribute('aria-label', 'Elegir proyecto');
   m.innerHTML = `
-    <div class="modal-head"><h3>Nueva iniciativa</h3><button class="icon-btn sm" data-x aria-label="Cerrar">${svg('x', 14)}</button></div>
+    <div class="modal-head"><h3>¿En qué proyecto?</h3><button class="icon-btn sm" data-x aria-label="Cerrar">${svg('x', 14)}</button></div>
     <div class="modal-body">
-      <div><label>Nombre de la iniciativa</label><input class="field" type="text"><div class="field-error"></div></div>
-      <div><label>Color</label>
-        <div class="color-swatches">${INIT_COLORS.map((c, i) => `<button type="button" class="color-sw${i === 0 ? ' on' : ''}" data-color="${c}" style="--sw:${c}" aria-label="Color ${i + 1}"></button>`).join('')}</div>
+      ${items.length ? `<div class="pick-init-list">${items.map(it => `
+        <button type="button" class="pick-init-row" data-iid="${it.id}">
+          <span class="proj-av" style="--av:${it.color || avatarColorFor(it.name)}">${esc(initialsFor(it.name))}</span>
+          <span class="pick-init-name">${esc(it.name)}</span>
+        </button>`).join('')}</div>` : ''}
+      <button type="button" class="btn pick-init-new">${svg('plus', 13)} ${t('welcome.newProject')}</button>
+    </div>`;
+  m.querySelectorAll('.pick-init-row').forEach(b => b.onclick = () => {
+    const iid = Number(b.dataset.iid);
+    closeModal();
+    onPick(iid);
+  });
+  m.querySelector('.pick-init-new').onclick = () => { closeModal(); promptNewInitiative(onPick); };
+  m.querySelector('[data-x]').onclick = closeModal;
+  openModal(m);
+}
+
+function promptNewInitiative(onCreated) {
+  // Color aleatorio por defecto; se puede cambiar en el selector emergente.
+  let color = INIT_COLORS[Math.floor(Math.random() * INIT_COLORS.length)];
+  const m = el('div', 'modal np-modal');
+  m.setAttribute('role', 'dialog'); m.setAttribute('aria-label', t('welcome.newProject'));
+  m.innerHTML = `
+    <div class="modal-head"><h3>${t('welcome.newProject')}</h3><button class="icon-btn sm" data-x aria-label="${t('common.close')}">${svg('x', 14)}</button></div>
+    <div class="modal-body">
+      <div><label>Nombre del proyecto</label><input class="field" type="text" placeholder="Ej: Cliente Acme, Proyecto Alpha" maxlength="120"><div class="field-error"></div></div>
+      <div class="np-color-row">
+        <label>Color</label>
+        <div class="np-color-wrap">
+          <button type="button" class="np-color-btn" id="npColorBtn">
+            <span class="np-color-dot" style="background:${color}"></span>
+            <span class="np-color-txt">Aleatorio</span>
+            <span class="np-color-chev">${svg('chevronDown', 12)}</span>
+          </button>
+          <div class="np-color-pop" id="npColorPop" hidden>
+            ${INIT_COLORS.map(c => `<button type="button" class="color-sw${c === color ? ' on' : ''}" data-color="${c}" style="--sw:${c}" aria-label="Color"></button>`).join('')}
+          </div>
+        </div>
       </div>
     </div>
-    <div class="modal-foot"><button class="btn" data-c>Cancelar (Esc)</button><button class="btn btn-primary" data-ok>Crear (⏎)</button></div>`;
+    <div class="modal-foot"><button class="btn" data-c>Cancelar</button><button class="btn btn-primary" data-ok>Crear</button></div>`;
   const input = m.querySelector('.field'); const err = m.querySelector('.field-error');
-  m.querySelectorAll('.color-sw').forEach(sw => sw.onclick = () => {
+  const colorBtn = m.querySelector('#npColorBtn');
+  const pop = m.querySelector('#npColorPop');
+  const dot = m.querySelector('.np-color-dot');
+  const txt = m.querySelector('.np-color-txt');
+  colorBtn.onclick = (e) => { e.stopPropagation(); pop.hidden = !pop.hidden; };
+  m.addEventListener('click', (e) => { if (!e.target.closest('.np-color-wrap')) pop.hidden = true; });
+  pop.querySelectorAll('.color-sw').forEach(sw => sw.onclick = () => {
     color = sw.dataset.color;
-    m.querySelectorAll('.color-sw').forEach(x => x.classList.remove('on'));
-    sw.classList.add('on');
+    dot.style.background = color;
+    txt.textContent = 'Personalizado';
+    pop.querySelectorAll('.color-sw').forEach(x => x.classList.toggle('on', x === sw));
+    pop.hidden = true;
   });
   const submit = async () => {
     const name = input.value.trim();
@@ -3385,23 +5376,35 @@ function promptNewInitiative() {
     const okBtn = m.querySelector('[data-ok]'); okBtn.classList.add('is-loading');
     try {
       const it = await api.createInitiative(name, color);
-      if (it) {
+      if (it && it.error === 'duplicate_name') {
+        okBtn.classList.remove('is-loading');
+        input.classList.add('invalid'); err.textContent = 'Ya existe un proyecto con ese nombre. Elige otro.'; input.focus(); input.select();
+        return;
+      }
+      if (it && it.id) {
         if (!it.color) it.color = color;
         STATE.initiatives.push(it); STATE.meetingsByInit[it.id] = [];
-        renderSidebar(); toast('ok', 'Iniciativa creada'); closeModal(); selectInitiative(it.id);
+        renderSidebar(); toast('ok', 'Proyecto creado'); closeModal(); selectInitiative(it.id);
+        // Si venimos de "elige un proyecto" (p. ej. al grabar), continuar la acción
+        if (typeof onCreated === 'function') onCreated(it.id);
+      } else {
+        okBtn.classList.remove('is-loading'); err.textContent = 'No se pudo crear el proyecto.';
       }
     } catch (e) { okBtn.classList.remove('is-loading'); err.textContent = 'No se pudo crear. ' + (e && e.message || ''); }
   };
   m.querySelector('[data-ok]').onclick = submit;
   m.querySelector('[data-c]').onclick = closeModal;
   m.querySelector('[data-x]').onclick = closeModal;
+  input.addEventListener('input', () => { input.classList.remove('invalid'); err.textContent = ''; });
   input.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); submit(); } });
   openModal(m);
 }
 function promptRenameInitiative(iid) {
   const it = STATE.initiatives.find(x => x.id === iid);
-  formModal('Renombrar iniciativa', 'Nuevo nombre', it ? it.name : '', 'Guardar', async (name) => {
-    await api.renameInitiative(iid, name); if (it) it.name = name; renderSidebar(); renderMain(); toast('ok', 'Iniciativa renombrada');
+  formModal('Renombrar proyecto', 'Nuevo nombre', it ? it.name : '', 'Guardar', async (name) => {
+    const r = await api.renameInitiative(iid, name);
+    if (r && r.error === 'duplicate_name') throw new Error('Ya existe un proyecto con ese nombre.');
+    if (it) it.name = name; renderSidebar(); renderMain(); toast('ok', 'Proyecto renombrado');
   });
 }
 function promptRenameMeeting(mid) {
@@ -3412,17 +5415,57 @@ function promptRenameMeeting(mid) {
     }
     return STATE.transcript && STATE.transcript.title ? STATE.transcript.title : '';
   })();
-  formModal('Renombrar reunión', 'Título', current, 'Guardar', async (title) => {
+  formModal('Renombrar reunion', 'Titulo', current, 'Guardar', async (title) => {
     await api.renameMeeting(mid, title);
     for (const k in STATE.meetingsByInit) { const m = STATE.meetingsByInit[k].find(x => x.id === mid); if (m) m.title = title; }
     if (STATE.transcript) STATE.transcript.title = title;
-    renderSidebar(); renderMain(); toast('ok', 'Reunión renombrada');
-  });
+    renderSidebar(); renderMain(); toast('ok', 'Reunion renombrada');
+  }, { placeholder: current, maxlength: 200 });
+}
+function promptChangeMeetingDate(mid) {
+  // Fecha actual de la reunión
+  let currentDate = '';
+  for (const k in STATE.meetingsByInit) {
+    const m = STATE.meetingsByInit[k].find(x => x.id === mid);
+    if (m && m.started_at) { currentDate = m.started_at.slice(0, 10); break; }
+  }
+  const wrap = el('div', 'modal');
+  wrap.setAttribute('role', 'dialog'); wrap.setAttribute('aria-label', 'Cambiar fecha');
+  wrap.innerHTML = `
+    <div class="modal-head"><h3>Cambiar fecha</h3><button class="icon-btn sm" data-x>${svg('x', 14)}</button></div>
+    <div class="modal-body">
+      <label style="font-size:11px;color:var(--text-secondary);font-weight:600;display:block;margin-bottom:6px">Fecha del calendario</label>
+      <input class="field" type="date" id="datePickerInput" value="${esc(currentDate)}" style="width:100%">
+      <p style="font-size:11px;color:var(--text-muted);margin-top:8px">Si dejas vacío se usará la fecha de importación original.</p>
+    </div>
+    <div class="modal-foot">
+      <button class="btn" data-c>Cancelar</button>
+      <button class="btn btn-primary" data-ok>Guardar</button>
+    </div>`;
+  wrap.querySelector('[data-x]').onclick = closeModal;
+  wrap.querySelector('[data-c]').onclick = closeModal;
+  wrap.querySelector('[data-ok]').onclick = async () => {
+    const val = wrap.querySelector('#datePickerInput').value.trim();
+    const r = await api.setMeetingDate(mid, val || currentDate);
+    if (r && r.ok) {
+      // Actualizar fecha en STATE
+      for (const k in STATE.meetingsByInit) {
+        const m = STATE.meetingsByInit[k].find(x => x.id === mid);
+        if (m) { m.started_at = r.started_at; }
+      }
+      closeModal(); toast('ok', 'Fecha actualizada');
+      await refreshMeetings(STATE.selInit); renderMain();
+    } else {
+      toast('err', errMsg(r && r.error, 'No se pudo cambiar la fecha'));
+    }
+  };
+  openModal(wrap);
+  setTimeout(() => wrap.querySelector('#datePickerInput').focus(), 80);
 }
 function promptMoveMeeting(mid) {
   const m = el('div', 'modal'); m.setAttribute('role', 'dialog'); m.setAttribute('aria-label', 'Mover reunión');
-  m.innerHTML = `<div class="modal-head"><h3>Mover a otra iniciativa</h3><button class="icon-btn sm" data-x>${svg('x', 14)}</button></div>
-    <div class="modal-body"><label>Iniciativa destino</label><span id="moveMount"></span></div>
+  m.innerHTML = `<div class="modal-head"><h3>Mover a otro proyecto</h3><button class="icon-btn sm" data-x>${svg('x', 14)}</button></div>
+    <div class="modal-body"><label>Proyecto destino</label><span id="moveMount"></span></div>
     <div class="modal-foot"><button class="btn" data-c>Cancelar</button><button class="btn btn-primary" data-ok>Mover</button></div>`;
   let target = STATE.initiatives[0] && STATE.initiatives[0].id;
   const sel = customSelect({
@@ -3436,9 +5479,9 @@ function promptMoveMeeting(mid) {
   openModal(m);
 }
 function promptNote() {
-  formModal('Añadir nota', 'Nota rápida (se vincula al momento actual)', '', 'Guardar', async (text) => {
+  formModal('Añadir nota', 'Nota rapida (se vincula al momento actual)', '', 'Guardar', async (text) => {
     await api.addNote(text); toast('ok', 'Nota añadida');
-  }, { textarea: true });
+  }, { textarea: true, placeholder: 'Escribe tu nota...', maxlength: 4000 });
 }
 
 async function openGlossary(iid) {
@@ -3470,30 +5513,46 @@ async function doOpenFolder(btn) {
 async function exportMeetingTo(mid) { const r = await api.exportMeetingTo(mid); if (r && r.ok) toast('ok', 'Exportado a ' + r.path); }
 async function exportInitiativeTo(iid) { const r = await api.exportInitiativeTo(iid); if (r && r.ok) toast('ok', 'Exportado a ' + r.path); }
 
-function _pickInitiativeForImport() {
+function _pickInitiativeForImport(preselectedId) {
   return new Promise((resolve) => {
+    let chosen = preselectedId != null && STATE.initiatives.some(it => it.id === preselectedId)
+      ? preselectedId : null;
     const m = el('div', 'modal');
     m.setAttribute('role', 'dialog');
     m.innerHTML = `
       <div class="modal-card iap-modal">
         <div class="modal-head">
-          <span class="modal-title">¿A qué iniciativa importar?</span>
+          <span class="modal-title">¿A qué proyecto importar?</span>
           <button class="icon-btn" id="iapClose">${svg('x', 14)}</button>
         </div>
         <div class="modal-body iap-body">
-          <p class="iap-hint">Selecciona una iniciativa o crea una nueva.</p>
+          <p class="iap-hint">Confirma el proyecto donde se guardará el vídeo. Puedes elegir otro o crear uno nuevo.</p>
           <div class="iap-list" id="iapList"></div>
-          <button class="btn iap-new-btn" id="iapNew">${svg('plus', 13)} Nueva iniciativa</button>
+          <button class="btn iap-new-btn" id="iapNew">${svg('plus', 13)} ${t('welcome.newProject')}</button>
+        </div>
+        <div class="modal-foot">
+          <button class="btn" id="iapCancel">Cancelar</button>
+          <button class="btn btn-primary" id="iapConfirm" disabled>Elegir archivos →</button>
         </div>
       </div>`;
     const list = m.querySelector('#iapList');
+    const confirm = m.querySelector('#iapConfirm');
+    const syncConfirm = () => { confirm.disabled = chosen == null; };
     STATE.initiatives.forEach(it => {
-      const row = el('button', 'iap-item');
+      const row = el('button', 'iap-item' + (it.id === chosen ? ' selected' : ''));
       row.innerHTML = `<span class="iap-dot" style="background:${_initColor(it)}"></span><span class="iap-name">${esc(it.name)}</span>`;
-      row.onclick = () => { closeModal(); resolve(it.id); };
+      row.onclick = () => {
+        chosen = it.id;
+        list.querySelectorAll('.iap-item').forEach(r => r.classList.remove('selected'));
+        row.classList.add('selected');
+        syncConfirm();
+      };
       list.appendChild(row);
     });
+    syncConfirm();
     m.querySelector('#iapClose').onclick = () => { closeModal(); resolve(null); };
+    m.querySelector('#iapCancel').onclick = () => { closeModal(); resolve(null); };
+    confirm.onclick = () => { if (chosen == null) return; closeModal(); resolve(chosen); };
     m.querySelector('#iapNew').onclick = () => {
       closeModal();
       _promptNewInitiativeReturn(resolve);
@@ -3507,55 +5566,99 @@ function _promptNewInitiativeReturn(onCreated) {
   const m = el('div', 'modal');
   m.setAttribute('role', 'dialog');
   m.innerHTML = `
-    <div class="modal-head"><h3>Nueva iniciativa</h3><button class="icon-btn sm" data-x>${svg('x', 14)}</button></div>
+    <div class="modal-head"><h3>${t('welcome.newProject')}</h3><button class="icon-btn sm" data-x>${svg('x', 14)}</button></div>
     <div class="modal-body" style="gap:12px">
-      <input class="field" id="niName2" placeholder="Nombre de la iniciativa" maxlength="120" autocomplete="off">
+      <input class="field" id="niName2" placeholder="Nombre del proyecto" maxlength="120" autocomplete="off">
     </div>
     <div class="modal-foot">
       <button class="btn" data-x>Cancelar</button>
       <button class="btn btn-primary" id="niOk2">Crear</button>
     </div>`;
   const inp = m.querySelector('#niName2');
+  const errEl = el('div', 'field-error'); m.querySelector('.modal-body').appendChild(errEl);
   const ok = async () => {
     const name = inp.value.trim();
     if (!name) { inp.focus(); return; }
-    closeModal();
+    const okBtn = m.querySelector('#niOk2'); okBtn.classList.add('is-loading');
     const r = await api.createInitiative(name, color).catch(() => null);
+    okBtn.classList.remove('is-loading');
+    if (r && r.error === 'duplicate_name') {
+      errEl.textContent = 'Ya existe un proyecto con ese nombre. Elige otro.'; inp.focus(); inp.select();
+      return;
+    }
     if (r && r.id) {
       STATE.initiatives.unshift(r);
       renderSidebar();
+      closeModal();
       onCreated(r.id);
-    } else { toast('err', 'No se pudo crear la iniciativa'); onCreated(null); }
+    } else { closeModal(); toast('err', 'No se pudo crear el proyecto'); onCreated(null); }
   };
   m.querySelector('#niOk2').onclick = ok;
+  inp.addEventListener('input', () => { errEl.textContent = ''; });
   inp.onkeydown = (e) => { if (e.key === 'Enter') ok(); };
   m.querySelectorAll('[data-x]').forEach(b => b.onclick = () => { closeModal(); onCreated(null); });
   openModal(m);
   setTimeout(() => inp.focus(), 50);
 }
 
-async function doImport(btn) {
+// Antes de abrir el selector nativo de archivos, confirma en qué proyecto
+// (y, si tiene carpetas, en cuál) va a quedar guardado lo importado.
+function confirmImportDestination(iid, kind, onConfirm) {
+  const it = STATE.initiatives.find(x => x.id === iid);
+  const name = it ? it.name : 'el proyecto';
+  const folders = iid ? _getFolders(iid) : [];
+  const noun = kind === 'audio' ? 'el audio' : 'el video';
+  const m = el('div', 'modal');
+  m.setAttribute('role', 'dialog'); m.setAttribute('aria-label', 'Confirmar importación');
+  m.innerHTML = `
+    <div class="modal-head"><h3>Importar a «${esc(name)}»</h3><button class="icon-btn sm" data-x aria-label="Cerrar">${svg('x', 14)}</button></div>
+    <div class="modal-body" style="gap:12px">
+      <p style="font-size:12px;color:var(--text-secondary);margin:0;line-height:1.5">Vas a elegir ${noun} desde tu computadora. Se guardará dentro del proyecto <b>${esc(name)}</b>.</p>
+      ${folders.length ? `<div><label>Carpeta (opcional)</label><div id="impFolderSel"></div></div>` : ''}
+    </div>
+    <div class="modal-foot"><button class="btn" data-x>Cancelar</button><button class="btn btn-primary" data-ok>Elegir archivo…</button></div>`;
+  let selFolder = null;
+  if (folders.length) {
+    const sel = customSelect({
+      value: null,
+      items: [{ value: null, label: 'Sin carpeta' }, ...folders.map(f => ({ value: f.id, label: f.name }))],
+      icon: 'folder',
+      onChange: (v) => { selFolder = v; },
+    });
+    m.querySelector('#impFolderSel').appendChild(sel);
+  }
+  m.querySelector('[data-ok]').onclick = () => { closeModal(); onConfirm(selFolder); };
+  m.querySelectorAll('[data-x]').forEach(b => b.onclick = closeModal);
+  openModal(m);
+}
+
+async function doImport(btn, kind, folderId) {
+  const noun = kind === 'audio' ? 'audio' : 'video';
+  let initId = STATE.selInit || (STATE.transcript && STATE.transcript.initiative_id) || null;
+  if (!initId) {
+    initId = await _pickInitiativeForImport();
+    if (!initId) return;
+  }
+  // Preflight con idioma/modelo antes de importar
+  openRecordingPreflight('meeting', () => _doImportExecute(btn, kind, folderId, initId, noun));
+}
+async function _doImportExecute(btn, kind, folderId, initId, noun) {
   btn.classList.add('is-loading');
   try {
-    let initId = STATE.selInit || (STATE.transcript && STATE.transcript.initiative_id) || null;
-    if (!initId) {
-      btn.classList.remove('is-loading');
-      initId = await _pickInitiativeForImport();
-      if (!initId) return;
-      btn.classList.add('is-loading');
-    }
-    const r = await api.importMediaMultiple(initId);
-    if (r && r.error) { toast('err', 'No se pudo importar: ' + r.error); }
-    else if (r && r.cancelled) { /* usuario cerró el diálogo */ }
+    const r = await api.importMediaMultiple(initId, kind);
+    if (r && r.error) { toast('err', errMsg(r.error, 'No se pudo importar el archivo')); }
+    else if (r && r.cancelled) { /* usuario cerro el dialogo */ }
     else if (r && r.ok) {
+      if (folderId != null && r.files) r.files.forEach(f => _setMeetingFolder(f.meeting_id, folderId));
+      toast('info', `Registrando ${r.count} ${noun}${r.count !== 1 ? 's' : ''}...`);
       await refreshMeetings(initId);
       try { renderBgJobs(await api.getBackgroundJobs()); } catch { /* sin jobs */ }
-      toast('ok', `${r.count} video${r.count !== 1 ? 's' : ''} importado${r.count !== 1 ? 's' : ''} · transcribiendo en 2.º plano`);
+      toast('ok', `${r.count} ${noun}${r.count !== 1 ? 's' : ''} importado${r.count !== 1 ? 's' : ''} · transcribiendo en 2.º plano`);
+      if (folderId != null) renderSidebar();
     }
   } catch { toast('err', 'Error al importar'); }
   btn.classList.remove('is-loading');
 }
-
 /* ============================================================
    7b. GRABACIÓN DE REUNIÓN
    ============================================================ */
@@ -3580,30 +5683,76 @@ function _nowDateShort() {
   const d = new Date();
   return `${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}/${String(d.getFullYear()).slice(-2)}`;
 }
-function startMeetingRecording() {
+// Nombre por defecto para reuniones: incluye dia y hora
+function _defaultMeetingTitle() {
+  const d = new Date();
+  const hh = String(d.getHours()).padStart(2,'0');
+  const mm = String(d.getMinutes()).padStart(2,'0');
+  return `Reunion ${DIAS_CORTOS[d.getDay()]} ${d.getDate()} ${MESES_CORTOS[d.getMonth()]} ${hh}:${mm}`;
+}
+// Fecha de hoy como en las listas: "mié 08 Jul"
+function _prettyToday() {
+  const d = new Date();
+  return `${DIAS_CORTOS[d.getDay()]} ${String(d.getDate()).padStart(2, '0')} ${MESES_CORTOS[d.getMonth()]}`;
+}
+/* Grabar arranca DE FRENTE, sin pedir el título.
+   Antes abría un formModal("Título de la reunión") antes de empezar: un paso
+   entre "quiero grabar" y "se está grabando, justo cuando la reunión ya empezó
+   y no hay tiempo de ponerle nombre. El título se pone después —desde el menú
+   "···" de la fila o desde la propia reunión— cuando ya se sabe de qué fue.
+   Mientras tanto lleva la fecha, y al transcribir el motor propone uno. */
+async function startMeetingRecording() {
   if (STATE.appState !== 'idle') return;
-  if (!STATE.selInit) { toast('err', 'Selecciona una iniciativa antes de grabar'); return; }
-  formModal('Nueva reunión', 'Título de la reunión', _nowDateShort(), 'Empezar a grabar', beginMeetingRecording);
+  /* Ni proyecto ni idioma se preguntan acá. El idioma y el modelo son ajustes
+     que viven en Configuración (y el idioma se cambia en caliente desde el pie
+     del panel); preguntarlos en cada grabación repetía una decisión que casi
+     nunca cambia. */
+  const iid = await proyectoDestino();
+  if (!iid) { toast('err', 'No se pudo preparar un proyecto para guardar la reunión'); return; }
+  STATE.selInit = iid;
+  _recordarProyecto(iid);
+  beginMeetingRecording(_nowDateShort());
 }
 async function beginMeetingRecording(title) {
-  if (!STATE.selInit) { toast('err', 'Selecciona una iniciativa antes de grabar'); return; }
-  const r = await api.startRecording(STATE.selInit, title);
-  if (!r || r.ok === false) throw new Error((r && r.error) || 'No se pudo iniciar la grabación');
-  STATE.selMeeting = r.meeting_id;
-  STATE.transcript = { title: r.title, started_at: r.started_at, utterances: [], assets: { captures: [], notes: [], video: null }, video_path: null };
-  STATE.screen = 'meeting';
-  STATE.meetingMicMuted = !!r.mic_muted;
-  STATE.provider = STATE.provider || 'auto';
-  startTimer();
-  setAppState(r && r.provider === 'replicate' ? 'recording-cloud' :
-    (r && r.live === false ? 'recording-local' : 'recording'));
-  // La reunión recién creada aparece ya en el árbol (con su spinner de grabación).
-  await refreshMeetings(STATE.selInit);
+  if (!STATE.selInit) { toast('err', 'Selecciona un proyecto antes de grabar'); return; }
+  STATE._livePartials = { me: '', others: '' };  // limpia el parcial de una reunión anterior
+  // Sesión nueva: el panel arranca expandido aunque la anterior quedara minimizada.
+  STATE._recPanelMin = false;
+  let r;
+  try {
+    r = await api.startRecording(STATE.selInit, title);
+  } catch (e) {
+    console.error('[grabar audio] startRecording lanzó:', e);
+    toast('err', 'No se pudo iniciar la grabación: ' + ((e && e.message) || e));
+    return;
+  }
+  if (!r || r.ok === false) {
+    toast('err', errMsg(r && r.error, 'No se pudo iniciar la grabación'));
+    return;
+  }
+  try {
+    STATE.selMeeting = r.meeting_id;
+    STATE.transcript = { title: r.title, started_at: r.started_at, utterances: [], assets: { captures: [], notes: [], video: null }, video_path: null };
+    STATE.screen = 'meeting';
+    STATE.meetingMicMuted = !!r.mic_muted;
+    STATE.provider = STATE.provider || 'auto';
+    startTimer();
+    setAppState(r && r.provider === 'replicate' ? 'recording-cloud' :
+      (r && r.live === false ? 'recording-local' : 'recording'));
+    // La reunión recién creada aparece ya en el árbol (con su spinner de grabación).
+    await refreshMeetings(STATE.selInit);
+  } catch (e) {
+    // El backend YA está grabando, pero el render falló. No dejar la UI en un
+    // estado inconsistente: mostrar el error real y reflejar que se está grabando.
+    console.error('[grabar audio] falló tras iniciar (render/refresh):', e);
+    toast('err', 'La grabación inició pero la vista falló: ' + ((e && e.message) || e));
+    try { setAppState('recording-local'); } catch (_) { /* estado ya aplicado */ }
+  }
 }
 async function toggleMeetingMic() {
   const next = !STATE.meetingMicMuted;
   const r = await api.toggleMeetingMicMute(next);
-  if (!r || r.ok === false) { toast('err', (r && r.error) || 'No se pudo cambiar el micrófono'); return; }
+  if (!r || r.ok === false) { toast('err', errMsg(r && r.error, 'No se pudo cambiar el micrófono')); return; }
   STATE.meetingMicMuted = next;
   renderActionBar();
   toast('info', next ? 'Tu micrófono está silenciado' : 'Tu micrófono está activo');
@@ -3617,26 +5766,14 @@ async function stopMeetingRecording() {
     setAppState('idle');
     await refreshMeetings(STATE.selInit);
     if (r && r.ok) {
-      toast('ok', 'Grabación detenida · se transcribe en segundo plano');
-      // Modal opcional para renombrar la reunión
-      if (stoppedId) {
-        const ts = _nowDateShort();
-        const mtg = (STATE.meetingsByInit[STATE.selInit] || []).find(m => m.id === stoppedId);
-        const curTitle = (mtg && mtg.title) || ts;
-        formModal('Nombrar la reunión', 'Título (opcional)', curTitle, 'Guardar nombre', async (title) => {
-          title = (title || '').trim();
-          if (!title || title === curTitle) return;
-          await api.renameMeeting(stoppedId, title);
-          for (const k in STATE.meetingsByInit) {
-            const m = STATE.meetingsByInit[k].find(x => x.id === stoppedId);
-            if (m) m.title = title;
-          }
-          renderSidebar(); renderMain();
-          toast('ok', 'Reunión renombrada');
-        });
-      }
+      /* Se guarda y punto. Antes al detener aparecía un formulario "Nombrar la
+         reunión": justo cuando la reunión termina y uno se va, había que
+         atender un diálogo para algo opcional. El nombre se pone DURANTE la
+         grabación, en el título del panel, o después desde el menú "···" de la
+         fila — y mientras tanto la reunión lleva su fecha, que ya identifica. */
+      toast('ok', 'Grabación guardada · se transcribe en segundo plano');
     } else {
-      toast('err', (r && r.error) || 'No se pudo finalizar la reunión');
+      toast('err', errMsg(r && r.error, 'No se pudo finalizar la reunión'));
     }
   } catch (e) {
     setAppState('idle');
@@ -3647,20 +5784,45 @@ function doCapture() {
   // Ctrl+Shift+S está reservado globalmente por la app.
   api.takeCapture(STATE.monitorIdx).then(() => toast('ok', 'Captura tomada'));
 }
-
 /* ============================================================
    7c. GRABACIÓN DE PANTALLA (V2)
    ============================================================ */
 async function openScreenPanel() {
   if (STATE.appState !== 'idle') return;
+  // Mismo criterio que la grabación de audio: el destino se resuelve solo.
+  if (!STATE.selInit) {
+    proyectoDestino().then((iid) => {
+      if (!iid) { toast('err', 'No se pudo preparar un proyecto'); return; }
+      STATE.selInit = iid; _recordarProyecto(iid);
+      renderSidebar(); openScreenPanel();
+    });
+    return;
+  }
   STATE.recElapsed = 0; STATE.screenPanelCollapsed = false;
-  STATE.screenRecording = false; STATE.screenMeetingId = null; STATE.screenPanelName = '';
-  // Colocación libre (OBS): por defecto la pantalla ocupa todo el lienzo.
+  // Nombre por defecto visible como en las listas ("mié 08 Jul"); si el usuario
+  // no lo cambia, no se renombra y el backend conserva su nombre por defecto.
+  STATE.screenRecording = false; STATE.screenMeetingId = null; STATE.screenPanelName = _prettyToday();
+  // Inicia como OBS: fuente a pantalla completa, con tiradores sobre el borde.
   STATE.screenTransform = { x: 0, y: 0, w: 1, h: 1 };
+  // Asegurar que monitorIdx apunte a un monitor real (mss.monitors[0] = pantalla virtual)
+  if (!STATE.monitors.find(x => x.index === STATE.monitorIdx)) {
+    STATE.monitorIdx = STATE.monitors.length ? STATE.monitors[0].index : 1;
+  }
+  // Cargar miniaturas para el selector visual
+  try {
+    const thumbs = await api.getMonitorThumbnails();
+    if (thumbs && thumbs.length) {
+      STATE.monitorThumbnails = thumbs.reduce((acc, t) => { acc[t.index] = t.thumbnail; return acc; }, {});
+      const freshMons = thumbs.map(t => ({ index: t.index, left: t.left, top: t.top, width: t.width, height: t.height }));
+      STATE.monitors = freshMons;
+      if (!STATE.monitors.find(x => x.index === STATE.monitorIdx)) {
+        STATE.monitorIdx = STATE.monitors[0].index;
+      }
+    }
+  } catch (_) {}
   const r = await api.startScreenPreview(STATE.monitorIdx);
-  if (!r || r.ok === false) { toast('err', (r && r.error) || 'No se pudo abrir la vista previa'); return; }
+  if (!r || r.ok === false) { toast('err', errMsg(r && r.error, 'No se pudo abrir la vista previa')); return; }
   if (r.recording) {
-    // El backend tiene una grabación activa que el JS no conocía: restaurar estado
     STATE.screenMeetingId = r.meeting_id || null;
     STATE.screenRecording = true;
     setAppState('screen-recording');
@@ -3689,16 +5851,18 @@ function showScreenPanel() {
   m.setAttribute('aria-label', recording ? 'Grabando pantalla' : 'Preparar grabación');
 
   const head = recording
-    ? `<span class="rec-badge"><span class="rdot"></span>REC</span><span class="rec-clock" id="screenClock">${fmt(STATE.recElapsed)}</span>`
+    ? `<span class="rec-badge"><span class="rdot"></span>REC</span><span class="rec-clock" id="screenClock">${fmt(STATE.recElapsed)}</span>${waveMarkup(9)}`
     : '';
   const sourceStyle = `left:${t.x * 100}%;top:${t.y * 100}%;width:${t.w * 100}%;height:${t.h * 100}%`;
   const handles = ['nw', 'n', 'ne', 'e', 'se', 's', 'sw', 'w']
     .map(h => `<span class="obs-h obs-${h}" data-h="${h}"></span>`).join('');
+  const moveIcon = `<span class="obs-move-icon" title="Arrastra para mover">⠿</span>`;
   const canvas = `
     <div class="obs-canvas" id="obsCanvas" style="aspect-ratio:${screenCanvasAspect()}">
-      ${recording ? '' : `<div class="obs-source" id="obsSource" style="${sourceStyle}">${handles}</div>`}
+      ${recording ? '' : `<div class="obs-dim" id="obsDim"></div><div class="obs-source" id="obsSource" style="${sourceStyle}">${handles}${moveIcon}</div>`}
       ${recording ? '<span class="obs-tag">grabando · composición final</span>' : ''}
     </div>`;
+  const resetBtn = !recording ? `<button class="btn btn-xs" id="scReset" title="Restablecer a pantalla completa" style="margin-left:auto;font-size:11px">Pantalla completa</button>` : '';
   const controls = recording
     ? `<button class="btn btn-stop" id="scStop"><span class="sq"></span>Detener vídeo</button>
        <button class="btn btn-lg ${STATE.micMuted ? 'btn-danger' : ''}" id="scMic">${micIcon()}${micLabel()}</button>
@@ -3708,33 +5872,107 @@ function showScreenPanel() {
        <button class="btn btn-lg ${STATE.micMuted ? 'btn-danger' : ''}" id="scMic">${micIcon()}${micLabel()}</button>
        <button class="btn btn-ghost" id="scCancel">Cancelar</button>`;
 
+  // Selector de monitores (miniaturas compactas para el dropdown)
+  const thumbs = STATE.monitorThumbnails || {};
+  const THUMB_H = 50;
+  const monPicker = (STATE.monitors.length ? STATE.monitors : []).map(mo => {
+    const ar = mo.width && mo.height ? mo.width / mo.height : 16 / 9;
+    const tw = Math.round(THUMB_H * ar);
+    const b64 = thumbs[mo.index] || '';
+    const sel = mo.index === STATE.monitorIdx;
+    const bg = b64 ? `background-image:url('data:image/jpeg;base64,${b64}')` : '';
+    return `<button type="button" class="mon-thumb${sel ? ' is-sel' : ''}" data-midx="${mo.index}" title="Pantalla ${mo.index} · ${mo.width}×${mo.height}" aria-pressed="${sel ? 'true' : 'false'}">
+      <div class="mon-thumb-screen" style="width:${tw}px;height:${THUMB_H}px;${bg}"></div>
+      <span class="mon-thumb-label">Pantalla ${mo.index}<br><span class="mon-thumb-res">${mo.width}×${mo.height}</span></span>
+    </button>`;
+  }).join('');
+  const selectedMonitor = STATE.monitors.find(mo => mo.index === STATE.monitorIdx);
+  const selectedLabel = selectedMonitor
+    ? `Pantalla ${selectedMonitor.index} · ${selectedMonitor.width}×${selectedMonitor.height}`
+    : 'Selecciona una pantalla';
+
+  // Dropdown de selección de pantalla (disponible siempre, incluso durante grabación)
+  const monDropHtml = monPicker
+    ? `<div class="mon-dropdown" id="monDropdown">
+        <button class="mon-dropdown-btn" id="monDropBtn" type="button" title="Cambiar pantalla">
+          ${svg('monitor', 13)}<span id="monDropLabel">${esc(selectedLabel)}</span>${svg('chevronDown', 11)}
+        </button>
+        <div class="mon-dropdown-pop" id="monDropPop">
+          <div class="mon-picker" id="monPicker">${monPicker}</div>
+        </div>
+      </div>`
+    : '';
+
   m.innerHTML = `
     ${head ? `<div class="modal-head">${head}${recording ? '<button class="icon-btn sc-collapse-btn" id="scCollapse" aria-label="Minimizar panel" title="Minimizar panel (−)" style="margin-left:auto">−</button>' : ''}</div>` : ''}
     <div class="screen-setup">
-      <span id="scMonMount"></span>
-      <input id="scName" class="field" placeholder="Nombre de la reunión" autocomplete="off" value="${esc(STATE.screenPanelName || '')}">
+      <input id="scName" class="field" maxlength="120" placeholder="Ej. Demo cliente, revision semanal..." autocomplete="off" value="${esc(STATE.screenPanelName || '')}">
+      ${monDropHtml}
     </div>
     ${canvas}
-    <div style="padding:14px 20px 18px;display:flex;gap:10px;align-items:center;flex-wrap:wrap">
-      ${controls}
+    <div style="padding:10px 20px 16px;display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+      ${controls}${resetBtn}
     </div>`;
 
-  m.querySelector('#scMonMount').replaceWith(customSelect({
-    value: STATE.monitorIdx, icon: 'monitor', className: 'cdrop-mon', minWidth: 210,
-    items: (STATE.monitors.length ? STATE.monitors : [{ index: 0, width: 0, height: 0 }]).map(mo => ({ value: mo.index, label: mo.width ? `Pantalla ${mo.index} · ${mo.width}×${mo.height}` : 'Pantalla 1' })),
-    onChange: (v) => {
-      STATE.monitorIdx = +v;
-      if (recording) api.setScreenMonitor(STATE.monitorIdx); else api.setScreenPreviewMonitor(STATE.monitorIdx);
-      const c = m.querySelector('#obsCanvas'); if (c) c.style.aspectRatio = screenCanvasAspect();
-    },
-  }));
+  if (!recording) {
+    const scReset = m.querySelector('#scReset');
+    if (scReset) scReset.onclick = () => {
+      STATE.screenTransform = { x: 0, y: 0, w: 1, h: 1 };
+      applyObsSource(); pushTransform();
+    };
+  }
+
+  // Dropdown de pantallas: disponible siempre (pre-grabación Y durante grabación)
+  {
+    const dropdown = m.querySelector('#monDropdown');
+    const dropBtn  = m.querySelector('#monDropBtn');
+    if (dropBtn && dropdown) {
+      dropBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        dropdown.classList.toggle('is-open');
+      });
+      const closeOutside = (e) => {
+        if (!dropdown.isConnected) { document.removeEventListener('click', closeOutside); return; }
+        if (!dropdown.contains(e.target)) dropdown.classList.remove('is-open');
+      };
+      document.addEventListener('click', closeOutside);
+    }
+
+    m.querySelector('#monPicker')?.addEventListener('click', (e) => {
+      const card = e.target.closest('.mon-thumb');
+      if (!card) return;
+      const idx = +card.dataset.midx;
+      dropdown?.classList.remove('is-open');
+      if (idx === STATE.monitorIdx) return;
+      STATE.monitorIdx = idx;
+      m.querySelectorAll('.mon-thumb').forEach(c => {
+        const isSelected = +c.dataset.midx === idx;
+        c.classList.toggle('is-sel', isSelected);
+        c.setAttribute('aria-pressed', isSelected ? 'true' : 'false');
+      });
+      const mon = STATE.monitors.find(mo => mo.index === idx);
+      const labelEl = m.querySelector('#monDropLabel');
+      if (labelEl && mon) labelEl.textContent = `Pantalla ${mon.index} · ${mon.width}×${mon.height}`;
+      const cv = m.querySelector('#obsCanvas'); if (cv) cv.style.aspectRatio = screenCanvasAspect();
+      const source = m.querySelector('#obsSource'); if (source) source.style.backgroundImage = 'none';
+      if (recording) {
+        // Cambio en caliente: actualiza la grabación y el preview simultáneamente
+        api.setScreenMonitor(STATE.monitorIdx);
+        api.setScreenPreviewMonitor(STATE.monitorIdx);
+        toast('ok', `Grabando Pantalla ${idx}`);
+      } else {
+        api.setScreenPreviewMonitor(STATE.monitorIdx);
+      }
+    });
+  }
   m.querySelector('#scName').oninput = (e) => { STATE.screenPanelName = e.target.value; };
   m.querySelector('#scName').onblur = (e) => {
     const v = e.target.value.trim();
-    if (v && recording && STATE.screenMeetingId) api.renameMeeting(STATE.screenMeetingId, v);
+    if (v && v !== _prettyToday() && recording && STATE.screenMeetingId) api.renameMeeting(STATE.screenMeetingId, v);
   };
   m.querySelector('#scMic').onclick = () => {
     STATE.micMuted = !STATE.micMuted;
+    _guardarMicMuted(STATE.micMuted);
     if (recording) api.toggleScreenMicMute(STATE.micMuted);
     const btn = m.querySelector('#scMic');
     btn.innerHTML = `${micIcon()}${micLabel()}`;
@@ -3755,6 +5993,8 @@ function showScreenPanel() {
     wireObsCanvas(m.querySelector('#obsCanvas'));
   }
   const root = $('#overlayRoot'); root.replaceChildren(m); root.hidden = false;
+  // Inicializar la máscara DESPUÉS de insertar en el DOM (getElementById necesita el documento)
+  if (!recording) applyObsSource();
   root.onclick = (e) => {
     if (e.target !== root) return;
     if (recording) { STATE.screenPanelCollapsed = true; root.hidden = true; renderActionBar(); }
@@ -3776,22 +6016,39 @@ function pushTransform() {
   _txTimer = setTimeout(() => api.setScreenTransform(t.x, t.y, t.w, t.h), 60);
 }
 
-// Arrastrar para mover + tirar de los tiradores para estirar (estilo OBS).
+// Redimensionar arrastrando cualquier borde/esquina + mover desde el centro (estilo OBS).
 function wireObsCanvas(canvas) {
   if (!canvas) return;
   const source = canvas.querySelector('#obsSource');
   if (!source) return;
   const MIN = 0.05;
+  const EDGE = 18; // px: zona de borde donde el cursor cambia a resize
   let mode = null, handle = null, sx = 0, sy = 0, orig = null;
-  const onMove = (e) => {
+
+  // Detecta si el puntero está en el borde del recuadro y devuelve la dirección ('n','se',…)
+  function edgeAt(e) {
+    const r = source.getBoundingClientRect();
+    const lx = e.clientX - r.left, ly = e.clientY - r.top;
+    const nW = lx < EDGE, nE = lx > r.width - EDGE;
+    const nN = ly < EDGE, nS = ly > r.height - EDGE;
+    if (!nW && !nE && !nN && !nS) return null;
+    return (nN ? 'n' : nS ? 's' : '') + (nW ? 'w' : nE ? 'e' : '');
+  }
+
+  const CURSORS = { n:'ns-resize', s:'ns-resize', e:'ew-resize', w:'ew-resize',
+                    nw:'nwse-resize', se:'nwse-resize', ne:'nesw-resize', sw:'nesw-resize' };
+
+  function doMove(e) {
+    if (!mode) return;
     const rect = canvas.getBoundingClientRect();
+    if (!rect.width || !rect.height) return;
     const dx = (e.clientX - sx) / rect.width;
     const dy = (e.clientY - sy) / rect.height;
     let { x, y, w, h } = orig;
     if (mode === 'move') {
       x = clamp(orig.x + dx, 0, 1 - w);
       y = clamp(orig.y + dy, 0, 1 - h);
-    } else {
+    } else if (handle) {
       if (handle.includes('e')) w = clamp(orig.w + dx, MIN, 1 - orig.x);
       if (handle.includes('s')) h = clamp(orig.h + dy, MIN, 1 - orig.y);
       if (handle.includes('w')) { const nx = clamp(orig.x + dx, 0, orig.x + orig.w - MIN); w = orig.w + (orig.x - nx); x = nx; }
@@ -3799,36 +6056,90 @@ function wireObsCanvas(canvas) {
     }
     STATE.screenTransform = { x, y, w, h };
     applyObsSource();
-  };
-  const onUp = () => {
-    window.removeEventListener('pointermove', onMove);
-    window.removeEventListener('pointerup', onUp);
+  }
+
+  // Con setPointerCapture los eventos pointermove/pointerup llegan siempre a source,
+  // incluso cuando el puntero sale del elemento — no se necesitan listeners en window.
+  source.addEventListener('pointermove', (e) => {
+    if (!mode) {
+      const hn = e.target.closest('.obs-h');
+      const dir = hn ? hn.dataset.h : edgeAt(e);
+      source.style.cursor = dir ? (CURSORS[dir] || 'nwse-resize') : 'move';
+    } else {
+      doMove(e);
+    }
+  });
+
+  source.addEventListener('pointerup', (e) => {
+    if (!mode) return;
+    mode = null; handle = null;
+    source.style.cursor = 'move';
+    try { source.releasePointerCapture(e.pointerId); } catch (_) {}
     pushTransform();
-  };
+  });
+
+  source.addEventListener('pointercancel', () => { mode = null; handle = null; source.style.cursor = 'move'; });
+
   source.addEventListener('pointerdown', (e) => {
+    if (e.button !== 0) return;
     const hn = e.target.closest('.obs-h');
-    mode = hn ? 'resize' : 'move';
-    handle = hn ? hn.dataset.h : null;
+    if (hn) {
+      mode = 'resize'; handle = hn.dataset.h;
+    } else {
+      const dir = edgeAt(e);
+      mode = dir ? 'resize' : 'move';
+      handle = dir || null;
+    }
     sx = e.clientX; sy = e.clientY; orig = { ...STATE.screenTransform };
     e.preventDefault();
-    window.addEventListener('pointermove', onMove);
-    window.addEventListener('pointerup', onUp);
+    try { source.setPointerCapture(e.pointerId); } catch (_) {}
   });
 }
 
 async function startScreenFromPanel() {
-  const name = (document.getElementById('scName')?.value || '').trim();
+  // Sin proyecto elegido: modal para seleccionar o crear uno y, al hacerlo,
+  // la grabación arranca sola (el modal reemplaza al panel; closeModal lo restaura).
+  if (!STATE.selInit) {
+    STATE.screenPanelName = (document.getElementById('scName')?.value || '').trim();
+    pickInitiativeModal((iid) => {
+      STATE.selInit = iid;
+      renderSidebar();
+      const nm = document.getElementById('scName');
+      if (nm && STATE.screenPanelName) nm.value = STATE.screenPanelName;
+      startScreenFromPanel();
+    });
+    return;
+  }
+  const name = (document.getElementById('scName')?.value || '').trim() || STATE.screenPanelName || '';
   const t = STATE.screenTransform;
   await api.setScreenTransform(t.x, t.y, t.w, t.h);  // colocación elegida
+  STATE._livePartials = { me: '', others: '' };  // limpia el parcial de una grabación anterior
   const r = await api.startScreenRecording(STATE.selInit, STATE.monitorIdx);
-  if (!r || r.ok === false) { toast('err', (r && r.error) || 'No se pudo iniciar la grabación'); return; }
+  if (!r || r.ok === false) { toast('err', errMsg(r && r.error, 'No se pudo iniciar la grabación')); return; }
   STATE.screenMeetingId = r.meeting_id || null;
   STATE.micMuted = !!r.mic_muted;
   STATE.screenRecording = true;
-  if (name && STATE.screenMeetingId) api.renameMeeting(STATE.screenMeetingId, name);
+  /* Sesión nueva, transcripción en blanco. Sin esto el panel arrancaba con las
+     frases de la grabación ANTERIOR: la ruta de audio sí reseteaba
+     STATE.transcript, esta no, y el panel flotante lee de ahí. */
+  STATE.selMeeting = STATE.screenMeetingId;
+  STATE.transcript = {
+    title: r.title || name || _prettyToday(), started_at: r.started_at,
+    utterances: [], assets: { captures: [], notes: [], video: null }, video_path: null,
+  };
+  if (name && name !== _prettyToday() && STATE.screenMeetingId) api.renameMeeting(STATE.screenMeetingId, name);
   startTimer();
-  setAppState('screen-recording');
-  showScreenPanel();  // re-render en modo grabación
+  /* Se cierra el panel GRANDE de configuración (el del recorte y el selector de
+     monitor): ya cumplió su función y ocuparía la pantalla que se está
+     grabando. El panel flotante, en cambio, queda EXPANDIDO — es donde se ve el
+     cronómetro y el texto apareciendo, que es justo lo que hay que poder mirar
+     mientras se graba. Minimizarlo lo dejaba inútil de entrada; se minimiza a
+     mano con su propio botón cuando molesta. */
+  STATE.screenPanelOpen = false;
+  STATE.screenPanelCollapsed = true;
+  STATE._recPanelMin = false;
+  closeModal();
+  setAppState('screen-recording')
   // La reunión recién creada aparece ya en el árbol (con su spinner de grabación).
   await refreshMeetings(STATE.selInit);
 }
@@ -3841,10 +6152,11 @@ async function cancelScreenPanel() {
 }
 async function stopScreenRecording() {
   STATE.screenPanelOpen = false;   // evitar que closeModal re-muestre el panel
-  // Aplica el nombre escrito en el panel (si lo hay) antes de cerrar.
+  // Aplica el nombre escrito en el panel (si lo hay y no es el de por defecto).
   const nameField = document.getElementById('scName');
-  if (nameField && nameField.value.trim() && STATE.screenMeetingId) {
-    api.renameMeeting(STATE.screenMeetingId, nameField.value.trim());
+  const _nfv = nameField ? nameField.value.trim() : '';
+  if (_nfv && _nfv !== _prettyToday() && STATE.screenMeetingId) {
+    api.renameMeeting(STATE.screenMeetingId, _nfv);
   }
   stopTimer();
   closeModal();
@@ -3854,10 +6166,10 @@ async function stopScreenRecording() {
   STATE.screenMeetingId = null;
   if (res && res.ok) {
     // El muxeo va en segundo plano; no bloqueamos. Avisará onScreenVideoSaved.
-    toast('info', 'Guardando el vídeo en segundo plano… puedes seguir usando la app');
+    toast('info', 'Guardando video…');
     await refreshMeetings(STATE.selInit);
   } else {
-    toast('err', (res && res.error) || 'No se pudo detener la grabación');
+    toast('err', errMsg(res && res.error, 'No se pudo detener la grabación'));
   }
 }
 // El vídeo terminó de guardarse/mezclarse en segundo plano.
@@ -3880,7 +6192,6 @@ window.onScreenVideoSaved = async function (meetingId, initiativeId, ok, audio) 
     toast('err', 'No se pudo guardar el vídeo');
   }
 };
-
 /* ============================================================
    7d. PROCESAMIENTO (con barra; Cancelar es V2)
    ============================================================ */
@@ -3926,7 +6237,7 @@ function runProcessing(stage, onDone) {
   }, 430);
 }
 function cancelJob() {
-  if (!v2Available('cancel_current_job')) { toast('info', 'Cancelar requiere backend V2 (cancel_current_job).'); }
+  if (!v2Available('cancel_meeting_job')) { toast('info', 'Cancelar requiere backend V2.'); }
   clearInterval(_proc);
   api.v2.cancelCurrentJob().catch(() => {});
   endProcessing(); toast('info', 'Operación cancelada');
@@ -3941,57 +6252,190 @@ function tickTimer() {
   STATE.recElapsed = Math.floor((Date.now() - STATE.recStartedAt) / 1000);
   renderTopStatus();
   const c = $('#screenClock'); if (c) c.textContent = fmt(STATE.recElapsed);
+  // Cronómetro del panel flotante: se actualiza el nodo suelto, no se
+  // re-renderiza el panel entero — reconstruirlo cada segundo reiniciaría la
+  // animación de entrada y el scroll de las burbujas.
+  const p = $('#recPanelTimer'); if (p) p.textContent = fmt(STATE.recElapsed);
 }
 function startTimer() { STATE.recStartedAt = Date.now(); STATE.recElapsed = 0; clearInterval(STATE.recTimer); STATE.recTimer = setInterval(tickTimer, 1000); }
 function stopTimer() { clearInterval(STATE.recTimer); STATE.recStartedAt = 0; }
 // Al volver a enfocar/mostrar la ventana, corrige el reloj al instante.
 document.addEventListener('visibilitychange', () => { if (!document.hidden) tickTimer(); });
 window.addEventListener('focus', tickTimer);
-function fmt(s) { const m = Math.floor(s / 60); return String(m).padStart(2, '0') + ':' + String(s % 60).padStart(2, '0'); }
-
+/* mm:ss hasta la hora, y h:mm:ss a partir de ahí. Antes una grabación de 90
+   minutos mostraba "90:00", que se lee como noventa segundos. */
+function fmt(s) {
+  s = Math.max(0, Math.floor(s || 0));
+  const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), seg = s % 60;
+  const dd = (n) => String(n).padStart(2, '0');
+  return h ? `${h}:${dd(m)}:${dd(seg)}` : `${dd(m)}:${dd(seg)}`;
+}
 /* ============================================================
-   7e. Iniciativas/reuniones V2 (archivar/eliminar)
+   7e. Proyectos/reuniones V2 (archivar/eliminar)
    ============================================================ */
 function _afterRemoveFromTree(iid) {
-  // Si la iniciativa abierta se archivó/eliminó, volver a la bienvenida.
+  // Si el proyecto abierta se archivó/eliminó, volver a la bienvenida.
   if (iid && STATE.selInit === iid) { STATE.selInit = null; STATE.selMeeting = null; STATE.screen = 'welcome'; }
 }
 async function toggleInitiativePin(iid) {
   const r = await api.toggleInitiativePin(iid);
-  if (!r || !r.ok) { toast('err', 'No se pudo anclar la iniciativa'); return; }
+  if (!r || !r.ok) { toast('err', 'No se pudo anclar el proyecto'); return; }
   STATE.initiatives = await api.listInitiatives() || [];   // reordena: ancladas arriba
   renderSidebar();
-  toast('ok', r.pinned ? 'Iniciativa anclada' : 'Iniciativa desanclada');
+  toast('ok', r.pinned ? 'Proyecto anclado' : 'Proyecto desanclado');
 }
 function archiveInitiative(iid) {
-  confirmModal('Archivar iniciativa', 'Se moverá al Archivo. Podrás restaurarla cuando quieras.', 'Archivar', async () => {
+  confirmModal('Archivar proyecto', 'Se moverá al Archivo. Podrás restaurarla cuando quieras.', 'Archivar', async () => {
     const r = await api.archiveItem('initiative', iid);
-    if (r && r.ok === false) { toast('err', r.error || 'No se pudo archivar'); return; }
-    toast('ok', 'Iniciativa archivada'); _afterRemoveFromTree(iid); STATE.initiatives = await api.listInitiatives() || []; renderSidebar(); renderMain(); updateLibraryCounts();
+    if (r && r.ok === false) { toast('err', errMsg(r.error, 'No se pudo archivar')); return; }
+    toast('ok', 'Proyecto archivado'); _afterRemoveFromTree(iid); STATE.initiatives = await api.listInitiatives() || []; renderSidebar(); renderMain(); updateLibraryCounts();
   }, false);
 }
 function deleteInitiative(iid) {
-  confirmModal('Enviar a la papelera', 'Se moverá a la Papelera con sus reuniones. Podrás restaurarla.', 'Mover a papelera', async () => {
-    const r = await api.trashItem('initiative', iid);
-    if (r && r.ok === false) { toast('err', r.error || 'No se pudo mover'); return; }
-    toast('ok', 'Iniciativa movida a la papelera'); _afterRemoveFromTree(iid); STATE.initiatives = await api.listInitiatives() || []; renderSidebar(); renderMain(); updateLibraryCounts();
-  });
+  archiveInitiative(iid);
+}
+
+function permanentlyDeleteInitiative(iid) {
+  confirmModal('Eliminar proyecto', 'Se eliminara permanentemente. Esta accion no se puede deshacer.', 'Eliminar', async () => {
+    const r = await api.permanentlyDeleteItem('initiative', iid);
+    if (r && r.ok === false) { toast('err', errMsg(r.error, 'No se pudo eliminar')); return; }
+    toast('ok', 'Proyecto eliminado'); _afterRemoveFromTree(iid); STATE.initiatives = await api.listInitiatives() || []; renderSidebar(); renderMain(); updateLibraryCounts();
+  }, true);
+}
+
+/* ---- Tour inicial (spotlight style) ---- */
+const TOUR_KEY = 'hm.tour.v2';
+function showInitialTourIfNeeded(force) {
+  if (!force && load(TOUR_KEY, '') === '1') return;
+  if (document.querySelector('.setup-overlay') || document.getElementById('initialTour')) return;
+  if (document.body.classList.contains('licensing')) return;   // nunca sobre la pantalla de licencia
+  STATE.sidebarOpen = true;
+  applySidebar();
+  renderActionBar();
+
+  // 4 pasos: los más importantes de la app
+  const steps = [
+    {
+      sel: '#navInitiatives', icon: 'folder', color: '#aacfbf',
+      title: 'Proyectos',
+      text: 'Organiza aquí cada cliente o proyecto. Todo su historial de reuniones queda en un solo lugar.',
+    },
+    {
+      sel: '#abRecord', icon: 'mic', color: '#ff7a82',
+      title: 'Graba reuniones o pantalla',
+      text: 'Pulsa "Grabar" y elige audio o pantalla (Meet, Zoom, Teams). Helpmeet escucha, transcribe en tiempo real y genera un resumen automático al terminar.',
+    },
+    {
+      sel: null, icon: 'rocket', color: '#aacfbf',
+      title: '¡Todo listo para empezar!',
+      text: 'Crea tu primer proyecto y empieza a grabar. Helpmeet se encarga del resto.',
+    },
+  ];
+
+  let idx = 0;
+  const root = el('div', 'initial-tour');
+  root.id = 'initialTour';
+  root.innerHTML = `
+    <div class="tour-spotlight" id="tourSpot"></div>
+    <div class="tour-card" id="tourCard" role="dialog" aria-modal="true" aria-live="polite">
+      <div class="tour-icon-ring" id="tourRing"></div>
+      <div class="tour-dots" id="tourDots"></div>
+      <h3 id="tourTitle"></h3>
+      <p id="tourBody"></p>
+      <div class="tour-actions">
+        <button class="tour-skip" id="tourSkip">Omitir tour</button>
+        <button class="tour-next" id="tourNext"></button>
+      </div>
+    </div>`;
+  document.body.appendChild(root);
+
+  const spotEl  = document.getElementById('tourSpot');
+  const cardEl  = document.getElementById('tourCard');
+  const ringEl  = document.getElementById('tourRing');
+  const dotsEl  = document.getElementById('tourDots');
+  const titleEl = document.getElementById('tourTitle');
+  const bodyEl  = document.getElementById('tourBody');
+  const nextBtn = document.getElementById('tourNext');
+
+  const finish = (startProject) => {
+    save(TOUR_KEY, '1');
+    document.querySelectorAll('.tour-target').forEach(n => n.classList.remove('tour-target'));
+    root.classList.add('tour-out');
+    setTimeout(() => { root.remove(); if (startProject) document.getElementById('btnNewInitiative')?.click(); }, 300);
+  };
+
+  const placeCard = (target) => {
+    const CW = 308, CH = 260, PAD = 10;
+    const vw = window.innerWidth, vh = window.innerHeight;
+    if (!target) {
+      spotEl.style.display = 'none';
+      cardEl.style.cssText += ';top:50%;left:50%;transform:translate(-50%,-50%)';
+      return;
+    }
+    const r = target.getBoundingClientRect();
+    spotEl.style.cssText = `display:block;top:${r.top - PAD}px;left:${r.left - PAD}px;width:${r.width + PAD * 2}px;height:${r.height + PAD * 2}px`;
+    const below = vh - r.bottom, above = r.top, right = vw - r.right, left = r.left;
+    let top, lft;
+    if (below >= CH + 18) {
+      top = r.bottom + 16; lft = clamp(r.left + r.width / 2 - CW / 2, 14, vw - CW - 14);
+    } else if (above >= CH + 18) {
+      top = r.top - CH - 16; lft = clamp(r.left + r.width / 2 - CW / 2, 14, vw - CW - 14);
+    } else if (right >= CW + 18) {
+      top = clamp(r.top + r.height / 2 - CH / 2, 14, vh - CH - 14); lft = r.right + 16;
+    } else {
+      top = clamp(r.top + r.height / 2 - CH / 2, 14, vh - CH - 14); lft = Math.max(14, r.left - CW - 16);
+    }
+    cardEl.style.cssText = `top:${top}px;left:${lft}px;transform:none`;
+  };
+
+  const render = (animate) => {
+    const step = steps[idx];
+    const isLast = idx === steps.length - 1;
+
+    document.querySelectorAll('.tour-target').forEach(n => n.classList.remove('tour-target'));
+
+    dotsEl.innerHTML = steps.map((_, i) => `<span class="tour-dot${i === idx ? ' is-on' : ''}"></span>`).join('');
+    ringEl.innerHTML = `<span style="color:${step.color}">${svg(step.icon, 24)}</span>`;
+    ringEl.style.background = step.color + '1e';
+    ringEl.style.borderColor = step.color + '45';
+    titleEl.textContent = step.title;
+    bodyEl.textContent = step.text;
+    nextBtn.textContent = isLast ? '¡Crear mi primer proyecto!' : 'Siguiente →';
+
+    const target = step.sel ? document.querySelector(step.sel) : null;
+    if (target) target.classList.add('tour-target');
+    placeCard(target);
+  };
+
+  const nextStep = () => {
+    if (idx >= steps.length - 1) { finish(true); return; }
+    cardEl.classList.add('tour-step-out');
+    setTimeout(() => {
+      cardEl.classList.remove('tour-step-out');
+      cardEl.style.animation = 'none';
+      void cardEl.offsetWidth;
+      cardEl.style.animation = '';
+      idx++;
+      render(true);
+    }, 160);
+  };
+
+  document.getElementById('tourSkip').onclick = () => finish(false);
+  nextBtn.onclick = nextStep;
+  root.addEventListener('click', (e) => { if (e.target === root) finish(false); });
+
+  setTimeout(() => render(false), 100);
 }
 function archiveMeeting(mid) {
   confirmModal('Archivar reunión', 'Se moverá al Archivo. Podrás restaurarla.', 'Archivar', async () => {
     const r = await api.archiveItem('meeting', mid);
-    if (r && r.ok === false) { toast('err', r.error || 'No se pudo archivar'); return; }
+    if (r && r.ok === false) { toast('err', errMsg(r.error, 'No se pudo archivar')); return; }
     toast('ok', 'Reunión archivada'); if (STATE.selMeeting === mid) backToTree(); refreshAll(); updateLibraryCounts();
   }, false);
 }
 function deleteMeeting(mid) {
-  confirmModal('Enviar a la papelera', 'Se moverá a la Papelera. Podrás restaurarla.', 'Mover a papelera', async () => {
-    const r = await api.trashItem('meeting', mid);
-    if (r && r.ok === false) { toast('err', r.error || 'No se pudo mover'); return; }
-    toast('ok', 'Reunión movida a la papelera'); if (STATE.selMeeting === mid) backToTree(); refreshAll(); updateLibraryCounts();
-  });
+  archiveMeeting(mid);
 }
-
 /* ============================================================
    8. BÚSQUEDA
    ============================================================ */
@@ -4018,19 +6462,58 @@ function highlight(text, q) {
   const re = new RegExp('(' + q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + ')', 'gi');
   return safe.replace(re, '<mark>$1</mark>');
 }
-
 /* ============================================================
    9. GLOBALS QUE PYTHON LLAMA  (deben existir con estos nombres)
    ============================================================ */
-// Python inyecta intervenciones en vivo durante grabación local.
-window.addUtterance = function (speaker, text) {
+// Python inyecta frases YA REALES (transcripción progresiva, guardadas en la
+// base de datos con su id definitivo) mientras se graba. Se insertan antes
+// del indicador de "escuchando" para que este se quede siempre al final.
+window.addUtterance = function (id, speaker, text, start, end) {
   if (!STATE.transcript) STATE.transcript = { title: '', started_at: '', utterances: [] };
-  const u = { id: 'live' + Date.now(), speaker: speaker === 'me' || speaker === 'Yo' ? 'me' : 'others', time: fmt(STATE.recElapsed), text };
+  const u = {
+    id, speaker: speaker === 'me' || speaker === 'Yo' ? 'me' : 'others',
+    time: fmt(Math.round(start)), start_time: start, end_time: end, text,
+  };
   STATE.transcript.utterances.push(u);
   if (STATE.screen === 'meeting' && STATE.activeTab === 'transcript') {
-    const r = document.querySelector('.reading'); if (r) r.appendChild(utterance(u));
+    const r = document.querySelector('.reading');
+    if (r) r.insertBefore(utterance(u), $('#previewTyping'));
     const lc = $('#liveCount'); if (lc) lc.textContent = STATE.transcript.utterances.length + ' frases';
   }
+  // Burbujas del panel flotante: se refrescan aunque no se esté mirando la
+  // pantalla de Reunión, porque el panel flota sobre cualquier vista.
+  const stream = $('#recStream');
+  if (stream) _recPanelBurbujas(stream);
+};
+// Texto EN VIVO de Vosk que todavía puede cambiar (no está guardado en la
+// base: la frase se persiste recién cuando Vosk detecta silencio y llama a
+// addUtterance). Reemplaza los 3 puntos del indicador de "escuchando" con el
+// texto real mientras se habla; `text` vacío devuelve los puntos (frase
+// cerrada, o silencio). Las dos pistas pueden tener parcial a la vez.
+window.setLivePartial = function (speaker, text) {
+  if (!STATE._livePartials) STATE._livePartials = { me: '', others: '' };
+  STATE._livePartials[speaker === 'me' ? 'me' : 'others'] = text || '';
+  /* El panel flotante puede estar visible sobre cualquier pantalla, así que su
+     burbuja en curso se actualiza SIEMPRE — no solo cuando se está mirando la
+     transcripción. Sin esto el panel no mostraba nada hasta que una frase se
+     cerraba, y eso era justo lo que faltaba al empezar a grabar. */
+  const viva = $('#recLiveBubble');
+  if (viva) _recPintaParcial(viva);
+  const typing = $('#previewTyping');
+  if (!typing) return;
+  const parts = [];
+  if (STATE._livePartials.me) {
+    parts.push(`<span class="preview-partial"><b>Yo:</b>${esc(STATE._livePartials.me)}</span>`);
+  }
+  // Sin etiqueta para el interlocutor: es el caso por defecto.
+  if (STATE._livePartials.others) {
+    parts.push(`<span class="preview-partial">${esc(STATE._livePartials.others)}</span>`);
+  }
+  // Sin parciales en curso vuelve al indicador de escucha del mockup.
+  typing.innerHTML = parts.length
+    ? '<span class="dots"><span></span><span></span><span></span></span>' + parts.join('')
+    : '<span class="dots"><span></span><span></span><span></span></span>' +
+      '<span class="listening-label">Escuchando…</span>';
 };
 // Texto de estado libre desde Python.
 window.setStatus = function (text) {
@@ -4048,7 +6531,6 @@ window.setProgress = function (frac) {
   if (f) f.classList.remove('indeterminate');
   renderTopStatus();
 };
-
 /* ============================================================
    Transcripción en SEGUNDO PLANO (indicador flotante)
    ============================================================ */
@@ -4073,6 +6555,7 @@ function renderBgJobs(jobs) {
   STATE.bgJobs = Array.isArray(jobs) ? jobs : [];
   refreshMeetingTitleJob();
   refreshSidebarJobs();
+  refreshVideoPanelButtons();
   // Eliminar tarjeta flotante si quedó de una sesión anterior
   const host = document.getElementById('bgJobs'); if (host) host.remove();
 }
@@ -4088,8 +6571,115 @@ window.onJobFinished = async function (meetingId, initiativeId, ok) {
 /* ---- Adaptadores V2 opcionales (Python puede llamarlos; si no, no pasa nada) ---- */
 window.onAppStateChanged = function (s) { if (s && s.state) setAppState(s.state); };
 window.onJobProgress = function (job) { if (job && typeof job.progress === 'number') { STATE.jobStage = job.stage || STATE.jobStage; window.setProgress(job.progress / 100); } };
-window.onAudioLevels = function (levels) { /* actualizar medidores en vivo cuando exista get_audio_levels */ };
+// Nivel de audio en vivo → waveforms reactivos. `levels` puede ser un número
+// (0..1) o un array de números por barra. Si no llegan niveles, los waves
+// vuelven solos a la animación de fallback (modo 'idle').
+let _waveIdleTimer = null;
+window.onAudioLevels = function (levels) {
+  const waves = document.querySelectorAll('.hm-wave');
+  if (!waves.length) return;
+  const arr = Array.isArray(levels) ? levels : [levels];
+  const peak = arr.reduce((m, v) => Math.max(m, +v || 0), 0);
+  waves.forEach(w => {
+    w.classList.remove('idle');
+    const bars = w.children;
+    for (let i = 0; i < bars.length; i++) {
+      // reparte los niveles disponibles; si hay menos que barras, interpola por índice
+      const src = arr.length >= bars.length
+        ? arr[i]
+        : arr[Math.floor(i / bars.length * arr.length)];
+      const lv = Math.max(0, Math.min(1, (+src || 0) * (0.7 + Math.random() * 0.3)));
+      bars[i].style.setProperty('--lv', lv.toFixed(3));
+    }
+  });
+  clearTimeout(_waveIdleTimer);
+  _waveIdleTimer = setTimeout(() => {
+    document.querySelectorAll('.hm-wave').forEach(w => {
+      w.classList.add('idle');
+      Array.from(w.children).forEach(b => b.style.removeProperty('--lv'));
+    });
+  }, peak > 0.02 ? 900 : 300);
+};
 window.onRecoveryDetected = function (rec) { showRecoveryBanner(rec); };
+
+/* ============================================================
+   MEDIDOR DE MICRÓFONO — el nivel de verdad, medido en el navegador
+
+   `window.onAudioLevels` está en este archivo desde antes, pero **Python nunca
+   lo llama**: no hay un solo emisor en todo `helpmeet/`. O sea que el waveform
+   verde —el que supuestamente prueba que entra audio— llevaba toda su vida
+   corriendo la animación de relleno de `.hm-wave.idle`, sin ninguna relación
+   con lo que dice el micrófono. Se veía convincente y no medía nada.
+
+   Medirlo acá y no en Python es lo único que sirve **en reposo**: el backend
+   solo tiene el audio mientras graba, y el dock —donde uno quiere comprobar
+   que el micrófono anda antes de empezar— está justo antes de eso.
+
+   El stream se abre solo cuando hace falta y se cierra al silenciar o al
+   esconder la ventana. Un micrófono abierto sin motivo es exactamente lo que
+   la gente teme de una app que graba.
+   ============================================================ */
+let _micStream = null, _micCtx = null, _micRAF = 0;
+
+async function _medidorMic() {
+  const hazFalta = !STATE.micMuted && !!document.querySelector('#btnMic, .rec-mute-btn');
+  if (!hazFalta || document.hidden) return _cortarMedidorMic();
+  if (_micStream || !navigator.mediaDevices?.getUserMedia) return;
+  try {
+    // Sin cancelación de eco ni supresión de ruido: acá se mide lo que entra,
+    // no se prepara para transcribir. Con los filtros puestos, hablar bajo
+    // apenas movía la aguja.
+    _micStream = await navigator.mediaDevices.getUserMedia({
+      audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false },
+    });
+  } catch (e) {
+    console.warn('[mic] sin acceso al micrófono:', (e && e.name) || e);
+    _micStream = null;
+    return;
+  }
+  _micCtx = new (window.AudioContext || window.webkitAudioContext)();
+  const an = _micCtx.createAnalyser();
+  an.fftSize = 512;
+  an.smoothingTimeConstant = 0.6;
+  _micCtx.createMediaStreamSource(_micStream).connect(an);
+  const buf = new Uint8Array(an.fftSize);
+  let suave = 0;
+
+  const tick = () => {
+    an.getByteTimeDomainData(buf);
+    let suma = 0;
+    for (let i = 0; i < buf.length; i++) { const d = (buf[i] - 128) / 128; suma += d * d; }
+    // Voz de conversación: RMS entre 0,05 y 0,2. Sin el factor, el medidor se
+    // quedaría pegado al suelo y parecería que no funciona.
+    const nivel = Math.min(1, Math.sqrt(suma / buf.length) * 6);
+    // Sube al instante y baja despacio: así una sílaba se alcanza a ver, en vez
+    // de parpadear entre picos.
+    suave = nivel > suave ? nivel : suave * 0.82 + nivel * 0.18;
+    _pintaNivelMic(suave);
+    _micRAF = requestAnimationFrame(tick);
+  };
+  _micRAF = requestAnimationFrame(tick);
+}
+
+function _cortarMedidorMic() {
+  if (_micRAF) { cancelAnimationFrame(_micRAF); _micRAF = 0; }
+  if (_micStream) { _micStream.getTracks().forEach(t => t.stop()); _micStream = null; }
+  if (_micCtx) { _micCtx.close().catch(() => {}); _micCtx = null; }
+  _pintaNivelMic(0);
+}
+
+/* Un solo número alimenta las dos señales: el halo de los botones de micrófono
+   y las barras del waveform, que hasta hoy fingían. */
+function _pintaNivelMic(n) {
+  const v = n.toFixed(3);
+  document.querySelectorAll('#btnMic, .rec-mute-btn').forEach(b => {
+    b.style.setProperty('--nivel', v);
+    b.classList.toggle('oye', n > 0.06);
+  });
+  if (n > 0.02) window.onAudioLevels([n, n * 0.78, n, n * 0.62, n * 0.9, n * 0.7, n]);
+}
+
+document.addEventListener('visibilitychange', () => { _medidorMic(); });
 function applyScreenPreviewFit(p) {
   if (!p) return;
   p.style.backgroundSize = STATE.screenScaleMode === 'fit' ? 'contain' :
@@ -4100,14 +6690,21 @@ function applyScreenPreviewFit(p) {
 window.setScreenPreview = function (b64) {
   if (!b64) return;
   const url = 'url(data:image/jpeg;base64,' + b64 + ')';
-  // Siempre pintamos sobre el canvas completo (como OBS: fondo negro + pantalla encima).
-  // El obsSource es solo el marco/handles de posicionamiento (transparente).
   const canvas = document.getElementById('obsCanvas');
   if (canvas) {
-    canvas.style.backgroundImage = url;
-    canvas.style.backgroundSize = 'contain';      // mantiene proporción EXACTA, sin distorsión
-    canvas.style.backgroundPosition = 'center';
-    canvas.style.backgroundRepeat = 'no-repeat';
+    const source = document.getElementById('obsSource');
+    if (source) {
+      canvas.style.backgroundImage = 'none';
+      source.style.backgroundImage = url;
+      source.style.backgroundSize = '100% 100%';
+      source.style.backgroundPosition = 'center';
+      source.style.backgroundRepeat = 'no-repeat';
+    } else {
+      canvas.style.backgroundImage = url;
+      canvas.style.backgroundSize = 'contain';
+      canvas.style.backgroundPosition = 'center';
+      canvas.style.backgroundRepeat = 'no-repeat';
+    }
   }
 };
 // Tu backend (grabación de pantalla) llama setPreview(); es el mismo destino.
@@ -4133,7 +6730,7 @@ function showRecoveryBanner(rec) {
     closeModal();
     if (!v2Available('recover_recording')) { toast('err', 'Recuperación no disponible'); return; }
     const r = await api.v2.recoverRecording(rec.id);
-    if (!r || !r.ok) { toast('err', r && r.error ? r.error : 'No se pudo recuperar la grabación'); return; }
+    if (!r || !r.ok) { toast('err', errMsg(r && r.error, 'No se pudo recuperar la grabación')); return; }
     try { renderBgJobs(await api.getBackgroundJobs()); } catch (e) {}
     if (r.meeting_id) {
       // Reunión conocida: navegar directo a ella (ya tiene video_path)
@@ -4150,7 +6747,6 @@ function showRecoveryBanner(rec) {
   m.querySelector('[data-disc]').onclick = () => confirmModal('Descartar grabación', 'Se eliminará el audio recuperado. Esta acción no se puede deshacer.', 'Descartar', async () => { if (v2Available('discard_recoverable_recording')) await api.v2.discardRecoverable(rec.id); toast('info', 'Grabación descartada'); });
   openModal(m);
 }
-
 /* ============================================================
    AJUSTES
    ============================================================ */
@@ -4160,33 +6756,27 @@ function showRecoveryBanner(rec) {
 async function openRecordingPreflight(kind, proceed) {
   if (STATE.appState !== 'idle') return;
   const isScreen = kind === 'screen';
-  const m = el('div', 'modal wide preflight-modal');
+  const m = el('div', 'modal preflight-modal');
   m.setAttribute('role', 'dialog');
-  m.setAttribute('aria-label', isScreen ? 'Comprobar grabación de pantalla' : 'Comprobar grabación de reunión');
+  m.setAttribute('aria-label', isScreen ? t('recording.screenTitle') : t('recording.title'));
   m.innerHTML = `
-    <div class="modal-head"><h3>${svg(isScreen ? 'monitorDot' : 'mic', 16)} <span id="preTitle">Comprobando…</span></h3><button class="icon-btn sm" data-x aria-label="Cerrar">${svg('x', 14)}</button></div>
+    <div class="modal-head"><h3>${svg(isScreen ? 'monitorDot' : 'mic', 16)} ${isScreen ? t('recording.screenTitle') : t('recording.title')}</h3><button class="icon-btn sm" data-x aria-label="${t('common.close')}">${svg('x', 14)}</button></div>
     <div class="modal-body">
       <div class="pre-cfg" id="preCfg">
         <div class="pre-cfg-row"><span class="pre-cfg-lbl">Idioma</span><div class="cfg-chips" id="cfgLang"></div></div>
         <div class="pre-cfg-row"><span class="pre-cfg-lbl">Modelo</span><div class="cfg-chips" id="cfgModel"></div></div>
       </div>
-      <div id="preflightList" class="diag-list"><p style="color:var(--text-muted);font-size:13px">Comprobando equipo…</p></div>
       <div class="preflight-foot">
-        <div class="help" id="preflightHelp"></div>
-        ${isScreen ? '<button class="btn" id="preFolder">Cambiar carpeta</button>' : ''}
-        <button class="btn" id="preReload">Recomprobar</button>
-        <button class="btn btn-primary" id="preStart" disabled>Comprobando…</button>
+        <button class="btn" id="preCancel">Cancelar</button>
+        <button class="btn btn-primary" id="preStart">Iniciar grabacion</button>
       </div>
     </div>`;
-  const list = m.querySelector('#preflightList');
-  const title = m.querySelector('#preTitle');
   const start = m.querySelector('#preStart');
-  let current = null;
 
-  // Configuración de transcripción (idioma + modelo) tal como está en Ajustes,
-  // editable aquí mismo en forma de chips. Lo que se elija queda guardado por
-  // defecto y se usa para esta grabación.
-  let cfg = await api.getSettings() || {};
+  let cfg = STATE.settings;
+  if (!cfg || !cfg.languages) {
+    try { cfg = await api.getSettings() || {}; STATE.settings = cfg; } catch (e) { cfg = {}; }
+  }
   const byLang = cfg.models_by_lang || {};
   function renderCfgChips() {
     const langBox = m.querySelector('#cfgLang');
@@ -4195,88 +6785,79 @@ async function openRecordingPreflight(kind, proceed) {
     langBox.innerHTML = (cfg.languages || []).map(lg =>
       `<button class="cfg-chip ${lg.id === cfg.language ? 'on' : ''}" data-lang="${lg.id}">${esc(lg.label)}</button>`).join('');
     modelBox.innerHTML = (byLang[cfg.language] || cfg.models || []).map(mo =>
-      `<button class="cfg-chip ${mo.tier === cfg.tier ? 'on' : ''}" data-tier="${mo.tier}" title="${esc(mo.label)} · ${esc(mo.download)}">${esc(mo.id)}</button>`).join('');
+      `<button class="cfg-chip ${mo.tier === cfg.tier ? 'on' : ''}" data-tier="${mo.tier}" title="${esc(mo.label)}">${esc(mo.id)}</button>`).join('');
     langBox.querySelectorAll('[data-lang]').forEach(b => b.onclick = async () => {
       if (b.dataset.lang === cfg.language) return;
       cfg = await api.v2.setTranscriptionSettings({ language: b.dataset.lang }) || cfg;
-      renderCfgChips(); toast('ok', `Idioma: ${cfg.language_label || b.dataset.lang}`);
+      renderCfgChips();
     });
     modelBox.querySelectorAll('[data-tier]').forEach(b => b.onclick = async () => {
       if (b.dataset.tier === cfg.tier) return;
       cfg = await api.v2.setTranscriptionSettings({ tier: b.dataset.tier }) || cfg;
-      renderCfgChips(); toast('ok', `Modelo: ${cfg.model || b.dataset.tier}`);
-      load();  // refresca el chequeo del modelo (puede cambiar el estado de descarga)
+      renderCfgChips();
     });
   }
   if (v2Available('set_transcription_settings')) renderCfgChips();
   else m.querySelector('#preCfg').hidden = true;
 
-  async function load() {
-    start.disabled = true; start.textContent = 'Comprobando…';
-    list.innerHTML = '<p style="color:var(--text-muted);font-size:13px">Comprobando equipo…</p>';
-    try {
-      current = await api.getRecordingPreflight(kind, STATE.monitorIdx) || {};
-      title.textContent = current.title || 'Comprobación previa';
-      list.replaceChildren();
-      (current.checks || []).forEach(info => {
-        const status = info.status || 'warn';
-        const ico = status === 'ok' ? svg('check', 14) : status === 'error' ? svg('x', 14) : svg('warn', 14);
-        const row = el('div', 'diag-row ' + status);
-        row.innerHTML = `<span class="diag-ico">${ico}</span><div class="diag-body"><div class="diag-label">${esc(info.title || '')}${info.required ? '' : '<span class="diag-opt">opcional</span>'}</div><div class="diag-detail" title="${esc(info.label || '')}">${esc(info.label || '')}</div></div>`;
-        list.appendChild(row);
-      });
-      start.textContent = current.action || 'Continuar';
-      start.disabled = !current.can_start;
-      m.querySelector('#preflightHelp').textContent = current.can_start
-        ? 'Todo listo.'
-        : 'Corrige lo marcado en rojo.';
-    } catch (e) {
-      list.innerHTML = '<div class="error-box"><p>No se pudo comprobar el equipo.</p></div>';
-      start.textContent = 'No disponible';
-    }
-  }
   m.querySelector('[data-x]').onclick = closeModal;
-  m.querySelector('#preReload').onclick = load;
-  const folder = m.querySelector('#preFolder');
-  if (folder) folder.onclick = async () => { const r = await api.chooseExportDir(); if (r && r.ok) load(); };
-  start.onclick = () => {
-    if (!current || !current.can_start) return;
-    closeModal();
-    setTimeout(proceed, 0);
-  };
+  m.querySelector('#preCancel').onclick = closeModal;
+  start.onclick = () => { closeModal(); setTimeout(proceed, 0); };
   openModal(m);
-  load();
 }
 
 async function openDiagnostics() {
-  const m = el('div', 'modal wide');
+  const m = el('div', 'modal wide diagnostics-modal');
   m.setAttribute('role', 'dialog'); m.setAttribute('aria-label', 'Diagnóstico del sistema');
   m.innerHTML = `
     <div class="modal-head"><h3>${svg('check', 16)} Diagnóstico</h3><button class="icon-btn sm" data-x aria-label="Cerrar">${svg('x', 14)}</button></div>
     <div class="modal-body">
+      <div class="diag-summary" id="diagSummary">
+        <span class="diag-summary-dot"></span>
+        <div><b>Comprobando equipo</b><span>Validando requisitos principales</span></div>
+      </div>
       <div id="diagList" class="diag-list"><p style="color:var(--text-muted);font-size:13px">Comprobando…</p></div>
-      <div class="row-inline" style="margin-top:14px"><div class="help" style="flex:1">Comprueba que tu equipo está listo para grabar y transcribir.</div><button class="btn" id="diagFolder">Cambiar carpeta de exportación</button><button class="btn" id="diagReload">Volver a comprobar</button></div>
+      <div class="diag-actions"><button class="btn" id="diagFolder">Cambiar carpeta</button><button class="btn" id="diagReload">Comprobar otra vez</button></div>
     </div>`;
   m.querySelector('[data-x]').onclick = closeModal;
   const listEl = m.querySelector('#diagList');
+  const summaryEl = m.querySelector('#diagSummary');
+  const compactDetail = (label, info) => {
+    const raw = String((info && (info.label || info.detail)) || 'No disponible');
+    if (/carpeta/i.test(label)) return raw.split(/[\\/]/).slice(-2).join('\\') || raw;
+    if (/procesamiento/i.test(label)) return raw.includes('local') ? 'Local, en este equipo' : raw.split('.')[0];
+    if (/modelo/i.test(label)) return raw.replace(/^Modelo\s*/i, '').replace(/descargado/i, 'listo').trim();
+    if (/micr[oó]fono|audio/i.test(label)) return raw.replace(/\s*\([^)]*\)/g, '').replace(/^Audio del sistema:\s*/i, '');
+    if (/ventana/i.test(label)) return raw.replace(/^WebView2\s*/i, '');
+    return raw;
+  };
   async function loadDiag() {
     listEl.innerHTML = '<p style="color:var(--text-muted);font-size:13px">Comprobando…</p>';
+    summaryEl.className = 'diag-summary';
+    summaryEl.innerHTML = '<span class="diag-summary-dot"></span><div><b>Comprobando equipo</b><span>Validando requisitos principales</span></div>';
     const d = await api.getDiagnostics() || {};
     const rows = [
-      ['Ventana (WebView2)', d.webview2],
+      ['WebView2', d.webview2],
       ['Espacio en disco', d.disk],
-      ['Modelo de transcripción', d.whisper],
+      ['Modelo', d.vosk],
       ['Micrófono', d.mic],
-      ['Audio del sistema', d.loopback],
-      ['Carpeta de exportación', d.export_dir],
-      ['Procesamiento del audio', d.processing],
+      ['Sistema', d.loopback],
+      ['Exportación', d.export_dir],
+      ['Procesamiento', d.processing],
     ];
     listEl.replaceChildren();
+    const okCount = rows.filter(([, info]) => (info && info.status) === 'ok').length;
+    const errorCount = rows.filter(([, info]) => (info && info.status) === 'error').length;
+    const warnCount = rows.length - okCount - errorCount;
+    summaryEl.classList.toggle('has-error', errorCount > 0);
+    summaryEl.classList.toggle('has-warn', !errorCount && warnCount > 0);
+    summaryEl.innerHTML = `<span class="diag-summary-dot"></span><div><b>${errorCount ? 'Revisa ' + errorCount + ' punto' + (errorCount > 1 ? 's' : '') : okCount + '/' + rows.length + ' listo'}</b><span>${errorCount ? 'Hay requisitos que necesitan atención' : warnCount ? 'Puedes grabar, con avisos menores' : 'Equipo listo para grabar y transcribir'}</span></div>`;
     rows.forEach(([label, info]) => {
       info = info || { status: 'warn', label: 'No disponible' };
       const ico = info.status === 'ok' ? svg('check', 14) : info.status === 'error' ? svg('x', 14) : svg('warn', 14);
       const row = el('div', 'diag-row ' + (info.status || 'warn'));
-      row.innerHTML = `<span class="diag-ico">${ico}</span><div class="diag-body"><div class="diag-label">${esc(label)}</div><div class="diag-detail">${esc(info.label || '')}${info.detail ? ' · ' + esc(info.detail) : ''}</div></div>`;
+      const full = `${info.label || ''}${info.detail ? ' · ' + info.detail : ''}`;
+      row.innerHTML = `<span class="diag-ico">${ico}</span><div class="diag-body"><div class="diag-label">${esc(label)}</div><div class="diag-detail" title="${esc(full)}">${esc(compactDetail(label, info))}</div></div>`;
       listEl.appendChild(row);
     });
   }
@@ -4291,11 +6872,13 @@ function openSettings() { STATE.screen = 'settings'; renderMain(); renderTopStat
 function viewSettings() {
   const wrap = el('div'); wrap.style.cssText = 'display:flex;flex-direction:column;flex:1;min-height:0';
   const head = el('div', 'mhead');
-  head.style.cssText = 'border-bottom:none;background:transparent';
-  head.innerHTML = `<div class="mhead-row"><h1 class="mtitle-h">Ajustes</h1></div>`;
+  head.style.cssText = 'border-bottom:none';
+  head.innerHTML = `<div class="mhead-row mhead-row--mid" style="max-width:1100px"><h1 class="page-title">${t('settings.title')}</h1></div>`;
   const content = el('div', 'content');
   const inner = el('div', 'sv-page');
-  inner.style.maxWidth = '640px';
+  inner.style.maxWidth = '1100px';
+  // Indicador de carga mientras se obtienen los settings
+  inner.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;padding:60px 0"><span class="spinner"></span><span style="margin-left:12px;color:var(--text-muted);font-size:13px">' + t('settings.loading') + '</span></div>';
   content.appendChild(inner);
   wrap.replaceChildren(head, content);
 
@@ -4307,62 +6890,97 @@ function viewSettings() {
     const sByLang = scfg.models_by_lang || {};
 
     inner.innerHTML = `
-      <div class="sv-section">
-        <div class="sv-sec-title">${svg('mic', 14)} Transcripción ${hasTx ? '<span class="privacy-badge"><i></i>Local</span>' : ''}</div>
-        <div class="sv-row"><span class="sv-lbl">Idioma</span><div class="cfg-chips" id="svLangChips"></div></div>
-        <div class="sv-row"><span class="sv-lbl">Modelo</span><div class="cfg-chips" id="svModelChips"></div></div>
+      <div class="sv-cards">
+      <div class="sv-section sv-card">
+        <div class="sv-sec-title">${svg('mic', 14)} ${t('settings.transcription')} ${hasTx ? '<span class="privacy-badge"><i></i>' + t('settings.local') + '</span>' : ''}</div>
+        <div class="sv-row"><span class="sv-lbl">${t('settings.language')}</span><div class="cfg-chips" id="svLangChips"></div></div>
+        <div class="sv-row"><span class="sv-lbl">${t('settings.model')}</span><div class="cfg-chips" id="svModelChips"></div></div>
         <label class="toggle-row" for="svDefaultMute" style="padding:10px 0 2px">
-          <span>Micrófono silenciado al iniciar</span>
+          <span>${t('settings.micMutedDefault')}</span>
           <input type="checkbox" id="svDefaultMute" ${s.default_mic_muted ? 'checked' : ''}>
           <span class="toggle-ui" aria-hidden="true"><i></i></span>
         </label>
       </div>
 
-      <div class="sv-section">
-        <div class="sv-sec-title">${svg('monitor', 14)} Grabación de pantalla</div>
-        <div class="sv-row"><span class="sv-lbl">Calidad</span><div class="cfg-chips" id="svVideoChips"></div></div>
-      </div>
-
-      <div class="sv-section">
-        <div class="sv-sec-title">${svg('edit', 14)} Instrucciones para la IA</div>
-        <textarea id="svAiInstr" class="obj-text sv-textarea" rows="8"
-          placeholder="Instrucciones al inicio de cada exportación a Claude…">${esc(s.ai_instructions || '')}</textarea>
-        <div class="sv-row-end">
-          <button class="btn" id="svAiReset">Restablecer</button>
-          <button class="btn btn-primary" id="svAiSave">Guardar</button>
-        </div>
-      </div>
-
-      <div class="sv-section">
-        <div class="sv-sec-title">${svg('folder', 14)} Carpeta de exportación</div>
-        <div class="sv-row">
-          <span class="sv-path mono">${esc(s.export_dir || '—')}</span>
-          <button class="btn" id="svDir">Elegir…</button>
-        </div>
-      </div>
-
-      <div class="sv-section" id="svLicSection">
-        <div class="sv-sec-title">${svg('checkSquare', 14)} Licencia</div>
-        <div class="sv-lic-rows">
+      <div class="sv-col">
+        <div class="sv-section sv-card">
+          <div class="sv-sec-title">${svg('palette', 14)} ${t('settings.appearance')}</div>
           <div class="sv-row">
-            <span class="sv-lbl">Estado</span>
-            <span id="svLicStatus" style="color:var(--text-secondary)">Cargando…</span>
+            <span class="sv-lbl">${t('settings.theme')}</span>
+            <div id="svThemeChips" style="display:flex;gap:8px">
+              <button class="cfg-chip" data-theme-opt="light">${t('settings.light')}</button>
+              <button class="cfg-chip" data-theme-opt="dark">${t('settings.dark')}</button>
+            </div>
           </div>
           <div class="sv-row">
-            <span class="sv-lbl">Plan</span>
+            <span class="sv-lbl">${t('settings.uiLanguage')}</span>
+            <div id="svUiLangChips" style="display:flex;gap:8px">
+              <button class="cfg-chip" data-ui-lang="es">${t('langSwitcher.es')}</button>
+              <button class="cfg-chip" data-ui-lang="en">${t('langSwitcher.en')}</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="sv-section sv-card">
+          <div class="sv-sec-title">${svg('monitor', 14)} ${t('settings.screenRecording')}</div>
+          <div class="sv-row"><span class="sv-lbl">${t('settings.quality')}</span><div class="cfg-chips" id="svVideoChips"></div></div>
+        </div>
+      </div>
+
+      <div class="sv-section sv-card sv-card--full">
+        <div class="sv-sec-title">${svg('edit', 14)} ${t('settings.aiInstructions')}</div>
+        <textarea id="svAiInstr" class="obj-text sv-textarea" rows="8" maxlength="10000"
+          placeholder="${t('settings.aiPlaceholder')}">${esc(s.ai_instructions || '')}</textarea>
+        <div class="sv-row-end">
+          <button class="btn" id="svAiReset">${t('settings.aiReset')}</button>
+          <button class="btn btn-primary" id="svAiSave">${t('settings.aiSave')}</button>
+        </div>
+      </div>
+
+      <div class="sv-section sv-card">
+        <div class="sv-sec-title">${svg('folder', 14)} ${t('settings.exportFolder')}</div>
+        <div class="sv-row">
+          <span class="sv-path mono">${esc(s.export_dir || '—')}</span>
+          <button class="btn" id="svDir">${t('settings.choose')}</button>
+        </div>
+      </div>
+
+      <div class="sv-section sv-card" id="svLicSection">
+        <div class="sv-sec-title">${svg('checkSquare', 14)} ${t('settings.license')}</div>
+        <div class="sv-lic-rows">
+          <div class="sv-row">
+            <span class="sv-lbl">${t('settings.licenseStatus')}</span>
+            <span id="svLicStatus" style="color:var(--text-secondary)">${t('settings.licenseLoading')}</span>
+          </div>
+          <div class="sv-row">
+            <span class="sv-lbl">${t('settings.licensePlan')}</span>
             <span id="svLicPlan" style="color:var(--text-primary)">—</span>
           </div>
         </div>
+        <div id="svLicFeatures" style="margin-top:8px"></div>
         <div class="sv-row-end" style="margin-top:12px">
           <button class="sv-act sv-lic-deactivate" id="svLicDeactivate" style="display:none">
-            ${svg('x', 11)} Desactivar en este dispositivo
+            ${svg('x', 11)} ${t('settings.licenseDeactivate')}
           </button>
         </div>
       </div>
 
-      <div class="sv-section sv-section--actions">
-        <button class="sv-act" id="svDiag">${svg('check', 13)} Diagnóstico</button>
-        <button class="sv-act sv-act--danger" id="svWipe">${svg('trash', 13)} Borrar datos</button>
+      <div class="sv-section sv-card sv-card--full">
+        <div class="sv-sec-title">${svg('download', 14)} ${t('settings.updates')}</div>
+        <div class="sv-upd-card">
+          <div class="sv-upd-ico">${svg('download', 17)}</div>
+          <div class="sv-upd-info">
+            <div class="sv-upd-ver">Helpmeet <span class="mono">v${esc(STATE.version || '')}</span></div>
+            <div class="sv-upd-status" id="svUpdStatus">${t('settings.updatesCheck')}</div>
+          </div>
+          <button class="btn" id="svUpdCheck">${t('settings.updatesCheck')}</button>
+        </div>
+      </div>
+
+      <div class="sv-section sv-section--actions sv-card--full">
+        <button class="sv-act" id="svDiag">${svg('check', 13)} ${t('settings.diagnostics')}</button>
+        <button class="sv-act sv-act--danger" id="svWipe">${svg('trash', 13)} ${t('settings.wipeData')}</button>
+      </div>
       </div>`;
 
     function renderChips() {
@@ -4376,12 +6994,12 @@ function viewSettings() {
       langBox.querySelectorAll('[data-lang]').forEach(b => b.onclick = async () => {
         if (b.dataset.lang === scfg.language) return;
         scfg = await api.v2.setTranscriptionSettings({ language: b.dataset.lang }) || scfg;
-        renderChips(); toast('ok', `Idioma: ${scfg.language_label || b.dataset.lang}`);
+        renderChips(); toast('ok', t('settings.language') + ': ' + (scfg.language_label || b.dataset.lang));
       });
       modelBox.querySelectorAll('[data-tier]').forEach(b => b.onclick = async () => {
         if (b.dataset.tier === scfg.tier) return;
         scfg = await api.v2.setTranscriptionSettings({ tier: b.dataset.tier }) || scfg;
-        renderChips(); toast('ok', `Modelo: ${scfg.model || b.dataset.tier}`);
+        renderChips(); toast('ok', t('settings.model') + ': ' + (scfg.model || b.dataset.tier));
       });
     }
     function renderVideoChips() {
@@ -4392,31 +7010,97 @@ function viewSettings() {
       box.querySelectorAll('[data-vprof]').forEach(b => b.onclick = async () => {
         if (b.dataset.vprof === scfg.video_profile) return;
         scfg = await api.v2.setTranscriptionSettings({ video_profile: b.dataset.vprof }) || scfg;
-        renderVideoChips(); toast('ok', 'Calidad guardada');
+        renderVideoChips(); toast('ok', t('settings.qualitySaved'));
       });
     }
     if (hasTx) { renderChips(); renderVideoChips(); }
 
     inner.querySelector('#svDefaultMute').onchange = async (e) => {
-      STATE.micMuted = e.target.checked; updateMicChip();
+      STATE.micMuted = e.target.checked; _guardarMicMuted(STATE.micMuted); updateMicChip();
       await api.v2.setTranscriptionSettings({ default_mic_muted: e.target.checked });
-      toast('ok', e.target.checked ? 'Micrófono empieza silenciado' : 'Micrófono empieza activo');
+      toast('ok', e.target.checked ? t('settings.micStartsMuted') : t('settings.micStartsActive'));
     };
-    inner.querySelector('#svAiSave').onclick = async () => { await api.setAiInstructions(inner.querySelector('#svAiInstr').value); toast('ok', 'Instrucciones guardadas'); };
-    inner.querySelector('#svAiReset').onclick = async () => { const r = await api.setAiInstructions(''); inner.querySelector('#svAiInstr').value = (r && r.text) || ''; toast('ok', 'Restablecido'); };
-    inner.querySelector('#svDir').onclick = async () => { const r = await api.chooseExportDir(); if (r && r.ok) { toast('ok', 'Carpeta actualizada'); openSettings(); } };
+    inner.querySelector('#svAiSave').onclick = async () => { await api.setAiInstructions(inner.querySelector('#svAiInstr').value); toast('ok', t('settings.aiSaved')); };
+    inner.querySelector('#svAiReset').onclick = async () => { const r = await api.setAiInstructions(''); inner.querySelector('#svAiInstr').value = (r && r.text) || ''; toast('ok', t('common.done')); };
+    inner.querySelector('#svDir').onclick = async () => { const r = await api.chooseExportDir(); if (r && r.ok) { toast('ok', t('settings.folderUpdated')); openSettings(); } };
     inner.querySelector('#svDiag').onclick = () => openDiagnostics();
+    // Apariencia: claro / oscuro cálido (persistido en hm.theme)
+    const themeBox = inner.querySelector('#svThemeChips');
+    if (themeBox) {
+      const renderTheme = () => {
+        const cur = load('hm.theme', 'light');
+        themeBox.querySelectorAll('[data-theme-opt]').forEach(b =>
+          b.classList.toggle('on', b.dataset.themeOpt === cur));
+      };
+      themeBox.querySelectorAll('[data-theme-opt]').forEach(b => b.onclick = () => {
+        const v = b.dataset.themeOpt;
+        save('hm.theme', v);
+        if (v === 'dark') document.body.dataset.theme = 'dark';
+        else delete document.body.dataset.theme;
+        // Actualizar favicon
+        const icoEl = document.getElementById('faviconIco');
+        if (icoEl) icoEl.href = v === 'dark' ? 'assets/helpmeet-dark.ico' : 'assets/helpmeet.ico';
+        // Actualizar icono de ventana nativa (Windows)
+        try { api.winRefreshTheme(v === 'dark'); } catch (e) { /* solo Windows */ }
+        renderTheme();
+        toast('ok', v === 'dark' ? t('settings.themeDarkActive') : t('settings.themeLightActive'));
+      });
+      renderTheme();
+    }
+    // Idioma de la UI
+    const uiLangBox = inner.querySelector('#svUiLangChips');
+    if (uiLangBox) {
+      const renderUiLang = () => {
+        const cur = HelpmeetI18n.getLang() || 'es';
+        uiLangBox.querySelectorAll('[data-ui-lang]').forEach(b =>
+          b.classList.toggle('on', b.dataset.uiLang === cur));
+      };
+      uiLangBox.querySelectorAll('[data-ui-lang]').forEach(b => b.onclick = async () => {
+        const lang = b.dataset.uiLang;
+        if (lang === HelpmeetI18n.getLang()) return;
+        HelpmeetI18n.switchLang(lang);
+        try { await api.setUiLanguage(lang); } catch (e) { /* offline / no pywebview */ }
+        renderUiLang();
+        toast('ok', t('settings.languageSaved'));
+      });
+      renderUiLang();
+    }
+    // Actualizaciones: comprueba bajo demanda; si hay versión nueva, el botón
+    // pasa a "Descargar" y abre el enlace en el navegador.
+    const updBtn = inner.querySelector('#svUpdCheck');
+    const updStatus = inner.querySelector('#svUpdStatus');
+    updBtn.onclick = async () => {
+      updBtn.disabled = true; updBtn.textContent = 'Comprobando…';
+      let u = null;
+      try { u = await api.checkForUpdate(); } catch (e) { u = null; }
+      if (u && u.available) {
+        updStatus.textContent = `Nueva versión ${u.version} disponible`;
+        updStatus.style.color = 'var(--accent)';
+        updBtn.disabled = false;
+        updBtn.textContent = `Descargar ${u.version}`;
+        updBtn.classList.add('btn-primary');
+        updBtn.onclick = () => api.openUrl(u.url);
+      } else {
+        updStatus.textContent = u ? 'Tienes la última versión' : 'No se pudo comprobar (¿sin internet?)';
+        updBtn.disabled = false;
+        updBtn.textContent = 'Buscar actualizaciones';
+      }
+    };
     // Sección licencia
     if (HAS_PYWEBVIEW()) {
       api.getLicenseInfo().then(info => {
         const stEl = inner.querySelector('#svLicStatus');
         const planEl = inner.querySelector('#svLicPlan');
         const btn = inner.querySelector('#svLicDeactivate');
+        const featEl = inner.querySelector('#svLicFeatures');
         if (!stEl) return;
         if (info && info.active) {
           stEl.textContent = 'Activa';
           stEl.style.color = 'var(--accent)';
-          planEl.textContent = info.plan || 'personal';
+          const planName = info.plan || 'personal';
+          const planBadge = planName === 'pro' ? '<span class="pro-badge">PRO</span>' :
+                            planName === 'team' ? '<span class="pro-badge" style="background:linear-gradient(135deg,#ede9fe,#ddd6fe);color:#5b21b6;border-color:#a78bfa">TEAM</span>' : '';
+          planEl.innerHTML = `${planName} ${planBadge}`;
           btn.style.display = '';
           btn.onclick = () => confirmModal(
             'Desactivar licencia',
@@ -4427,16 +7111,38 @@ function viewSettings() {
               showLicenseGate();
             }
           );
+          // Cargar features del plan
+          api.getPlanFeatures().then(pf => {
+            window._planFeatures = pf;
+            if (!featEl || !pf) return;
+            const features = [
+              { key: 'video_unlimited', label: 'Video ilimitado', ok: pf.video_unlimited, locked: !pf.video_unlimited ? `Limitado a ${pf.video_hours}h (${pf.video_hours_used?.toFixed(1) || 0}h usadas)` : '' },
+              { key: 'zip_export', label: 'Exportar ZIP', ok: pf.zip_export },
+              { key: 'participants', label: 'Participantes', ok: pf.participants },
+              { key: 'glossary', label: 'Glosario', ok: pf.glossary },
+              { key: 'recovery', label: 'Recuperar grabaciones', ok: pf.recovery },
+            ];
+            featEl.innerHTML = features.map(f => {
+              const icon = f.ok ? '✅' : '🔒';
+              const cls = f.ok ? '' : 'feature-locked';
+              const msg = f.locked || `Disponible en Helpmeet Pro`;
+              return `<div class="sv-row ${cls}" data-upgrade-msg="${msg}" style="font-size:12px;padding:2px 0;color:var(--text-secondary)">
+                <span>${icon} ${f.label}</span>
+                ${!f.ok && pf.plan === 'personal' ? '<span class="pro-badge">PRO</span>' : ''}
+              </div>`;
+            }).join('');
+          });
         } else {
           stEl.textContent = 'Sin licencia';
           planEl.textContent = '—';
+          if (featEl) featEl.innerHTML = '';
         }
       });
     }
 
     inner.querySelector('#svWipe').onclick = () => {
       confirmModal('Borrar todos los datos',
-        'Se borrarán TODOS tus datos locales: iniciativas, reuniones, transcripciones, notas, capturas y ajustes. Tu carpeta de exportación NO se toca. Esta acción no se puede deshacer.',
+        'Se borrarán TODOS tus datos locales: proyectos, reuniones, transcripciones, notas, capturas y ajustes. Tu carpeta de exportación NO se toca. Esta acción no se puede deshacer.',
         'Borrar todo', async () => {
           const r = await api.wipeAllData();
           if (r && r.ok) {
@@ -4452,24 +7158,64 @@ function viewSettings() {
 
   return wrap;
 }
-
 /* ============================================================
    ATAJOS DE TECLADO
    ============================================================ */
 document.addEventListener('keydown', (e) => {
+  // El <dialog> del buscador se cierra solo con Esc (nativo); si está abierto,
+  // ningún otro atajo debe dispararse por debajo.
+  if ($('#searchOverlay')?.open) return;
   if (e.key === 'Escape') { if (!$('#overlayRoot').hidden) closeModal(); closeMenu(); return; }
   if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') { e.preventDefault(); openSearch(); }
   if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'n') { e.preventDefault(); promptNewInitiative(); }
   if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'b') { e.preventDefault(); STATE.sidebarOpen = !STATE.sidebarOpen; applySidebar(); }
 });
 
+/* ---- Cableado del buscador global ---- */
+function wireSearchOverlay() {
+  const dlg = $('#searchOverlay'); if (!dlg) return;
+  const input = $('#searchInput'); if (!input) return;
+
+  // Filtrado local instantáneo mientras se escribe.
+  input.addEventListener('input', () => renderSearchOverlay(input.value));
+
+  input.addEventListener('keydown', async (e) => {
+    if (e.key === 'ArrowDown') { e.preventDefault(); soMoveCursor(1); return; }
+    if (e.key === 'ArrowUp')   { e.preventDefault(); soMoveCursor(-1); return; }
+    if (e.key !== 'Enter') return;
+    e.preventDefault();
+    // Con una fila marcada por las flechas, Enter la abre.
+    if (SO.cursor >= 0 && SO.rows[SO.cursor]) { SO.rows[SO.cursor].click(); return; }
+    // Sin marca, Enter busca dentro de las transcripciones (api.search).
+    const q = input.value.trim();
+    if (!q) return;
+    const hits = await api.search(q) || [];
+    renderSearchOverlay(q, hits);
+    if (!hits.length) {
+      const list = $('#searchOverlayResults');
+      const nada = el('div', 'search-overlay-hint');
+      nada.textContent = 'Nada en las transcripciones para esa búsqueda.';
+      list?.appendChild(nada);
+    }
+  });
+
+  // Clic en el ::backdrop cierra (showModal no lo hace solo).
+  dlg.addEventListener('click', (e) => { if (e.target === dlg) closeSearchOverlay(); });
+  // Esc nativo: sincroniza la clase de la animación.
+  dlg.addEventListener('close', () => dlg.classList.remove('show'));
+}
+
 /* Prevención de cierre durante grabación */
+/* Re-render settings page when language changes */
+document.addEventListener('helpmeet:lang-changed', () => {
+  if (STATE.screen === 'settings') openSettings();
+});
+
 window.addEventListener('beforeunload', (e) => {
   if (STATE.appState === 'recording' || STATE.appState === 'recording-local' || STATE.appState === 'recording-cloud' || STATE.appState === 'screen-recording') {
     e.preventDefault(); e.returnValue = '';
   }
 });
-
 /* ============================================================
    REFRESCOS / INIT
    ============================================================ */
@@ -4480,7 +7226,7 @@ function bootstrapAvailable() {
   return !HAS_PYWEBVIEW() || typeof window.pywebview.api.get_bootstrap_state === 'function';
 }
 
-// Vuelca el estado de arranque (iniciativas, reuniones, monitores y contadores)
+// Vuelca el estado de arranque (proyectos, reuniones, monitores y contadores)
 // que llega en UNA sola llamada al backend.
 function applyBootstrap(b) {
   STATE.initiatives = b.initiatives || [];
@@ -4494,7 +7240,9 @@ function applyBootstrap(b) {
   const ac = $('#archiveCount'), tc = $('#trashCount');
   if (ac) ac.textContent = STATE.archiveCount; if (tc) tc.textContent = STATE.trashCount;
   if (b.version) { STATE.version = b.version; const ve = $('#headerVersion'); if (ve) ve.textContent = 'v' + b.version; }
-  if (b.default_mic_muted != null) { STATE.micMuted = !!b.default_mic_muted; updateMicChip(); }
+  checkForUpdateOnce();
+  // El backend manda si trae el dato; si no, queda lo guardado en el navegador.
+  if (b.default_mic_muted != null) { STATE.micMuted = !!b.default_mic_muted; _guardarMicMuted(STATE.micMuted); updateMicChip(); }
   // Restaurar estado de grabación de pantalla si el backend la tenía activa
   if (b.screen_recording) {
     STATE.screenMeetingId = b.screen_meeting_id || null;
@@ -4502,6 +7250,26 @@ function applyBootstrap(b) {
     setAppState('screen-recording');
     startTimer();
   }
+}
+
+// Aviso de actualización: consulta una sola vez por sesión, en segundo plano.
+// Si hay versión nueva, el chip de versión del header se vuelve clicable y
+// abre la descarga en el navegador. Sin internet: silencio total.
+let _updateChecked = false;
+async function checkForUpdateOnce() {
+  if (_updateChecked) return;
+  _updateChecked = true;
+  let u = null;
+  try { u = await api.checkForUpdate(); } catch (e) { return; }
+  if (!u || !u.available) return;
+  const ve = $('#headerVersion');
+  if (ve) {
+    ve.textContent = `v${u.current} · ⬆ ${u.version} disponible`;
+    ve.classList.add('has-update');
+    ve.title = `Nueva versión ${u.version} — clic para descargar`;
+    ve.onclick = () => api.openUrl(u.url);
+  }
+  toast('info', `Nueva versión ${u.version} disponible — clic en la versión (arriba) para descargar`);
 }
 
 async function refreshAll() {
@@ -4529,84 +7297,130 @@ const WC_SVG = {
 };
 
 function wireTopbar() {
-  $('#btnNewInitiative').innerHTML = svg('plus', 14);
-  $('#btnNewInitiativeRail').innerHTML = svg('plus', 16);
-  $('#btnArchive')?.querySelector('.ico-archive')?.replaceWith(elFromHTML('<span class="ico">' + svg('archive', 14) + '</span>'));
-  $('#btnTrash').querySelector('.ico-trash')?.replaceWith(elFromHTML('<span class="ico">' + svg('trash', 14) + '</span>'));
-  $('#navInitiatives').querySelector('.ico-rocket')?.replaceWith(elFromHTML('<span class="ico">' + svg('rocket', 15) + '</span>'));
-  $('#navInitiatives .nav-chev').innerHTML = svg('chevron', 17);
-  $('#navMeetings').querySelector('.ico-meetings')?.replaceWith(elFromHTML('<span class="ico">' + svg('calendar', 15) + '</span>'));
-  $('#btnSettingsSide').querySelector('.ico-settings')?.replaceWith(elFromHTML('<span class="ico">' + svg('settings', 14) + '</span>'));
-  // Rail
-  $('#railMeetings')?.querySelector('.ico-meetings')?.replaceWith(elFromHTML('<span class="ico">' + svg('calendar', 16) + '</span>'));
-  $('#railInitiatives')?.querySelector('.ico-rocket')?.replaceWith(elFromHTML('<span class="ico">' + svg('rocket', 16) + '</span>'));
-  $('#btnNewInitiativeRail').innerHTML = svg('plus', 16);
-  $('#railArchive')?.querySelector('.ico-archive')?.replaceWith(elFromHTML('<span class="ico">' + svg('archive', 15) + '</span>'));
-  $('#railTrash')?.querySelector('.ico-trash')?.replaceWith(elFromHTML('<span class="ico">' + svg('trash', 15) + '</span>'));
-  $('#railSettings')?.querySelector('.ico-settings')?.replaceWith(elFromHTML('<span class="ico">' + svg('settings', 15) + '</span>'));
+  /* FASE 1 del rediseño: los iconos del chasis ya vienen en el HTML, del sprite
+     SVG (<use href="#i-…">), así que aquí ya no se inyectan uno por uno. Con
+     ellos desaparecieron el botón grande "Nuevo proyecto", la cabecera
+     "Proyectos" con su contador y su botón de refrescar, y el <aside> del riel
+     colapsado entero (ahora el sidebar cambia de ancho, no se cambia de
+     elemento). Ver css/shell.css. */
 
-  $('#btnNewInitiative').onclick = promptNewInitiative;
-  $('#btnNewInitiativeRail').onclick = promptNewInitiative;
-  if ($('#btnArchive')) $('#btnArchive').onclick = () => { STATE.screen = 'archive'; renderMain(); };
-  $('#btnTrash').onclick = () => { STATE.screen = 'trash'; renderMain(); };
-  $('#btnSettingsSide').onclick = () => { STATE.screen = 'settings'; renderMain(); renderTopStatus(); };
-  $('#railMeetings')?.addEventListener('click', () => { STATE.sidebarOpen = true; applySidebar(); openMeetingsView(); });
-  $('#railInitiatives')?.addEventListener('click', () => { STATE.sidebarOpen = true; applySidebar(); });
-  $('#railArchive')?.addEventListener('click', () => { STATE.sidebarOpen = true; applySidebar(); STATE.screen = 'archive'; renderMain(); });
-  $('#railTrash')?.addEventListener('click', () => { STATE.sidebarOpen = true; applySidebar(); STATE.screen = 'trash'; renderMain(); });
-  $('#railSettings')?.addEventListener('click', () => { STATE.sidebarOpen = true; applySidebar(); STATE.screen = 'settings'; renderMain(); renderTopStatus(); });
-  $('#navInitiativesToggle').onclick = () => {
-    STATE.openInits = {};   // colapsa todo lo abierto en el árbol
-    STATE.selInit = null; STATE.selMeeting = null;
-    STATE.screen = 'initiatives-list';
+  // Plegar/desplegar el panel lateral.
+  const menuBtn = $('#btnMenu');
+  if (menuBtn) menuBtn.onclick = () => { STATE.sidebarOpen = !STATE.sidebarOpen; applySidebar(); };
+
+  // Buscador desde la titlebar (además de Ctrl+K).
+  $('#btnSearchTop')?.addEventListener('click', openSearch);
+
+  // "Mis notas": el icono pliega la lista de proyectos; el texto y la flecha
+  // navegan por su cuenta (los cablea el resto de wireTopbar más abajo).
+  const foldBtn = $('#btnFoldProjects');
+  if (foldBtn) {
+    foldBtn.onclick = () => {
+      // En el riel colapsado no hay nada que plegar: el icono abre la gestión.
+      if ($('#shell')?.classList.contains('collapsed')) {
+        STATE.screen = 'initiatives-list'; renderMain(); renderTopStatus(); return;
+      }
+      // La clase va en #sidebarFold, el contenedor que se pliega; #sidebarTree
+      // es el hijo que recorta. Ver .projlist-fold en shell.css.
+      const nested = $('#sidebarFold');
+      const plegado = nested?.classList.toggle('collapsed-group');
+      foldBtn.setAttribute('aria-expanded', plegado ? 'false' : 'true');
+    };
+  }
+  // El texto "Mis notas" abre la misma vista agregada que la fila de abajo.
+  $('#btnMyNotes')?.addEventListener('click', () => {
+    STATE.screen = 'allnotes'; STATE.selInit = null; STATE.selMeeting = null;
     renderSidebar(); renderMain(); renderTopStatus();
-  };
-  // El chevron colapsa/expande el árbol sin navegar
-  $('#navInitiatives .nav-chev').onclick = (e) => {
-    e.stopPropagation();
-    const tree = $('#sidebarTree');
-    const collapsed = tree.classList.toggle('is-collapsed');
-    $('#navInitiatives').classList.toggle('collapsed', collapsed);
-    $('#navInitiativesToggle').setAttribute('aria-expanded', String(!collapsed));
-  };
-  $('#navMeetings').onclick = openMeetingsView;
-  $('#navFavorites')?.querySelector('.ico-star')?.replaceWith(elFromHTML('<span class="ico">' + svg('star', 15) + '</span>'));
-  if ($('#navFavorites')) $('#navFavorites').onclick = () => { STATE.screen = 'favorites'; renderMain(); renderTopStatus(); };
+  });
+  $('#btnManageSpaces')?.addEventListener('click', () => {
+    STATE.screen = 'initiatives-list'; renderMain(); renderTopStatus();
+  });
 
-  // Controles de ventana frameless — iconos SVG estilo Win11
-  const wcMin = $('#wcMin'), wcMax = $('#wcMax'), wcClose = $('#wcClose');
-  if (wcMin) wcMin.innerHTML = WC_SVG.min;
-  if (wcMax) wcMax.innerHTML = WC_SVG.max;
-  if (wcClose) wcClose.innerHTML = WC_SVG.close;
+  // Sincronizar con las carpetas del disco: era el botón ↻ de la cabecera
+  // "Proyectos", que el mockup eliminó. La acción sigue disponible desde el
+  // menú "···" de cualquier proyecto y desde Configuración.
+  $('#btnNewInitiative')?.addEventListener('click', promptNewInitiative);
+  $('#navHome')?.addEventListener('click', () => { STATE.screen = 'welcome'; STATE.selInit = null; STATE.selMeeting = null; renderSidebar(); renderMain(); renderTopStatus(); });
+  $('#btnArchive')?.addEventListener('click', () => { STATE.screen = 'archive'; renderMain(); renderTopStatus(); });
+  $('#btnTrash')?.addEventListener('click', () => { STATE.screen = 'trash'; renderMain(); renderTopStatus(); });
+  $('#btnSettingsSide')?.addEventListener('click', () => { STATE.screen = 'settings'; renderMain(); renderTopStatus(); });
 
+  // Tema claro/oscuro. El botón vive ahora en la titlebar y es solo un icono
+  // (sol/luna) que se intercambia en el sprite, sin etiqueta de texto.
+  const themeBtn = $('#btnThemeToggle');
+  const themeIconUse = $('#themeIcon')?.querySelector('use');
+  const updateThemeUI = () => {
+    const isDark = load('hm.theme', 'light') === 'dark';
+    if (themeIconUse) themeIconUse.setAttribute('href', isDark ? '#i-sun' : '#i-moon');
+    if (themeBtn) {
+      const lbl = isDark ? 'Cambiar a modo claro' : 'Cambiar a modo oscuro';
+      themeBtn.title = lbl; themeBtn.setAttribute('aria-label', lbl);
+    }
+  };
+  updateThemeUI();
+  if (themeBtn) themeBtn.onclick = () => {
+    const isDark = load('hm.theme', 'light') === 'dark';
+    const next = isDark ? 'light' : 'dark';
+    save('hm.theme', next);
+    if (next === 'dark') document.body.dataset.theme = 'dark';
+    else delete document.body.dataset.theme;
+    // Actualizar favicon
+    const icoEl = document.getElementById('faviconIco');
+    if (icoEl) icoEl.href = next === 'dark' ? 'assets/helpmeet-dark.ico' : 'assets/helpmeet.ico';
+    // Actualizar icono de ventana nativa (Windows)
+    try { api.winRefreshTheme(next === 'dark'); } catch (e) { /* solo Windows */ }
+    updateThemeUI();
+    toast('ok', next === 'dark' ? t('settings.themeDarkActive') : t('settings.themeLightActive'));
+  };
+  /* El <aside class="sidebar-rail"> desapareció con la Fase 1: el mockup usa un
+     solo panel que cambia de ancho, así que los mismos .navitem sirven en los
+     dos estados y no hay que cablear un juego de botones duplicado. */
+  $('#navMeetings')?.addEventListener('click', openMeetingsView);
+  $('#navFavorites')?.addEventListener('click', () => { STATE.screen = 'favorites'; renderMain(); renderTopStatus(); });
+  $('#navDocs')?.addEventListener('click', openDocsView);
+
+  // Controles de ventana frameless. Los iconos base vienen del sprite; solo se
+  // sustituye el de maximizar, que alterna entre cuadrado y "restaurar".
+  const wcMax = $('#wcMax');
   const updateMaxIcon = async () => {
     if (!wcMax) return;
     const r = await api.winIsMaximized().catch(() => ({ maximized: false }));
-    wcMax.innerHTML = (r && r.maximized) ? WC_SVG.restore : WC_SVG.max;
+    const u = wcMax.querySelector('use');
+    if (u) u.setAttribute('href', (r && r.maximized) ? '#i-pages' : '#i-maximize');
   };
+  const wcMin = $('#wcMin'), wcClose = $('#wcClose');
 
   if (wcMin) wcMin.onclick = () => api.winMinimize();
   if (wcMax) wcMax.onclick = async () => { await api.winMaximize(); setTimeout(updateMaxIcon, 80); };
   if (wcClose) wcClose.onclick = () => api.winClose();
 
-  // Arrastre de ventana: solo desde el topbar, ignorando elementos interactivos
-  const topbar = document.querySelector('.topbar');
+  /* Arrastre de ventana desde la barra de título, ignorando lo interactivo.
+     Con la Fase 1 la barra pasó de .topbar a .titlebar y este querySelector
+     quedó devolviendo null: la ventana dejó de poder moverse y de responder al
+     doble clic para maximizar. Se aceptan las dos clases para no volver a
+     romperlo si alguna pantalla vieja sigue usando la anterior. */
+  const topbar = document.querySelector('.titlebar, .topbar');
   if (topbar) {
-    topbar.addEventListener('mousedown', (e) => {
+    topbar.addEventListener('mousedown', async (e) => {
       if (e.button !== 0) return;
-      if (e.target.closest('button, input, a, [role="button"], .brand, .win-controls')) return;
+      if (e.target.closest('button, input, a, [role="button"], .brand, .win-controls, .wincontrols, .topbar-status')) return;
       e.preventDefault();
+      // Maximizada: al agarrarla se restaura primero (como cualquier app de
+      // Windows) y recién entonces se arrastra; antes se movía a pantalla completa.
+      try {
+        const r = await api.winIsMaximized().catch(() => null);
+        if (r && r.maximized) { await api.winMaximize(); setTimeout(updateMaxIcon, 80); }
+      } catch (err) { /* sin backend: seguir con el arrastre normal */ }
       api.winStartMove();
     });
     // Doble clic → maximizar/restaurar
     topbar.addEventListener('dblclick', (e) => {
-      if (e.target.closest('button, input, a, [role="button"], .brand, .win-controls')) return;
+      if (e.target.closest('button, input, a, [role="button"], .brand, .win-controls, .wincontrols')) return;
       wcMax?.click();
     });
   }
 }
 function elFromHTML(h) { const t = el('div'); t.innerHTML = h; return t.firstChild; }
-
 /* ============================================================
    ASISTENTE DE PRIMERA EJECUCIÓN (SETUP)
    ============================================================ */
@@ -4614,32 +7428,33 @@ function showSetupOverlay(cfg) {
   // cfg: objeto get_transcription_settings (puede ser null si aún no cargó)
   const ov = el('div', 'setup-overlay');
   ov.innerHTML = `
+    <div class="setup-theme-toggle" id="setupThemeChips">
+      <button class="cfg-chip" data-theme-opt="light">Claro</button>
+      <button class="cfg-chip" data-theme-opt="dark">Oscuro</button>
+    </div>
     <div class="setup-box">
       <div class="setup-hero">
         <img class="setup-logo-img" src="assets/helpmeet-symbol.svg" alt="">
         <h1 class="setup-h1">Bienvenido a Helpmeet</h1>
-        <p class="setup-sub">Vamos a preparar el motor de transcripción antes de tu primera grabación.<br>Solo se hace una vez y tardará unos minutos.</p>
+        <p class="setup-sub">Vamos a preparar el motor de transcripción antes de tu primera grabación. Solo se hace una vez y tardará unos minutos.</p>
       </div>
 
+      <div class="setup-cols">
+        <div class="setup-section">
+          <div class="setup-section-title">Carpeta de grabaciones</div>
+          <div class="setup-folder-row">
+            <span class="setup-folder-path" id="setupFolderPath">…</span>
+            <button class="btn setup-folder-btn" id="setupFolderBtn">Cambiar</button>
+          </div>
+        </div>
+        <div class="setup-section setup-section-checks">
+          <div class="setup-section-title">Estado del sistema</div>
+          <div class="setup-checks" id="setupChecks"><span class="setup-check-placeholder">Comprobando…</span></div>
+        </div>
+      </div>
       <div class="setup-section" id="setupCfgWrap">
-        <div class="setup-section-title">Idioma y calidad</div>
-        <div class="pre-cfg">
-          <div class="pre-cfg-row"><span class="pre-cfg-lbl">Idioma</span><div class="cfg-chips" id="setupLangChips"></div></div>
-          <div class="pre-cfg-row"><span class="pre-cfg-lbl">Calidad</span><div class="cfg-chips" id="setupModelChips"></div></div>
-        </div>
-      </div>
-
-      <div class="setup-section">
-        <div class="setup-section-title">Carpeta de grabaciones</div>
-        <div class="setup-folder-row">
-          <span class="setup-folder-path" id="setupFolderPath">…</span>
-          <button class="btn setup-folder-btn" id="setupFolderBtn">Cambiar</button>
-        </div>
-      </div>
-
-      <div class="setup-section">
-        <div class="setup-section-title">Estado del sistema</div>
-        <div class="setup-checks" id="setupChecks"><span class="setup-check-placeholder">Comprobando…</span></div>
+        <div class="setup-section-title">Idioma y calidad del modelo</div>
+        <div id="setupModelChips"></div>
       </div>
 
       <div class="setup-progress-wrap" id="setupProgressWrap" hidden>
@@ -4657,21 +7472,68 @@ function showSetupOverlay(cfg) {
 
   document.body.appendChild(ov);
 
+  // Modo claro/oscuro también aquí: es la primera pantalla que se ve y
+  // todavía no hay forma de llegar a Configuración para elegirlo.
+  const themeBox = ov.querySelector('#setupThemeChips');
+  if (themeBox) {
+    const renderTheme = () => {
+      const cur = load('hm.theme', 'light');
+      themeBox.querySelectorAll('[data-theme-opt]').forEach(b =>
+        b.classList.toggle('on', b.dataset.themeOpt === cur));
+    };
+    themeBox.querySelectorAll('[data-theme-opt]').forEach(b => b.onclick = () => {
+      const v = b.dataset.themeOpt;
+      save('hm.theme', v);
+      if (v === 'dark') document.body.dataset.theme = 'dark';
+      else delete document.body.dataset.theme;
+      renderTheme();
+    });
+    renderTheme();
+  }
+
   let _cfg = cfg || {};
   let _started = false;
+
+  // Nombre corto de cada calidad. El chip muestra el id real del modelo
+  // (base/small/medium/large-v3); la etiqueta va debajo, pequeña.
+  const TIER_LABEL = {
+    fast: 'Rápido', balanced: 'Recomendado', accurate: 'Preciso', max: 'Máxima',
+  };
 
   async function _loadChips() {
     try { _cfg = await api.v2.getTranscriptionSettings() || _cfg; } catch (e) { /* usa lo que hay */ }
     const byLang = _cfg.models_by_lang || {};
-    const langEl = ov.querySelector('#setupLangChips');
     const modelEl = ov.querySelector('#setupModelChips');
-    langEl.innerHTML = (_cfg.languages || []).map(lg =>
-      `<button class="cfg-chip${lg.id === _cfg.language ? ' on' : ''}" data-lang="${esc(lg.id)}">${esc(lg.label)}</button>`
+
+    // Recomendado por defecto: Español + calidad "Rápido" (small).
+    if (!_cfg.tier) {
+      try { _cfg = await api.v2.setTranscriptionSettings({ language: 'es', tier: 'balanced' }) || _cfg; } catch (e) { /* */ }
+    }
+
+    // Paso 1 — Idioma
+    const langChips = (_cfg.languages || []).map(lg =>
+      `<button class="cfg-chip setup-lang-chip${lg.id === _cfg.language ? ' on' : ''}" data-lang="${esc(lg.id)}">${esc(lg.label)}</button>`
     ).join('');
-    modelEl.innerHTML = (byLang[_cfg.language] || _cfg.models || []).map(mo =>
-      `<button class="cfg-chip${mo.tier === _cfg.tier ? ' on' : ''}" data-tier="${esc(mo.tier)}" title="${esc(mo.label)} · ${esc(mo.download)}">${esc(mo.id)}<span class="cfg-chip-sub">${esc(mo.download)}</span></button>`
-    ).join('');
-    langEl.querySelectorAll('[data-lang]').forEach(b => b.onclick = async () => {
+
+    // Paso 2 — Calidad (mismos modelos para ambos idiomas)
+    const models = byLang[_cfg.language] || _cfg.models || [];
+    const qualChips = models.map(mo => {
+      const active = mo.tier === _cfg.tier;
+      const isRec  = mo.tier === 'balanced';
+      return `<button class="cfg-chip setup-model-chip${active ? ' on' : ''}${isRec ? ' is-rec' : ''}${mo.downloaded ? ' is-dl' : ''}" data-tier="${esc(mo.tier)}" title="${esc(mo.label)}">${isRec ? '<span class="setup-q-star">★</span>' : ''}${esc(mo.id)}<span class="cfg-chip-sub">${esc(TIER_LABEL[mo.tier] || '')} · ${esc(mo.download)}</span></button>`;
+    }).join('');
+
+    modelEl.innerHTML = `
+      <div class="setup-pick">
+        <span class="setup-pick-lbl">Idioma</span>
+        <div class="setup-pick-chips">${langChips}</div>
+      </div>
+      <div class="setup-pick">
+        <span class="setup-pick-lbl">Calidad</span>
+        <div class="setup-pick-chips">${qualChips}</div>
+      </div>`;
+
+    modelEl.querySelectorAll('[data-lang]').forEach(b => b.onclick = async () => {
       try { _cfg = await api.v2.setTranscriptionSettings({ language: b.dataset.lang }) || _cfg; } catch (e) { /* */ }
       _loadChips();
     });
@@ -4679,6 +7541,7 @@ function showSetupOverlay(cfg) {
       try { _cfg = await api.v2.setTranscriptionSettings({ tier: b.dataset.tier }) || _cfg; } catch (e) { /* */ }
       _loadChips();
     });
+
     // Carpeta de destino
     const folderEl = ov.querySelector('#setupFolderPath');
     if (folderEl && _cfg.export_dir) folderEl.textContent = _cfg.export_dir;
@@ -4712,6 +7575,7 @@ function showSetupOverlay(cfg) {
       ov.style.display = 'none';
       ov.style.pointerEvents = 'none';
       if (ov.parentNode) ov.remove();
+      setTimeout(() => showInitialTourIfNeeded(false), 300);
     }, 450);
   }
 
@@ -4730,12 +7594,28 @@ function showSetupOverlay(cfg) {
       if (label) label.textContent = `Cargando en memoria… ${pct}%`;
     } else if (e.stage === 'done') {
       if (fill) fill.style.width = '100%';
-      if (label) label.textContent = '¡Listo! El motor ya está caliente.';
+      if (label) label.textContent = 'Completado';
+      if (errEl) errEl.hidden = true;
       btn.textContent = 'Comenzar →';
       btn.disabled = false;
       btn.onclick = _enterApp;
+      _loadChecks();
     } else if (e.stage === 'error') {
-      if (errEl) { errEl.hidden = false; errEl.textContent = e.error || 'Error durante la instalación.'; }
+      if (errEl) {
+        errEl.hidden = false;
+        const msg = errMsg(e.error, 'Error durante la instalación.');
+        errEl.innerHTML =
+          `<span class="setup-error-text">${esc(msg)}</span>` +
+          `<a class="setup-clear-cache" href="#">Limpiar caché y reintentar</a>`;
+        errEl.querySelector('.setup-clear-cache').onclick = async (ev) => {
+          ev.preventDefault();
+          try { await api.v2.clearVoskCache(); } catch (_) { /* */ }
+          errEl.hidden = true;
+          if (label) label.textContent = 'Preparando…';
+          if (fill) fill.style.width = '3%';
+          btn.click();
+        };
+      }
       if (label) label.textContent = 'Se produjo un error.';
       btn.textContent = 'Reintentar';
       btn.disabled = false;
@@ -4777,10 +7657,11 @@ window.doLicenseActivate = async function() {
       await new Promise(r => setTimeout(r, 400));
       gate.hidden = true;
       gate.classList.remove('lic-fade-out');
+      document.body.classList.remove('licensing');
       await _finishInit();
     } else {
       if (errEl) {
-        errEl.textContent = (result && result.error) || 'Key invalida. Intentalo de nuevo.';
+        errEl.textContent = errMsg(result && result.error, 'No se pudo activar. Revisa la key e inténtalo de nuevo.');
         errEl.hidden = false;
       }
       input.classList.add('lic-shake');
@@ -4789,7 +7670,7 @@ window.doLicenseActivate = async function() {
       btn.innerHTML = 'Activar';
     }
   } catch (e) {
-    if (errEl) { errEl.textContent = 'Error inesperado. Intentalo de nuevo.'; errEl.hidden = false; }
+    if (errEl) { errEl.textContent = 'Error inesperado. Inténtalo de nuevo.'; errEl.hidden = false; }
     btn.disabled = false;
     btn.innerHTML = 'Activar';
   }
@@ -4797,6 +7678,13 @@ window.doLicenseActivate = async function() {
 
 function showLicenseGate() {
   const gate = document.getElementById('licenseGate');
+  // Pantalla completa: oculta la app de detrás y cierra modales abiertos
+  // (p. ej. si se llega aquí desde Configuración → Desactivar licencia).
+  document.body.classList.add('licensing');
+  try { closeModal(); } catch (e) {}
+  // El tour (z 12000) quedaría por encima del gate: fuera también.
+  document.getElementById('initialTour')?.remove();
+  document.querySelectorAll('.tour-target').forEach(n => n.classList.remove('tour-target'));
   gate.hidden = false;
   gate.classList.add('lic-fade-in');
   setTimeout(() => gate.classList.remove('lic-fade-in'), 400);
@@ -4847,20 +7735,36 @@ async function _finishInit() {
     }
   } catch (e) { console.warn('init', e); }
   renderSidebar(); renderActionBar(); renderMain();
+  setTimeout(() => showInitialTourIfNeeded(false), 500);
   if (!booted) {
     updateLibraryCounts();
     try { renderBgJobs(await api.getBackgroundJobs()); } catch (e) { /* sin jobs */ }
   }
-  // Recuperación al arrancar (V2). Si no hay backend, no molesta.
-  if (v2Available('list_recoverable_recordings')) {
+  // Recuperacion al arrancar (V2). Si no hay backend, no molesta.
+  // Solo disponible en planes Pro/Team.
+  if (hasFeature('recovery') && v2Available('list_recoverable_recordings')) {
     const recs = await api.v2.listRecoverable();
     if (recs && recs.length) showRecoveryBanner(recs[0]);
   }
 }
 
+// Captura de errores JS que de otro modo se perderían en silencio (p. ej. una
+// promesa rechazada dentro de un setTimeout sin await). Sin esto, un fallo de
+// render durante "Iniciar grabación" hacía que "no pasara nada".
+window.addEventListener('error', (e) => {
+  console.error('[JS error]', e.message, e.filename + ':' + e.lineno);
+  try { toast('err', 'Error: ' + e.message); } catch (_) { /* toast no listo */ }
+});
+window.addEventListener('unhandledrejection', (e) => {
+  const reason = (e && e.reason && (e.reason.message || e.reason)) || 'desconocido';
+  console.error('[promesa no manejada]', reason);
+  try { toast('err', 'Error: ' + reason); } catch (_) { /* toast no listo */ }
+});
+
 async function init() {
   applySidebar();
   wireTopbar();
+  wireSearchOverlay();
   setAppState('idle');
 
   // Verificar licencia
@@ -4868,6 +7772,8 @@ async function init() {
     try {
       const lic = await api.checkLicense();
       if (!lic || !lic.ok) { showLicenseGate(); return; }
+      // Cargar features del plan para gating de UI
+      window._planFeatures = await api.getPlanFeatures();
     } catch (e) { console.warn('license_check', e); }
   }
 
@@ -4892,3 +7798,547 @@ async function init() {
     setTimeout(poll, 60);
   })();
 })();
+
+
+
+/* ============================================================
+   PANEL FLOTANTE DE GRABACIÓN — FASE 7
+   Cronómetro centrado, burbujas de lo transcrito y controles al pie.
+
+   Ausencia deliberada: Pausar/Reanudar. api_recording.py solo expone silenciar
+   (toggle_meeting_mic_mute / toggle_screen_mic_mute) y detener. Construir la
+   pausa de verdad implica cortar y retomar la captura sin cerrar la sesión, y
+   decidir qué pasa con las marcas de tiempo durante el hueco — es desarrollo,
+   no rediseño. Un botón que no hace nada es peor que su ausencia.
+   ============================================================ */
+function recPanel(opts) {
+  opts = opts || {};
+  const esPantalla = opts.modo === 'screen';
+  const it = STATE.initiatives.find(x => x.id === STATE.selInit);
+  const silenciado = esPantalla ? STATE.micMuted : STATE.meetingMicMuted;
+
+  const panel = el('div', 'rec-panel' + (STATE._recPanelMin ? ' is-minimized' : '') + (esPantalla ? '' : ' mode-audio'));
+  panel.id = 'recPanel';
+
+  const btn = (cls, icono, titulo, onClick, extra) => {
+    const b = el('button', cls);
+    b.type = 'button';
+    if (titulo) { b.title = titulo; b.setAttribute('aria-label', titulo); }
+    b.innerHTML = `<svg class="icon"><use href="#${icono}"/></svg>` + (extra || '');
+    if (onClick) b.onclick = onClick;
+    return b;
+  };
+
+  /* ---- Cabecera: buscar a la izquierda; ajustes, copiar y minimizar a la
+     derecha. Las tres de la derecha son de sesión; buscar es de contenido, y por
+     eso queda sola en el otro extremo. ---- */
+  const head = el('div', 'rec-panel-head');
+  head.appendChild(btn('icon-btn', 'i-search', 'Buscar en lo transcrito', openSearch));
+
+  /* Título en la cabecera, editable con un clic. La reunión nace con la fecha
+     porque preguntarlo antes de grabar frenaba el arranque; poder escribirlo
+     ACÁ, mientras la reunión pasa, es el momento en que de verdad se sabe de
+     qué es. Se guarda al salir del campo o con Enter. */
+  const tituloActual = (STATE.transcript && STATE.transcript.title) || _prettyToday();
+  const tit = el('button', 'rec-title');
+  tit.type = 'button';
+  tit.title = 'Clic para ponerle nombre a la reunión';
+  tit.textContent = tituloActual;
+  tit.onclick = () => {
+    const inp = el('input', 'rec-title-input');
+    inp.type = 'text';
+    inp.value = tit.textContent;
+    inp.setAttribute('aria-label', 'Nombre de la reunión');
+    tit.replaceWith(inp);
+    inp.focus(); inp.select();
+    const guardar = () => {
+      const v = (inp.value || '').trim() || tituloActual;
+      tit.textContent = v;
+      inp.replaceWith(tit);
+      if (v !== tituloActual) {
+        const mid = STATE.selMeeting || STATE.screenMeetingId;
+        if (mid) {
+          api.renameMeeting(mid, v).catch(() => {});
+          if (STATE.transcript) STATE.transcript.title = v;
+          refreshMeetings(STATE.selInit);
+        }
+      }
+    };
+    inp.addEventListener('blur', guardar);
+    inp.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') { e.preventDefault(); inp.blur(); }
+      if (e.key === 'Escape') { inp.value = tit.textContent; inp.blur(); }
+    });
+  };
+  head.appendChild(tit);
+  const hr = el('div', 'rec-panel-head-right');
+  hr.appendChild(btn('icon-btn', 'i-settings', 'Ajustes de transcripción', () => {
+    STATE.screen = 'settings'; renderMain(); renderTopStatus();
+  }));
+  hr.appendChild(btn('icon-btn', 'i-copy', 'Copiar lo transcrito', async () => {
+    const us = ((STATE.transcript && STATE.transcript.utterances) || []).filter(u => !u.kind || u.kind === 'utterance');
+    if (!us.length) { toast('info', 'Todavía no hay nada transcrito'); return; }
+    await navigator.clipboard.writeText(us.map(u => `[${u.time}] ${u.speaker === 'me' ? 'Yo' : 'Los demás'}: ${u.text}`).join('\n'));
+    toast('ok', 'Copiado al portapapeles');
+  }));
+  hr.appendChild(btn('icon-btn rec-min-btn', 'i-minus', 'Minimizar el panel',
+    () => { STATE._recPanelMin = true; renderActionBar(); }));
+  head.appendChild(hr);
+  panel.appendChild(head);
+
+  // ---- Cronómetro ----
+  const timer = el('div', 'rec-timer-center');
+  timer.innerHTML = `<span class="rec-timer" id="recPanelTimer">${fmt(STATE.recElapsed)}</span>`;
+  panel.appendChild(timer);
+
+  // ---- Burbujas ----
+  const stream = el('div', 'rec-stream scroll');
+  stream.id = 'recStream';
+  _recPanelBurbujas(stream);
+  panel.appendChild(stream);
+
+  // ---- Pie ----
+  const foot = el('div', 'rec-panel-foot');
+
+  const izq = el('div', 'rec-foot-left');
+  const wave = el('span', 'waveform live');
+  wave.setAttribute('aria-hidden', 'true');
+  wave.innerHTML = '<span></span><span></span><span></span><span></span><span></span>';
+  izq.appendChild(wave);
+
+  izq.appendChild(btn(
+    'icon-btn rec-mute-btn' + (silenciado ? ' muted' : ''),
+    silenciado ? 'i-mic-off' : 'i-mic',
+    silenciado ? 'Activar el micrófono' : 'Silenciar el micrófono',
+    () => {
+      if (esPantalla) { STATE.micMuted = !STATE.micMuted; _guardarMicMuted(STATE.micMuted); api.toggleScreenMicMute(STATE.micMuted); }
+      else toggleMeetingMic();
+      renderActionBar();
+    }));
+
+  /* Notas y Captura con su nombre revelado al pasar el mouse por el grupo, no
+     por cada botón: así se leen los dos a la vez. Misma técnica 0fr→1fr que el
+     dock, para que el gesto sea el mismo en toda la app.
+     Iconos cambiados: el "pin" no se leía como nota (parecía una aguja suelta)
+     y ahora es un cuaderno; la captura usa el marco de imagen, que es lo que
+     una captura produce. */
+  const grupo = el('div', 'rec-tools is-reveal');
+  const conRotulo = (cls, icono, rotulo, onClick) => {
+    const b = el('button', cls);
+    b.type = 'button';
+    b.title = rotulo;
+    b.setAttribute('aria-label', rotulo);
+    b.innerHTML = `<svg class="icon"><use href="#${icono}"/></svg>` +
+      `<span class="rec-label-grid"><span class="rec-label">${esc(rotulo)}</span></span>`;
+    b.onclick = onClick;
+    return b;
+  };
+  grupo.appendChild(conRotulo('rec-tool-btn rec-note-btn', 'i-note-plus', 'Notas', () => promptNote()));
+  if (esPantalla) {
+    grupo.appendChild(conRotulo('rec-tool-btn rec-cap-btn', 'i-screenshot', 'Capturar pantalla',
+      () => api.takeCapture(STATE.monitorIdx).then(() => toast('ok', 'Captura guardada'))));
+  }
+  izq.appendChild(grupo);
+
+  izq.appendChild(el('span', 'rec-foot-sep'));
+
+  /* Detener: cuadrado y no icono de sprite, igual que el mockup. Es la única
+     acción irreversible del panel y va después del separador para que no quede
+     a la misma distancia visual que el resto. */
+  const stop = el('button', 'rec-stop');
+  stop.type = 'button';
+  stop.title = esPantalla ? 'Detener la grabación de pantalla' : 'Detener la grabación';
+  stop.setAttribute('aria-label', stop.title);
+  stop.innerHTML = '<span class="rec-stop-sq"></span>';
+  stop.onclick = () => { STATE._recPanelMin = false; (esPantalla ? stopScreenRecording : stopMeetingRecording)(); };
+  izq.appendChild(stop);
+
+  foot.appendChild(izq);
+
+  // Expandir: solo visible cuando el panel está minimizado.
+  foot.appendChild(btn('icon-btn rec-expand-btn', 'i-expand-up', 'Ampliar el panel',
+    () => { STATE._recPanelMin = false; renderActionBar(); }));
+
+  /* ---- Selectores del pie derecho ----
+     Proyecto destino: en la app la reunión SIEMPRE nace dentro de un proyecto,
+     así que poder cambiarlo sin salir de la grabación evita tener que moverla
+     después. Monitor y recorte solo existen en modo pantalla. */
+  const der = el('div', 'rec-foot-right');
+
+  der.appendChild(_recPick('i-folder', it ? it.name : 'Sin proyecto', (e) => {
+    openMenu(e, (STATE.initiatives || []).map(p => ({
+      label: p.name, icon: 'folder',
+      onClick: async () => {
+        if (STATE.selMeeting) await api.moveMeeting(STATE.selMeeting, p.id).catch(() => {});
+        STATE.selInit = p.id;
+        renderSidebar(); renderActionBar(); renderTopStatus();
+        toast('ok', `Se guardará en ${p.name}`);
+      },
+    })));
+  }));
+
+  if (esPantalla) {
+    const mon = (STATE.monitors || []).find(m => m.index === STATE.monitorIdx);
+    der.appendChild(_recPick('i-monitor', mon ? `Monitor ${mon.index}` : 'Monitor 1', (e) => {
+      openMenu(e, (STATE.monitors || []).map(m => ({
+        label: `Monitor ${m.index} · ${m.width}×${m.height}`, icon: 'monitor',
+        onClick: () => { STATE.monitorIdx = m.index; api.setScreenMonitor(m.index); renderActionBar(); },
+      })));
+    }));
+    const crop = el('button', 'rec-pick rec-crop-btn');
+    crop.type = 'button';
+    crop.title = 'Ajustar el área de captura';
+    crop.setAttribute('aria-label', crop.title);
+    crop.innerHTML = '<svg class="icon"><use href="#i-crop"/></svg>';
+    crop.onclick = () => { STATE.screenPanelCollapsed = false; showScreenPanel(); };
+    der.appendChild(crop);
+  }
+
+  // Idioma de transcripción: los que realmente soporta Vosk.
+  const IDIOMAS = { es: 'Español', en: 'English' };
+  const actual = IDIOMAS[STATE.txLang] || 'Auto';
+  der.appendChild(_recPick(null, actual, (e) => {
+    openMenu(e, [{ label: 'Auto', onClick: () => { STATE.txLang = ''; renderActionBar(); } }]
+      .concat(Object.keys(IDIOMAS).map(k => ({
+        label: IDIOMAS[k], onClick: () => { STATE.txLang = k; renderActionBar(); },
+      }))));
+  }));
+
+  foot.appendChild(der);
+  panel.appendChild(foot);
+  return panel;
+}
+
+/* Selector del pie: icono opcional + valor + chevron hacia arriba (el menú se
+   abre hacia arriba porque el panel vive pegado al borde inferior). */
+function _recPick(icono, valor, onClick) {
+  const b = el('button', 'rec-pick');
+  b.type = 'button';
+  b.setAttribute('aria-haspopup', 'true');
+  b.innerHTML =
+    (icono ? `<svg class="icon"><use href="#${icono}"/></svg>` : '') +
+    `<span class="rec-pick-val">${esc(valor)}</span>` +
+    `<svg class="icon rec-pick-chev"><use href="#i-chevup"/></svg>`;
+  b.onclick = onClick;
+  return b;
+}
+
+/* Burbujas del panel: las frases ya cerradas, y al final una burbuja en curso
+   con el texto parcial que el motor todavía está refinando + los tres puntos.
+   Solo se etiqueta "Yo": las frases del interlocutor son el caso por defecto —
+   la mayoría del texto— y repetir "Los demás" en cada burbuja era ruido. */
+function _recPanelBurbujas(stream) {
+  const us = ((STATE.transcript && STATE.transcript.utterances) || [])
+    .filter(u => !u.kind || u.kind === 'utterance');
+  stream.replaceChildren();
+
+  us.slice(-6).forEach(u => {
+    const b = el('div', 'rec-bubble');
+    const yo = u.speaker === 'me';
+    b.innerHTML = (yo ? '<span class="rec-bubble-who">Yo</span>' : '') + esc(u.text || '');
+    stream.appendChild(b);
+  });
+
+  // Burbuja en curso: se rellena desde window.setLivePartial.
+  const viva = el('div', 'rec-bubble is-live');
+  viva.id = 'recLiveBubble';
+  _recPintaParcial(viva);
+  stream.appendChild(viva);
+
+  stream.scrollTop = stream.scrollHeight;
+}
+
+/* Contenido de la burbuja en curso. Sin parcial todavía muestra solo los puntos
+   —"sigue escuchando"— en vez de una frase vacía. */
+function _recPintaParcial(burbuja) {
+  const p = STATE._livePartials || {};
+  const yo = (p.me || '').trim();
+  const otros = (p.others || '').trim();
+  const puntos = '<span class="rec-typing" aria-label="Transcribiendo"><span></span><span></span><span></span></span>';
+  if (!yo && !otros) { burbuja.innerHTML = puntos; return; }
+  // Si hablo yo se marca; lo del interlocutor va sin etiqueta.
+  const texto = yo
+    ? '<span class="rec-bubble-who">Yo</span>' + esc(yo)
+    : esc(otros);
+  burbuja.innerHTML = texto + puntos;
+}
+
+/* ============================================================
+   SELECCIÓN MÚLTIPLE
+   Las casillas de cada fila (.row-checkbox) alimentan una barra global que
+   entra desde abajo. Patrón de explorador de archivos: la acción vive en la
+   fila y se revela al pasar el mouse, en vez de un "modo selección" que se
+   enciende desde una barra de herramientas.
+   ============================================================ */
+/* Casillas marcadas, sin filtrar por id. Antes se mapeaba a Number(data-mid) y
+   se descartaba lo que diera NaN: si una sola fila no traia el atributo, la
+   cuenta bajaba y la barra se ocultaba aunque hubiera casillas marcadas. */
+function _selMarcadas() {
+  return [...document.querySelectorAll('.row-checkbox:checked')];
+}
+/* Los ids solo hacen falta para EJECUTAR las acciones, no para saber si hay
+   seleccion. Se resuelven aparte y se ignoran las filas sin id. */
+function _selSeleccionadas() {
+  return _selMarcadas()
+    .map(c => c.closest('.row-wrap'))
+    .filter(Boolean)
+    .map(w => Number(w.dataset.mid))
+    .filter(n => Number.isFinite(n));
+}
+
+function _selBarra() {
+  let bar = $('#selBar');
+  if (bar) return bar;
+  bar = el('div', 'sel-bar');
+  bar.id = 'selBar';
+  bar.hidden = true;
+  document.body.appendChild(bar);
+  return bar;
+}
+
+function refrescarSeleccion() {
+  const marcadas = _selMarcadas();
+  const ids = _selSeleccionadas();
+  const bar = _selBarra();
+  const dock = document.querySelector('.rec-dock');
+
+  if (!marcadas.length) {
+    bar.hidden = true;
+    bar.replaceChildren();
+    if (dock) dock.hidden = false;
+    return;
+  }
+
+  // El dock se aparta mientras hay selección: las dos barras ocupan el mismo
+  // punto. Salvo que haya una grabación en curso, que manda.
+  if (dock && STATE.appState === 'idle') dock.hidden = true;
+
+  bar.replaceChildren();
+  bar.hidden = false;
+  // Reinicia la animación de entrada al cambiar el contenido.
+  bar.style.animation = 'none'; void bar.offsetWidth; bar.style.animation = '';
+
+  const n = marcadas.length;
+  const cuenta = el('span', 'sel-count');
+  cuenta.innerHTML = `<span class="sel-badge">${n}</span>` +
+    `<span>${n === 1 ? 'seleccionada' : 'seleccionadas'}</span>`;
+  bar.appendChild(cuenta);
+
+  const limpiar = el('button', 'icon-btn sel-clear');
+  limpiar.type = 'button';
+  limpiar.title = 'Quitar selección';
+  limpiar.setAttribute('aria-label', 'Quitar selección');
+  limpiar.innerHTML = '<svg class="icon icon-sm"><use href="#i-close"/></svg>';
+  limpiar.onclick = () => {
+    document.querySelectorAll('.row-checkbox:checked').forEach(c => { c.checked = false; });
+    refrescarSeleccion();
+  };
+  bar.appendChild(limpiar);
+  bar.appendChild(el('span', 'rec-foot-sep'));
+
+  const accion = (icono, texto, onClick) => {
+    const b = el('button', 'btn-ghost');
+    b.type = 'button';
+    b.innerHTML = `<svg class="icon"><use href="#${icono}"/></svg>${texto}`;
+    b.onclick = onClick;
+    bar.appendChild(b);
+    return b;
+  };
+
+  // Mover a otro proyecto: existe de verdad (move_meeting).
+  accion('i-folder', 'Mover a proyecto', () => {
+    pickInitiativeModal(async (iid) => {
+      for (const mid of ids) await api.moveMeeting(mid, iid).catch(() => {});
+      toast('ok', `${ids.length} ${ids.length === 1 ? 'reunión movida' : 'reuniones movidas'}`);
+      STATE.meetingsByInit = {};
+      await refreshAll();
+      renderSidebar(); renderMain(); refrescarSeleccion();
+    });
+  });
+
+  // Mover a carpeta: organizar es una tarea a posteriori, mirando la lista,
+  // no reunión a reunión — por eso vive acá y no solo en el menú de la fila.
+  if (STATE.selInit) {
+    accion('i-folder', 'Mover a carpeta', (e) => {
+      const carpetas = _getFolders(STATE.selInit);
+      const items = carpetas.map(f => ({
+        label: f.name, icon: 'folder',
+        onClick: () => { ids.forEach(mid => _setMeetingFolder(mid, f.id)); renderMain(); refrescarSeleccion(); },
+      }));
+      items.push({ sep: true });
+      items.push({ label: 'Sacar de la carpeta', icon: 'x',
+        onClick: () => { ids.forEach(mid => _setMeetingFolder(mid, null)); renderMain(); refrescarSeleccion(); } });
+      openMenu(e, items);
+    });
+  }
+
+  accion('i-archive', 'Archivar', () => {
+    confirmModal('Archivar reuniones',
+      `Se archivan ${ids.length} ${ids.length === 1 ? 'reunión' : 'reuniones'}. Se pueden restaurar desde Archivados.`,
+      'Archivar', async () => {
+        for (const mid of ids) await api.archiveItem('meeting', mid).catch(() => {});
+        toast('ok', 'Archivadas');
+        STATE.meetingsByInit = {};
+        await refreshAll();
+        renderSidebar(); renderMain(); refrescarSeleccion();
+      });
+  });
+
+  // Marcar todas como favoritas: es local (localStorage), instantáneo.
+  accion('i-star', 'Favoritas', () => {
+    const s = _getMeetingFavs();
+    const todasYa = ids.every(id => s.has(id));
+    ids.forEach(id => todasYa ? s.delete(id) : s.add(id));
+    _setMeetingFavs(s);
+    renderSidebar(); renderMain(); refrescarSeleccion();
+  });
+}
+
+// Delegado global: cualquier casilla de cualquier lista alimenta la misma barra.
+/* Se escuchan 'change' Y 'click' en fase de CAPTURA, y con try/catch visible.
+   Motivo: la barra no aparecia y por lectura del codigo no se veia por que. Con
+   un solo 'change' en fase de burbuja, cualquier handler intermedio que llame a
+   stopPropagation la deja muda; y si refrescarSeleccion lanza, el fallo es
+   invisible. Asi el evento llega siempre y un error se ve en pantalla en vez de
+   perderse en la consola. */
+function _selDispara(e) {
+  const cb = e.target && e.target.closest
+    ? (e.target.closest('.row-checkbox') || (e.target.closest('.row-select-slot') ? e.target.closest('.row-select-slot').querySelector('.row-checkbox') : null))
+    : null;
+  if (!cb) return;
+  // El click sobre la etiqueta cambia el estado DESPUES de este handler.
+  requestAnimationFrame(() => {
+    try {
+      refrescarSeleccion();
+    } catch (err) {
+      console.error('[seleccion]', err);
+      try { toast('err', 'Fallo la barra de seleccion: ' + ((err && err.message) || err)); } catch (_) {}
+    }
+  });
+}
+document.addEventListener('change', _selDispara, true);
+document.addEventListener('click', _selDispara, true);
+
+/* ============================================================
+   TOOLTIP DEL RIEL COLAPSADO
+   El title= nativo no se puede posicionar ni estilar: es una caja genérica que
+   tapa el icono de abajo justo cuando el riel mide 60px. Este reutiliza el
+   mismo texto en un elemento propio, y quita el title mientras se muestra para
+   que el del navegador no aparezca encima. Se restaura al salir, porque es el
+   nombre accesible que leen los lectores de pantalla.
+   ============================================================ */
+(function () {
+  const RETARDO = 450;
+  let tip = null, temporizador = null, activo = null;
+
+  const elemento = () => {
+    if (!tip) {
+      tip = el('div', 'rail-tooltip');
+      tip.setAttribute('role', 'tooltip');
+      document.body.appendChild(tip);
+    }
+    return tip;
+  };
+
+  function colocar(el0) {
+    const t = elemento();
+    const r = el0.getBoundingClientRect();
+    t.style.top = Math.min(Math.max(r.top + r.height / 2, 16), window.innerHeight - 16) + 'px';
+    const ancho = t.offsetWidth;
+    const izq = r.right + 10;
+    t.style.left = (izq + ancho > window.innerWidth - 8 ? r.left - ancho - 10 : izq) + 'px';
+  }
+
+  function ocultar() {
+    clearTimeout(temporizador); temporizador = null;
+    if (tip) tip.classList.remove('show');
+    activo = null;
+  }
+
+  document.addEventListener('mouseover', (e) => {
+    const shell = $('#shell');
+    if (!shell || !shell.classList.contains('collapsed')) return;
+    const btn = e.target.closest('.sidebar [title]');
+    if (!btn || btn === activo) return;
+    ocultar();
+    activo = btn;
+    const texto = btn.getAttribute('title');
+    if (!texto) return;
+    btn.dataset.tipText = texto;
+    btn.removeAttribute('title');       // silencia el tooltip nativo
+    temporizador = setTimeout(() => {
+      const t = elemento();
+      t.textContent = texto;
+      t.classList.add('show');
+      colocar(btn);
+    }, RETARDO);
+  });
+
+  document.addEventListener('mouseout', (e) => {
+    const btn = e.target.closest('.sidebar [title], .sidebar [data-tip-text]');
+    if (!btn) return;
+    if (btn.dataset.tipText) { btn.setAttribute('title', btn.dataset.tipText); delete btn.dataset.tipText; }
+    if (btn === activo) ocultar();
+  });
+
+  // Plegar/desplegar deja el tooltip huérfano si no se cierra a mano.
+  document.addEventListener('click', (e) => { if (e.target.closest('#btnMenu')) ocultar(); });
+  window.addEventListener('blur', ocultar);
+})();
+
+/* ---- Todas mis notas ----
+   Las reuniones de todos los proyectos, agrupadas por MES. Se diferencia de
+   Inicio a propósito: Inicio es "qué pasó hoy" (tarjeta del día y agrupación por
+   día, para lo reciente); esto es el archivo completo, donde el mes es la unidad
+   con la que uno busca hacia atrás. */
+function viewAllNotes() {
+  const wrap = el('div', 'content-scroll scroll');
+  const inner = el('div', 'content-inner');
+
+  const items = [];
+  for (const [iid, ms] of Object.entries(STATE.meetingsByInit || {})) {
+    const it = (STATE.initiatives || []).find(x => x.id === Number(iid));
+    for (const m of (ms || [])) items.push({ m, it });
+  }
+  items.sort((a, b) => String(b.m.started_at || '').localeCompare(String(a.m.started_at || '')));
+
+  const nProy = (STATE.initiatives || []).length;
+  const hero = el('div', 'space-hero');
+  hero.innerHTML =
+    `<div class="space-hero-badge"><svg class="icon"><use href="#i-layers"/></svg></div>` +
+    `<h1 class="page-title">Todas mis notas</h1>` +
+    `<div class="space-hero-sub">Las reuniones de todos tus proyectos, en un solo sitio.</div>` +
+    `<div class="space-hero-meta">` +
+      `<span class="item"><svg class="icon"><use href="#i-lock"/></svg>Todo es privado</span>` +
+      `<span class="sep">·</span>` +
+      `<span class="item"><svg class="icon"><use href="#i-folder"/></svg>${nProy} ${nProy === 1 ? 'proyecto' : 'proyectos'}</span>` +
+    `</div>`;
+  inner.appendChild(hero);
+
+  if (!items.length) {
+    const v = el('div', 'empty-state');
+    v.innerHTML =
+      `<svg class="icon icon-lg"><use href="#i-pages"/></svg>` +
+      `<div class="l1">Todavía no hay reuniones</div>` +
+      `<div class="l2">Lo que grabes va a aparecer acá, sin importar en qué proyecto lo guardes.</div>`;
+    inner.appendChild(v);
+    wrap.appendChild(inner);
+    return wrap;
+  }
+
+  let mes = null, lista = null;
+  items.forEach(({ m, it }) => {
+    const et = m.month_label || 'Sin fecha';
+    if (et !== mes) {
+      const g = el('div', 'group-label'); g.textContent = et;
+      inner.appendChild(g);
+      lista = el('div', 'list');
+      inner.appendChild(lista);
+      mes = et;
+    }
+    lista.appendChild(meetingRow(m, it, { showProject: true, showDate: true }));
+  });
+
+  wrap.appendChild(inner);
+  return wrap;
+}

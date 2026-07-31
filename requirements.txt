@@ -1,4 +1,4 @@
-faster-whisper==1.0.3
+vosk==0.3.45
 requests==2.32.3
 PyAudioWPatch==0.2.12.7
 mss==9.0.1
@@ -7,3 +7,9 @@ SQLAlchemy==2.0.30
 pywebview==5.1
 numpy==2.4.6
 av==12.3.0
+replicate==1.0.7
+python-dotenv==1.2.2
+markitdown[pdf,docx,pptx]==0.1.6
+pypdf==6.14.2
+rapidocr-onnxruntime==1.4.4
+pypdfium2==5.11.0

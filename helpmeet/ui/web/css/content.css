@@ -1,0 +1,720 @@
+/* ============================================================
+   Helpmeet — CONTENIDO (área principal + patrón de fila)
+   Portado desde 01-projects/helpmeet/03-diseno/mockup.html — FASE 2.
+
+   El patrón de fila (.row-wrap) es la pieza que más se reutiliza del mockup:
+   lo usan Inicio, la pestaña Reuniones de cada proyecto y Favoritos. Vive aquí
+   y no en cada pantalla.
+
+   Traducción de tokens: --border -> --border-strong · --border-soft ->
+   --border-subtle · --text-tertiary -> --text-muted · --bg -> --bg-app
+   ============================================================ */
+
+:root {
+  --content-max: 620px;
+  --font-serif: Georgia, 'Times New Roman', serif;
+  --fs-display: 30px;
+  --fs-daynum: 54px;
+}
+
+/* ---------- Contenedor ---------- */
+.main { flex: 1; min-width: 0; display: flex; flex-direction: column; min-height: 0; }
+.content-scroll { flex: 1; min-height: 0; overflow-y: auto; padding: 48px 24px 120px; }
+.content-inner { max-width: var(--content-max); margin: 0 auto; }
+
+/* Título serif: es el rasgo tipográfico que más distingue al rediseño. */
+.page-title {
+  font-family: var(--font-serif); font-weight: 400; font-size: var(--fs-display);
+  letter-spacing: -.01em; margin: 0 0 22px; color: var(--text-primary);
+}
+.page-title .accent-dot {
+  width: 7px; height: 7px; border-radius: 50%; display: inline-block;
+  margin-right: 10px; vertical-align: middle; margin-top: -4px;
+}
+
+/* ---------- Tarjeta del día ---------- */
+.today-card { display: flex; align-items: center; gap: 28px; margin-bottom: 32px; }
+.today-num-wrap { display: flex; align-items: center; gap: 12px; flex-shrink: 0; }
+.today-num {
+  font-size: var(--fs-daynum); font-weight: 600; line-height: 1;
+  color: var(--text-primary); position: relative;
+}
+.today-num .today-dot {
+  position: absolute; top: 2px; right: -11px; width: 7px; height: 7px;
+  border-radius: 50%; background: var(--recording);
+}
+.today-labels { display: flex; flex-direction: column; gap: 2px; color: var(--text-secondary); font-size: 12px; }
+.today-labels .cap { text-transform: capitalize; }
+.today-stats { flex: 1; display: flex; align-items: center; justify-content: center; gap: 34px; flex-wrap: wrap; }
+.tstat { display: flex; flex-direction: column; gap: 2px; align-items: center; text-align: center; }
+.tstat-val { font-size: 22px; font-weight: 600; color: var(--text-primary); line-height: 1.1; font-variant-numeric: tabular-nums; }
+.tstat-lbl { font-size: 11px; color: var(--text-muted); }
+.tstat-sep { width: 1px; height: 26px; background: var(--border-subtle); }
+
+/* ---------- Listas ---------- */
+.group-label {
+  font-size: 11px; text-transform: uppercase; letter-spacing: .07em;
+  color: var(--text-muted); margin: 28px 0 10px;
+}
+.group-label:first-of-type { margin-top: 0; }
+
+.list { display: flex; flex-direction: column; }
+
+/* Fila simple (resultados, archivos): sin casilla ni acciones. */
+.row {
+  display: flex; align-items: center; gap: 12px; width: 100%; padding: 7px 8px;
+  border-radius: 8px; border: none; border-bottom: 1px solid var(--border-subtle);
+  background: none; text-align: left; font-family: inherit; color: inherit; cursor: pointer;
+}
+.row:hover { background: var(--bg-hover); }
+.row-icon {
+  width: 32px; height: 32px; border-radius: 8px; background: var(--bg-elevated); flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center; color: var(--text-secondary);
+}
+.row-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.row-title { font-size: 14px; font-weight: 500; color: var(--text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.row-sub { display: flex; align-items: center; font-size: 11px; color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.row-sub-ico { width: 11px; height: 11px; flex-shrink: 0; opacity: .7; margin-right: 5px; vertical-align: -1px; }
+
+/* ---- Box de ubicación, al lado de la duración ----
+   Dice la subcarpeta donde la reunión está guardada. Dos valores posibles y los
+   dos contestan la misma pregunta: la carpeta del usuario cuando está archivada
+   en una, y la carpeta de mes que escribe el exportador cuando no
+   (exporter.py → month_folder_name, "2026-07 Julio").
+   Recuadrado y no texto suelto a propósito: el subtítulo ya lleva la duración, y
+   sin el borde las dos cosas se leen como una sola frase.
+   El nombre del PROYECTO se queda en .row-proj-icon, a la derecha — así la fila
+   nunca repite el mismo dato dos veces. */
+.row-folder-chip {
+  display: inline-flex; align-items: center; gap: 4px; flex-shrink: 0;
+  margin-left: 9px; padding: 1px 6px; max-width: 170px;
+  border: 1px solid var(--border-subtle); border-radius: var(--r-sm);
+  font-size: 10px; color: var(--text-muted);
+  transition: border-color .12s, color .12s;
+}
+.row-folder-chip .icon { width: 11px; height: 11px; flex-shrink: 0; }
+.row-folder-chip-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.row-wrap:hover .row-folder-chip { border-color: var(--border-strong); color: var(--text-secondary); }
+.row-meta { flex-shrink: 0; display: flex; flex-direction: column; align-items: flex-end; gap: 2px; transition: opacity 150ms var(--ease-reveal); }
+.row-time { font-size: 11px; color: var(--text-secondary); font-family: var(--font-mono); width: 92px; text-align: right; display: inline-block; white-space: nowrap; }
+
+/* ---------- Fila de reunión (.row-wrap) ----------
+   .row no puede llevar la casilla dentro: sigue siendo un <button> de
+   navegación y un botón no puede anidar limpiamente otro control. Por eso
+   .row-wrap se queda con el padding, el borde y el fondo del hover, y .row
+   queda reducida a un botón de contenido. */
+.row-wrap { position: relative; display: flex; align-items: center; gap: 12px; width: 100%; padding: 9px 8px; }
+/* La lista se corre a la izquierda exactamente lo que mide la zona de la
+   casilla (8 padding + 18 casilla + 12 gap = 38px), para que el recuadro del
+   hover quede a ras del texto. La casilla sobresale al margen, que es donde
+   corresponde: es un control de la lista, no contenido. */
+.list:has(.row-wrap) { margin-left: -30px; }
+.row-wrap::before {
+  content: ""; position: absolute; left: 30px; right: 0; top: 0; bottom: 0;
+  border-radius: 8px; transition: background 120ms ease; pointer-events: none;
+}
+.row-wrap > * { position: relative; z-index: 1; }
+.row-wrap:hover::before, .row-wrap:focus-within::before { background: var(--bg-hover); }
+/* Seleccionada sigue viéndose seleccionada sin el mouse encima. */
+.row-wrap:has(.row-checkbox:checked)::before { background: var(--bg-elevated); }
+.row-wrap .row {
+  flex: 1; min-width: 0; display: flex; align-items: center; gap: 12px;
+  padding: 0; border-bottom: none; border-radius: 0; background: none;
+}
+
+/* Casilla AL COSTADO del icono, no dentro. El hueco se reserva siempre en vez
+   de aparecer y desplazar la fila: recorrer la lista empujaría el contenido de
+   cada fila una tras otra. */
+.row-select-slot { display: grid; place-items: center; width: 18px; flex-shrink: 0; cursor: pointer; transition: transform 120ms var(--ease-reveal); }
+.row-select-slot:active { transform: scale(.94); }
+.row-select-slot > * { grid-area: 1/1; }
+.row-doc-icon {
+  display: grid; place-items: center; width: 32px; height: 32px; flex-shrink: 0;
+  border-radius: 8px; background: var(--bg-elevated); color: var(--text-secondary);
+}
+.row-checkbox {
+  appearance: none; -webkit-appearance: none; width: 16px; height: 16px; margin: 0;
+  border-radius: 5px; border: 1.5px solid var(--border-strong); background: var(--bg-elevated);
+  cursor: pointer; opacity: 0;
+  transition: opacity 150ms var(--ease-reveal), background-color 120ms ease, border-color 120ms ease;
+}
+.row-checkbox:checked { background: var(--text-primary); border-color: var(--text-primary); }
+.row-wrap:hover .row-checkbox, .row-wrap:focus-within .row-checkbox, .row-checkbox:checked { opacity: 1; }
+/* El tick va atado a :checked y nunca a :hover — sobre una fila solo señalada
+   mentiría sobre el estado. Arranca en scale(.8) y no en 0: nada en el mundo
+   real aparece desde la nada. */
+.row-check-mark {
+  width: 10px; height: 10px; stroke-width: 2.4; color: var(--bg-app);
+  opacity: 0; transform: scale(.8);
+  transition: opacity 140ms var(--ease-reveal), transform 140ms var(--ease-reveal);
+}
+.row-checkbox:checked ~ .row-check-mark { opacity: 1; transform: scale(1); }
+
+/* Proyecto como icono teñido, con el nombre que crece al pasar el mouse
+   (técnica grid 0fr→1fr: anima el ancho sin reflow ni parpadeo del texto). */
+.row-proj-icon { display: flex; align-items: center; flex-shrink: 0; opacity: .85; min-width: 0; margin-right: -12px; }
+.row-proj-icon svg { width: 14px; height: 14px; flex-shrink: 0; }
+.row-proj-name-grid { display: grid; grid-template-columns: 0fr; transition: grid-template-columns 200ms var(--ease-reveal); }
+.row-proj-name { overflow: hidden; white-space: nowrap; font-size: 10px; color: var(--text-muted); opacity: .75; letter-spacing: .01em; }
+.row-wrap:hover .row-proj-name-grid, .row-wrap:focus-within .row-proj-name-grid { grid-template-columns: 1fr; }
+.row-wrap:hover .row-proj-name, .row-wrap:focus-within .row-proj-name { padding-left: 4px; }
+
+/* Estrella: oculta en reposo, revelada al hover, pero SIEMPRE visible cuando
+   está activa — si solo existiera al hover, una reunión marcada no se
+   distinguiría de una que no lo está. El :hover usa --border-strong y no
+   --bg-hover porque la fila ya está pintada con ese fondo. */
+.row-fav-btn {
+  width: 24px; height: 24px; flex-shrink: 0; opacity: 0; margin-right: -11px;
+  border: none; background: none; border-radius: 6px; cursor: pointer; color: var(--text-muted);
+  display: grid; place-items: center;
+  transition: opacity 150ms var(--ease-reveal), background .12s, color .12s, transform 120ms var(--ease-reveal);
+}
+.row-fav-btn svg { width: 15px; height: 15px; }
+.row-wrap:hover .row-fav-btn, .row-wrap:focus-within .row-fav-btn, .row-fav-btn.active { opacity: 1; }
+.row-fav-btn.active { color: var(--text-primary); }
+.row-fav-btn.active svg { fill: currentColor; }
+.row-wrap .row-fav-btn:hover { background: var(--border-strong); color: var(--text-primary); transform: scale(1.08); }
+.row-fav-btn:active { transform: scale(.94); }
+
+/* Dos columnas [hora][···]: al pasar el mouse la de la hora se cierra a 0fr y
+   el bloque encoge hasta medir solo el botón, así la estrella queda pegada a
+   los "···". Se anima con la misma técnica 0fr→1fr, así que es deslizamiento
+   y no salto. */
+.row-actions-slot {
+  display: grid; flex-shrink: 0; grid-template-columns: 1fr 28px; align-items: center;
+  transition: grid-template-columns 200ms var(--ease-reveal);
+}
+.row-wrap:hover .row-actions-slot, .row-wrap:focus-within .row-actions-slot { grid-template-columns: 0fr 28px; }
+.row-actions-slot > .row-meta { grid-column: 1; justify-self: end; overflow: hidden; }
+.row-actions-slot > .row-more-btn { grid-column: 2; justify-self: end; }
+.row-more-btn {
+  width: 24px; height: 24px; border: none; background: none; border-radius: 6px;
+  color: var(--text-muted); cursor: pointer; display: grid; place-items: center; opacity: 0;
+  transition: opacity 150ms var(--ease-reveal), background .12s, color .12s, transform 120ms var(--ease-reveal);
+}
+.row-wrap:hover .row-more-btn, .row-wrap:focus-within .row-more-btn { opacity: 1; }
+.row-more-btn:hover { background: var(--border-strong); color: var(--text-primary); transform: scale(1.08); }
+.row-more-btn:active { transform: scale(.94); }
+
+/* Estado vacío: sin caja ni borde, centrado. */
+.empty-state {
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 6px; padding: 60px 20px; text-align: center; min-height: 220px;
+}
+.empty-state.compact { min-height: auto; padding: 28px 20px; }
+.empty-state .icon-lg { width: 30px; height: 30px; color: var(--text-faint); stroke-width: 1.3; margin-bottom: 6px; }
+.empty-state .l1 { font-size: 13px; color: var(--text-secondary); }
+.empty-state .l2 { font-size: 11px; color: var(--text-muted); max-width: 340px; }
+
+@media (prefers-reduced-motion: reduce) {
+  .row-proj-name-grid, .row-actions-slot, .row-meta, .row-checkbox,
+  .row-check-mark, .row-fav-btn, .row-more-btn, .row-select-slot { transition: none; }
+  .row-wrap .row-fav-btn:hover, .row-more-btn:hover,
+  .row-select-slot:active, .row-fav-btn:active, .row-more-btn:active { transform: none; }
+}
+
+/* ============================================================
+   PROYECTO — FASE 4
+   ============================================================ */
+.proj-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; margin-bottom: 8px; }
+.proj-header-main { min-width: 0; }
+.proj-header .page-title { margin: 0 0 4px; }
+.proj-meta { font-size: 12px; color: var(--text-muted); }
+.proj-header-actions { display: flex; align-items: center; gap: 12px; flex-shrink: 0; }
+
+.btn-pill-secondary {
+  display: inline-flex; align-items: center; gap: 6px; padding: 5px 13px;
+  border: 1px solid var(--border-strong); border-radius: var(--r-pill); background: none;
+  color: var(--text-secondary); font-family: inherit; font-size: 12px; cursor: pointer;
+  transition: background .12s, color .12s, border-color .12s;
+}
+.btn-pill-secondary:hover { background: var(--bg-hover); color: var(--text-primary); }
+
+/* Rótulo de sección con una acción a la derecha. */
+.group-label-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 28px 0 10px; }
+.group-label-row:first-child { margin-top: 0; }
+.btn-newfolder {
+  display: inline-flex; align-items: center; gap: 6px; padding: 5px 12px;
+  border: none; border-radius: 10px; background: var(--bg-elevated);
+  color: var(--text-secondary); font-family: inherit; font-size: 11px; cursor: pointer;
+  transition: background .12s, color .12s;
+}
+.btn-newfolder:hover { background: var(--bg-hover); color: var(--text-primary); }
+.arrow-suffix { color: var(--text-faint); font-weight: 400; }
+
+/* ---- Carpetas creadas por el usuario, dentro del proyecto ---- */
+.ufolder { display: flex; flex-direction: column; }
+.ufolder-head { display: flex; align-items: center; gap: 4px; border-radius: 8px; padding-right: 6px; }
+.ufolder-head:hover { background: var(--bg-hover); }
+.ufolder-toggle {
+  flex: 1; min-width: 0; display: flex; align-items: center; gap: 10px;
+  padding: 8px; border: none; background: none; cursor: pointer;
+  color: var(--text-secondary); font-family: inherit; font-size: 13px; text-align: left;
+}
+.ufolder-chev { transition: transform .16s ease; flex-shrink: 0; }
+.ufolder.open .ufolder-chev { transform: rotate(90deg); }
+.ufolder-ico { color: var(--text-muted); flex-shrink: 0; }
+.ufolder-name { color: var(--text-primary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ufolder-count { margin-left: auto; font-size: 11px; color: var(--text-muted); flex-shrink: 0; }
+.ufolder-more { opacity: 0; transition: opacity .12s; }
+.ufolder-head:hover .ufolder-more, .ufolder-more:focus-visible { opacity: 1; }
+/* 0fr→1fr y no max-height. height:auto no se puede transicionar, cierto, pero
+   el max-height obliga a inventar un tope y sale mal por los dos lados: corto
+   recorta la carpeta cuando tiene más reuniones de las previstas, y largo —acá
+   estaba en 1200px para un contenido de ~100px— hace que la animación se gaste
+   recorriendo espacio vacío y parezca un salto seco al final. Con grid la
+   altura la pone el contenido y el recorrido es siempre el real. */
+.ufolder-children {
+  display: grid; grid-template-rows: 0fr;
+  transition: grid-template-rows .22s var(--ease-reveal);
+}
+.ufolder-children.open { grid-template-rows: 1fr; }
+.ufolder-inner { overflow: hidden; opacity: 0; transition: opacity .16s ease; }
+.ufolder-children.open .ufolder-inner { opacity: 1; }
+.ufolder-children .list { margin-left: -6px; padding-bottom: 6px; }
+.ufolder-empty { padding: 10px 8px 10px 46px; font-size: 11px; color: var(--text-faint); }
+
+/* ---- Árbol de exportación (pestaña Carpetas) ----
+   Guía vertical por nivel, sin codos: es la estructura real que escribe
+   exporter.py en disco, no carpetas que el usuario pueda mover. */
+.folder-tree { margin-top: 4px; font-size: 12px; }
+.folder-row, .folder-leaf {
+  display: flex; align-items: center; gap: 8px; padding: 5px 6px;
+  color: var(--text-secondary); border-radius: 6px;
+}
+.folder-row-root { color: var(--text-primary); font-weight: 500; }
+.folder-name { font-family: var(--font-mono); font-size: 11px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.folder-children { border-left: 1px solid var(--border-subtle); margin-left: 7px; padding-left: 13px; }
+.folder-item { display: flex; flex-direction: column; }
+.folder-toggle {
+  display: flex; align-items: center; gap: 8px; width: 100%; padding: 5px 6px;
+  border: none; background: none; cursor: pointer; color: var(--text-secondary);
+  font-family: inherit; text-align: left; border-radius: 6px;
+}
+.folder-toggle:hover { background: var(--bg-hover); color: var(--text-primary); }
+.folder-toggle-arrow { transition: transform .16s ease; flex-shrink: 0; }
+.folder-item.open .folder-toggle-arrow { transform: rotate(90deg); }
+/* Mismo 0fr→1fr que el resto de los plegados de la app: la lista de ficheros
+   cambia de largo según haya vídeo o solo audio, y un tope fijo se pasaba de
+   largo justo en el caso corto. */
+.folder-meeting-children {
+  display: grid; grid-template-rows: 0fr;
+  border-left: 1px solid var(--border-subtle); margin-left: 7px; padding-left: 13px;
+  transition: grid-template-rows .22s var(--ease-reveal);
+}
+.folder-meeting-children.open { grid-template-rows: 1fr; }
+.folder-leaf-inner { overflow: hidden; opacity: 0; transition: opacity .16s ease; }
+.folder-meeting-children.open .folder-leaf-inner { opacity: 1; }
+.folder-leaf { color: var(--text-muted); font-family: var(--font-mono); font-size: 11px; }
+.folder-leaf .icon { flex-shrink: 0; }
+
+/* ---- Plegado por mes y por semana ----
+   grid-template-rows 0fr→1fr y no max-height: acá anidan tres plegados uno
+   dentro de otro, y un max-height inventado por nivel se recorta con el de
+   arriba en cuanto se abren dos a la vez. Con 0fr→1fr la altura la pone el
+   contenido, así que el mes crece exactamente lo que crece la semana que se
+   está abriendo dentro. Necesita el hijo con overflow:hidden, que además es
+   quien lleva la línea guía del nivel. */
+.folder-group-children {
+  display: grid; grid-template-rows: 0fr;
+  transition: grid-template-rows 260ms var(--ease-reveal);
+}
+.folder-group-children.open { grid-template-rows: 1fr; }
+.folder-group-inner {
+  overflow: hidden; display: flex; flex-direction: column;
+  border-left: 1px solid var(--border-subtle); margin-left: 7px; padding-left: 13px;
+  opacity: 0; transition: opacity .16s ease;
+}
+.folder-group-children.open > .folder-group-inner { opacity: 1; }
+.folder-item-group > .folder-toggle .folder-name { color: var(--text-primary); }
+/* Cuántas reuniones esconde el pliegue, sin tener que abrirlo. */
+.folder-count {
+  margin-left: 2px; padding: 0 6px; border-radius: 999px; flex-shrink: 0;
+  background: var(--bg-hover); color: var(--text-muted);
+  font-family: var(--font-ui); font-size: 10px;
+}
+/* La semana NO es carpeta en disco (exporter.py escribe proyecto/mes/reunión):
+   va sin monoespaciada y sin "/" final, para que no se lea como una ruta. */
+.folder-week > .folder-toggle .folder-name { font-family: var(--font-ui); color: var(--text-secondary); }
+
+@media (prefers-reduced-motion: reduce) {
+  .ufolder-chev, .ufolder-children, .folder-toggle-arrow, .folder-meeting-children,
+  .folder-group-children { transition: none; }
+}
+
+/* ============================================================
+   DOCUMENTOS → .md — FASE 5
+   ============================================================ */
+.docs-head { margin-bottom: 18px; }
+.docs-head .page-title { margin: 0 0 6px; }
+.docs-arrow { color: var(--text-muted); font-family: var(--font-ui); font-size: 22px; vertical-align: 2px; }
+.docs-sub { font-size: 12px; color: var(--text-muted); margin: 0; max-width: 520px; line-height: 1.5; }
+
+.docs-bar { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 8px; }
+.docs-bar .docs-import { margin-left: auto; }
+
+/* Casilla y no conmutador: es un sí/no que se decide antes de importar, y una
+   caja marcada se lee de un vistazo sin interpretar un cambio de fondo. El
+   <input> real queda oculto pero sigue ahí, así el teclado, el foco y el clic
+   sobre la etiqueta funcionan solos, sin JS. */
+.docs-check { cursor: pointer; user-select: none; display: inline-flex; align-items: center; gap: 8px; }
+.docs-check-input { position: absolute; width: 1px; height: 1px; opacity: 0; margin: 0; pointer-events: none; }
+.docs-check-box {
+  display: grid; place-items: center; width: 14px; height: 14px; flex-shrink: 0;
+  border: 1.5px solid var(--text-muted); border-radius: 4px;
+  transition: background 120ms ease, border-color 120ms ease;
+}
+.docs-check .docs-check-box .icon {
+  width: 12px; height: 12px; color: var(--bg-app); stroke-width: 2.2;
+  opacity: 0; transform: scale(.5);
+  transition: opacity 110ms ease, transform 160ms var(--ease-reveal);
+}
+.docs-check:hover .docs-check-box { border-color: var(--text-secondary); }
+.docs-check-input:checked + .docs-check-box { background: var(--text-primary); border-color: var(--text-primary); }
+.docs-check-input:checked + .docs-check-box .icon { opacity: 1; transform: scale(1); }
+.docs-check:has(.docs-check-input:checked) { color: var(--text-primary); }
+.docs-check-input:focus-visible + .docs-check-box { outline: 2px solid var(--text-muted); outline-offset: 2px; }
+
+/* Con "Todos los espacios" la lista se parte por proyecto. Filtrar por uno solo
+   oculta los otros grupos: una única lista en el DOM, no dos. */
+.doc-group { margin-top: 26px; }
+.doc-group.is-first { margin-top: 0; }
+.doc-group[hidden] { display: none; }
+.doc-group-label { display: flex; align-items: center; gap: 7px; margin: 0 0 8px; font-size: 11px; text-transform: uppercase; letter-spacing: .07em; color: var(--text-muted); }
+.doc-group-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
+.doc-group-count { color: var(--text-muted); opacity: .65; }
+.doc-group-count::before { content: "·"; margin-right: 7px; }
+
+.doc-list { display: flex; flex-direction: column; }
+.doc-row { display: flex; align-items: center; gap: 12px; padding: 11px 8px; border-radius: 8px; transition: background 120ms ease; }
+.doc-row:hover { background: var(--bg-hover); }
+.doc-ico {
+  display: grid; place-items: center; width: 32px; height: 32px; flex-shrink: 0;
+  border-radius: 8px; background: var(--bg-elevated); color: var(--text-muted);
+}
+.doc-main { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; flex: 1; min-width: 0; }
+.doc-name { font-size: 14px; font-weight: 500; color: var(--text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+.doc-badges { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.doc-badge {
+  display: inline-flex; align-items: center; gap: 4px; font-size: 10px;
+  padding: 2px 7px; border-radius: var(--r-pill);
+  border: 1px solid var(--border-subtle); color: var(--text-muted);
+}
+.doc-badge.date { font-family: var(--font-mono); }
+.doc-badge.ocr { color: var(--text-secondary); }
+.doc-badge .icon { width: 11px; height: 11px; }
+
+/* Las acciones aparecen al pasar el mouse; el mensaje de error se ve siempre,
+   porque es información de estado y no una acción que haya que descubrir.
+   "Ver" lleva texto y las otras tres solo icono: de las cuatro, abrir el .md
+   convertido es la que se usa siempre y el resto son de mantenimiento. */
+.doc-actions { display: flex; align-items: center; gap: 6px; flex-shrink: 0; opacity: 0; transition: opacity 140ms var(--ease-reveal); }
+.doc-row:hover .doc-actions, .doc-actions:focus-within { opacity: 1; }
+.doc-view {
+  display: inline-flex; align-items: center; gap: 6px; flex-shrink: 0; padding: 5px 11px;
+  border-radius: 8px; border: 1px solid var(--border-strong); background: none;
+  color: var(--text-secondary); font-family: inherit; font-size: 11px; cursor: pointer;
+  transition: background .12s, color .12s, border-color .12s;
+}
+.doc-view:hover { background: var(--bg-elevated); color: var(--text-primary); border-color: var(--text-muted); }
+.doc-view .icon { width: 13px; height: 13px; }
+/* Caja propia para cada icono, no un icon-btn desnudo: sin borde, cuatro
+   acciones seguidas se leen como una sola mancha y no como controles separables. */
+.doc-act {
+  width: 28px; height: 28px; flex-shrink: 0; display: grid; place-items: center;
+  border-radius: 8px; border: 1px solid var(--border-subtle); background: none;
+  color: var(--text-muted); cursor: pointer;
+  transition: background .12s, color .12s, border-color .12s;
+}
+.doc-act:hover { background: var(--bg-elevated); color: var(--text-primary); border-color: var(--text-muted); }
+.doc-act .icon { width: 14px; height: 14px; }
+.doc-act.doc-del:hover { color: var(--danger); border-color: var(--danger); background: transparent; }
+.doc-status { flex-shrink: 0; font-size: 11px; color: var(--text-muted); font-style: italic; }
+
+/* Selector tipo "píldora con valor" — filtro de espacio y de OCR. */
+.rec-pick {
+  display: inline-flex; align-items: center; gap: 7px; padding: 5px 11px;
+  border-radius: var(--r-pill); border: 1px solid var(--border-strong); background: none;
+  color: var(--text-secondary); font-family: inherit; font-size: 12px; cursor: pointer;
+  transition: background .12s, color .12s, border-color .12s;
+}
+.rec-pick:hover { background: var(--bg-hover); color: var(--text-primary); }
+.rec-pick .icon { width: 13px; height: 13px; flex-shrink: 0; }
+.rec-pick-chev { width: 12px; height: 12px; opacity: .6; }
+
+/* ============================================================
+   FAVORITOS Y ESPACIOS — FASE 6
+   ============================================================ */
+
+/* ---- Favoritos ---- */
+.fav-head { display: flex; align-items: baseline; gap: 12px; margin-bottom: 16px; }
+.fav-head .page-title { margin: 0; }
+.fav-count { font-size: 12px; color: var(--text-muted); }
+.fav-head .fav-clear { margin-left: auto; align-self: center; }
+
+.fav-group + .fav-group { margin-top: 4px; }
+/* La cabecera es un botón porque colapsa. El chevron gira en vez de cambiar de
+   glifo: el giro dice "esto se abre"; cambiar de icono solo dice "algo cambió"
+   y hay que aprenderse cuál significa qué.
+   El botón de vaciar es HERMANO del de colapsar, no hijo: un button dentro de
+   otro es HTML inválido y el navegador desarma el anidamiento. */
+.fav-group-hdr { display: flex; align-items: center; gap: 4px; padding-right: 8px; border-radius: 8px; transition: background 120ms ease; }
+.fav-group-hdr:hover { background: var(--bg-hover); }
+.fav-group-toggle {
+  flex: 1; min-width: 0; display: flex; align-items: center; gap: 9px; padding: 9px 8px;
+  border: none; background: none; cursor: pointer;
+  color: var(--text-primary); font-family: inherit; font-size: 12px; font-weight: 500; text-align: left;
+}
+.fav-chev { width: 12px; height: 12px; flex-shrink: 0; color: var(--text-muted); transition: transform 160ms var(--ease-reveal); }
+.fav-group.is-open .fav-chev { transform: rotate(90deg); }
+.fav-group-dot { width: 9px; height: 9px; border-radius: 3px; flex-shrink: 0; }
+.fav-group-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.fav-group-cnt { font-size: 11px; color: var(--text-muted); font-variant-numeric: tabular-nums; }
+/* Vaciar el grupo entero se revela al pasar por su cabecera: quita varias
+   reuniones de una vez y no tiene por qué estar a un clic mientras solo se
+   está mirando la lista. */
+.fav-group-clear { opacity: 0; transition: opacity 140ms var(--ease-reveal), background .12s, color .12s; }
+.fav-group-hdr:hover .fav-group-clear, .fav-group-clear:focus-visible { opacity: 1; }
+.fav-group-hdr:hover .fav-group-clear:hover { background: var(--border-strong); color: var(--text-primary); }
+.fav-group-body[hidden] { display: none; }
+/* Acá la columna derecha lleva la FECHA y no la hora: las favoritas son de días
+   sueltos y una hora sin día no ubica nada. Y como estas filas no llevan menú,
+   la hora no debe encogerse al pasar el mouse — si no, la fecha bailaría. */
+.fav-list .row-time { width: 52px; }
+.fav-list .row-wrap:hover .row-time, .fav-list .row-wrap:focus-within .row-time { width: 52px; }
+.fav-list .row-wrap:hover .row-actions-slot, .fav-list .row-wrap:focus-within .row-actions-slot { grid-template-columns: 1fr 0px; }
+
+/* ---- Tabla de espacios ---- */
+.esp-head { display: flex; align-items: baseline; gap: 12px; margin-bottom: 20px; }
+.esp-head .page-title { margin: 0; }
+.esp-count { font-size: 12px; color: var(--text-muted); }
+.esp-table-wrap { border: 1px solid var(--border-subtle); border-radius: 12px; overflow: hidden; }
+/* Reparto fijo de columnas: sin esto el navegador reparte según el contenido y
+   la primera se come el ancho sobrante, dejando las demás apretadas y con
+   separaciones distintas en cada fila. */
+.esp-table { width: 100%; border-collapse: collapse; font-size: 12px; table-layout: fixed; }
+.esp-table th:nth-child(1), .esp-table td:nth-child(1) { width: 32%; }
+.esp-table th:nth-child(2), .esp-table td:nth-child(2) { width: 20%; }
+.esp-table th:nth-child(3), .esp-table td:nth-child(3) { width: 13%; }
+.esp-table th:nth-child(4), .esp-table td:nth-child(4) { width: 14%; }
+.esp-table th:nth-child(5), .esp-table td:nth-child(5) { width: 21%; }
+.esp-table th {
+  text-align: left; font-size: 10px; text-transform: uppercase; letter-spacing: .07em;
+  font-weight: 500; color: var(--text-muted); padding: 11px 14px;
+  background: var(--bg-elevated); border-bottom: 1px solid var(--border-subtle); white-space: nowrap;
+}
+.esp-table td { padding: 12px 14px; border-bottom: 1px solid var(--border-subtle); color: var(--text-secondary); }
+.esp-table tbody td { height: 46px; }
+.esp-table tbody tr:last-child td { border-bottom: none; }
+.esp-table tbody tr { transition: background 120ms ease; }
+.esp-table tbody tr:hover { background: var(--bg-hover); }
+/* Cifras a la derecha y tabulares: así 98 y 4 quedan alineados dígito a dígito
+   y se comparan de un vistazo, que es para lo que sirve una tabla. */
+th.esp-num, td.esp-num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.esp-name { color: var(--text-primary); font-weight: 500; }
+.esp-name-inner { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.esp-name-txt { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.esp-name .dot { width: 9px; height: 9px; border-radius: 3px; flex-shrink: 0; }
+.esp-pend {
+  display: inline-flex; align-items: center; gap: 6px; font-size: 11px;
+  color: var(--recording); border-radius: var(--r-pill); padding: 2px 8px;
+  background: color-mix(in srgb, var(--recording) 12%, transparent);
+  white-space: nowrap; border: none; cursor: pointer; font-family: inherit;
+  transition: background .12s;
+}
+.esp-pend:hover { background: color-mix(in srgb, var(--recording) 20%, transparent); }
+.esp-ok { font-size: 11px; color: var(--text-muted); }
+.esp-new {
+  display: flex; align-items: center; gap: 8px; width: 100%; padding: 12px 14px;
+  border: none; border-top: 1px solid var(--border-subtle); background: none; cursor: pointer;
+  color: var(--text-muted); font-family: inherit; font-size: 12px; text-align: left;
+  transition: background 120ms ease, color 120ms ease;
+}
+.esp-new:hover { background: var(--bg-hover); color: var(--text-primary); }
+.esp-new .icon { width: 14px; height: 14px; }
+
+/* Desplegable de reuniones por espacio */
+.esp-toggle {
+  width: 20px; height: 20px; display: grid; place-items: center; flex-shrink: 0;
+  border-radius: 5px; border: none; background: none; cursor: pointer;
+  color: var(--text-muted); transition: background .12s, color .12s;
+}
+.esp-toggle svg { width: 12px; height: 12px; transition: transform 160ms var(--ease-reveal); }
+.esp-toggle[aria-expanded="true"] svg { transform: rotate(90deg); }
+.esp-toggle:hover { background: var(--border-strong); color: var(--text-primary); }
+.esp-detail > td { padding: 0 14px 12px 14px; height: auto; background: var(--bg-app); }
+.esp-sub { display: flex; flex-direction: column; border-left: 2px solid var(--border-strong); margin-left: 9px; }
+.esp-sub-month { font-size: 10px; text-transform: uppercase; letter-spacing: .07em; color: var(--text-muted); padding: 8px 12px 4px; }
+.esp-sub-row {
+  display: flex; align-items: center; gap: 10px; padding: 8px 12px; width: 100%; text-align: left;
+  border: none; background: none; cursor: pointer; font-family: inherit;
+  color: var(--text-secondary); font-size: 11px; border-radius: 0 6px 6px 0;
+  transition: background 120ms ease, color 120ms ease;
+}
+.esp-sub-row:hover { background: var(--bg-hover); color: var(--text-primary); }
+.esp-sub-row .icon { width: 13px; height: 13px; flex-shrink: 0; color: var(--text-muted); }
+.esp-sub-title { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.esp-sub-dur { flex-shrink: 0; color: var(--text-muted); }
+.esp-sub-time { flex-shrink: 0; width: 104px; text-align: right; color: var(--text-muted); white-space: nowrap; }
+.esp-sub-empty { padding: 10px 12px; color: var(--text-muted); font-size: 11px; }
+
+@media (prefers-reduced-motion: reduce) {
+  .fav-chev, .esp-toggle svg, .fav-group-clear { transition: none; }
+}
+
+/* ============================================================
+   BARRA DE SELECCIÓN MÚLTIPLE
+   Entra desde abajo con el mismo gesto que el panel de grabación: las dos
+   ocupan el mismo punto de la pantalla, así que compartir la entrada evita
+   que se lean como dos cosas distintas apareciendo de formas distintas.
+   ============================================================ */
+@keyframes selBarIn {
+  from { opacity: 0; transform: translateX(-50%) translateY(16px); }
+  to   { opacity: 1; transform: translateX(-50%) translateY(0); }
+}
+.sel-bar {
+  position: fixed; left: 50%; transform: translateX(-50%); bottom: 20px; z-index: 31;
+  display: flex; align-items: center; gap: 6px; padding: 6px 8px;
+  background: var(--bg-elevated); border: 1px solid var(--border-strong); border-radius: var(--r-pill);
+  box-shadow: 0 1px 2px rgba(0,0,0,.18), 0 12px 30px -10px rgba(0,0,0,.45);
+  animation: selBarIn 240ms var(--ease-reveal) both;
+  /* Las cuatro de abajo son explícitas a propósito. La barra vieja —franja
+     pegajosa arriba de la lista— se ocultaba con `top:0; max-height:0;
+     overflow:hidden; opacity:0` y se revelaba con una clase `.open` que el
+     código nuevo ya no pone. Esta regla ganaba en todo lo que redeclaraba,
+     pero lo que NO redeclaraba sobrevivía: la barra se construía, se llenaba
+     y medía cero píxeles recortando su contenido. Aquellas reglas ya se
+     borraron de style.css y components.css; esto queda para que la píldora
+     no dependa de que nadie las reintroduzca. `opacity` importa incluso con
+     la animación puesta, porque con prefers-reduced-motion se anula. */
+  top: auto; max-height: none; overflow: visible; opacity: 1;
+}
+.sel-bar[hidden] { display: none; }
+.sel-count { display: inline-flex; align-items: center; gap: 7px; padding-left: 6px; font-size: 12px; color: var(--text-secondary); }
+.sel-badge {
+  display: grid; place-items: center; min-width: 20px; height: 20px; padding: 0 6px;
+  border-radius: var(--r-pill); background: var(--text-primary); color: var(--bg-app);
+  font-size: 11px; font-weight: 600; font-variant-numeric: tabular-nums;
+}
+.sel-bar .btn-ghost {
+  display: inline-flex; align-items: center; gap: 6px; white-space: nowrap;
+  padding: 6px 10px; border-radius: var(--r-pill); border: none; background: none;
+  color: var(--text-secondary); font-family: inherit; font-size: 12px; cursor: pointer;
+  transition: background .12s, color .12s;
+}
+.sel-bar .btn-ghost:hover { background: var(--bg-hover); color: var(--text-primary); }
+.sel-bar .btn-ghost .icon { width: 14px; height: 14px; flex-shrink: 0; }
+.sel-clear { width: 26px; height: 26px; }
+
+@media (prefers-reduced-motion: reduce) { .sel-bar { animation: none; } }
+
+/* ============================================================
+   TODAS MIS NOTAS — hero de la vista agregada
+   ============================================================ */
+.space-hero { display: flex; flex-direction: column; align-items: center; text-align: center; gap: 8px; margin-bottom: 32px; }
+.space-hero-badge {
+  width: 40px; height: 40px; display: grid; place-items: center; border-radius: 12px;
+  background: var(--bg-elevated); color: var(--text-muted); margin-bottom: 4px;
+}
+.space-hero-badge .icon { width: 19px; height: 19px; }
+.space-hero .page-title { margin: 0; }
+.space-hero-sub { font-size: 12.5px; color: var(--text-muted); max-width: 420px; }
+.space-hero-meta { display: flex; align-items: center; gap: 10px; font-size: 11px; color: var(--text-faint); margin-top: 4px; }
+.space-hero-meta .item { display: inline-flex; align-items: center; gap: 5px; }
+.space-hero-meta .icon { width: 12px; height: 12px; }
+.space-hero-meta .sep { opacity: .5; }
+
+/* Fila "Todas mis notas" del sidebar. Sin punto de color ni menu: no es un
+   proyecto, es una vista agregada, y eso debe verse a simple vista. */
+.projitem.proj-all .proj-row-nav { color: var(--text-secondary); }
+.projitem.proj-all .icon { color: var(--text-muted); }
+.proj-all-count { margin-left: auto; margin-right: 6px; font-size: 10px; color: var(--text-faint); font-family: var(--font-mono); }
+
+/* ---- Ancho de la columna de la hora ----
+   92px alcanzan para "10:06 AM" pero no para "31 jul · 10:06 AM": dentro de un
+   proyecto la fila lleva fecha + hora y el texto se salia del ancho del
+   contenido, cortado por el borde derecho. El mockup usa 136px justo por eso. */
+.project-panel .row-time,
+.list .row-wrap .row-time { width: 118px; }
+.fav-list .row-time { width: 52px; }
+
+/* ============================================================
+   MENU CONTEXTUAL — forma del mockup (.proj-row-menu)
+   Se veia a todo el ancho de la ventana y sin esquinas: las reglas del diseno
+   anterior quedaron a medias. Mismo aspecto que el menu del sidebar.
+   ============================================================ */
+.ctx-menu {
+  position: fixed; z-index: 12000; min-width: 232px; max-width: 300px; padding: 6px;
+  border: 1px solid var(--border-strong); border-radius: 12px;
+  background: var(--bg-elevated); color: var(--text-primary);
+  box-shadow: 0 1px 2px rgba(0,0,0,.18), 0 12px 32px -8px rgba(0,0,0,.42);
+}
+.ctx-item {
+  display: flex; align-items: center; gap: 10px; width: 100%;
+  padding: 8px 10px; border-radius: 8px; cursor: pointer;
+  color: var(--text-secondary); font-size: 12px; text-align: left;
+  transition: background .12s, color .12s;
+}
+.ctx-item svg { color: var(--text-muted); flex-shrink: 0; transition: color .12s; }
+.ctx-item:hover { background: var(--bg-hover); color: var(--text-primary); }
+.ctx-item:hover svg { color: currentColor; }
+.ctx-item.danger { color: var(--danger); }
+.ctx-item.danger svg { color: currentColor; }
+.ctx-item.danger:hover { background: color-mix(in srgb, var(--danger) 12%, transparent); }
+.ctx-sep { height: 1px; background: var(--border-subtle); margin: 4px 6px; }
+/* Distintivo PRO: antes se colaba como HTML dentro de la etiqueta y salia
+   impreso como texto. Ahora es un elemento propio. */
+.ctx-badge {
+  margin-left: auto; font-size: 9px; font-weight: 700; letter-spacing: .06em;
+  padding: 2px 6px; border-radius: 999px; flex-shrink: 0;
+  color: var(--pro-badge, #c8a32b); border: 1px solid currentColor;
+}
+
+/* ============================================================
+   Fila: hora y "···" sin solaparse
+   El colapso del track (1fr -> 0fr) dependia de que .row-meta recortara su
+   contenido; cuando no lo hacia, el boton se dibujaba ENCIMA de la hora. Se
+   resuelve de forma determinista: la hora se desvanece y el boton ocupa su
+   sitio, cada uno en su columna, sin depender de que el recorte funcione.
+   ============================================================ */
+.row-actions-slot {
+  display: grid; grid-template-columns: auto 28px; align-items: center;
+  flex-shrink: 0; gap: 2px;
+  transition: none;
+}
+.row-actions-slot > .row-meta {
+  grid-column: 1; justify-self: end; overflow: hidden;
+  transition: opacity 150ms var(--ease-reveal);
+}
+.row-actions-slot > .row-more-btn { grid-column: 2; justify-self: end; }
+/* La hora se va al pasar el mouse; el boton aparece en su columna, siempre
+   reservada, asi que nada se mueve de sitio. */
+.row-wrap:hover .row-actions-slot > .row-meta,
+.row-wrap:focus-within .row-actions-slot > .row-meta { opacity: 0; }
+
+/* El indicador de proyecto debe verse en los DOS estados: en reposo el icono,
+   y al pasar el mouse tambien su nombre. Antes desaparecia justo al señalar la
+   fila, que es cuando mas se quiere saber de que proyecto es. */
+.row-proj-icon { opacity: .85; }
+.row-wrap:hover .row-proj-icon, .row-wrap:focus-within .row-proj-icon { opacity: 1; }
+
+/* Cuando la reunion esta dentro de una carpeta el nombre es mas largo
+   ("Proyecto / Carpeta"), asi que necesita mas sitio al revelarse. */
+.row-proj-icon.has-folder .row-proj-name { max-width: 220px; }
+.row-proj-icon .row-proj-name { max-width: 150px; text-overflow: ellipsis; }
+
+/* ============================================================
+   Lado derecho de la fila: sin solapes
+   El mockup usa margenes negativos (-11 y -12px) para pegar la estrella y el
+   indicador de carpeta a la hora. Aqui la hora es mas ancha (lleva fecha) y no
+   se colapsa, asi que esos margenes hacian que el icono de carpeta se metiera
+   ENTRE la fecha y la hora, encima del texto. Se reemplazan por un gap normal.
+   ============================================================ */
+.row-fav-btn { margin-right: 0; }
+.row-proj-icon { margin-right: 0; }
+.row-wrap { gap: 8px; }
+/* El bloque de la derecha se lee como un grupo: estrella, ubicacion, hora y
+   menu, separados de forma uniforme y sin pisarse. */
+.row-wrap > .row-fav-btn,
+.row-wrap > .row-proj-icon,
+.row-wrap > .row-actions-slot { flex-shrink: 0; }

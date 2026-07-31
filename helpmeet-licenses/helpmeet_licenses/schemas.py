@@ -1,3 +1,4 @@
+from __future__ import annotations
 from datetime import date, datetime
 from typing import Literal, Optional
 
@@ -67,6 +68,10 @@ class CreateLicenseRequest(BaseModel):
     max_devices: int = Field(default=1, ge=1, le=25)
 
 
+class ReactivateRequest(BaseModel):
+    plan: Optional[str] = None
+
+
 # ── Responses ─────────────────────────────────────────────
 
 
@@ -99,6 +104,16 @@ class CustomerOut(BaseModel):
     model_config = {"from_attributes": True}
 
 
+class CustomerWithLicenses(BaseModel):
+    id: int
+    email: str
+    name: Optional[str]
+    created_at: datetime
+    licenses: list[LicenseOut] = []
+
+    model_config = {"from_attributes": True}
+
+
 class ActivationOut(BaseModel):
     id: int
     device_name: Optional[str]
@@ -116,6 +131,7 @@ class CreateLicenseResponse(BaseModel):
     license_key: str
     key_last4: str
     plan: str
+    email_sent: bool = False
 
 
 class LicenseOut(BaseModel):
@@ -125,8 +141,15 @@ class LicenseOut(BaseModel):
     status: str
     updates_until: Optional[date]
     max_devices: int = 1
+    video_seconds_used: int = 0
     created_at: datetime
-    customer: CustomerOut
+    revoked_at: Optional[datetime] = None
+    customer: Optional[CustomerOut] = None
     activations: list[ActivationOut] = []
 
     model_config = {"from_attributes": True}
+
+
+class ReportUsageRequest(BaseModel):
+    activation_token: str
+    seconds: int

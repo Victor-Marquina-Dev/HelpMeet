@@ -161,12 +161,22 @@ def _migrate_meeting_context(engine) -> None:
 
 
 def _migrate_note_is_context(engine) -> None:
-    """Añade la columna `is_context` (entradas de Contexto) a bases anteriores."""
+    """Anade la columna `is_context` (entradas de Contexto) a bases anteriores."""
     with engine.begin() as connection:
         existing = {column["name"] for column in inspect(connection).get_columns("notes")}
         if "is_context" not in existing:
             connection.exec_driver_sql(
                 "ALTER TABLE notes ADD COLUMN is_context BOOLEAN DEFAULT 0"
+            )
+
+
+def _migrate_utterance_language(engine) -> None:
+    """Anade la columna `language` a utterances (multi-idioma)."""
+    with engine.begin() as connection:
+        existing = {column["name"] for column in inspect(connection).get_columns("utterances")}
+        if "language" not in existing:
+            connection.exec_driver_sql(
+                "ALTER TABLE utterances ADD COLUMN language VARCHAR(10) DEFAULT ''"
             )
 
 
@@ -190,6 +200,7 @@ def init_db():
     _migrate_initiative_color(_engine)
     _migrate_meeting_context(_engine)
     _migrate_note_is_context(_engine)
+    _migrate_utterance_language(_engine)
     _ensure_indexes(_engine)
     _ensure_fts(_engine)
     _SessionFactory = sessionmaker(bind=_engine)

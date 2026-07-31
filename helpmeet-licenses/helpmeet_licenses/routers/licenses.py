@@ -8,6 +8,7 @@ from helpmeet_licenses.schemas import (
     ActivateRequest, ActivateResponse,
     ValidateRequest, ValidateResponse,
     DeactivateRequest, OkResponse,
+    ReportUsageRequest,
 )
 from helpmeet_licenses.auth import hash_key, create_activation_token, verify_activation_token
 
@@ -108,6 +109,27 @@ def validate(req: ValidateRequest, db: Session = Depends(get_db)):
     _log_event(db, lic.id, "validated", {"device_id_hash": device_hash})
     db.commit()
     return ValidateResponse(ok=True, status="active", plan=lic.plan)
+
+@router.post("/report-usage", response_model=OkResponse)
+def report_usage(req: ReportUsageRequest, db: Session = Depends(get_db)):
+    try:
+        payload = verify_activation_token(req.activation_token)
+    except ValueError as e:
+        return OkResponse(ok=False, error=str(e))
+
+    if "license_id" not in payload:
+        return OkResponse(ok=False, error="invalid_token")
+
+    lic = db.get(License, payload["license_id"])
+    if not lic or lic.status != "active":
+        return OkResponse(ok=False, error="license_not_found")
+
+    if req.seconds > 0:
+        lic.video_seconds_used = (lic.video_seconds_used or 0) + req.seconds
+        db.commit()
+
+    return OkResponse(ok=True, video_seconds_used=lic.video_seconds_used or 0)
+
 
 @router.post("/deactivate", response_model=OkResponse)
 def deactivate(req: DeactivateRequest, db: Session = Depends(get_db)):

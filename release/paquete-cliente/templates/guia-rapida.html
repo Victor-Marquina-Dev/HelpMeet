@@ -1,0 +1,133 @@
+<meta charset="utf-8">
+<title>Guía Rápida — Helpmeet 3.2.0</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@600;700;800&family=DM+Sans:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  @page { size: A4; margin: 16mm 20mm; }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { font-family:'DM Sans',sans-serif; color:#15181b; font-size:10.5pt; line-height:1.5;
+         -webkit-print-color-adjust:exact; print-color-adjust:exact; }
+
+  .cover { display:flex; align-items:center; gap:14px; padding-bottom:14px;
+           border-bottom:2.5px solid #0a9268; margin-bottom:22px; }
+  .cover .txt h1 { font-family:Syne,sans-serif; font-size:26pt; letter-spacing:-1px; line-height:1.05; }
+  .cover .txt p { color:#5f6368; font-size:10pt; margin-top:3px; }
+  .ver { margin-left:auto; font-family:'JetBrains Mono',monospace; font-size:8.5pt;
+         color:#0a9268; border:1.5px solid #0a9268; border-radius:99px; padding:4px 12px; }
+
+  h2 { font-family:Syne,sans-serif; font-size:14pt; letter-spacing:-.4px; margin:20px 0 9px;
+       display:flex; align-items:center; gap:9px; }
+  h2 .n { background:#0a9268; color:#fff; width:24px; height:24px; border-radius:50%;
+          font-size:10.5pt; display:inline-flex; align-items:center; justify-content:center; flex:none; }
+  h2:first-of-type { margin-top:4px; }
+
+  p.lead { margin-bottom:8px; }
+  ol, ul { margin:6px 0 6px 20px; }
+  li { margin-bottom:4px; }
+
+  .box { background:#f6f8fc; border:1px solid #e4e7ec; border-left:3px solid #0a9268;
+         border-radius:7px; padding:11px 14px; margin:10px 0; }
+  .box.warn { border-left-color:#e37400; background:#fff8f0; }
+  .box b { font-weight:600; }
+  .box p { font-size:9.5pt; }
+
+  table { width:100%; border-collapse:collapse; margin:9px 0; font-size:9.5pt; }
+  th { background:#f6f8fc; text-align:left; padding:7px 10px; font-weight:600;
+       border-bottom:1.5px solid #d3d7de; }
+  td { padding:6px 10px; border-bottom:1px solid #e4e7ec; }
+  code { font-family:'JetBrains Mono',monospace; font-size:9pt;
+         background:#eef2f6; padding:1.5px 5px; border-radius:4px; }
+
+  .foot { margin-top:24px; padding-top:11px; border-top:1px solid #e4e7ec;
+          display:flex; justify-content:space-between; color:#80868b; font-size:8.5pt; }
+  .foot a { color:#0a9268; text-decoration:none; font-weight:500; }
+  .kbd { font-family:'JetBrains Mono',monospace; font-size:8.5pt; border:1px solid #d3d7de;
+         border-bottom-width:2px; border-radius:4px; padding:1px 6px; background:#fff; }
+</style>
+
+<div class="cover">
+  <svg width="52" height="52" viewBox="0 0 64 64">
+    <defs><linearGradient id="g" x1="10" y1="10" x2="54" y2="56" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#6FE3B5"/><stop offset="1" stop-color="#34C78A"/></linearGradient></defs>
+    <rect width="64" height="64" rx="14" fill="#141c18"/>
+    <rect x="12" y="13" width="40" height="11" rx="5.5" fill="url(#g)"/>
+    <rect x="12" y="27" width="40" height="11" rx="5.5" fill="url(#g)"/>
+    <circle cx="21" cy="47" r="7" fill="url(#g)"/>
+  </svg>
+  <div class="txt">
+    <h1>Guía Rápida</h1>
+    <p>Empieza a usar Helpmeet en 5 minutos</p>
+  </div>
+  <div class="ver">v3.2.0</div>
+</div>
+
+<h2><span class="n">1</span>Instala y activa</h2>
+<ol>
+  <li>Ejecuta <code>Helpmeet-Setup-3.2.0.exe</code></li>
+  <li>Abre Helpmeet desde el menú inicio</li>
+  <li>Introduce tu <b>Product Key</b> (formato <code>HM-XXXX-XXXX-XXXX-XXXX</code>)</li>
+</ol>
+<div class="box warn">
+  <p><b>¿Windows muestra "Windows protegió tu PC"?</b><br>
+  Es normal en aplicaciones nuevas. Pulsa <b>Más información</b> → <b>Ejecutar de todas formas</b>.</p>
+</div>
+<div class="box">
+  <p><b>Tu Product Key llega por email</b>, en un correo aparte de esta descarga.
+  Si no lo ves en unos minutos, revisa la carpeta de spam.</p>
+</div>
+
+<h2><span class="n">2</span>Prepara el motor de transcripción</h2>
+<p class="lead">La primera vez, Helpmeet descarga el modelo que transcribe tu audio. Ocurre una sola vez.</p>
+<table>
+  <tr><th>Modelo</th><th>Tamaño</th><th>Cuándo usarlo</th></tr>
+  <tr><td><code>base</code></td><td>~145 MB</td><td>Equipos modestos, borradores rápidos</td></tr>
+  <tr><td><code>small</code></td><td>~480 MB</td><td><b>Recomendado</b> — mejor equilibrio</td></tr>
+  <tr><td><code>medium</code></td><td>~1.5 GB</td><td>Audio con ruido o varios interlocutores</td></tr>
+  <tr><td><code>large-v3</code></td><td>~3 GB</td><td>Máxima precisión, equipos potentes</td></tr>
+</table>
+<p>Puedes cambiarlo cuando quieras en <b>Configuración → Transcripción</b>.</p>
+
+<h2><span class="n">3</span>Crea tu primer proyecto</h2>
+<p class="lead">Los proyectos agrupan reuniones relacionadas: un cliente, un producto, una iniciativa.</p>
+<ol>
+  <li>Pulsa <b>+ Nuevo proyecto</b> en la barra lateral</li>
+  <li>Ponle nombre (por ejemplo, el nombre de tu cliente)</li>
+  <li>Opcional: añade contexto del proyecto para orientar a la IA</li>
+</ol>
+
+<h2><span class="n">4</span>Graba una reunión</h2>
+<ol>
+  <li>Entra en tu proyecto y pulsa <b>Grabar</b></li>
+  <li>Elige <b>solo audio</b> o <b>audio + pantalla</b></li>
+  <li>Al terminar, pulsa <b>Detener</b></li>
+</ol>
+<div class="box">
+  <p><b>Se graban dos pistas separadas:</b> tu micrófono y el audio del sistema
+  (lo que dicen los demás en Meet, Teams o Zoom). Puedes silenciar tu micrófono
+  durante la grabación sin cortarla.</p>
+</div>
+
+<h2><span class="n">5</span>Transcribe y exporta</h2>
+<ol>
+  <li>Pulsa <b>Transcribir</b> en la reunión grabada</li>
+  <li>Al terminar, usa <b>Copiar transcripción .md</b></li>
+  <li>Pégalo en Claude, ChatGPT o la IA que uses</li>
+</ol>
+<p>También puedes exportar el proyecto entero en Markdown, con capturas incluidas,
+desde el menú <b>···</b> del proyecto.</p>
+
+<h2><span class="n">6</span>Atajos útiles</h2>
+<table>
+  <tr><th>Acción</th><th>Atajo</th></tr>
+  <tr><td>Captura de pantalla durante la reunión</td><td><span class="kbd">Ctrl</span> + <span class="kbd">Shift</span> + <span class="kbd">S</span></td></tr>
+  <tr><td>Buscar en transcripciones</td><td><span class="kbd">Ctrl</span> + <span class="kbd">F</span></td></tr>
+  <tr><td>Nuevo proyecto</td><td><span class="kbd">Ctrl</span> + <span class="kbd">N</span></td></tr>
+  <tr><td>Exportar reunión actual</td><td><span class="kbd">Ctrl</span> + <span class="kbd">E</span></td></tr>
+</table>
+<p style="font-size:9.5pt;color:#5f6368">Consulta el Manual de Usuario para la lista completa.</p>
+
+<div class="foot">
+  <span>Helpmeet 3.2.0 — MIMOTECH</span>
+  <span>Soporte: <a href="mailto:helpmeet@mimotech.vip">helpmeet@mimotech.vip</a></span>
+</div>

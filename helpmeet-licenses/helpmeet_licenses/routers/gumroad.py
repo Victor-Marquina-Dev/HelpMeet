@@ -18,7 +18,6 @@ En producción, se puede añadir validación de IP de Gumroad como capa extra.
 """
 from datetime import datetime, timezone
 
-from html import escape
 import hmac
 from typing import Optional
 
@@ -31,88 +30,36 @@ from helpmeet_licenses.database import get_db
 from helpmeet_licenses.keys import generate_license_key
 from helpmeet_licenses.models import Customer, License, LicenseEvent
 from helpmeet_licenses.schemas import OkResponse
+from helpmeet_licenses.email_service import send_license_key_email
 
 
-ADMIN_EMAIL = "victormarquina591@gmail.com"
-
-
-def _notify_admin(buyer_email: str, license_key: str, plan: str) -> None:
-    """Notifica a Victor cuando hay una nueva venta."""
-    if not settings.resend_api_key:
-        return
-    try:
-        import resend
-        buyer_email = escape(buyer_email)
-        license_key = escape(license_key)
-        plan = escape(plan)
-        resend.api_key = settings.resend_api_key
-        resend.Emails.send({
-            "from": "Helpmeet Admin <onboarding@resend.dev>",
-            "to": ADMIN_EMAIL,
-            "subject": f"Nueva venta Helpmeet — {buyer_email}",
-            "html": f"""
-<div style="font-family:sans-serif;max-width:480px;margin:0 auto;padding:32px;background:#0f1110;color:#e3e2e0">
-  <h2 style="color:#aacfbf;margin-bottom:4px">Nueva venta</h2>
-  <p style="color:#8b928e;margin-bottom:24px">Helpmeet — Plan {plan}</p>
-
-  <div style="background:#1a1c1b;border-radius:10px;padding:20px;margin-bottom:20px">
-    <div style="font-size:12px;color:#8b928e;margin-bottom:4px">COMPRADOR</div>
-    <div style="font-size:16px;color:#e3e2e0">{buyer_email}</div>
+def _notify_admin_gumroad(buyer_email: str, license_key: str, plan: str) -> None:
+    """Notifica a Victor cuando hay una nueva venta via Gumroad."""
+    from helpmeet_licenses.email_service import send_email
+    plan_label = {"personal": "Personal", "pro": "Pro", "team": "Team"}.get(plan, plan)
+    send_email(
+        to=settings.admin_notify_email,
+        subject=f"Nueva venta Gumroad — {buyer_email}",
+        body_html=f"""
+<div style="font-family:sans-serif;max-width:480px;margin:0 auto;padding:32px;background:#0f172a;color:#e2e8f0;border-radius:12px">
+  <h2 style="color:#2dd4bf;margin-bottom:4px">Nueva venta Gumroad</h2>
+  <p style="color:#94a3b8;margin-bottom:24px">Plan {plan_label}</p>
+  <div style="background:#1e293b;border-radius:10px;padding:16px;margin-bottom:16px">
+    <div style="font-size:11px;color:#64748b;text-transform:uppercase">Comprador</div>
+    <div style="font-size:16px;margin-top:4px">{buyer_email}</div>
   </div>
-
-  <div style="background:#1a1c1b;border-radius:10px;padding:20px;margin-bottom:24px">
-    <div style="font-size:12px;color:#8b928e;margin-bottom:8px">PRODUCT KEY GENERADA</div>
-    <code style="font-size:18px;letter-spacing:2px;color:#aacfbf;font-weight:bold">{license_key}</code>
+  <div style="background:#1e293b;border-radius:10px;padding:20px;margin-bottom:24px;text-align:center">
+    <div style="font-size:11px;color:#64748b;text-transform:uppercase;margin-bottom:10px">Product Key</div>
+    <code style="font-size:18px;letter-spacing:2px;color:#2dd4bf;font-weight:bold">{license_key}</code>
   </div>
-
-  <p style="color:#8b928e;font-size:13px">
-    Abre el panel admin y haz clic en <strong style="color:#aacfbf">Enviar key</strong>
-    para que el cliente la reciba por email.
-  </p>
 </div>
-"""
-        })
-    except Exception:
-        pass
+""",
+    )
 
 
-def _send_license_email(to_email: str, license_key: str, plan: str) -> None:
-    """Envía la Product Key al comprador via Resend."""
-    if not settings.resend_api_key:
-        return
-    try:
-        import resend
-        license_key = escape(license_key)
-        plan = escape(plan)
-        resend.api_key = settings.resend_api_key
-        resend.Emails.send({
-            "from": "Helpmeet <onboarding@resend.dev>",
-            "to": to_email,
-            "subject": "Tu Product Key de Helpmeet",
-            "html": f"""
-<div style="font-family:sans-serif;max-width:480px;margin:0 auto;padding:32px">
-  <h2 style="color:#aacfbf">¡Gracias por comprar Helpmeet!</h2>
-  <p>Aquí está tu Product Key personal:</p>
-  <div style="background:#1e201f;border-radius:8px;padding:20px;text-align:center;margin:24px 0">
-    <code style="font-size:20px;letter-spacing:2px;color:#aacfbf;font-weight:bold">{license_key}</code>
-  </div>
-  <p><strong>Cómo activar:</strong></p>
-  <ol>
-    <li>Descarga e instala Helpmeet</li>
-    <li>Abre la aplicación</li>
-    <li>Introduce tu Product Key cuando se solicite</li>
-    <li>¡Listo!</li>
-  </ol>
-  <p style="color:#888;font-size:13px">
-    Plan: {plan} · 1 dispositivo<br>
-    ¿Cambiaste de PC? Responde este email y lo resolvemos.<br>
-    Soporte: victor.marquina30@gmail.com
-  </p>
-</div>
-"""
-        })
-    except Exception:
-        pass  # El email falla silenciosamente — la licencia ya está creada
+def _send_license_email_gumroad(to_email: str, license_key: str, plan: str) -> None:
+    """Envia la Product Key al comprador via Gmail API."""
+    send_license_key_email(to_email, license_key, plan)
 
 router = APIRouter(prefix="/api/gumroad", tags=["gumroad"])
 
@@ -120,6 +67,15 @@ PLAN_MAP = {
     "helpmeet_personal": "personal",
     "helpmeet_pro": "pro",
     "helpmeet_team": "team",
+}
+
+# Dispositivos incluidos en cada plan. Debe coincidir con _PLAN_FEATURES en
+# helpmeet/ui/api/api_licenses.py (lo que la app promete al usuario) y con la
+# tabla de precios de docs/GUIA_VENTA_GUMROAD.md.
+PLAN_DEVICES = {
+    "personal": 1,
+    "pro": 2,
+    "team": 5,
 }
 
 
@@ -210,7 +166,7 @@ async def gumroad_webhook(
         key_hash=hash_key(key),
         key_last4=key[-4:],
         plan=plan,
-        max_devices=1,
+        max_devices=PLAN_DEVICES.get(plan, 1),
     )
     db.add(lic)
     db.flush()
@@ -226,6 +182,6 @@ async def gumroad_webhook(
     db.commit()
 
     # Notificar a Victor (admin) con los detalles de la venta
-    _notify_admin(email, key, plan)
+    _notify_admin_gumroad(email, key, plan)
 
     return OkResponse(ok=True)

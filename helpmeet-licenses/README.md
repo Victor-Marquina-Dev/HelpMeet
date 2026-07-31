@@ -2,17 +2,22 @@
 
 Backend FastAPI para gestionar licencias de Helpmeet.
 
-## Setup rápido
+## Setup rapido (desarrollo local con SQLite)
 
 ```bash
 cd helpmeet-licenses
-python -m venv .venv
-.venv\Scripts\activate
 pip install -r requirements.txt
-cp .env.example .env   # editar con tus valores
+cp .env.example .env          # ya configurado para SQLite local
+alembic upgrade head           # crea helpmeet_licenses.db
+python seed_dev.py             # genera product key de prueba
 ```
 
-## Base de datos
+## Setup produccion (PostgreSQL)
+
+Cambiar `.env`:
+```
+DATABASE_URL=postgresql://postgres:TU_PASSWORD@localhost:5432/helpmeet_licenses
+```
 
 ```bash
 psql -U postgres -c "CREATE DATABASE helpmeet_licenses;"
@@ -22,10 +27,10 @@ alembic upgrade head
 ## Arrancar el servidor
 
 ```bash
-uvicorn helpmeet_licenses.main:app --reload --port 8765
+uvicorn helpmeet_licenses.main:app --reload --port 8001
 ```
 
-Documentación: http://localhost:8765/docs
+Documentacion: http://localhost:8001/docs
 
 ## Crear una licencia (CLI)
 
@@ -44,18 +49,18 @@ pytest -v
 
 ## Variables de entorno (.env)
 
-| Variable | Descripción |
+| Variable | Descripcion |
 |---|---|
-| `DATABASE_URL` | URL PostgreSQL (ej: postgresql://postgres:pass@localhost:5432/helpmeet_licenses) |
-| `JWT_SECRET` | Secreto para firmar JWT (mínimo 32 chars) |
+| `DATABASE_URL` | SQLite (`sqlite:///./helpmeet_licenses.db`) o PostgreSQL |
+| `JWT_SECRET` | Secreto para firmar JWT (minimo 32 chars) |
 | `ADMIN_API_KEY` | Clave para endpoints admin (header X-Admin-Key) |
 
-## Endpoints públicos
+## Endpoints publicos
 
-| Endpoint | Método | Descripción |
+| Endpoint | Metodo | Descripcion |
 |---|---|---|
 | `/api/license/activate` | POST | Activa una licencia con una product key |
-| `/api/license/validate` | POST | Valida un token de activación |
+| `/api/license/validate` | POST | Valida un token de activacion |
 | `/api/license/deactivate` | POST | Desactiva un dispositivo |
 | `/health` | GET | Health check |
 

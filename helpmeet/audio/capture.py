@@ -1,19 +1,26 @@
+import time
 import wave
 import threading
 from pathlib import Path
 import pyaudiowpatch as pyaudio
+from helpmeet.audio.ring_buffer import AudioRingBuffer
 
 
 class DualAudioRecorder:
     """Graba micrófono ('me') y loopback del sistema ('others') en archivos WAV."""
 
-    def __init__(self, dest_dir):
+    def __init__(self, dest_dir, preview_seconds: float | None = None):
         self.dest_dir = Path(dest_dir)
         self.dest_dir.mkdir(parents=True, exist_ok=True)
         self._pa = pyaudio.PyAudio()
         self._running = False
         self._threads = []
         self._mic_muted = False
+        # `preview_seconds`: si se indica, cada pista recibe un AudioRingBuffer
+        # con los últimos N segundos de audio para que ProgressiveTranscriber los lea sin
+        # tocar el WAV que se está escribiendo a disco.
+        self._preview_seconds = preview_seconds
+        self.preview_buffers: dict[str, AudioRingBuffer] = {}
 
     def set_mic_muted(self, muted: bool) -> None:
         """Silencia/activa el micrófono ('me') sin cortar la grabación.
@@ -42,16 +49,25 @@ class DualAudioRecorder:
         wf.setnchannels(channels)
         wf.setsampwidth(self._pa.get_sample_size(pyaudio.paInt16))
         wf.setframerate(rate)
+        preview_buf = self.preview_buffers.get(label)
         stream = self._pa.open(
             format=pyaudio.paInt16, channels=channels, rate=rate,
             input=True, input_device_index=device_info["index"],
             frames_per_buffer=1024,
         )
         while self._running:
+            # El loopback WASAPI no entrega datos si no suena nada: read()
+            # bloquearía indefinidamente y stop() no podría cerrar limpio.
+            # Solo se lee cuando hay un bloque completo disponible.
+            if stream.get_read_available() < 1024:
+                time.sleep(0.01)
+                continue
             data = stream.read(1024, exception_on_overflow=False)
             if label == "me" and self._mic_muted:
                 data = b"\x00" * len(data)   # silencio mientras el micro está muteado
             wf.writeframes(data)
+            if preview_buf is not None:
+                preview_buf.append(data)
         stream.stop_stream()
         stream.close()
         wf.close()
@@ -65,6 +81,18 @@ class DualAudioRecorder:
         targets = [(mic, "me")]
         if loop:
             targets.append((loop, "others"))
+        if self._preview_seconds:
+            # Se crean ANTES de lanzar los hilos de captura, con el rate/canales
+            # reales de cada dispositivo: así ProgressiveTranscriber nunca ve el dict
+            # cambiar de tamaño mientras lo recorre (solo se mutan los bytes
+            # internos de cada AudioRingBuffer, ya protegidos con su lock).
+            for dev, label in targets:
+                self.preview_buffers[label] = AudioRingBuffer(
+                    self._preview_seconds,
+                    rate=int(dev["defaultSampleRate"]),
+                    channels=int(dev["maxInputChannels"]) or 2,
+                    sampwidth=self._pa.get_sample_size(pyaudio.paInt16),
+                )
         for dev, label in targets:
             t = threading.Thread(target=self._record, args=(dev, label), daemon=True)
             t.start()
@@ -73,5 +101,9 @@ class DualAudioRecorder:
     def stop(self):
         self._running = False
         for t in self._threads:
-            t.join(timeout=2)
+            t.join(timeout=5)
+        # Nunca liberar PortAudio con un hilo aún dentro de read():
+        # terminate() en ese estado revienta el proceso (access violation).
+        if any(t.is_alive() for t in self._threads):
+            return
         self._pa.terminate()

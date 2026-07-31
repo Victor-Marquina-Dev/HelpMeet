@@ -6,17 +6,15 @@ from sqlalchemy.orm import Session
 from helpmeet.db.models import Meeting, Initiative
 from helpmeet.db.repository import resolved_speaker_name
 from helpmeet.glossary import glossary_from_meetings
+from helpmeet.constants import SPEAKER_LABEL, MONTHS_ES
+from helpmeet.utils import fmt_time
 
-SPEAKER_LABEL = {"me": "Yo", "others": "Los demás"}
-MONTHS_ES = (
-    "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
-    "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre",
-)
+_VIDEO_EXTS = frozenset({".mp4", ".mkv", ".mov", ".avi", ".webm"})
 
 
 def transcript_filename(meeting: Meeting) -> str:
     """Nombre portable y reconocible para la transcripción de una reunión."""
-    title = _slug(meeting.title) or "reunion"
+    title = _slug(meeting.title) or "reunión"
     return f"{meeting.started_at:%Y-%m-%d_%H-%M}_{title}.txt"
 
 
@@ -47,7 +45,7 @@ def build_transcript_txt(meeting: Meeting) -> str:
         speaker = resolved_speaker_name(utterance, participants)
         important = "★ " if utterance.highlighted else ""
         text = " ".join((utterance.text or "").split())
-        lines.append(f"[{_fmt_time(utterance.start_time)}] {important}{speaker}: {text}")
+        lines.append(f"[{fmt_time(utterance.start_time)}] {important}{speaker}: {text}")
         lines.append("")
 
     if meeting.notes or meeting.captures or meeting.audio_path:
@@ -55,12 +53,12 @@ def build_transcript_txt(meeting: Meeting) -> str:
     events = []
     for note in meeting.notes:
         offset = _offset(note.created_at, meeting.started_at)
-        events.append((offset, f"[{_fmt_time(offset)}] Nota: {note.text}"))
+        events.append((offset, f"[{fmt_time(offset)}] Nota: {note.text}"))
     for capture in meeting.captures:
         offset = _offset(capture.taken_at, meeting.started_at)
         suffix = Path(capture.image_path).suffix or ".png"
         name = f"{capture.code}{suffix}"
-        events.append((offset, f"[{_fmt_time(offset)}] Captura: capturas/{name}"))
+        events.append((offset, f"[{fmt_time(offset)}] Captura: capturas/{name}"))
     for _, description in sorted(events, key=lambda item: item[0]):
         lines.extend([description, ""])
     if meeting.audio_path:
@@ -106,11 +104,19 @@ def export_transcript_package(meeting: Meeting, destination: Path) -> dict:
 
 
 def _slug(text: str) -> str:
-    text = re.sub(r"[^\w\s-]", "", text, flags=re.UNICODE).strip().lower()
-    return re.sub(r"[\s_-]+", "-", text)
+    """Convierte texto a un nombre de archivo seguro para sistemas de archivos.
+
+    Elimina caracteres no alfanumericos, resuelve a lowercase y colapsa
+    espacios/guiones. Si el resultado es vacio o potencialmente peligroso
+    (path traversal), devuelve un fallback seguro."""
+    cleaned = re.sub(r"[^\w\s-]", "", text, flags=re.UNICODE).strip().lower()
+    slug = re.sub(r"[\s_-]+", "-", cleaned).strip("-")
+    if not slug or slug.startswith(".") or ".." in slug:
+        return "sin-nombre"
+    return slug[:120]
 
 
-def _fmt_time(seconds: float) -> str:
+def fmt_time(seconds: float) -> str:
     m, s = divmod(int(seconds), 60)
     return f"{m:02d}:{s:02d}"
 
@@ -202,7 +208,7 @@ def _render_meeting(meeting: Meeting, captures_dir: Path,
         lines.append(f"- Capturas: {len(meeting.captures)}")
     if meeting.notes:
         lines.append(f"- Notas: {len(meeting.notes)}")
-    if meeting.audio_path and str(meeting.audio_path).lower().endswith(".mp4"):
+    if meeting.audio_path and Path(meeting.audio_path).suffix.lower() in _VIDEO_EXTS:
         video = Path(meeting.audio_path)
         if video.exists():
             lines.append(f"- Video: [{video.name}]({video_ref or video.name})")
@@ -210,17 +216,17 @@ def _render_meeting(meeting: Meeting, captures_dir: Path,
 
     for utt in sorted_utts:
         label = resolved_speaker_name(utt, participants)
-        lines.append(f"[{_fmt_time(utt.start_time)}] {label}: {utt.text}")
+        lines.append(f"[{fmt_time(utt.start_time)}] {label}: {utt.text}")
         for name, offset in captures_by_utt.get(utt.id, []):
-            lines.append(f"        [{_fmt_time(offset)}] 📷 (ver {captures_ref}/{name})")
+            lines.append(f"        [{fmt_time(offset)}] 📷 (ver {captures_ref}/{name})")
         for text, offset in notes_by_utt.get(utt.id, []):
-            lines.append(f"        [{_fmt_time(offset)}] 📝 Nota: {text}")
+            lines.append(f"        [{fmt_time(offset)}] 📝 Nota: {text}")
 
     # capturas y notas que no quedaron ligadas a ninguna frase, al final
     for name, offset in captures_by_utt.get(None, []):
-        lines.append(f"[{_fmt_time(offset)}] 📷 (ver {captures_ref}/{name})")
+        lines.append(f"[{fmt_time(offset)}] 📷 (ver {captures_ref}/{name})")
     for text, offset in notes_by_utt.get(None, []):
-        lines.append(f"[{_fmt_time(offset)}] 📝 Nota: {text}")
+        lines.append(f"[{fmt_time(offset)}] 📝 Nota: {text}")
 
     return lines
 
@@ -236,10 +242,23 @@ def meeting_folder_name(meeting: Meeting) -> str:
     return f"{meeting.started_at:%Y-%m-%d_%H-%M-%S}_{meeting.id:04d}"
 
 
+_MARKER = ".helpmeet"
+
+
+def is_helpmeet_folder(path: Path) -> bool:
+    """True si la carpeta fue creada y es gestionada por Helpmeet."""
+    return (path / _MARKER).exists()
+
+
 def initiative_export_dir(initiative: Initiative, base_dir: Path) -> Path:
     """Carpeta de exportación de una iniciativa (la crea si no existe)."""
     out_dir = Path(base_dir) / _slug(initiative.name)
     out_dir.mkdir(parents=True, exist_ok=True)
+    # Marca la carpeta como propiedad de Helpmeet para distinguirla de carpetas
+    # preexistentes en caso de colisión de nombre (Windows ignora mayúsculas).
+    marker = out_dir / _MARKER
+    if not marker.exists():
+        marker.touch()
     return out_dir
 
 
@@ -256,7 +275,7 @@ def initiative_month_dir(initiative: Initiative, base_dir: Path, when) -> Path:
 
 def _move_video_to_meeting(meeting: Meeting, meeting_dir: Path) -> None:
     """Reubica el vídeo en su carpeta y oculta las pistas técnicas antiguas."""
-    if not meeting.audio_path or not str(meeting.audio_path).lower().endswith(".mp4"):
+    if not meeting.audio_path or Path(meeting.audio_path).suffix.lower() not in _VIDEO_EXTS:
         return
     source = Path(meeting.audio_path)
     if not source.exists():
@@ -281,7 +300,7 @@ def _move_video_to_meeting(meeting: Meeting, meeting_dir: Path) -> None:
 
 def _move_audio_to_meeting(meeting: Meeting, meeting_dir: Path) -> None:
     """Mueve el WAV de grabación de audio a la carpeta de exportación."""
-    if not meeting.audio_path or str(meeting.audio_path).lower().endswith(".mp4"):
+    if not meeting.audio_path or Path(meeting.audio_path).suffix.lower() in _VIDEO_EXTS:
         return
     source = Path(meeting.audio_path)
     if not source.exists():
@@ -318,7 +337,42 @@ def _organize_meeting(meeting: Meeting, base_dir: Path) -> Path:
     (folder / "transcripcion.md").write_text(
         "\n".join(document) + "\n", encoding="utf-8"
     )
+    # Formatos adicionales: TXT plano y TSV (para Excel / Google Sheets)
+    _write_transcript_txt(meeting, folder / "transcripcion.txt")
+    _write_transcript_tsv(meeting, folder / "transcripcion.tsv")
     return folder
+
+
+def _write_transcript_txt(meeting: Meeting, dest: Path) -> None:
+    """Transcripción en texto plano con timestamps, sin Markdown."""
+    utterances = sorted(meeting.utterances, key=lambda u: u.start_time)
+    participants = list(meeting.initiative.participants)
+    lines = []
+    for u in utterances:
+        speaker = resolved_speaker_name(u, participants)
+        ts = fmt_time(u.start_time)
+        text = " ".join((u.text or "").split())
+        lines.append(f"[{ts}] {speaker}: {text}")
+    dest.write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+
+def _write_transcript_tsv(meeting: Meeting, dest: Path) -> None:
+    """Transcripción en TSV: start\\tend\\tspeaker\\ttext."""
+    import csv
+    utterances = sorted(meeting.utterances, key=lambda u: u.start_time)
+    participants = list(meeting.initiative.participants)
+    with dest.open("w", encoding="utf-8", newline="") as f:
+        writer = csv.writer(f, delimiter="\t")
+        writer.writerow(["inicio", "fin", "hablante", "texto"])
+        for u in utterances:
+            speaker = resolved_speaker_name(u, participants)
+            text = " ".join((u.text or "").split())
+            writer.writerow([
+                f"{u.start_time:.2f}",
+                f"{u.end_time:.2f}" if u.end_time else "",
+                speaker,
+                text,
+            ])
 
 
 def organize_meeting_folder(session: Session, meeting_id: int, base_dir: Path) -> Path:
@@ -345,23 +399,44 @@ def _context_header(ini: Initiative) -> list[str]:
     return lines
 
 
-def build_meeting_context(session: Session, meeting_id: int) -> str:
-    """Texto markdown de UNA reunión, con la cabecera para la IA, listo para copiar.
+def build_meeting_context(session: Session, meeting_id: int, language: str | None = None) -> str:
+    """Texto markdown de UNA reunion, con la cabecera para la IA, listo para copiar.
 
-    No altera la carpeta de exportación: renderiza en una carpeta temporal que se
-    descarta (solo necesita un destino para las capturas, que aquí no se usan)."""
+    No altera la carpeta de exportacion: renderiza en una carpeta temporal que se
+    descarta (solo necesita un destino para las capturas, que aqui no se usan).
+    Si `language` se especifica, filtra solo utterances de ese idioma."""
     import tempfile
     meeting: Meeting = session.get(Meeting, meeting_id)
     if meeting is None:
         return ""
-    header = _context_header(meeting.initiative)
-    with tempfile.TemporaryDirectory() as tmp:
-        captures_dir = Path(tmp) / "capturas"
-        captures_dir.mkdir(parents=True, exist_ok=True)
-        video_ref = Path(meeting.audio_path).name if meeting.audio_path else None
-        lines = _render_meeting(meeting, captures_dir, captures_ref="capturas",
-                                video_ref=video_ref)
-    return "\n".join(header + [""] + lines) + "\n"
+    # Filtrar utterances por idioma si se especifica
+    if language:
+        filtered = [u for u in meeting.utterances if getattr(u, 'language', '') == language]
+        if not filtered:
+            return ""
+        # Crear una copia temporal con utterances filtradas para _render_meeting
+        original_utterances = meeting.utterances
+        meeting.utterances = filtered
+        try:
+            header = _context_header(meeting.initiative)
+            with tempfile.TemporaryDirectory() as tmp:
+                captures_dir = Path(tmp) / "capturas"
+                captures_dir.mkdir(parents=True, exist_ok=True)
+                video_ref = Path(meeting.audio_path).name if meeting.audio_path else None
+                lines = _render_meeting(meeting, captures_dir, captures_ref="capturas",
+                                        video_ref=video_ref)
+            return "\n".join(header + [""] + lines) + "\n"
+        finally:
+            meeting.utterances = original_utterances
+    else:
+        header = _context_header(meeting.initiative)
+        with tempfile.TemporaryDirectory() as tmp:
+            captures_dir = Path(tmp) / "capturas"
+            captures_dir.mkdir(parents=True, exist_ok=True)
+            video_ref = Path(meeting.audio_path).name if meeting.audio_path else None
+            lines = _render_meeting(meeting, captures_dir, captures_ref="capturas",
+                                    video_ref=video_ref)
+        return "\n".join(header + [""] + lines) + "\n"
 
 
 def _export_initiative_folder(ini: Initiative, base_dir: Path) -> Path:

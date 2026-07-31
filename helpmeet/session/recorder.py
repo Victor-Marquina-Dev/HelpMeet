@@ -7,25 +7,34 @@ from pathlib import Path
 import numpy as np
 from helpmeet import config
 from helpmeet import recovery
+from helpmeet import settings
 from helpmeet.db.database import get_session
 from helpmeet.db import repository as repo
 from helpmeet.audio.capture import DualAudioRecorder
 from helpmeet.screenshot.capture import take_screenshot
+from helpmeet.session.vosk_live_transcriber import VoskLiveTranscriber
 
 _CHANNELS = (("me", "me.wav"), ("others", "others.wav"))
-
 
 class MeetingRecorder:
     """Orquesta una reunión.
 
     - live=True  : modo heredado por trozos con texto en vivo.
-    - live=False : graba la reunión entera sin cortes y la transcribe al parar,
-                   tanto en local como con Replicate. Sin huecos de audio.
+    - live=False : graba la reunión entera sin cortes (sin huecos de audio) y
+                   la transcribe EN VIVO con Vosk mientras grabas, palabra a
+                   palabra (ver VoskLiveTranscriber) — al parar solo falta
+                   cerrar la última frase, no la reunión entera.
     """
+
+    # Cota de seguridad del buffer en memoria que vacía VoskLiveTranscriber
+    # (segundos). Transcribe SOLO audio nuevo cada pasada (drain, no ventana
+    # móvil); esto solo evita que el buffer crezca sin límite si una pasada
+    # tarda más de lo normal.
+    PREVIEW_WINDOW_SECONDS = 10.0
 
     def __init__(self, initiative_id: int, title: str, engine, live: bool = False,
                  chunk_seconds: int = 6, on_utterance=None, on_status=None,
-                 mic_muted: bool = False, on_progress=None):
+                 mic_muted: bool = False, on_progress=None, on_partial=None):
         self.initiative_id = initiative_id
         self.title = title
         self.engine = engine
@@ -34,6 +43,7 @@ class MeetingRecorder:
         self.on_utterance = on_utterance
         self.on_status = on_status
         self.on_progress = on_progress
+        self.on_partial = on_partial
         self._mic_muted = bool(mic_muted)
         self._running = False
         self._session = get_session()
@@ -41,6 +51,7 @@ class MeetingRecorder:
         self._last_utterance_id = None
         self._thread = None
         self._recorder = None
+        self._progressive = None
         # Carpeta de audio ÚNICA por grabación: así, si esta reunión se
         # transcribe en segundo plano mientras grabas otra, sus WAV no se pisan.
         self._tmp = recovery.recovery_dir() / uuid.uuid4().hex
@@ -58,6 +69,7 @@ class MeetingRecorder:
         obj.on_utterance = None
         obj.on_status = on_status
         obj.on_progress = on_progress
+        obj._progressive = None
         obj._mic_muted = False
         obj._running = False
         obj._session = get_session()
@@ -91,11 +103,26 @@ class MeetingRecorder:
             self._thread.start()
         else:
             # grabación continua de toda la reunión (sin huecos)
-            self._recorder = DualAudioRecorder(self._tmp)
+            self._recorder = DualAudioRecorder(self._tmp, preview_seconds=self.PREVIEW_WINDOW_SECONDS)
             self._recorder.set_mic_muted(self._mic_muted)
             self._recorder.start()
+            # Transcripción en vivo con Vosk: va guardando frases definitivas
+            # mientras grabas, palabra a palabra (aislada del audio real,
+            # nunca puede reintroducir huecos), así al parar normalmente solo
+            # falta cerrar la última frase, no la reunión entera.
+            self._progressive = VoskLiveTranscriber(
+                self._recorder.preview_buffers, self.meeting.id,
+                language=settings.get_transcription_language() or "",
+                # Indirección a propósito (no `self.on_utterance` directo): al
+                # parar, `_queue_transcription` pone `on_utterance = None` para
+                # silenciar el push en vivo durante el tramo final que procesa
+                # `flush_tail()`. Si capturáramos el callback aquí, esa
+                # desactivación posterior no tendría efecto.
+                on_utterance=lambda *a: self.on_utterance(*a) if self.on_utterance else None,
+                on_partial=lambda *a: self.on_partial(*a) if self.on_partial else None,
+            )
+            self._progressive.start()
 
-    # ---------- modo en vivo (local, por trozos) ----------
     def _live_loop(self):
         elapsed = 0.0
         while self._running:
@@ -121,7 +148,6 @@ class MeetingRecorder:
             time.sleep(0.2)
             slept += 0.2
 
-    # ---------- común ----------
     @staticmethod
     def _has_audio(wav, threshold: float = 30.0) -> bool:
         """True si el WAV tiene sonido real (evita transcribir silencio).
@@ -159,10 +185,11 @@ class MeetingRecorder:
             if not seg.text:
                 continue
             u = repo.add_utterance(self._session, self.meeting.id, label,
-                                   seg.text, elapsed + seg.start, elapsed + seg.end)
+                                   seg.text, elapsed + seg.start, elapsed + seg.end,
+                                   language=settings.get_transcription_language() or "")
             self._last_utterance_id = u.id
             if self.on_utterance:
-                self.on_utterance(label, seg.text, u.start_time, u.end_time)
+                self.on_utterance(u.id, label, seg.text, u.start_time, u.end_time)
 
     def capture_screenshot(self, monitor_index: int = 1):
         path = take_screenshot(config.CAPTURES_DIR, monitor_index)
@@ -213,9 +240,11 @@ class MeetingRecorder:
                 if self.on_status:
                     self.on_status(f"No se pudo transcribir una pista: {exc}")
                 continue
+            current_lang = settings.get_transcription_language() or ""
             rows = [
                 {"speaker": label, "text": seg.text,
-                 "start_time": seg.start, "end_time": seg.end}
+                 "start_time": seg.start, "end_time": seg.end,
+                 "language": current_lang}
                 for seg in segments if seg.text
             ]
             created = repo.add_utterances(self._session, self.meeting.id, rows)
@@ -223,7 +252,7 @@ class MeetingRecorder:
                 self._last_utterance_id = created[-1].id
             if self.on_utterance:  # modo live: avisar de cada frase
                 for u in created:
-                    self.on_utterance(u.speaker, u.text, u.start_time, u.end_time)
+                    self.on_utterance(u.id, u.speaker, u.text, u.start_time, u.end_time)
         if self.on_progress and tracks and getattr(self.engine, "supports_progress", False):
             self.on_progress(1.0)
         if tracks and len(failures) == len(tracks):
@@ -254,6 +283,11 @@ class MeetingRecorder:
         aparte con `transcribe()`, normalmente desde un worker en segundo plano,
         para no bloquear ni impedir empezar otra grabación."""
         self._running = False
+        if self._progressive:
+            # Rápido: solo detiene la pasada periódica. El tramo final
+            # pendiente se procesa aparte en transcribe() (worker en 2º
+            # plano), para no bloquear "empezar otra grabación enseguida".
+            self._progressive.stop_loop()
         if self.live:
             if self._thread:
                 self._thread.join(timeout=60)
@@ -264,8 +298,8 @@ class MeetingRecorder:
 
     def _resolve_engine(self):
         """Carga el motor de forma perezosa. `engine` puede ser una instancia o
-        una *factory* (callable que la crea). Así empezar a grabar NO espera a que
-        Whisper cargue: el modelo se carga al comenzar a transcribir (al detener)."""
+        una *factory* (callable que la crea). Así empezar a grabar NO espera a
+        que el modelo cargue: se carga al comenzar a transcribir (al detener)."""
         if not hasattr(self.engine, "transcribe_file") and callable(self.engine):
             if self.on_status:
                 self.on_status("Cargando el modelo…")
@@ -273,7 +307,7 @@ class MeetingRecorder:
         return self.engine
 
     def _persist_audio(self):
-        """Mezcla me.wav + others.wav y guarda grabacion.wav en el directorio
+        """Mezcla me.wav + others.wav y guarda grabación.wav en el directorio
         de medios interno. La ruta queda registrada en meeting.audio_path para
         que el exportador la mueva después a la carpeta del usuario."""
         from helpmeet.media_storage import meeting_media_dir
@@ -292,15 +326,23 @@ class MeetingRecorder:
             pass
 
     def transcribe(self):
-        """Transcribe el audio ya grabado y enlaza las capturas por tiempo.
+        """Completa la transcripción y enlaza las capturas por tiempo.
 
-        Se llama después de `stop_capture()`. Al terminar limpia su carpeta de
-        audio temporal. En modo live el texto ya se generó durante la grabación."""
+        Se llama después de `stop_capture()`, normalmente desde un worker en
+        segundo plano. Con transcripción progresiva, casi toda la reunión ya
+        quedó transcrita mientras grababas: aquí solo se procesa el último
+        tramo pendiente. Si la transcripción progresiva falló por completo
+        (no persistió ninguna frase), cae al método antiguo (archivo entero)
+        como red de seguridad — nunca debe quedar una reunión sin transcribir."""
         if not self.live:
-            self._resolve_engine()
-            if self.on_status:
-                self.on_status("Preparando la transcripción…")
-            self._transcribe_channels()
+            if self._progressive:
+                self._progressive.flush_tail()
+                self._progressive.close()
+            if not (self._progressive and self._progressive.produced_any):
+                self._resolve_engine()
+                if self.on_status:
+                    self.on_status("Preparando la transcripción…")
+                self._transcribe_channels()
         self._link_captures_by_time()
         self._persist_audio()
         # Solo se elimina al completar todo. Si Python/Windows se cierra o el

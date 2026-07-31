@@ -1,0 +1,106 @@
+===========================================
+  HELPMEET 3.2.0 - Windows
+  Graba, transcribe y organiza tus reuniones
+===========================================
+
+Gracias por tu compra.
+
+
+-------------------------------------------
+CONTENIDO DE ESTE PAQUETE
+-------------------------------------------
+
+  Helpmeet-Setup-3.2.0.exe   Instalador
+  Guia-Rapida.pdf            Empieza en 5 minutos
+  Manual-de-Usuario.pdf      Documentacion completa
+  LEEME.txt                  Este archivo
+
+
+-------------------------------------------
+COMO ACTIVAR
+-------------------------------------------
+
+1. Ejecuta Helpmeet-Setup-3.2.0.exe
+2. Abre Helpmeet
+3. Introduce tu Product Key cuando se solicite
+4. Listo
+
+Tu Product Key llega por email en los proximos
+minutos, en un correo aparte de esta descarga.
+Si no lo ves, revisa la carpeta de spam.
+
+La clave tiene el formato:
+  HM-XXXX-XXXX-XXXX-XXXX
+
+
+-------------------------------------------
+AVISO DE WINDOWS AL INSTALAR
+-------------------------------------------
+
+Windows puede mostrar "Windows protegio tu PC".
+Es normal en aplicaciones nuevas.
+
+  1. Pulsa "Mas informacion"
+  2. Pulsa "Ejecutar de todas formas"
+
+
+-------------------------------------------
+PRIMER USO
+-------------------------------------------
+
+La primera vez, Helpmeet descarga el motor de
+transcripcion. Ocurre una sola vez y tarda unos
+minutos segun el modelo que elijas:
+
+  base      ~145 MB   mas rapido
+  small     ~480 MB   recomendado
+  medium    ~1.5 GB   mas preciso
+  large-v3  ~3 GB     maxima calidad
+
+Puedes cambiar de modelo despues en Configuracion.
+
+Todo se procesa en tu PC. Tu audio nunca sale
+de tu equipo.
+
+
+-------------------------------------------
+REQUISITOS
+-------------------------------------------
+
+  Sistema    Windows 10 u 11 (64 bits)
+  Espacio    4 GB libres segun el modelo
+  RAM        8 GB recomendado
+
+No funciona en Mac ni Linux.
+
+
+-------------------------------------------
+TU PLAN
+-------------------------------------------
+
+El instalador es el mismo para todos los planes.
+Tu Product Key activa las funciones que te
+corresponden:
+
+  Personal   1 dispositivo   video 10 h
+  Pro        2 dispositivos  video ilimitado
+  Team       5 dispositivos  video ilimitado
+
+Si necesitas mas dispositivos, escribenos para
+ampliar tu licencia.
+
+
+-------------------------------------------
+SOPORTE
+-------------------------------------------
+
+  helpmeet@mimotech.vip
+
+Respondemos en menos de 24 h.
+Incluye tu Product Key para ayudarte mas rapido.
+
+
+-------------------------------------------
+Helpmeet 3.2.0 - MIMOTECH
+Pago unico - Actualizaciones incluidas por 1 ano
+===========================================

@@ -27,7 +27,7 @@ Registro de todas las decisiones tomadas durante el diseño del sistema de licen
 
 **Decisión:** Local (desarrollo y pruebas).
 
-**Pendiente:** Elegir hosting para producción en Fase 3 (Railway / Render / VPS).
+**Pendiente:** Elegir hosting para producción en Fase 3 (Fly.io / Railway / Render / VPS).
 
 ---
 

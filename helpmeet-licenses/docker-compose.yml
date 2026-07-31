@@ -1,0 +1,23 @@
+version: "3.9"
+
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: helpmeet_dev_postgres
+    restart: unless-stopped
+    ports:
+      - "5436:5432"
+    environment:
+      POSTGRES_USER: helpmeet
+      POSTGRES_PASSWORD: helpmeet_dev_2026
+      POSTGRES_DB: helpmeet_licenses
+    volumes:
+      - helpmeet_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U helpmeet -d helpmeet_licenses"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  helpmeet_pgdata:

@@ -1,0 +1,357 @@
+/* ============================================================
+   Helpmeet — CHASIS (titlebar + sidebar + riel colapsado)
+   Portado desde 01-projects/helpmeet/03-diseno/mockup.html.
+
+   Se carga DESPUÉS de tokens.css y ANTES de layout.css/style.css a propósito:
+   define el chasis nuevo, y las hojas viejas todavía traen reglas del diseño
+   anterior que se van retirando a medida que cada pantalla se reconstruye.
+
+   Traducción de tokens del mockup a los de la app:
+     --bg            -> --bg-app
+     --border        -> --border-strong
+     --border-soft   -> --border-subtle
+     --text-tertiary -> --text-muted
+   Los tamaños de fuente y radios van con el valor literal del mockup, que no
+   coincide con la escala del diseño anterior (--r-sm allí es 4px, acá 6px).
+   ============================================================ */
+
+:root {
+  --titlebar-h: 44px;
+  --sidebar-w-collapsed: 60px;
+  /* Una sola duración para todo lo que se mueve al plegar el panel: el ancho,
+     el corte del degradado de la barra de título y el desvanecido de los
+     rótulos. Cuando cada pieza tenía la suya, el plegado se leía como tres
+     animaciones sueltas ocurriendo cerca. */
+  --dur-panel-fold: 240ms;
+  /* Ease-out fuerte de la skill emil-design-eng: las curvas nativas
+     ("ease", "ease-out") se sienten flojas para un movimiento que debe leerse
+     como deliberado. Se usa en los controles que aparecen al pasar el mouse. */
+  --ease-reveal: cubic-bezier(.23, 1, .32, 1);
+}
+
+/* ---------- Iconos del sprite ---------- */
+.icon {
+  width: 16px; height: 16px;
+  stroke: currentColor; fill: none;
+  stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round;
+  flex-shrink: 0; display: block;
+}
+.icon-sm { width: 14px; height: 14px; }
+
+/* ---------- Estructura ---------- */
+body { display: flex; flex-direction: column; }
+
+/* Sin border-bottom aquí a propósito: la titlebar ocupa todo el ancho de la
+   ventana (es hermana de .shell, no está dentro del sidebar), así que un borde
+   se leería como una línea cruzando la ventana entera. */
+.titlebar {
+  height: var(--titlebar-h); flex-shrink: 0;
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 0 10px 0 16px; background: var(--bg-app);
+  position: relative; z-index: 10000;
+}
+/* Sin app-region:drag. La ventana la mueve el JS llamando a win_start_move()
+   sobre el mousedown de esta barra; declarar la region de arrastre del sistema
+   interceptaba ese mousedown y la ventana dejaba de poder moverse. Los handles
+   .wr de los bordes (z-index 11000) siguen encima para redimensionar. */
+.titlebar-right { display: flex; align-items: center; gap: 6px; }
+.titlebar-action {
+  width: 30px; height: 30px; display: flex; align-items: center; justify-content: center;
+  border: 1px solid var(--border-strong); border-radius: 6px;
+  color: var(--text-secondary); background: none; cursor: pointer;
+  transition: background .12s, color .12s;
+}
+.titlebar-action:hover { background: var(--bg-hover); color: var(--text-primary); }
+.sidebar-collapse-btn { color: var(--text-muted); flex-shrink: 0; background: none; border: none; cursor: pointer; }
+.sidebar-collapse-btn:hover { color: var(--text-primary); }
+
+.icon-btn {
+  width: 28px; height: 28px; flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+  border-radius: 6px; border: none; background: none; cursor: pointer;
+  color: var(--text-secondary); transition: background .12s, color .12s;
+}
+.icon-btn:hover { background: var(--bg-hover); color: var(--text-primary); }
+.wincontrols { display: flex; align-items: center; gap: 2px; margin-left: 6px; }
+.wincontrols .icon-btn { width: 32px; }
+.wincontrols .icon-btn.close:hover { background: var(--danger); color: #fff; }
+
+.shell { flex: 1; display: flex; min-height: 0; }
+
+/* ---------- Sidebar ---------- */
+.sidebar {
+  width: var(--sidebar-w); flex-shrink: 0; background: var(--bg-sidebar);
+  display: flex; flex-direction: column; position: relative;
+  transition: width var(--dur-panel-fold) var(--ease-reveal); min-height: 0;
+  /* visible, no hidden: el ::before sube 44px para que la linea recorra la
+     ventana entera, y el overflow:hidden que traia la hoja vieja lo recortaba
+     justo en ese tramo — la linea parecia arrancar a la altura de "Inicio".
+     Solo se recorta al colapsar, donde si hace falta para la transicion. */
+  overflow: visible;
+}
+/* ::before dibuja el borde derecho arrancando desde arriba de la titlebar, así
+   la línea recorre la ventana entera y no solo la parte de abajo. */
+.sidebar::before {
+  content: ''; position: absolute; top: calc(-1 * var(--titlebar-h)); bottom: 0;
+  right: 0; border-right: 1px solid var(--border-subtle); pointer-events: none;
+  /* Por encima de la barra de título (z-index 10000): la línea sube 44px para
+     recorrer la ventana entera, pero el fondo de la barra le tapaba justo ese
+     tramo y parecía arrancar debajo. Al ir en el mismo contexto de apilado
+     —.sidebar es position:relative sin z-index, así que no crea uno propio—
+     basta con un valor mayor para que se dibuje encima. */
+  z-index: 10001;
+}
+.shell.collapsed .sidebar { width: var(--sidebar-w-collapsed); overflow: hidden; }
+.shell.collapsed .sidebar::before { border-right-color: transparent; }
+
+.nav { padding: 0 8px; display: flex; flex-direction: column; gap: 1px; }
+.navitem {
+  display: flex; align-items: center; gap: 10px; padding: 7px 8px; border-radius: 6px;
+  color: var(--text-secondary); font-family: inherit; font-size: 12px;
+  width: 100%; text-align: left; border: none; background: none; cursor: pointer;
+  transition: background .12s, color .12s, padding var(--dur-panel-fold) var(--ease-reveal);
+}
+.navitem:hover { background: var(--bg-hover); color: var(--text-primary); }
+.navitem.active { background: var(--bg-elevated); color: var(--text-primary); }
+.navitem .label-text { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.navitem .nav-count { margin-left: auto; font-size: 10px; color: var(--text-muted); font-family: var(--font-mono); }
+/* Iconos centrados en el riel, pero SIN justify-content:center.
+   Centrar de golpe los mandaba al medio del panel todavía ancho (x≈95px) y de
+   ahí se arrastraban hasta los 30px finales: un salto grande al empezar. El
+   padding sí se puede animar, así que se centra corriéndolo.
+   La cuenta: riel 60 − 16 de padding de .nav = 44px de ítem; un icono de 16
+   queda centrado con 14px a la izquierda (44−16)/2. Absoluto: 8+14=22, el
+   icono ocupa 22–38 y su centro cae en 30 = la mitad exacta de 60. */
+.shell.collapsed .navitem,
+.shell.collapsed .space-fold-btn { padding-left: 14px; padding-right: 14px; }
+/* Antes: display:none. El rótulo desaparecía en el fotograma cero y el panel
+   seguía deslizándose 160 ms con el hueco vacío a la vista. Ahora se apaga
+   mientras el panel se cierra, que es un solo gesto en vez de dos.
+   flex/width en cero para que no reserve sitio; el recorte lo hace el
+   overflow del panel, así no hace falta inventar ningún ancho. */
+.shell.collapsed .navitem .label-text,
+.shell.collapsed .navitem .nav-count,
+.shell.collapsed .projitem .label-text {
+  opacity: 0; flex: 0 0 0; width: 0; margin: 0; overflow: hidden; pointer-events: none;
+}
+.navitem .label-text, .navitem .nav-count, .projitem .label-text {
+  opacity: 1; transition: opacity 120ms var(--ease-reveal);
+}
+
+.projlist { padding: 0 8px; display: flex; flex-direction: column; gap: 1px; margin-top: 4px; }
+.shell.collapsed .projlist { margin-top: 0; }
+/* .projitem es un contenedor de fila (div), no un botón: envuelve dos objetivos
+   de clic independientes para que la fila tenga "el nombre navega, el control
+   hace otra cosa", igual que el triángulo de un árbol de archivos. */
+.projitem {
+  display: flex; align-items: center; border-radius: 6px; position: relative;
+  color: var(--text-secondary); font-size: 12px; width: 100%; text-align: left;
+}
+.projitem:hover { background: var(--bg-hover); color: var(--text-primary); }
+.projitem.active { background: var(--bg-elevated); color: var(--text-primary); }
+.projitem .label-text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+
+.space-toggle-btn, .proj-row-nav {
+  flex: 1; min-width: 0; display: flex; align-items: center; gap: 10px;
+  color: inherit; font: inherit; font-family: inherit; text-align: left;
+  border: none; background: none; cursor: pointer;
+}
+.space-toggle-btn { padding: 7px 8px; }
+.space-fold-btn {
+  display: flex; align-items: center; padding: 7px 8px; flex-shrink: 0; border-radius: 6px;
+  color: var(--text-secondary); border: none; background: none; cursor: pointer;
+  transition: background .12s, color .12s;
+}
+.space-fold-btn:hover { background: var(--border-strong); color: var(--text-primary); }
+
+/* "+" y "→": aparecen al pasar el mouse por la fila. Llevan caja propia porque
+   sobre el fondo resaltado un icono suelto se lee como parte del texto. */
+.space-add-btn, .space-manage-btn {
+  width: 24px; height: 24px; display: grid; place-items: center; border-radius: 7px;
+  background: var(--bg-hover); border: 1px solid transparent; color: var(--text-muted);
+  opacity: 0; flex-shrink: 0; cursor: pointer;
+  transition: opacity .12s ease, background .12s, color .12s, border-color .12s,
+              transform 120ms var(--ease-reveal);
+}
+.space-add-btn { margin-right: 2px; }
+.space-add-btn .icon, .space-manage-btn .icon { width: 13px; height: 13px; stroke-width: 1.9; }
+.projitem.space-root:hover .space-add-btn,
+.projitem.space-root:hover .space-manage-btn,
+.space-add-btn:focus-visible, .space-manage-btn:focus-visible { opacity: 1; }
+.space-add-btn:hover, .space-manage-btn:hover {
+  background: var(--border-strong); border-color: var(--border-strong);
+  color: var(--text-primary); transform: scale(1.06);
+}
+.space-add-btn:active, .space-manage-btn:active { transform: scale(.94); }
+
+/* En el riel el icono de "Mis notas" ocupa la fila entera y centra, igual que
+   los .navitem; el botón del nombre se oculta ENTERO (ocultar solo su texto
+   dejaba el padding ocupando sitio y corría el icono fuera de la columna). */
+/* Sin justify-content:center. El mockup fija el riel en 60px —y no en 56—
+   justamente para que el sangrado de 16px sea el mismo en los dos estados;
+   centrar los iconos al plegar los hacía saltar 14px de lado mientras el
+   panel se cerraba, que es el movimiento que hacía sentir tosca la
+   transición. Ahora lo único que se mueve es el borde del panel. */
+.shell.collapsed .space-fold-btn { width: 100%; }
+.shell.collapsed .space-toggle-btn,
+.shell.collapsed .space-add-btn,
+.shell.collapsed .space-manage-btn,
+.shell.collapsed .proj-row-menu-btn { display: none; }
+/* A 60px los puntos de color no dicen de qué proyecto son: solo suman ruido. */
+/* Se enrolla con el mismo mecanismo que el plegado de "Mis notas" en vez de
+   esfumarse: es el mismo gesto de "esto se guarda", y ya está resuelto. */
+.shell.collapsed .projlist-fold { grid-template-rows: 0fr; }
+.shell.collapsed .projlist-nested { opacity: 0; }
+
+/* Carpetas anidadas bajo "Mis notas". El sangrado de 16px se mantiene igual en
+   los dos estados — por eso el riel mide 60px y no 56px.
+
+   El plegado va con grid-template-rows 0fr→1fr, no con max-height. Estaba en
+   max-height:2000px→0 para un contenido de unos 180px: la animación se pasaba
+   nueve décimas partes del recorrido en espacio vacío, así que al desplegar
+   parecía abrirse de golpe y al plegar daba un salto seco al final. Con grid la
+   altura la pone el contenido, sin números inventados y sin recortar la lista
+   cuando hay más proyectos. La técnica exige que el hijo lleve overflow:hidden
+   — de ahí el par .projlist-fold + .projlist-nested. */
+.projlist-fold {
+  display: grid; grid-template-rows: 1fr;
+  transition: grid-template-rows .22s var(--ease-reveal);
+}
+.projlist-fold.collapsed-group { grid-template-rows: 0fr; }
+.projlist-nested {
+  overflow: hidden; display: flex; flex-direction: column; gap: 1px;
+  margin-top: 1px; padding-left: 16px;
+  opacity: 1; transition: opacity .14s ease;
+}
+.projlist-fold.collapsed-group .projlist-nested { opacity: 0; }
+.projitem.nested { font-size: 11px; }
+.proj-row-nav { padding: 6px 8px; }
+.proj-pin { width: 11px; height: 11px; fill: currentColor; stroke: none; display: none; flex-shrink: 0; }
+.projitem.nested.pinned .proj-pin { display: block; }
+
+/* "···" al final de la fila: invisible hasta el hover. */
+.proj-row-menu-btn {
+  width: 20px; height: 20px; flex-shrink: 0; margin-left: auto; margin-right: 6px;
+  border-radius: 6px; display: flex; align-items: center; justify-content: center;
+  color: var(--text-muted); border: none; background: none; cursor: pointer;
+  opacity: 0; transition: opacity .12s ease, background .12s, color .12s;
+}
+.projitem.nested:hover .proj-row-menu-btn,
+.proj-row-menu-btn.open,
+.proj-row-menu-btn:focus-visible { opacity: 1; }
+.proj-row-menu-btn:hover { background: var(--border-strong); color: var(--text-primary); }
+
+.sidebar-spacer { flex: 1; min-height: 8px; }
+.sidebar-footer { padding: 0 8px 8px; display: flex; flex-direction: column; gap: 1px; }
+.shell.collapsed .sidebar-footer { align-items: center; }
+
+.sidebar-resize-handle {
+  width: 4px; cursor: col-resize; flex: none; background: transparent;
+  position: relative; z-index: 30; transition: background .15s;
+}
+.sidebar-resize-handle:hover,
+body.sidebar-dragging .sidebar-resize-handle { background: var(--border-strong); }
+.shell.collapsed .sidebar-resize-handle { cursor: e-resize; }
+
+/* ---------- Menú "···" de proyecto (popover nativo) ----------
+   Popover y no position:absolute porque .sidebar recorta con overflow:hidden
+   cuando está colapsada. Al subir al top layer, el navegador aporta gratis el
+   cierre al hacer clic fuera, el Esc y "un solo menú abierto a la vez". */
+.proj-row-menu {
+  position: fixed; z-index: 40; min-width: 232px; margin: 0; padding: 6px;
+  border: 1px solid var(--border-strong); border-radius: 12px;
+  background: var(--bg-elevated); color: var(--text-primary);
+  box-shadow: 0 1px 2px rgba(0,0,0,.18), 0 12px 32px -8px rgba(0,0,0,.42);
+  opacity: 0; transform: scale(.97) translateY(-4px);
+  transition: opacity .13s var(--ease-reveal), transform .13s var(--ease-reveal);
+}
+.proj-row-menu.show { opacity: 1; transform: scale(1) translateY(0); }
+.proj-row-menu:popover-open { display: block; }
+.menu-item {
+  display: flex; align-items: center; gap: 10px; width: 100%;
+  padding: 8px 10px; border-radius: 8px; border: none; background: none;
+  color: var(--text-secondary); font-family: inherit; font-size: 12px;
+  text-align: left; cursor: pointer; transition: background .12s, color .12s;
+}
+.menu-item .icon { color: var(--text-muted); transition: color .12s; }
+.menu-item:hover { background: var(--bg-hover); color: var(--text-primary); }
+.menu-item:hover .icon { color: currentColor; }
+.menu-item.danger { color: var(--danger); }
+.menu-item.danger .icon { color: currentColor; }
+.menu-item.danger:hover { background: color-mix(in srgb, var(--danger) 12%, transparent); }
+.menu-sep { height: 1px; background: var(--border-subtle); margin: 4px 6px; }
+
+/* Renombrar en línea, dentro de la propia fila del sidebar. */
+.rename-input {
+  flex: 1; min-width: 0; background: var(--bg-input); color: var(--text-primary);
+  border: 1px solid var(--border-strong); border-radius: 5px;
+  padding: 3px 6px; font: inherit; font-size: 11px; outline: none;
+}
+
+/* ---------- Tooltip propio del riel colapsado ----------
+   El title= nativo no se puede posicionar ni estilar (caja genérica que tapa el
+   icono de abajo). Este reutiliza ese mismo texto en un elemento que sí
+   controlamos; el JS quita el title mientras se muestra para que el del
+   navegador no aparezca encima. */
+.rail-tooltip {
+  position: fixed; z-index: 200; pointer-events: none;
+  background: var(--bg-elevated); color: var(--text-primary);
+  border: 1px solid var(--border-strong); border-radius: 6px;
+  padding: 5px 9px; font-size: 11px; white-space: nowrap;
+  box-shadow: var(--shadow-pop);
+  opacity: 0; transform: translateY(-50%) translateX(-4px);
+  transition: opacity .12s ease, transform .12s ease;
+}
+.rail-tooltip.show { opacity: 1; transform: translateY(-50%) translateX(0); }
+
+@media (prefers-reduced-motion: reduce) {
+  .space-add-btn, .space-manage-btn, .proj-row-menu, .rail-tooltip,
+  .sidebar, .projlist-nested, .projlist-fold, .titlebar,
+  .navitem .label-text, .navitem .nav-count, .projitem .label-text { transition: none; }
+  .space-add-btn:hover, .space-manage-btn:hover,
+  .space-add-btn:active, .space-manage-btn:active { transform: none; }
+}
+
+/* ---- Recuadro de los botones de la barra de título ----
+   .titlebar-action se declara ANTES de .icon-btn y los botones llevan las dos
+   clases; con la misma especificidad gana la última, así que el border:none de
+   .icon-btn borraba el recuadro. Se redeclara al final, donde sí gana. */
+.titlebar .titlebar-action {
+  border: 1px solid var(--border-strong); border-radius: 6px;
+  width: 30px; height: 30px;
+}
+.titlebar .titlebar-action:hover { background: var(--bg-hover); color: var(--text-primary); border-color: var(--border-strong); }
+/* Los controles de ventana NO llevan recuadro: son del sistema, no acciones de
+   la app, y enmarcarlos los pondría al mismo nivel visual. */
+.titlebar .wincontrols .icon-btn { border: none; }
+
+/* ---- El color del panel llega hasta el borde superior ----
+   La barra de titulo ocupa todo el ancho y pintaba un solo color, asi que el
+   tono del panel arrancaba recien debajo de ella (a la altura de "Inicio").
+   Se parte en dos con un corte duro exactamente en el ancho del panel: a la
+   izquierda el tono del panel, a la derecha el del lienzo. Sigue el ancho real
+   en los dos estados, incluido el riel colapsado. */
+/* El corte del degradado va en una variable REGISTRADA (@property con
+   syntax:<length>) y no directamente en el `linear-gradient`. Sin registrar,
+   una custom property es texto para el navegador y no interpola: al plegar, la
+   franja cálida saltaba de 190px a 60px de golpe mientras el panel se deslizaba
+   debajo, y eran dos movimientos distintos en la misma esquina. Registrada, se
+   anima como cualquier longitud y el corte viaja pegado al borde del panel.
+   Si el motor no soportara @property, el salto es el de antes: no hay
+   regresión, solo se pierde la interpolación. */
+@property --tb-corte {
+  syntax: "<length>";
+  inherits: false;
+  initial-value: 190px;
+}
+.titlebar {
+  --tb-corte: var(--sidebar-w);
+  background: linear-gradient(to right,
+    var(--bg-sidebar) 0, var(--bg-sidebar) var(--tb-corte),
+    var(--bg-app) var(--tb-corte), var(--bg-app) 100%);
+  transition: --tb-corte var(--dur-panel-fold) var(--ease-reveal);
+}
+.shell.collapsed ~ * .titlebar, body:has(.shell.collapsed) .titlebar {
+  --tb-corte: var(--sidebar-w-collapsed);
+}

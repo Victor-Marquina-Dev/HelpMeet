@@ -2,7 +2,7 @@
 ;  Helpmeet — Instalador (Inno Setup 6)
 ;  Instala POR USUARIO, sin privilegios de administrador.
 ;  Compilar con:  iscc /DMyAppVersion=0.1.0 installer\Helpmeet.iss
-;  (lo hace automáticamente scripts\build_installer.ps1)
+;  (lo hace automáticamente scripts\build_release.ps1)
 ; ============================================================
 
 #ifndef MyAppVersion
@@ -29,6 +29,7 @@ VersionInfoVersion={#MyAppVersion}
 PrivilegesRequired=lowest
 PrivilegesRequiredOverridesAllowed=dialog
 DefaultDirName={autopf}\Helpmeet
+DisableDirPage=no
 DisableProgramGroupPage=yes
 UninstallDisplayName={#MyAppName}
 UninstallDisplayIcon={app}\{#MyAppExeName}

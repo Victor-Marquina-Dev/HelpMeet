@@ -16,30 +16,29 @@ def test_disk_space_on_missing_path_uses_existing_parent(tmp_path):
     assert res["total_gb"] > 0
 
 
-def test_whisper_model_status_not_downloaded(tmp_path, monkeypatch):
-    # Forzamos una caché vacía: el modelo aparece como "se descargará".
-    fake_cache = tmp_path / "hub"
-    fake_cache.mkdir()
-    monkeypatch.setattr("huggingface_hub.constants.HF_HUB_CACHE", str(fake_cache))
-    res = diagnostics.whisper_model_status("small")
+def test_vosk_model_status_not_downloaded(tmp_path, monkeypatch):
+    # Aislamos la carpeta local de Helpmeet (DATA_DIR/models/vosk/...) para
+    # que el resultado no dependa de si ESTE equipo ya tiene el modelo real.
+    monkeypatch.setattr("helpmeet.config.DATA_DIR", tmp_path / "sin_datos")
+    res = diagnostics.vosk_model_status("vosk-model-small-es-0.42")
     assert res["downloaded"] is False
     assert res["status"] == "warn"
 
 
-def test_whisper_model_status_downloaded(tmp_path, monkeypatch):
-    fake_cache = tmp_path / "hub"
-    snap = fake_cache / "models--Systran--faster-whisper-small" / "snapshots" / "abc"
-    snap.mkdir(parents=True)
-    (snap / "model.bin").write_bytes(b"x" * 2048)
-    monkeypatch.setattr("huggingface_hub.constants.HF_HUB_CACHE", str(fake_cache))
-    res = diagnostics.whisper_model_status("small")
+def test_vosk_model_status_downloaded(tmp_path, monkeypatch):
+    monkeypatch.setattr("helpmeet.config.DATA_DIR", tmp_path / "sin_datos")
+    from helpmeet.transcription.vosk_engine import model_dir_for
+    marker = model_dir_for("vosk-model-small-es-0.42") / "am" / "final.mdl"
+    marker.parent.mkdir(parents=True)
+    marker.write_bytes(b"x")
+    res = diagnostics.vosk_model_status("vosk-model-small-es-0.42")
     assert res["downloaded"] is True
     assert res["status"] == "ok"
 
 
 def test_run_diagnostics_has_all_sections(tmp_path):
-    report = diagnostics.run_diagnostics(tmp_path, tmp_path / "export", "small")
-    for key in ("webview2", "disk", "whisper", "mic", "loopback", "export_dir", "processing"):
+    report = diagnostics.run_diagnostics(tmp_path, tmp_path / "export", "vosk-model-small-es-0.42")
+    for key in ("webview2", "disk", "vosk", "mic", "loopback", "export_dir", "processing"):
         assert key in report
         assert "status" in report[key]
     assert report["processing"]["status"] == "ok"
@@ -50,7 +49,7 @@ def test_preflight_is_different_for_meeting_and_screen(tmp_path, monkeypatch):
         "mic": {"status": "ok", "label": "Micrófono de prueba"},
         "loopback": {"status": "ok", "label": "Audio del sistema"},
     })
-    monkeypatch.setattr(diagnostics, "whisper_model_status", lambda _: {
+    monkeypatch.setattr(diagnostics, "vosk_model_status", lambda _: {
         "status": "ok", "label": "Modelo listo",
     })
     monkeypatch.setattr(diagnostics, "video_encoder_status", lambda: {
@@ -58,10 +57,10 @@ def test_preflight_is_different_for_meeting_and_screen(tmp_path, monkeypatch):
     })
 
     meeting = diagnostics.recording_preflight(
-        "meeting", tmp_path / "data", tmp_path / "exports", "small"
+        "meeting", tmp_path / "data", tmp_path / "exports", "vosk-model-small-es-0.42"
     )
     screen = diagnostics.recording_preflight(
-        "screen", tmp_path / "data", tmp_path / "exports", "small",
+        "screen", tmp_path / "data", tmp_path / "exports", "vosk-model-small-es-0.42",
         monitor={"index": 2, "width": 1920, "height": 1080}, fps=30,
     )
 
@@ -84,12 +83,12 @@ def test_preflight_blocks_when_required_microphone_fails(tmp_path, monkeypatch):
         "mic": {"status": "error", "label": "Sin micrófono"},
         "loopback": {"status": "warn", "label": "Sin loopback"},
     })
-    monkeypatch.setattr(diagnostics, "whisper_model_status", lambda _: {
+    monkeypatch.setattr(diagnostics, "vosk_model_status", lambda _: {
         "status": "warn", "label": "Se descargará después",
     })
 
     result = diagnostics.recording_preflight(
-        "meeting", tmp_path / "data", tmp_path / "exports", "small"
+        "meeting", tmp_path / "data", tmp_path / "exports", "vosk-model-small-es-0.42"
     )
 
     assert result["can_start"] is False

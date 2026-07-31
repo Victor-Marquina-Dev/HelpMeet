@@ -3,6 +3,7 @@ __pycache__/
 *.pyc
 data/
 .env
+.env.*
 *.env
 .claude/
 .superpowers/
@@ -10,9 +11,12 @@ data/
 assets/models/
 *.sqlite
 *.sqlite3
+helpmeet-licenses/helpmeet_licenses.db
 .pytest_cache/
 build/
 dist/
+recursos/v*
+dist_release/
 
 # Artefactos de diseno (no versionar)
 Helpmeet — Rediseño de interfaz/
@@ -39,3 +43,20 @@ helpmeet-licenses/*.txt
 helpmeet.log
 lic2.txt
 lic_debug.txt
+
+# Cobertura de tests (regenerable)
+.coverage
+coverage.xml
+coverage_html/
+
+# Corpus de audio real para el benchmark de motores (migracion Vosk, TASK-001+).
+# Toda la carpeta (audio + transcripciones + metadatos) contiene contenido real
+# de reuniones de trabajo con clientes: nunca se versiona. La metodologia queda
+# documentada en scripts/vosk_bench/README.md, que si se trackea.
+scripts/vosk_bench/corpus/
+scripts/vosk_bench/demo_grabaciones/
+
+# Respaldos por fase del rediseño (copias de app.js/index.html previas a cada
+# fase, hechas para poder volver atrás durante el trabajo). La historia de git
+# ya cumple esa función: no se versionan y se pueden borrar cuando se quiera.
+*.pre-*

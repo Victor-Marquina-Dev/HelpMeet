@@ -1,0 +1,866 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#f4f7f5">
+<meta name="color-scheme" content="light dark">
+
+<!-- Theme (set before paint to avoid flash) -->
+<script>
+  (function () {
+    var theme = 'light';
+    try {
+      var stored = localStorage.getItem('helpmeet-theme');
+      theme = stored || 'light';
+    } catch (e) {
+      theme = 'light';
+    }
+    document.documentElement.dataset.theme = theme;
+  })();
+</script>
+
+<!-- Primary Meta -->
+<title data-i18n="meta.title">Helpmeet — Graba, Transcribe y Entiende tus Reuniones. 100% Local.</title>
+<meta name="description" data-i18n="meta.description" content="Helpmeet transforma tus reuniones en contexto accionable con IA local. Todo en tu PC, sin suscripciones, sin nube. Transcripcion, grabacion de pantalla y exportacion a Claude. Pago unico.">
+<meta name="keywords" data-i18n="meta.keywords" content="transcripcion reuniones, grabar reuniones, transcripcion local, whisper, IA reuniones, grabar pantalla, helpmeet, transcripcion offline">
+<meta name="author" content="Helpmeet">
+<meta name="robots" content="index, follow, max-image-preview:large">
+<link rel="canonical" href="https://helpmeet.mimotech.vip/">
+
+<!-- Open Graph / Facebook / LinkedIn / WhatsApp -->
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://helpmeet.mimotech.vip/">
+<meta property="og:title" data-i18n="meta.ogTitle" content="Helpmeet — Graba, Transcribe y Entiende tus Reuniones. 100% Local.">
+<meta property="og:description" data-i18n="meta.ogDescription" content="Transcripcion de reuniones con IA en tu PC. Sin nube. Sin suscripciones. Pago unico. Exporta a Claude Code.">
+<meta property="og:site_name" content="Helpmeet">
+<meta property="og:locale" content="es_PE">
+<meta property="og:image" content="https://helpmeet.mimotech.vip/og-image.svg">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:type" content="image/svg+xml">
+<meta property="og:image:alt" data-i18n="meta.ogImageAlt" content="Helpmeet — Transcripcion de reuniones 100% local">
+
+<!-- Twitter / X Cards -->
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:site" content="@helpmeet_app">
+<meta name="twitter:creator" content="@helpmeet_app">
+<meta name="twitter:title" data-i18n="meta.twitterTitle" content="Helpmeet — Graba, Transcribe y Entiende tus Reuniones">
+<meta name="twitter:description" data-i18n="meta.twitterDescription" content="Transcripcion de reuniones con IA en tu PC. Sin nube. Sin suscripciones. Pago unico.">
+<meta name="twitter:image" content="https://helpmeet.mimotech.vip/og-image.svg">
+<meta name="twitter:image:alt" data-i18n="meta.twitterImageAlt" content="Helpmeet — Transcripcion de reuniones 100% local">
+
+<!-- Favicon -->
+<link rel="icon" type="image/svg+xml" href="/assets/helpmeet-app-icon.svg">
+<link rel="icon" type="image/png" href="/landing/favicon.png">
+<link rel="apple-touch-icon" href="/assets/helpmeet-app-icon.svg">
+
+<!-- Fonts -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@500;600;700;800&family=DM+Sans:ital,wght@0,300;0,400;0,500;0,600;1,300&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+
+<!-- GSAP -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/ScrollTrigger.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/ScrollToPlugin.min.js"></script>
+
+<link href="/landing/landing.css?v=20260724b" rel="stylesheet">
+
+<!-- JSON-LD Structured Data -->
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "SoftwareApplication",
+  "name": "Helpmeet",
+  "applicationCategory": "BusinessApplication",
+  "operatingSystem": "Windows 10, Windows 11",
+  "description": "Aplicacion de escritorio para grabar, transcribir y entender reuniones con IA local. Sin nube, sin suscripciones, pago unico.",
+  "url": "https://helpmeet.mimotech.vip",
+  "image": "https://helpmeet.mimotech.vip/og-image.svg",
+  "author": {
+    "@type": "Organization",
+    "name": "MIMOTECH",
+    "url": "https://helpmeet.mimotech.vip"
+  },
+  "offers": {
+    "@type": "Offer",
+    "price": "99.00",
+    "priceCurrency": "USD",
+    "description": "Licencia perpetua — pago unico"
+  }
+}
+</script>
+</head>
+<body>
+
+<!-- LOADER -->
+<div class="loader" id="loader">
+  <div class="loader-mark">
+    <svg viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg" width="44" height="44">
+      <rect x="12" y="13" width="40" height="11" rx="5.5" fill="#34C78A"/>
+      <rect x="12" y="27" width="40" height="11" rx="5.5" fill="#34C78A"/>
+      <circle cx="21" cy="47" r="7" fill="#34C78A"/>
+    </svg>
+  </div>
+</div>
+
+<!-- SPOTLIGHT + CURSOR RING (mouse-follow effects) -->
+<div class="spotlight" id="spotlight" aria-hidden="true"></div>
+<div class="cursor-ring" id="cursorRing" aria-hidden="true"></div>
+
+<!-- NAV -->
+<a href="#main" class="skip-link" data-i18n="skipLink">Saltar al contenido principal</a>
+<header>
+  <nav id="nav" aria-label="Principal">
+    <a href="#hero" class="nav-logo" aria-label="Helpmeet — Inicio">
+      <span class="nav-logo-dot" aria-hidden="true">
+        <svg viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <rect x="12" y="13" width="40" height="11" rx="5.5" fill="#34C78A"/>
+          <rect x="12" y="27" width="40" height="11" rx="5.5" fill="#34C78A"/>
+          <circle cx="21" cy="47" r="7" fill="#34C78A"/>
+        </svg>
+      </span>
+      <span>Helpmeet</span>
+    </a>
+    <ul class="nav-links" role="list">
+      <li><a href="#how" class="nav-link" data-i18n="nav.how">Como funciona</a></li>
+      <li><a href="#features" class="nav-link" data-i18n="nav.features">Features</a></li>
+      <li><a href="#compare" class="nav-link" data-i18n="nav.compare">Comparativa</a></li>
+      <li><a href="#pricing" class="nav-link" data-i18n="nav.pricing">Precios</a></li>
+      <li><a href="#faq" class="nav-link" data-i18n="nav.faq">FAQ</a></li>
+    </ul>
+    <div class="nav-actions">
+      <div class="lang-switcher">
+        <button type="button" class="lang-btn" data-lang-switch="es" aria-label="Espanol">ES</button>
+        <span class="lang-sep" aria-hidden="true">|</span>
+        <button type="button" class="lang-btn" data-lang-switch="en" aria-label="English">EN</button>
+      </div>
+      <button type="button" class="theme-toggle" id="themeToggle" data-i18n-attr="aria-label:nav.themeToggle,title:nav.themeTitle" aria-label="Cambiar tema claro u oscuro" title="Cambiar tema">
+        <svg class="icon-sun" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></svg>
+        <svg class="icon-moon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+      </button>
+      <a href="#pricing" class="nav-cta" data-i18n="nav.buy">
+        Comprar
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" aria-hidden="true"><path d="M5 12h14M13 5l7 7-7 7"/></svg>
+      </a>
+    </div>
+  </nav>
+</header>
+<main id="main">
+
+<!-- HERO -->
+<section class="hero" id="hero" aria-labelledby="heroTitle">
+  <div class="hero-bg" aria-hidden="true">
+    <div class="hero-grid"></div>
+    <div class="hero-ring r3"></div>
+    <div class="hero-ring r2"></div>
+    <div class="hero-ring"></div>
+    <div class="hero-orb"></div>
+    <div class="hero-orb-satellite"></div>
+    <div class="hero-orb-satellite s2"></div>
+  </div>
+
+  <div class="hero-content">
+
+    <h1 id="heroTitle" class="hero-title" data-i18n-html="hero.titleLine1">
+      Tus reuniones,<br><em>entendidas.</em>
+    </h1>
+
+    <p class="hero-lead" data-i18n-html="hero.leadLine1">
+      Todo en tu PC.<br><span class="lead-em">Sin suscripciones.</span>
+    </p>
+
+    <p class="hero-desc">
+      <span data-i18n="hero.desc">Graba audio o pantalla, transcribe con IA local y organiza cada reunion por proyecto.</span><span class="mobile-hide" data-i18n="hero.descExtra"> Exporta todo el contexto listo para trabajar con Claude Code.</span>
+    </p>
+
+    <div class="hero-actions">
+      <a href="#pricing" class="btn primary">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+        <span class="btn-text-full" data-i18n="hero.ctaFull">Comprar Helpmeet — desde $49</span>
+        <span class="btn-text-mini" data-i18n="hero.ctaMini">Comprar · desde $49</span>
+      </a>
+      <a href="#how" class="btn ghost">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 18l6-6-6-6"/></svg>
+        <span data-i18n="hero.how">Ver como funciona</span>
+      </a>
+    </div>
+  </div>
+
+  <!-- APP MOCK — reunión ya procesada, sin señales de tiempo real -->
+  <div class="hero-app" id="heroApp" aria-label="Vista previa de Helpmeet mostrando una reunión ya procesada">
+    <div class="app-wrap" id="appWrap">
+      <div class="app-window">
+        <div class="app-tb">
+          <div class="app-dot r" aria-hidden="true"></div>
+          <div class="app-dot y" aria-hidden="true"></div>
+          <div class="app-dot g" aria-hidden="true"></div>
+          <div class="app-title">
+            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" aria-hidden="true" style="color: var(--green);"><polyline points="20 6 9 17 4 12"/></svg>
+            <span data-i18n="appMock.title">Helpmeet v3.2.0 · Transcripcion completada</span>
+          </div>
+        </div>
+        <div class="app-body">
+          <div class="app-side">
+            <div class="app-side-label" data-i18n="appMock.projects">Proyectos</div>
+            <div class="app-side-item on">
+              <div class="pd" style="background:#34C78A" aria-hidden="true"></div><span data-i18n="appMock.project1">Demo cliente Acme</span>
+              <span class="count">12</span>
+            </div>
+            <div class="app-side-item">
+              <div class="pd" style="background:#86b5e0" aria-hidden="true"></div><span data-i18n="appMock.project2">Sprint planning</span>
+              <span class="count">8</span>
+            </div>
+            <div class="app-side-item">
+              <div class="pd" style="background:#e8c17b" aria-hidden="true"></div><span data-i18n="appMock.project3">Entrevistas</span>
+              <span class="count">5</span>
+            </div>
+            <div class="app-side-item">
+              <div class="pd" style="background:#a98fd6" aria-hidden="true"></div><span data-i18n="appMock.project4">Board meetings</span>
+              <span class="count">3</span>
+            </div>
+            <div class="app-side-item">
+              <div class="pd" style="background:#e08b8b" aria-hidden="true"></div><span data-i18n="appMock.project5">1:1 con equipo</span>
+              <span class="count">17</span>
+            </div>
+          </div>
+
+          <div class="app-main">
+            <div class="app-meet-head">
+              <div class="app-meet-title" data-i18n="appMock.meetingTitle">Kick-off Q3</div>
+              <div class="app-meet-time" data-i18n="appMock.meetingTime">lun 08 · 34:12</div>
+              <div class="done-indicator" aria-label="Reunion procesada">
+                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg>
+                <span data-i18n="appMock.processed">Procesada</span>
+              </div>
+            </div>
+            <div class="app-tabs" role="tablist">
+              <div class="app-tab on" role="tab" aria-selected="true" data-i18n="appMock.tabTranscript">Transcripcion</div>
+              <div class="app-tab" role="tab" aria-selected="false" data-i18n="appMock.tabNotes">Notas</div>
+              <div class="app-tab" role="tab" aria-selected="false" data-i18n="appMock.tabFiles">Archivos</div>
+              <div class="app-tab" role="tab" aria-selected="false" data-i18n="appMock.tabContext">Contexto</div>
+            </div>
+            <div class="app-utterances">
+              <div class="utt show">
+                <div class="utt-av" style="background:rgba(52,199,138,.2);color:#34C78A;" aria-hidden="true">TM</div>
+                <div class="utt-body">
+                  <div class="who"><span data-i18n="appMock.speaker1">Tomas</span> <span>00:12</span></div>
+                  <span class="utt-text" data-i18n="appMock.utterance1">El objetivo para Q3 es llegar a 500 usuarios activos antes de septiembre.</span>
+                </div>
+              </div>
+              <div class="utt show">
+                <div class="utt-av" style="background:rgba(134,181,224,.2);color:#86b5e0;" aria-hidden="true">SR</div>
+                <div class="utt-body">
+                  <div class="who"><span data-i18n="appMock.speaker2">Sara</span> <span>01:34</span></div>
+                  <span class="utt-text" data-i18n="appMock.utterance2">Necesitamos revisar el onboarding. El 60% abandona en el primer dia.</span>
+                </div>
+              </div>
+              <div class="utt show">
+                <div class="utt-av" style="background:rgba(232,193,123,.2);color:#e8c17b;" aria-hidden="true">YO</div>
+                <div class="utt-body">
+                  <div class="who"><span data-i18n="appMock.speaker3">Tu</span> <span>02:18</span></div>
+                  <span class="utt-text" data-i18n="appMock.utterance3">Propongo un rediseno del tutorial interactivo para el sprint 4.</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="app-right">
+            <div class="mini-card">
+              <div class="mini-card-title">
+                <span data-i18n="appMock.audioTitle">Audio de la reunion</span>
+                <span class="mini-card-meta">
+                  <svg width="9" height="9" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><polygon points="6 3 20 12 6 21 6 3"/></svg>
+                  <span data-i18n="appMock.play">Reproducir</span>
+                </span>
+              </div>
+              <div class="wave wave-play" aria-hidden="true">
+                <span style="height:22%"></span><span style="height:48%"></span><span style="height:30%"></span>
+                <span style="height:66%"></span><span style="height:40%"></span><span style="height:78%"></span>
+                <span style="height:34%"></span><span style="height:56%"></span><span style="height:28%"></span>
+                <span style="height:70%"></span><span style="height:44%"></span><span style="height:60%"></span>
+                <span style="height:26%"></span><span style="height:52%"></span><span style="height:36%"></span>
+                <span style="height:74%"></span><span style="height:38%"></span><span style="height:58%"></span>
+                <span style="height:30%"></span><span style="height:46%"></span>
+                <div class="wave-playhead"></div>
+              </div>
+            </div>
+            <div class="mini-card">
+              <div class="mini-card-title" data-i18n="appMock.durationLabel">Duracion total</div>
+              <div class="stat-mini">
+                <div class="n" data-i18n="appMock.duration">34:12</div>
+                <div class="l" data-i18n="appMock.speakers">3 hablantes</div>
+              </div>
+            </div>
+            <div class="mini-card">
+              <div class="mini-card-title" data-i18n="appMock.glossaryLabel">Glosario automatico</div>
+              <div class="chip-list">
+                <div class="chip" data-i18n="appMock.keyword1">onboarding</div>
+                <div class="chip" data-i18n="appMock.keyword2">retencion</div>
+                <div class="chip" data-i18n="appMock.keyword3">Q3</div>
+                <div class="chip" data-i18n="appMock.keyword4">sprint 4</div>
+                <div class="chip" data-i18n="appMock.keyword5">tutorial</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- TICKER -->
+<div class="ticker-wrap band">
+  <div class="ticker-inner">
+    <div class="ticker-item" data-i18n="ticker.item1">Transcripcion local con Whisper</div>
+    <div class="ticker-item" data-i18n="ticker.item2">Sin suscripcion mensual</div>
+    <div class="ticker-item" data-i18n="ticker.item3">Grabacion de audio y pantalla</div>
+    <div class="ticker-item" data-i18n="ticker.item4">Exporta contexto para Claude o ChatGPT</div>
+    <div class="ticker-item" data-i18n="ticker.item5">Glosario automatico de terminos</div>
+    <div class="ticker-item" data-i18n="ticker.item6">Funciona sin internet</div>
+    <div class="ticker-item" data-i18n="ticker.item7">Multiples hablantes</div>
+    <div class="ticker-item" data-i18n="ticker.item8">Pago unico, licencia perpetua</div>
+    <div class="ticker-item" data-i18n="ticker.item1">Transcripcion local con Whisper</div>
+    <div class="ticker-item" data-i18n="ticker.item2">Sin suscripcion mensual</div>
+    <div class="ticker-item" data-i18n="ticker.item3">Grabacion de audio y pantalla</div>
+    <div class="ticker-item" data-i18n="ticker.item4">Exporta contexto para Claude o ChatGPT</div>
+    <div class="ticker-item" data-i18n="ticker.item5">Glosario automatico de terminos</div>
+    <div class="ticker-item" data-i18n="ticker.item6">Funciona sin internet</div>
+    <div class="ticker-item" data-i18n="ticker.item7">Multiples hablantes</div>
+    <div class="ticker-item" data-i18n="ticker.item8">Pago unico, licencia perpetua</div>
+  </div>
+</div>
+
+<!-- STATS -->
+<div class="stats-wrap band">
+  <div class="stats-row">
+    <div class="stat-cell">
+      <div class="stat-num"><span data-target="100">0</span><span class="suffix">%</span></div>
+      <div class="stat-lbl" data-i18n="stats.local">local, nada sale de tu PC</div>
+    </div>
+    <div class="stat-cell">
+      <div class="stat-num"><span data-target="0">0</span></div>
+      <div class="stat-lbl" data-i18n="stats.noSubscriptions">Suscripciones mensuales</div>
+    </div>
+    <div class="stat-cell">
+      <div class="stat-num">&#x221E;</div>
+      <div class="stat-lbl" data-i18n="stats.unlimited">Reuniones y proyectos</div>
+    </div>
+    <div class="stat-cell">
+      <div class="stat-num"><span data-target="3">0</span></div>
+      <div class="stat-lbl" data-i18n="stats.lifetimePlans">Planes de por vida</div>
+    </div>
+  </div>
+</div>
+
+<!-- HOW -->
+<section class="section" id="how">
+  <div class="wrap">
+    <div class="sec-head">
+      <div>
+        <div class="section-label" data-i18n="how.label">Como funciona</div>
+        <h2 class="section-title" data-i18n-html="how.titleLine1">De la reunion al<br>contexto <em>en 4 pasos</em></h2>
+      </div>
+      <p class="section-sub" data-i18n="how.subtitle">Sin configuraciones complejas. Sin cuenta en la nube. Solo instala, graba y todo se procesa en tu propia computadora.</p>
+    </div>
+
+    <div class="how-wrap">
+      <div class="how-left">
+        <div class="how-visual">
+          <div class="how-viz-frame on" data-step="0">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5.5 11.5a6.5 6.5 0 0 0 13 0"/><path d="M12 18v3M9 21h6"/></svg>
+          </div>
+          <div class="how-viz-frame" data-step="1">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M2 12h4l3-9 4 18 3-9h6"/></svg>
+          </div>
+          <div class="how-viz-frame" data-step="2">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M16 13H8M16 17H8M10 9H8"/></svg>
+          </div>
+          <div class="how-viz-frame" data-step="3">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M22 3H2l8 9.46V19l4 2v-8.54L22 3z"/></svg>
+          </div>
+        </div>
+      </div>
+      <div class="how-steps" id="howSteps">
+        <div class="how-step active" data-idx="0">
+          <div class="how-step-head">
+            <div class="how-step-n">01</div>
+            <h3 data-i18n="how.step1Title">Graba audio o pantalla</h3>
+          </div>
+          <p data-i18n="how.step1Desc">Graba tu microfono, el audio del sistema y la pantalla simultaneamente. Compatible con Meet, Zoom, Teams y cualquier app.</p>
+        </div>
+        <div class="how-step" data-idx="1">
+          <div class="how-step-head">
+            <div class="how-step-n">02</div>
+            <h3 data-i18n="how.step2Title">Transcripcion automatica local</h3>
+          </div>
+          <p data-i18n="how.step2Desc">Whisper AI procesa el audio en tu PC. Identifica hablantes, marca tiempos y genera transcripcion editable al instante.</p>
+        </div>
+        <div class="how-step" data-idx="2">
+          <div class="how-step-head">
+            <div class="how-step-n">03</div>
+            <h3 data-i18n="how.step3Title">Exporta y usa con IA</h3>
+          </div>
+          <p data-i18n="how.step3Desc">Copia el contexto completo de cualquier proyecto para pegarlo en Claude o ChatGPT. O exporta como .md, .txt o .zip.</p>
+        </div>
+        <div class="how-step" data-idx="3">
+          <div class="how-step-head">
+            <div class="how-step-n">04</div>
+            <h3 data-i18n="how.step4Title">Organiza por proyecto</h3>
+          </div>
+          <p data-i18n="how.step4Desc">Agrupa reuniones por cliente o proyecto. Busca en todas las transcripciones. El glosario extrae terminos clave.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- FEATURES -->
+<section class="section features-section" id="features">
+  <div class="features-bg" aria-hidden="true">
+    <span class="fbg-grid"></span>
+    <span class="fbg-orb"></span>
+    <span class="fbg-orb fbg-orb-2"></span>
+  </div>
+
+  <div class="wrap">
+    <div class="sec-head">
+      <div>
+        <div class="section-label" data-i18n="features.label">Caracteristicas</div>
+        <h2 class="section-title" data-i18n-html="features.titleLine1">Todo lo que necesitas.<br><em>Nada de lo que no.</em></h2>
+      </div>
+      <p class="section-sub" data-i18n="features.subtitle">Sin telemetria oculta, sin dependencias raras, sin bloatware. Solo las funciones que un profesional necesita para dominar sus reuniones.</p>
+    </div>
+
+    <div class="bento" id="bento">
+
+      <article class="b b-1 hero-cell" data-b>
+        <span class="b-glow" aria-hidden="true"></span>
+        <span class="b-num">01</span>
+        <div class="b-inner">
+          <div class="b-icon">
+            <span class="b-icon-ring" aria-hidden="true"></span>
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+          </div>
+          <h3 data-i18n="features.f1Title">100% privado y local</h3>
+          <p data-i18n="features.f1Desc">Ni una sola palabra sale de tu computadora. Sin servidores, sin API keys externas, sin que nadie lea tus reuniones. Whisper corre en tu GPU o CPU.</p>
+          <span class="tag" data-i18n="features.f1Tag">Diferenciador clave</span>
+          <div class="b-visual">
+            <div class="b-code">
+              <div><span class="c" data-i18n="features.f1CodeLabel"># estado del pipeline</span></div>
+              <div><span class="k" data-i18n="features.f1CodeAudio">audio</span> → <span data-i18n="features.f1CodeLocal">local</span> · <span class="s" data-i18n="features.f1CodeWhisper">"whisper.cpp"</span></div>
+              <div><span class="k" data-i18n="features.f1CodeNetwork">network</span> → <span class="s" data-i18n="features.f1CodeDisabled">disabled</span></div>
+              <div><span class="k" data-i18n="features.f1CodeTelemetry">telemetry</span> → <span class="s" data-i18n="features.f1CodeOff">off</span></div>
+            </div>
+          </div>
+        </div>
+      </article>
+
+      <article class="b b-2" data-b>
+        <span class="b-glow" aria-hidden="true"></span>
+        <span class="b-num">02</span>
+        <div class="b-inner">
+          <div class="b-icon">
+            <span class="b-icon-ring" aria-hidden="true"></span>
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg>
+          </div>
+          <h3 data-i18n="features.f2Title">Grabacion de pantalla + audio</h3>
+          <p data-i18n="features.f2Desc">Video de tu pantalla con audio de sistema y microfono por pistas separadas. Transcripcion por canal para mejor precision.</p>
+          <div class="b-wave">
+            <span style="height:20%"></span><span style="height:60%"></span><span style="height:30%"></span>
+            <span style="height:75%"></span><span style="height:45%"></span><span style="height:85%"></span>
+            <span style="height:25%"></span><span style="height:55%"></span><span style="height:35%"></span>
+            <span style="height:70%"></span><span style="height:40%"></span><span style="height:65%"></span>
+            <span style="height:20%"></span><span style="height:55%"></span><span style="height:30%"></span>
+            <span style="height:75%"></span><span style="height:35%"></span><span style="height:60%"></span>
+          </div>
+        </div>
+      </article>
+
+      <article class="b b-3" data-b>
+        <span class="b-glow" aria-hidden="true"></span>
+        <span class="b-num">03</span>
+        <div class="b-inner">
+          <div class="b-icon">
+            <span class="b-icon-ring" aria-hidden="true"></span>
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+          </div>
+          <h3 data-i18n="features.f3Title">Identificacion de hablantes</h3>
+          <p data-i18n="features.f3Desc">Asigna nombres a cada voz. Helpmeet aprende quien es quien en cada proyecto.</p>
+        </div>
+      </article>
+
+      <article class="b b-4" data-b>
+        <span class="b-glow" aria-hidden="true"></span>
+        <span class="b-num">04</span>
+        <div class="b-inner">
+          <div class="b-icon">
+            <span class="b-icon-ring" aria-hidden="true"></span>
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="10.7" cy="10.7" r="5.7"/><path d="M15.2 15.2 20 20"/></svg>
+          </div>
+          <h3 data-i18n="features.f4Title">Busqueda de texto completo</h3>
+          <p data-i18n="features.f4Desc">Busca en todas las transcripciones al instante. Encuentra cualquier decision en segundos.</p>
+        </div>
+      </article>
+
+      <article class="b b-5" data-b>
+        <span class="b-glow" aria-hidden="true"></span>
+        <span class="b-num">05</span>
+        <div class="b-inner">
+          <div class="b-icon">
+            <span class="b-icon-ring" aria-hidden="true"></span>
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>
+          </div>
+          <h3 data-i18n="features.f5Title">Contexto listo para IA</h3>
+          <p data-i18n="features.f5Desc">Exporta el historial completo de un proyecto -- reuniones, decisiones, participantes -- en un bloque listo para pegar en Claude o ChatGPT.</p>
+          <div class="b-tags-list">
+            <span class="b-tag">.md</span>
+            <span class="b-tag">.txt</span>
+            <span class="b-tag">.zip</span>
+            <span class="b-tag">Claude</span>
+            <span class="b-tag">ChatGPT</span>
+            <span class="b-tag">Copilot</span>
+            <span class="b-tag">Gemini</span>
+          </div>
+        </div>
+      </article>
+
+      <article class="b b-6" data-b>
+        <span class="b-glow" aria-hidden="true"></span>
+        <span class="b-num">06</span>
+        <div class="b-inner">
+          <div class="b-icon">
+            <span class="b-icon-ring" aria-hidden="true"></span>
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M8 17v-4l2 2.5 2-2.5v4"/></svg>
+          </div>
+          <h3 data-i18n="features.f6Title">Documentos a Markdown</h3>
+          <p data-i18n-html="features.f6Desc">PDFs, DOCX y presentaciones a <code style="font-family:var(--font-mono);color:var(--green);">.md</code> con OCR.</p>
+        </div>
+      </article>
+
+      <article class="b b-7" data-b>
+        <span class="b-glow" aria-hidden="true"></span>
+        <span class="b-num">07</span>
+        <div class="b-inner">
+          <div class="b-icon">
+            <span class="b-icon-ring" aria-hidden="true"></span>
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M1 1l22 22M16.72 11.06A10.94 10.94 0 0 1 19 12.55M5 12.55a10.94 10.94 0 0 1 5.17-2.39M10.71 5.05A16 16 0 0 1 22.58 9M1.42 9a15.91 15.91 0 0 1 4.7-2.88M8.53 16.11a6 6 0 0 1 6.95 0M12 20h.01"/></svg>
+          </div>
+          <h3 data-i18n="features.f7Title">Funciona sin internet</h3>
+          <p data-i18n="features.f7Desc">Sube al avion, ve al campo, quedate sin wifi. Helpmeet no lo notara.</p>
+        </div>
+      </article>
+
+    </div>
+    <div class="bento-dots" id="bentoDots" aria-hidden="true"></div>
+  </div>
+</section>
+
+<!-- MODEL COMPARISON -->
+<section class="section" id="compare">
+  <div class="wrap">
+    <div class="sec-head">
+      <div>
+        <div class="section-label" data-i18n="compare.label">Filosofia</div>
+        <h2 class="section-title" data-i18n-html="compare.titleLine1">Disenado con<br><em>otra filosofia.</em></h2>
+      </div>
+      <p class="section-sub" data-i18n="compare.subtitle">La mayoria de herramientas de transcripcion viven en la nube y cobran cada mes. Helpmeet es local por diseno y de un solo pago. Comparamos modelos, no marcas.</p>
+    </div>
+
+    <div class="model-grid" id="modelGrid">
+
+      <article class="model-card model-cloud">
+        <header class="model-card-head">
+          <div class="model-icon model-icon--muted" aria-hidden="true">
+            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M17.5 19a4.5 4.5 0 1 0-.9-8.91A7 7 0 1 0 4 15"/><path d="M17.5 19H9"/><line x1="4" y1="22" x2="20" y2="6"/></svg>
+          </div>
+          <span class="model-tag" data-i18n="compare.cloudTag">Modelo tradicional</span>
+        </header>
+        <h3 class="model-title" data-i18n="compare.cloudTitle">Cloud + suscripcion</h3>
+        <p class="model-sub" data-i18n="compare.cloudSub">Enfoque mas comun en el mercado.</p>
+        <ul class="model-list">
+          <li data-i18n="compare.cloud1">El audio se sube a servidores externos para procesarse.</li>
+          <li data-i18n="compare.cloud2">Requiere conexion a internet activa para funcionar.</li>
+          <li data-i18n="compare.cloud3">Cargos recurrentes (mensuales o anuales) mientras se use.</li>
+          <li data-i18n="compare.cloud4">Si dejas de pagar, dejas de acceder a tus transcripciones.</li>
+          <li data-i18n="compare.cloud5">El manejo de datos depende de las politicas del proveedor.</li>
+        </ul>
+        <footer class="model-foot">
+          <span class="model-foot-lbl" data-i18n="compare.cloudCostLabel">Costo a 3 anos</span>
+          <span class="model-foot-val cloud" data-i18n="compare.cloudCost">≈ $612</span>
+        </footer>
+      </article>
+
+      <div class="model-vs" aria-hidden="true">
+        <span class="model-vs-line"></span>
+        <span class="model-vs-text">VS</span>
+        <span class="model-vs-line"></span>
+      </div>
+
+      <article class="model-card model-us">
+        <header class="model-card-head">
+          <div class="model-icon model-icon--brand" aria-hidden="true">
+            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="16" rx="3"/><path d="M9 12l2 2 4-4"/></svg>
+          </div>
+          <span class="model-tag on" data-i18n="compare.usTag">El modelo Helpmeet</span>
+        </header>
+        <h3 class="model-title" data-i18n="compare.usTitle">Local + pago unico</h3>
+        <p class="model-sub" data-i18n="compare.usSub">Control total de tus datos y tus costos.</p>
+        <ul class="model-list model-list--check">
+          <li data-i18n="compare.us1">Todo el procesamiento ocurre en tu propia computadora.</li>
+          <li data-i18n="compare.us2">Funciona sin conexion — incluso en modo avion.</li>
+          <li data-i18n="compare.us3">Un solo pago. Licencia perpetua para la version adquirida.</li>
+          <li data-i18n="compare.us4">La aplicacion sigue funcionando aunque no renueves.</li>
+          <li data-i18n="compare.us5">Los archivos y transcripciones quedan en tu disco duro.</li>
+        </ul>
+        <footer class="model-foot">
+          <span class="model-foot-lbl" data-i18n="compare.usCostLabel">Costo a 3 anos</span>
+          <span class="model-foot-val us" data-i18n-html="compare.usCost">$99 <em>una sola vez</em></span>
+        </footer>
+      </article>
+
+    </div>
+
+    <!-- Cost comparison: A vs B -->
+    <div class="cost-section" id="costSection">
+      <div class="sec-head">
+        <div>
+          <div class="section-label" data-i18n="cost.label">Costo real</div>
+          <h2 class="section-title" data-i18n-html="cost.titleLine1">Un pago hoy.<br><em>No una renta de por vida.</em></h2>
+        </div>
+        <p class="section-sub" data-i18n="cost.subtitle">La mayoria de herramientas de transcripcion cobran entre $12 y $25 USD al mes. Helpmeet cuesta lo mismo que 5 meses de suscripcion y es tuyo para siempre.</p>
+      </div>
+
+      <div class="cost-compare">
+        <div class="cost-side">
+          <div class="cost-side-label cloud" data-i18n="cost.cloudLabel">Modelo suscripcion</div>
+          <div class="cost-side-amount cloud" data-i18n="cost.cloudAmount">$612</div>
+          <div class="cost-side-sub" data-i18n="cost.cloudSub">En 3 anos, a $17/mes</div>
+        </div>
+        <div class="cost-vs">
+          <span class="cost-vs-line"></span>
+          <span class="cost-vs-badge">VS</span>
+          <span class="cost-vs-line"></span>
+        </div>
+        <div class="cost-side">
+          <div class="cost-side-label local" data-i18n="cost.localLabel">Helpmeet Pro</div>
+          <div class="cost-side-amount local" data-i18n="cost.localAmount">$99</div>
+          <div class="cost-side-sub" data-i18n="cost.localSub">Una sola vez. Para siempre.</div>
+        </div>
+      </div>
+
+      <div class="cost-result">
+        <div class="cost-result-label" data-i18n="cost.savingsLabel">Ahorro estimado</div>
+        <div class="cost-result-amount" data-i18n="cost.savingsAmount">$513</div>
+        <div class="cost-result-sub" data-i18n="cost.savingsSub">Y cada ano que pasa, la diferencia crece. Sin letra chica. Sin renovaciones automaticas.</div>
+      </div>
+    </div>
+
+  </div>
+</section>
+
+<!-- QUOTE -->
+<div class="quote-band" id="quote">
+  <div class="quote-inner">
+    <span class="quote-mark">"</span>
+    <p class="quote-text" id="quoteText" data-i18n="quote.text">Estuve mas de un ano pagando una suscripcion cloud para transcribir mis reuniones. Con Helpmeet pago una sola vez y mis datos no salen de mi PC. No pienso volver atras.</p>
+    <p class="quote-author" data-i18n="quote.author">Usuario · consultor independiente</p>
+  </div>
+</div>
+
+<!-- PRICING -->
+<section class="section" id="pricing">
+  <div class="wrap">
+    <div class="sec-head">
+      <div>
+        <div class="section-label" data-i18n="pricing.label">Precios</div>
+        <h2 class="section-title" data-i18n-html="pricing.titleLine1">Un pago,<br><em>para siempre.</em></h2>
+      </div>
+      <p class="section-sub" data-i18n="pricing.subtitle">Sin suscripciones. Sin sorpresas. Las actualizaciones del primer ano incluidas. Despues, tuyo para siempre en la version que compraste.</p>
+    </div>
+
+    <div class="pricing-grid" id="pricingGrid">
+
+      <div class="plan">
+        <div class="plan-name" data-i18n="pricing.personalName">Personal</div>
+        <div class="plan-desc" data-i18n="pricing.personalDesc">Para profesionales independientes y freelancers.</div>
+        <div class="plan-price">
+          <span class="plan-currency">$</span>
+          <span class="plan-amount">49</span>
+        </div>
+        <div class="plan-once" data-i18n="pricing.personalDevice">Pago unico · 1 dispositivo</div>
+        <ul class="plan-features">
+          <li><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg><span data-i18n="pricing.personalF1">Grabacion de audio y video</span></li>
+          <li><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg><span data-i18n="pricing.personalF2">Transcripcion local (Whisper)</span></li>
+          <li><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg><span data-i18n="pricing.personalF3">10h de video por mes</span></li>
+          <li><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg><span data-i18n="pricing.personalF4">Proyectos ilimitados</span></li>
+          <li><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg><span data-i18n="pricing.personalF5">Exportar a .md y .txt</span></li>
+          <li><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg><span data-i18n="pricing.personalF6">Busqueda de texto completo</span></li>
+          <li class="off"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><line x1="5" y1="12" x2="19" y2="12"/></svg><span data-i18n="pricing.personalF7">Participantes y glosario</span></li>
+          <li class="off"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><line x1="5" y1="12" x2="19" y2="12"/></svg><span data-i18n="pricing.personalF8">Exportar ZIP</span></li>
+        </ul>
+        <a href="https://mimotech.gumroad.com/l/helpmeet" target="_blank" rel="noopener" class="plan-btn" data-i18n="pricing.personalBtn">Comprar Personal</a>
+      </div>
+
+      <div class="plan featured">
+        <div class="plan-badge" data-i18n="pricing.proBadge">Mas popular</div>
+        <div class="plan-name" data-i18n="pricing.proName">Pro</div>
+        <div class="plan-desc" data-i18n="pricing.proDesc">Para profesionales que usan IA y necesitan todas las features.</div>
+        <div class="plan-price">
+          <span class="plan-currency">$</span>
+          <span class="plan-amount">99</span>
+        </div>
+        <div class="plan-once" data-i18n="pricing.proDevice">Pago unico · 2 dispositivos</div>
+        <ul class="plan-features">
+          <li><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg><span data-i18n="pricing.proF1">Todo lo de Personal</span></li>
+          <li><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg><strong data-i18n="pricing.proF2">Video ilimitado</strong></li>
+          <li><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg><span data-i18n="pricing.proF3">Participantes y asignacion</span></li>
+          <li><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg><span data-i18n="pricing.proF4">Glosario automatico</span></li>
+          <li><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg><span data-i18n="pricing.proF5">Exportar ZIP con recursos</span></li>
+          <li><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg><span data-i18n="pricing.proF6">Contexto completo para IA</span></li>
+          <li><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg><span data-i18n="pricing.proF7">Documentos → Markdown (OCR)</span></li>
+          <li><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg><span data-i18n="pricing.proF8">Recuperacion de grabaciones</span></li>
+        </ul>
+        <a href="https://mimotech.gumroad.com/l/helpmeet" target="_blank" rel="noopener" class="plan-btn" data-i18n="pricing.proBtn">Comprar Pro</a>
+      </div>
+
+      <div class="plan">
+        <div class="plan-name" data-i18n="pricing.teamName">Team</div>
+        <div class="plan-desc" data-i18n="pricing.teamDesc">Para equipos pequenos y startups con reuniones diarias.</div>
+        <div class="plan-price">
+          <span class="plan-currency">$</span>
+          <span class="plan-amount">199</span>
+        </div>
+        <div class="plan-once" data-i18n="pricing.teamDevice">Pago unico · 5 dispositivos</div>
+        <ul class="plan-features">
+          <li><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg><span data-i18n="pricing.teamF1">Todo lo de Pro</span></li>
+          <li><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg><span data-i18n="pricing.teamF2">5 activaciones de dispositivo</span></li>
+          <li><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg><span data-i18n="pricing.teamF3">Soporte prioritario</span></li>
+          <li><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg><span data-i18n="pricing.teamF4">Acceso anticipado a features</span></li>
+          <li><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg><span data-i18n="pricing.teamF5">Factura para empresa</span></li>
+        </ul>
+        <a href="https://mimotech.gumroad.com/l/helpmeet" target="_blank" rel="noopener" class="plan-btn" data-i18n="pricing.teamBtn">Comprar Team</a>
+      </div>
+    </div>
+
+    <div class="pricing-note">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--green)" stroke-width="2.5"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+      <strong data-i18n="pricing.guarantee">Garantia de 14 dias.</strong>
+      <span data-i18n="pricing.guaranteeText"> Si no funciona en tu PC, te devolvemos el dinero.</span>
+    </div>
+  </div>
+</section>
+
+<!-- FAQ -->
+<section class="section" id="faq">
+  <div class="wrap">
+    <div class="sec-head">
+      <div>
+        <div class="section-label" data-i18n="faq.label">Preguntas frecuentes</div>
+        <h2 class="section-title" data-i18n-html="faq.titleLine1">Dudas <em>resueltas.</em></h2>
+      </div>
+      <p class="section-sub"><span data-i18n="faq.subtitlePrefix">Si tienes alguna otra pregunta escribenos a </span><span style="color:var(--green);">team+helpmeet@mimotech.vip</span><span data-i18n="faq.subtitleSuffix"> y te respondemos en menos de 24h.</span></p>
+    </div>
+
+    <div class="faq-list" id="faqList">
+      <div class="faq">
+        <button class="faq-q">
+          <span data-i18n="faq.q1">Realmente todo se procesa en mi PC?</span>
+          <span class="faq-plus"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg></span>
+        </button>
+        <div class="faq-a" data-i18n="faq.a1">Si. Helpmeet usa Whisper.cpp corriendo en local. La aplicacion no envia audio, transcripciones ni metadatos a ningun servidor externo. Puedes desconectar tu red al usarlo y funciona perfectamente.</div>
+      </div>
+      <div class="faq">
+        <button class="faq-q">
+          <span data-i18n="faq.q2">Que requisitos tiene mi PC?</span>
+          <span class="faq-plus"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg></span>
+        </button>
+        <div class="faq-a" data-i18n="faq.a2">Windows 10 o 11, 8 GB de RAM minimo (16 GB recomendado), 2 GB libres en disco. Cualquier CPU moderna funciona; una GPU acelera la transcripcion pero no es obligatoria.</div>
+      </div>
+      <div class="faq">
+        <button class="faq-q">
+          <span data-i18n="faq.q3">Puedo transcribir en varios idiomas?</span>
+          <span class="faq-plus"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg></span>
+        </button>
+        <div class="faq-a" data-i18n="faq.a3">Si. Whisper detecta el idioma automaticamente y soporta mas de 90 idiomas, incluyendo espanol, ingles, portugues, frances y aleman con muy alta precision.</div>
+      </div>
+      <div class="faq">
+        <button class="faq-q">
+          <span data-i18n="faq.q4">Que pasa si cambio de computadora?</span>
+          <span class="faq-plus"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg></span>
+        </button>
+        <div class="faq-a" data-i18n="faq.a4">Tu licencia incluye reactivacion gratuita cuando cambies de PC. Solo escribenos y liberamos tu slot en menos de 24h. Los planes Pro y Team te permiten activar en mas de un dispositivo desde el inicio.</div>
+      </div>
+      <div class="faq">
+        <button class="faq-q">
+          <span data-i18n="faq.q5">Reciben actualizaciones para siempre?</span>
+          <span class="faq-plus"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg></span>
+        </button>
+        <div class="faq-a" data-i18n="faq.a5">El primer ano recibes todas las actualizaciones incluidas. Despues puedes seguir usando la version que compraste para siempre, o renovar a bajo costo para nuevas features mayores.</div>
+      </div>
+      <div class="faq">
+        <button class="faq-q">
+          <span data-i18n="faq.q6">Funciona con Google Meet, Zoom y Teams?</span>
+          <span class="faq-plus"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg></span>
+        </button>
+        <div class="faq-a" data-i18n="faq.a6">Con todos y con cualquier otra app. Helpmeet captura el audio del sistema y tu microfono a nivel de sistema operativo, no depende de integraciones oficiales que te puedan bloquear.</div>
+      </div>
+      <div class="faq">
+        <button class="faq-q">
+          <span data-i18n="faq.q7">Hay garantia de devolucion?</span>
+          <span class="faq-plus"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg></span>
+        </button>
+        <div class="faq-a" data-i18n="faq.a7">14 dias completos sin preguntas. Si por cualquier razon Helpmeet no funciona como esperas en tu PC, te devolvemos el 100% del dinero.</div>
+      </div>
+      <div class="faq">
+        <button class="faq-q">
+          <span data-i18n="faq.q8">Hay version portable?</span>
+          <span class="faq-plus"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg></span>
+        </button>
+        <div class="faq-a" data-i18n="faq.a8">Si. Escribenos a team+helpmeet@mimotech.vip y te enviamos la version portable. No requiere instalacion, solo descomprimir y ejecutar. Ideal para equipos corporativos con restricciones de instalacion.</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- FINAL CTA -->
+<div class="final-cta" id="finalCta">
+  <div class="final-glow"></div>
+  <div class="wrap">
+    <h2 data-i18n-html="finalCta.titleLine1">Deja de pagar<br><em>cada mes.</em></h2>
+    <p data-i18n="finalCta.desc">Un pago unico. Datos en tu PC. Contexto de reuniones listo para IA.</p>
+    <a href="https://mimotech.gumroad.com/l/helpmeet" target="_blank" rel="noopener" class="cta-mega">
+      <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+      <span class="cta-mega-full" data-i18n="finalCta.btnFull">Obtener Helpmeet Pro — $99</span>
+      <span class="cta-mega-mini" data-i18n="finalCta.btnMini">Obtener Pro · $99</span>
+    </a>
+    <div class="cta-sub" data-i18n="finalCta.sub">Solo $99 · Pago unico · Windows · Licencia de por vida</div>
+  </div>
+</div>
+
+</main>
+
+<!-- FOOTER -->
+<footer>
+  <div class="footer-brand">
+    <svg width="22" height="22" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <rect x="12" y="13" width="40" height="11" rx="5.5" fill="#34C78A"/>
+      <rect x="12" y="27" width="40" height="11" rx="5.5" fill="#34C78A"/>
+      <circle cx="21" cy="47" r="7" fill="#34C78A"/>
+    </svg>
+    Helpmeet
+  </div>
+  <span class="footer-copy" data-i18n="footer.copy">2026 MimoTech · Todos los derechos reservados</span>
+  <a href="https://mimotech.gumroad.com" target="_blank" class="footer-link">
+    <span data-i18n="footer.store">Tienda en Gumroad</span>
+    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M7 17L17 7M8 7h9v9"/></svg>
+  </a>
+</footer>
+
+<!-- i18n — must load before landing.js to have translations ready for dynamic text -->
+<script src="/landing/i18n/i18n.js?v=20260725c"></script>
+<script src="/landing/landing.js?v=20260724b"></script>
+
+</body>
+</html>

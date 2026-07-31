@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<meta name="theme-color" content="#f6f8fc">
+<title>Helpmeet Admin — Panel de Administracion</title>
+<meta name="description" content="Panel de administracion de licencias de Helpmeet.">
+<meta property="og:title" content="Helpmeet Admin">
+<meta property="og:type" content="website">
+<link rel="icon" type="image/svg+xml" href="assets/helpmeet-app-icon.svg">
+<link rel="stylesheet" href="css/style.css?v=20260725c">
+<script>
+(function(){
+  var theme = 'light';
+  try { var s = localStorage.getItem('hm_admin_theme'); if (s === 'dark' || s === 'light') theme = s; } catch(e) {}
+  if (theme === 'dark') document.body.setAttribute('data-theme', 'dark');
+})();
+</script>
+</head>
+<body>
+<div id="login">
+  <div class="lcard">
+    <div class="logo"><img class="brand-logo" src="assets/helpmeet-symbol.svg" alt="">Helpmeet</div>
+    <p>Panel de administracion</p>
+    <div class="pwd-wrap">
+      <input class="inp" type="password" id="keyInput" placeholder="Clave de administrador" autocomplete="off" aria-label="Clave administrador">
+      <button type="button" class="pwd-toggle" id="pwdToggle" aria-label="Mostrar u ocultar contrasena" title="Mostrar contrasena">
+        <svg id="pwdEye" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+      </button>
+    </div>
+    <button class="btn-primary" id="loginBtn">Entrar</button>
+    <div class="err" id="loginErr">Clave incorrecta</div>
+  </div>
+</div>
+
+<div id="app">
+  <div class="topbar">
+    <a href="/" class="brand" title="Volver al sitio"><img class="brand-logo" src="assets/helpmeet-symbol.svg" alt="">Helpmeet</a>
+    <span class="brand-sep">/</span>
+    <span class="brand-sub">Admin</span>
+    <div class="right">
+      <span class="ts" id="lastUpdated"></span>
+      <button class="theme-toggle-btn" id="themeToggle" title="Cambiar tema">
+        <svg id="themeIcon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"/><path d="M12 1v2M12 21v2M4.2 4.2l1.4 1.4M18.4 18.4l1.4 1.4M1 12h2M21 12h2M4.2 19.8l1.4-1.4M18.4 5.6l1.4-1.4"/></svg>
+      </button>
+      <button class="btn-sm" id="refreshBtn">Actualizar</button>
+      <button class="btn-sm" id="logoutBtn">Salir</button>
+    </div>
+  </div>
+
+  <div class="main">
+    <!-- Tab navigation -->
+    <nav class="tab-nav">
+      <button class="tab-btn active" data-tab="dashboard">Panel</button>
+      <button class="tab-btn" data-tab="customers">Clientes</button>
+      <button class="tab-btn" data-tab="reports">Reportes</button>
+    </nav>
+
+    <!-- ═══ DASHBOARD ═══ -->
+    <div class="tab-panel active" id="tab-dashboard">
+    <div class="stats">
+      <div class="stat"><div class="n" id="sTotal">—</div><div class="l">Totales</div></div>
+      <div class="stat"><div class="n n--green" id="sActive">—</div><div class="l">Activas</div></div>
+      <div class="stat"><div class="n n--red" id="sRevoked">—</div><div class="l">Revocadas</div></div>
+      <div class="stat"><div class="n" id="sCustomers">—</div><div class="l">Clientes</div></div>
+    </div>
+
+    <div class="section-block" id="revenueBlock">
+      <div class="section-hd">
+        <div class="section-title">Ingresos</div>
+        <span class="section-hint">Calculado con precio de lista</span>
+      </div>
+      <div class="stats stats--rev">
+        <div class="stat">
+          <div class="stat-body">
+            <div class="n" id="rTotal">—</div>
+            <div class="l">Ingresos totales</div>
+            <div class="stat-sub" id="rTotalSub">&nbsp;</div>
+          </div>
+        </div>
+        <div class="stat">
+          <div class="stat-body">
+            <div class="n n--green" id="rActive">—</div>
+            <div class="l">Valor activo</div>
+            <div class="stat-sub" id="rActiveSub">&nbsp;</div>
+          </div>
+        </div>
+        <div class="stat">
+          <div class="stat-body">
+            <div class="n" id="rArpu">—</div>
+            <div class="l">Ingreso por licencia</div>
+            <div class="stat-sub">Promedio sobre el total emitido</div>
+          </div>
+        </div>
+        <div class="stat">
+          <div class="stat-body">
+            <div class="n n--green" id="rMonth">—</div>
+            <div class="l">Este mes</div>
+            <div class="stat-sub" id="rMonthSub">&nbsp;</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="section-block" id="planBlock">
+      <div class="section-hd">
+        <div class="section-title">Distribucion por plan</div>
+        <span class="section-hint">Licencias emitidas por tipo</span>
+      </div>
+      <div class="plan-grid" id="planGrid"></div>
+    </div>
+
+    <div class="tbar tbar--wrap">
+      <div class="tbar-left">
+        <div class="section-title">Licencias activas</div>
+        <span class="badge-count" id="activeCount">0</span>
+      </div>
+      <div class="tbar-controls">
+        <input class="filter-input" id="searchInput" type="search" placeholder="Buscar por email, nombre o #ID" aria-label="Buscar licencia">
+        <select class="filter-select" id="planFilter" aria-label="Filtrar por plan">
+          <option value="">Todos los planes</option>
+          <option value="personal">Personal</option>
+          <option value="pro">Pro</option>
+          <option value="team">Team</option>
+        </select>
+        <button class="btn-green" id="newLicBtn">+ Nueva licencia</button>
+      </div>
+    </div>
+    <div class="table-wrap" id="activeWrap">
+      <div class="table-loading" id="tableLoading">Cargando...</div>
+      <table id="licTable" hidden>
+        <thead><tr><th>#</th><th>Cliente</th><th>Key</th><th>Plan</th><th>Estado</th><th>Video</th><th>Disp.</th><th>Email</th><th>Creada</th><th>Acciones</th></tr></thead>
+        <tbody id="licBody"></tbody>
+      </table>
+    </div>
+
+    <div class="revoked-section">
+      <div class="tbar">
+        <div class="tbar-left">
+          <div class="section-title">Historial revocadas</div>
+          <span class="badge-count" id="revokedCount">0</span>
+        </div>
+        <button class="revoked-toggle-btn" id="toggleRevokedBtn">Mostrar</button>
+      </div>
+      <div id="revokedSection" hidden>
+        <div class="table-wrap revoked-table-wrap">
+          <table id="revokedTable">
+            <thead><tr><th>#</th><th>Cliente</th><th>Key</th><th>Plan</th><th>Estado</th><th>Dispositivos</th><th>Revocada</th><th>Acciones</th></tr></thead>
+            <tbody id="revokedBody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+    </div><!-- /tab-dashboard -->
+
+    <!-- ═══ CLIENTES ═══ -->
+    <div class="tab-panel" id="tab-customers">
+      <div class="tbar">
+        <div class="tbar-left">
+          <div class="section-title">Clientes</div>
+          <span class="badge-count" id="customersCount">0</span>
+        </div>
+      </div>
+      <div class="table-wrap">
+        <table id="customersTable">
+          <thead><tr><th>#</th><th>Nombre</th><th>Email</th><th>Licencias</th><th>Plan actual</th><th>Estado</th><th>Creado</th></tr></thead>
+          <tbody id="customersBody"><tr><td colspan="7" class="table-empty">Cargando...</td></tr></tbody>
+        </table>
+      </div>
+    </div><!-- /tab-customers -->
+
+    <!-- ═══ REPORTES ═══ -->
+    <div class="tab-panel" id="tab-reports">
+    <div class="report-filters">
+      <div class="section-title">Filtros</div>
+      <div class="rf-controls">
+        <select class="filter-select" id="reportYear" aria-label="Filtrar por año">
+          <option value="">Todos los años</option>
+        </select>
+        <select class="filter-select" id="reportMonths" aria-label="Periodo">
+          <option value="6">Ultimos 6 meses</option>
+          <option value="12">Último año</option>
+          <option value="24">Ultimos 2 años</option>
+          <option value="0">Todo el historial</option>
+        </select>
+        <button class="btn-sm" id="exportBtn">Exportar CSV</button>
+      </div>
+    </div>
+
+    <div class="reports-grid">
+      <div class="report-card report-card--wide">
+        <div class="rc-hd">
+          <div class="rc-title">Crecimiento de licencias</div>
+          <div class="rc-hint" id="growthTotal">&nbsp;</div>
+        </div>
+        <div class="growth-chart" id="growthChart"></div>
+      </div>
+      <div class="report-card">
+        <div class="rc-hd">
+          <div class="rc-title">Salud del negocio</div>
+        </div>
+        <div class="health-list" id="healthList"></div>
+      </div>
+      <div class="report-card report-card--wide">
+        <div class="rc-hd">
+          <div class="rc-title">Top clientes por ingreso</div>
+          <div class="rc-hint">Top 5</div>
+        </div>
+        <div class="top-customers" id="topCustomers"></div>
+      </div>
+    </div>
+
+    <div class="log-section" id="logSection">
+      <div class="section-hd">
+        <div class="section-title">Actividad reciente</div>
+        <button class="btn-sm" id="clearLogBtn">Limpiar</button>
+      </div>
+      <div class="log-box" id="logBox"></div>
+    </div>
+    </div><!-- /tab-reports -->
+
+  </div>
+</div>
+
+<dialog id="createDialog" aria-labelledby="createModalTitle">
+  <h3 id="createModalTitle">Nueva licencia</h3>
+  <div class="modal-field"><label for="createEmail">Email del cliente *</label><input id="createEmail" type="email" placeholder="cliente@email.com"></div>
+  <div class="modal-field"><label for="createName">Nombre</label><input id="createName" type="text" placeholder="Nombre"></div>
+  <div class="modal-field"><label for="createPlan">Plan</label><select id="createPlan"><option value="personal">Personal</option><option value="pro">Pro</option><option value="team">Team</option></select></div>
+  <div class="key-result" id="keyResult">
+    <div class="lbl">Key generada — copiala ahora</div>
+    <code id="keyValue"></code>
+    <button class="copy-btn" id="copyKeyBtn">Copiar</button>
+  </div>
+  <div class="modal-err" id="createErr"></div>
+  <div class="modal-btns">
+    <button class="btn-cancel" id="closeCreateBtn">Cerrar</button>
+    <button class="btn-green" id="createBtn">Crear licencia</button>
+  </div>
+</dialog>
+
+<dialog id="confirmDialog" class="modal--sm" aria-labelledby="confirmTitle">
+  <h3 id="confirmTitle">Confirmar accion</h3>
+  <p class="confirm-desc" id="confirmDesc"></p>
+  <div class="modal-btns">
+    <button class="btn-cancel" id="cancelConfirmBtn">Cancelar</button>
+    <button class="btn-danger" id="confirmBtn">Confirmar</button>
+  </div>
+</dialog>
+
+<dialog id="reactivateDialog" aria-labelledby="reactivateTitle">
+  <h3 id="reactivateTitle">Reactivar licencia</h3>
+  <p class="confirm-desc" id="reactivateDesc"></p>
+  <div class="modal-field"><label for="reactivatePlan">Nuevo plan</label><select id="reactivatePlan"><option value="personal">Personal</option><option value="pro">Pro</option><option value="team">Team</option></select></div>
+  <div class="modal-err" id="reactivateErr"></div>
+  <div class="modal-btns">
+    <button class="btn-cancel" id="closeReactivateBtn">Cancelar</button>
+    <button class="btn-green" id="reactivateBtn">Reactivar</button>
+  </div>
+</dialog>
+
+<output class="toast" id="toast"></output>
+<script src="js/config.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>

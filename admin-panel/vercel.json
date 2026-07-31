@@ -1,0 +1,7 @@
+{
+  "rewrites": [
+    { "source": "/admin-poderoso", "destination": "/admin.html" },
+    { "source": "/admin-poderoso/(.*)", "destination": "/$1" },
+    { "source": "/(.*)", "destination": "/landing/$1" }
+  ]
+}
