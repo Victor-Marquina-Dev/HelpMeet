@@ -1185,7 +1185,11 @@ mark { background: rgba(241,184,75,.3); color: #ffe9b0; border-radius: 3px; padd
 .video-section { display: flex; flex-direction: column; gap: 20px; }
 .video-panel { margin: 0; max-width: 860px; }
 .video-panel--compact { max-width: 520px; }
-.video-panel--compact .video-player-wrap { max-height: 300px; }
+/* El tope va en el VIDEO, no en el contenedor. El wrap tiene overflow:hidden,
+   asi que un max-height ahi no encoge el video: le corta la parte de abajo.
+   En el video, con el object-fit:contain que ya trae por defecto, se ajusta
+   entero y conserva su proporcion. */
+.video-panel--compact .video-player { max-height: 300px; }
 .video-panel--compact .rec-actions { margin-top: 10px; }
 
 /* ── Pestana General ── */
@@ -1195,7 +1199,11 @@ mark { background: rgba(241,184,75,.3); color: #ffe9b0; border-radius: 3px; padd
 .general-info-row { display: flex; gap: 12px; font-size: 13px; }
 .general-info-label { color: var(--muted); min-width: 75px; font-weight: 600; }
 .video-panel--compact { max-width: 440px; flex: 1; min-width: 300px; }
-.video-panel--compact .video-player-wrap { max-height: 260px; }
+/* El tope va en el VIDEO, no en el contenedor. El wrap tiene overflow:hidden,
+   asi que un max-height ahi no encoge el video: le corta la parte de abajo.
+   En el video, con el object-fit:contain que ya trae por defecto, se ajusta
+   entero y conserva su proporcion. */
+.video-panel--compact .video-player { max-height: 260px; }
 .video-panel--compact .rec-actions { margin-top: 8px; }
 @media (max-width: 700px) { .general-row { flex-direction: column; } .video-panel--compact { max-width: 100%; } }
 .video-file {
