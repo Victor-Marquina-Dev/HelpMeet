@@ -1,6 +1,7 @@
 import io
 import shutil
 import threading
+import time
 from fractions import Fraction
 from pathlib import Path
 import av
@@ -231,7 +232,24 @@ class ScreenVideoRecorder:
         # bf=0: sin B-frames -> DTS no negativo -> el remux (mux final) no falla
         # con "Cannot rebase to zero time". No afecta a la nitidez.
         stream.options = {"preset": self._preset, "crf": self._crf, "bf": "0"}
-        stream.codec_context.time_base = Fraction(1, self.fps)
+        # Base de tiempo en MILISEGUNDOS, no en 1/fps.
+        #
+        # gdigrab no entrega los fps nominales: suelta los fotogramas que puede
+        # segun la carga de la maquina. Sellando con `pts = idx` y
+        # `time_base = 1/fps` el archivo declara que hubo `fps` fotogramas por
+        # segundo pase lo que pase, asi que si de 20 llegaron 9, el video se
+        # reproduce 2,2 veces mas rapido. El audio no se entera porque se graba
+        # aparte y con su frecuencia real: de ahi la desincronizacion.
+        #
+        # Con base en milisegundos y el pts tomado del reloj, cada fotograma
+        # queda donde de verdad ocurrio y el video dura lo que duro la
+        # grabacion, aunque falten fotogramas por el camino.
+        TB_MS = Fraction(1, 1000)
+        stream.codec_context.time_base = TB_MS
+        t0 = None
+        ultimo_pts = -1
+        # idx ya no marca el tiempo, pero sigue contando fotogramas para la
+        # cadencia de la vista previa (uno de cada N).
         idx = 0
         try:
             # Bucle externo: se reabre la captura cuando se cambia de monitor en
@@ -271,8 +289,19 @@ class ScreenVideoRecorder:
                             _, source, sink = scale_filter
                             source.push(frame)
                             img = sink.pull()
-                        img.pts = idx
-                        img.time_base = Fraction(1, self.fps)
+                        # El reloj arranca con el PRIMER fotograma, no al abrir
+                        # la captura: gdigrab tarda en entregar el primero y ese
+                        # arranque en frio saldria como un congelado inicial.
+                        if t0 is None:
+                            t0 = time.monotonic()
+                        pts = int((time.monotonic() - t0) * 1000)
+                        # Estrictamente creciente: dos fotogramas en el mismo
+                        # milisegundo harian fallar el muxado.
+                        if pts <= ultimo_pts:
+                            pts = ultimo_pts + 1
+                        ultimo_pts = pts
+                        img.pts = pts
+                        img.time_base = TB_MS
                         # P-08: cada ~medio segundo, deja una copia reducida e
                         # independiente del fotograma para la vista previa. Es
                         # mucho más barato que recapturar la pantalla entera.
