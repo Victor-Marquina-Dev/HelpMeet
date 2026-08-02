@@ -43,8 +43,21 @@ class Handler(http.server.SimpleHTTPRequestHandler):
     def log_message(self, format, *args):
         print(f"[helpmeet] {args[0]}")
 
+class Servidor(socketserver.ThreadingTCPServer):
+    """Un hilo por conexión.
+
+    Con el TCPServer normal el servidor atiende de a una: el navegador deja la
+    conexión abierta esperando más peticiones y todo lo demás queda en cola
+    hasta que expira. Se notaba al abrir la página y ver que cualquier otra
+    petición —una imagen, otra pestaña— se quedaba colgada.
+    """
+
+    allow_reuse_address = True
+    daemon_threads = True
+
+
 if __name__ == "__main__":
-    with socketserver.TCPServer(("", PORT), Handler) as httpd:
+    with Servidor(("", PORT), Handler) as httpd:
         print(f"Helpmeet unificado → http://localhost:{PORT}")
         print(f"  Landing : http://localhost:{PORT}/")
         print(f"  Admin   : http://localhost:{PORT}/admin-poderoso")
