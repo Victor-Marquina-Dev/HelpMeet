@@ -116,10 +116,30 @@ gsap.utils.toArray('.sec-head').forEach(head => {
 const steps = document.querySelectorAll('#howSteps .how-step');
 const frames = document.querySelectorAll('.how-viz-frame');
 function setActive(idx) { steps.forEach((s, i) => s.classList.toggle('active', i === idx)); frames.forEach((f, i) => f.classList.toggle('on', i === idx)); }
-steps.forEach((s, i) => {
-  ScrollTrigger.create({ trigger: s, start: 'top 60%', end: 'bottom 60%', onEnter: () => setActive(i), onEnterBack: () => setActive(i) });
-  s.addEventListener('click', () => setActive(i));
-});
+steps.forEach((s, i) => s.addEventListener('click', () => setActive(i)));
+
+/* El paso activo sale del PROGRESO del scroll repartido en tramos iguales,
+   no de la posición de cada paso.
+
+   Dos intentos anteriores fallaron por la misma razón de fondo: los cuatro
+   pasos NO miden lo mismo (cada texto tiene distinto largo). Con un rango por
+   paso, el más corto se quedaba sin ventana; midiendo cuál cae más cerca del
+   centro, el más corto nunca llegaba a ser el más cercano. En los dos casos
+   había uno que no se veía nunca.
+
+   Repartiendo el recorrido en cuartos, cada paso ocupa exactamente lo mismo y
+   ninguno puede saltarse, midan lo que midan. */
+if (steps.length) {
+  ScrollTrigger.create({
+    trigger: '#howSteps',
+    start: 'top 75%',
+    end: 'bottom 45%',
+    onUpdate: (self) => {
+      const i = Math.min(steps.length - 1, Math.floor(self.progress * steps.length));
+      setActive(i);
+    },
+  });
+}
 
 /* ── Bento features — lightweight reveal + mobile swipe ── */
 (function initBento() {

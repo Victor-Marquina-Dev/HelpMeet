@@ -23,7 +23,7 @@
 <!-- Primary Meta -->
 <title data-i18n="meta.title">Helpmeet — Graba, Transcribe y Entiende tus Reuniones. 100% Local.</title>
 <meta name="description" data-i18n="meta.description" content="Helpmeet transforma tus reuniones en contexto accionable con IA local. Todo en tu PC, sin suscripciones, sin nube. Transcripcion, grabacion de pantalla y exportacion a Claude. Pago unico.">
-<meta name="keywords" data-i18n="meta.keywords" content="transcripcion reuniones, grabar reuniones, transcripcion local, whisper, IA reuniones, grabar pantalla, helpmeet, transcripcion offline">
+<meta name="keywords" data-i18n="meta.keywords" content="transcripcion reuniones, grabar reuniones, transcripcion local, vosk, IA reuniones, grabar pantalla, helpmeet, transcripcion offline">
 <meta name="author" content="Helpmeet">
 <meta name="robots" content="index, follow, max-image-preview:large">
 <link rel="canonical" href="https://helpmeet.mimotech.vip/">
@@ -35,10 +35,10 @@
 <meta property="og:description" data-i18n="meta.ogDescription" content="Transcripcion de reuniones con IA en tu PC. Sin nube. Sin suscripciones. Pago unico. Exporta a Claude Code.">
 <meta property="og:site_name" content="Helpmeet">
 <meta property="og:locale" content="es_PE">
-<meta property="og:image" content="https://helpmeet.mimotech.vip/og-image.svg">
+<meta property="og:image" content="https://helpmeet.mimotech.vip/og-image.png">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
-<meta property="og:image:type" content="image/svg+xml">
+<meta property="og:image:type" content="image/png">
 <meta property="og:image:alt" data-i18n="meta.ogImageAlt" content="Helpmeet — Transcripcion de reuniones 100% local">
 
 <!-- Twitter / X Cards -->
@@ -47,7 +47,7 @@
 <meta name="twitter:creator" content="@helpmeet_app">
 <meta name="twitter:title" data-i18n="meta.twitterTitle" content="Helpmeet — Graba, Transcribe y Entiende tus Reuniones">
 <meta name="twitter:description" data-i18n="meta.twitterDescription" content="Transcripcion de reuniones con IA en tu PC. Sin nube. Sin suscripciones. Pago unico.">
-<meta name="twitter:image" content="https://helpmeet.mimotech.vip/og-image.svg">
+<meta name="twitter:image" content="https://helpmeet.mimotech.vip/og-image.png">
 <meta name="twitter:image:alt" data-i18n="meta.twitterImageAlt" content="Helpmeet — Transcripcion de reuniones 100% local">
 
 <!-- Favicon -->
@@ -58,14 +58,14 @@
 <!-- Fonts -->
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Syne:wght@500;600;700;800&family=DM+Sans:ital,wght@0,300;0,400;0,500;0,600;1,300&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,300..800;1,300..800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 
 <!-- GSAP -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/ScrollTrigger.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/ScrollToPlugin.min.js"></script>
 
-<link href="/landing/landing.css?v=20260724b" rel="stylesheet">
+<link href="/landing/landing.css?v=20260802h" rel="stylesheet">
 
 <!-- JSON-LD Structured Data -->
 <script type="application/ld+json">
@@ -84,10 +84,12 @@
     "url": "https://helpmeet.mimotech.vip"
   },
   "offers": {
-    "@type": "Offer",
-    "price": "99.00",
+    "@type": "AggregateOffer",
+    "lowPrice": "49.00",
+    "highPrice": "199.00",
+    "offerCount": 3,
     "priceCurrency": "USD",
-    "description": "Licencia perpetua — pago unico"
+    "description": "Licencia perpetua — pago unico. Personal $49 · Pro $99 · Team $199"
   }
 }
 </script>
@@ -97,11 +99,7 @@
 <!-- LOADER -->
 <div class="loader" id="loader">
   <div class="loader-mark">
-    <svg viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg" width="44" height="44">
-      <rect x="12" y="13" width="40" height="11" rx="5.5" fill="#34C78A"/>
-      <rect x="12" y="27" width="40" height="11" rx="5.5" fill="#34C78A"/>
-      <circle cx="21" cy="47" r="7" fill="#34C78A"/>
-    </svg>
+    <svg viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="16.0064" y="14.32" width="31.9872" height="9.52" rx="4.76" fill="#34C78A"/><rect x="16.0064" y="26.56" width="22.848" height="9.52" rx="4.76" fill="#34C78A"/><circle cx="21.4464" cy="44.24" r="5.44" fill="#34C78A"/></svg>
   </div>
 </div>
 
@@ -115,11 +113,7 @@
   <nav id="nav" aria-label="Principal">
     <a href="#hero" class="nav-logo" aria-label="Helpmeet — Inicio">
       <span class="nav-logo-dot" aria-hidden="true">
-        <svg viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
-          <rect x="12" y="13" width="40" height="11" rx="5.5" fill="#34C78A"/>
-          <rect x="12" y="27" width="40" height="11" rx="5.5" fill="#34C78A"/>
-          <circle cx="21" cy="47" r="7" fill="#34C78A"/>
-        </svg>
+        <svg viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="16.0064" y="14.32" width="31.9872" height="9.52" rx="4.76" fill="#34C78A"/><rect x="16.0064" y="26.56" width="22.848" height="9.52" rx="4.76" fill="#34C78A"/><circle cx="21.4464" cy="44.24" r="5.44" fill="#34C78A"/></svg>
       </span>
       <span>Helpmeet</span>
     </a>
@@ -189,122 +183,92 @@
   </div>
 
   <!-- APP MOCK — reunión ya procesada, sin señales de tiempo real -->
-  <div class="hero-app" id="heroApp" aria-label="Vista previa de Helpmeet mostrando una reunión ya procesada">
+  <div class="hero-app" id="heroApp" aria-label="Vista previa de Helpmeet grabando una reunión">
     <div class="app-wrap" id="appWrap">
       <div class="app-window">
-        <div class="app-tb">
-          <div class="app-dot r" aria-hidden="true"></div>
-          <div class="app-dot y" aria-hidden="true"></div>
-          <div class="app-dot g" aria-hidden="true"></div>
-          <div class="app-title">
-            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" aria-hidden="true" style="color: var(--green);"><polyline points="20 6 9 17 4 12"/></svg>
-            <span data-i18n="appMock.title">Helpmeet v3.2.0 · Transcripcion completada</span>
+
+        <!-- Barra lateral -->
+        <aside class="ap-side">
+          <div class="ap-side-top">
+            <svg class="ap-i" viewBox="0 0 20 20" aria-hidden="true"><rect x="3" y="4" width="14" height="12" rx="2"/><path d="M8 4v12"/></svg>
           </div>
-        </div>
-        <div class="app-body">
-          <div class="app-side">
-            <div class="app-side-label" data-i18n="appMock.projects">Proyectos</div>
-            <div class="app-side-item on">
-              <div class="pd" style="background:#34C78A" aria-hidden="true"></div><span data-i18n="appMock.project1">Demo cliente Acme</span>
-              <span class="count">12</span>
+          <div class="ap-nav">
+            <span class="ap-item"><svg class="ap-i" viewBox="0 0 20 20" aria-hidden="true"><path d="M3 9.5 10 3l7 6.5M5 8.5V17h10V8.5"/></svg><b data-i18n="appMock.navHome">Inicio</b></span>
+            <span class="ap-item"><svg class="ap-i" viewBox="0 0 20 20" aria-hidden="true"><path d="M10 3.3l2 4 4.4.6-3.2 3 .8 4.4L10 13.2l-4 2.1.8-4.4-3.2-3 4.4-.6 2-4z"/></svg><b data-i18n="appMock.navFav">Favoritos</b><i class="ap-n">1</i></span>
+            <span class="ap-item"><svg class="ap-i" viewBox="0 0 20 20" aria-hidden="true"><rect x="3" y="4.5" width="14" height="12" rx="2"/><path d="M3 8h14M7 3v3M13 3v3"/></svg><b data-i18n="appMock.navCal">Calendario</b></span>
+            <span class="ap-item"><svg class="ap-i" viewBox="0 0 20 20" aria-hidden="true"><path d="M6 3h5l3 3v11H6z"/><path d="M11 3v3h3"/></svg><b data-i18n="appMock.navDocs">Documentos</b></span>
+            <span class="ap-item"><svg class="ap-i" viewBox="0 0 20 20" aria-hidden="true"><path d="M15.6 8.4V5.1a1.5 1.5 0 0 0-1.5-1.5H5.9A1.5 1.5 0 0 0 4.4 5.1v9.8a1.5 1.5 0 0 0 1.5 1.5h3.2"/><circle cx="14.2" cy="12.4" r="1.9"/></svg><b data-i18n="appMock.navNotes">Mis notas</b></span>
+          </div>
+          <div class="ap-tree">
+            <span class="ap-item ap-sub"><svg class="ap-i" viewBox="0 0 20 20" aria-hidden="true"><rect x="6.5" y="3.5" width="10" height="10" rx="2"/><rect x="3.5" y="6.5" width="10" height="10" rx="2"/></svg><b data-i18n="appMock.navAll">Todas mis notas</b><i class="ap-n">167</i></span>
+            <span class="ap-item ap-sub"><i class="ap-fold" style="--c:#e0a33c"></i><b data-i18n="appMock.folder1">Cliente Acme</b></span>
+            <span class="ap-item ap-sub is-on"><i class="ap-fold" style="--c:#4d8fd6"></i><b data-i18n="appMock.folder2">Sprint planning</b></span>
+          </div>
+          <div class="ap-side-foot">
+            <span class="ap-item"><svg class="ap-i" viewBox="0 0 20 20" aria-hidden="true"><path d="M4 6h12M8 6V4.5A1.5 1.5 0 0 1 9.5 3h1A1.5 1.5 0 0 1 12 4.5V6M6 6l.6 10a1.5 1.5 0 0 0 1.5 1.4h3.8a1.5 1.5 0 0 0 1.5-1.4L14 6"/></svg><b data-i18n="appMock.navTrash">Papelera</b><i class="ap-n">7</i></span>
+            <span class="ap-item"><svg class="ap-i" viewBox="0 0 20 20" aria-hidden="true"><path d="M10 2.3 16.2 6v8L10 17.7 3.8 14V6z"/><circle cx="10" cy="10" r="2.7"/></svg><b data-i18n="appMock.navSettings">Configuracion</b></span>
+          </div>
+        </aside>
+
+        <!-- Panel principal -->
+        <div class="ap-main">
+          <div class="ap-titlebar">
+            <span class="ap-win"><svg class="ap-i" viewBox="0 0 20 20" aria-hidden="true"><circle cx="9" cy="9" r="5.5"/><path d="M17 17l-3.8-3.8"/></svg></span>
+            <span class="ap-win"><svg class="ap-i" viewBox="0 0 20 20" aria-hidden="true"><path d="M15.5 12.4A6.5 6.5 0 1 1 7.6 4.5a5.2 5.2 0 0 0 7.9 7.9z"/></svg></span>
+            <span class="ap-win ap-wsep"><svg class="ap-i" viewBox="0 0 20 20" aria-hidden="true"><path d="M4.5 10h11"/></svg></span>
+            <span class="ap-win"><svg class="ap-i" viewBox="0 0 20 20" aria-hidden="true"><rect x="4.5" y="4.5" width="11" height="11" rx="1.2"/></svg></span>
+            <span class="ap-win"><svg class="ap-i" viewBox="0 0 20 20" aria-hidden="true"><path d="M5 5l10 10M15 5 5 15"/></svg></span>
+          </div>
+
+          <div class="ap-body">
+            <div class="ap-crumb">‹ Sprint planning</div>
+            <h3 class="ap-title" data-i18n="appMock.meetingTitle">Kick-off Q3</h3>
+
+            <div class="ap-tabs">
+              <span class="ap-tab" data-i18n="appMock.tabTx">Transcripcion</span>
+              <span class="ap-tab is-on" data-i18n="appMock.tabGeneral">General</span>
+              <span class="ap-tab" data-i18n="appMock.tabNotes">Notas</span>
+              <span class="ap-tab" data-i18n="appMock.tabFiles">Archivos</span>
+              <span class="ap-tab-acts">
+                <svg class="ap-i" viewBox="0 0 20 20" aria-hidden="true"><rect x="7" y="7" width="9" height="9" rx="1.6"/><path d="M13 7V5.5A1.5 1.5 0 0 0 11.5 4H5.5A1.5 1.5 0 0 0 4 5.5v6A1.5 1.5 0 0 0 5.5 13H7"/></svg>
+                <svg class="ap-i" viewBox="0 0 20 20" aria-hidden="true"><path d="M10 3.3l2 4 4.4.6-3.2 3 .8 4.4L10 13.2l-4 2.1.8-4.4-3.2-3 4.4-.6 2-4z"/></svg>
+                <svg class="ap-i ap-i-solid" viewBox="0 0 20 20" aria-hidden="true"><path d="M2.4 6a2 2 0 0 1 2-2h3.3a1.5 1.5 0 0 1 1.1.5l1.2 1.3a1.5 1.5 0 0 0 1.1.5h4.5a2 2 0 0 1 2 2v5.8a2 2 0 0 1-2 2H4.4a2 2 0 0 1-2-2z"/></svg>
+              </span>
             </div>
-            <div class="app-side-item">
-              <div class="pd" style="background:#86b5e0" aria-hidden="true"></div><span data-i18n="appMock.project2">Sprint planning</span>
-              <span class="count">8</span>
-            </div>
-            <div class="app-side-item">
-              <div class="pd" style="background:#e8c17b" aria-hidden="true"></div><span data-i18n="appMock.project3">Entrevistas</span>
-              <span class="count">5</span>
-            </div>
-            <div class="app-side-item">
-              <div class="pd" style="background:#a98fd6" aria-hidden="true"></div><span data-i18n="appMock.project4">Board meetings</span>
-              <span class="count">3</span>
-            </div>
-            <div class="app-side-item">
-              <div class="pd" style="background:#e08b8b" aria-hidden="true"></div><span data-i18n="appMock.project5">1:1 con equipo</span>
-              <span class="count">17</span>
+
+            <div class="ap-facts">
+              <span><em data-i18n="appMock.factDate">Fecha</em> 2 de agosto, 16:40</span>
+              <span><em data-i18n="appMock.factDur">Duracion</em> 34:12</span>
             </div>
           </div>
 
-          <div class="app-main">
-            <div class="app-meet-head">
-              <div class="app-meet-title" data-i18n="appMock.meetingTitle">Kick-off Q3</div>
-              <div class="app-meet-time" data-i18n="appMock.meetingTime">lun 08 · 34:12</div>
-              <div class="done-indicator" aria-label="Reunion procesada">
-                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg>
-                <span data-i18n="appMock.processed">Procesada</span>
-              </div>
+          <!-- Dock de grabación en curso -->
+          <div class="ap-dock">
+            <div class="ap-dock-head">
+              <svg class="ap-i" viewBox="0 0 20 20" aria-hidden="true"><circle cx="9" cy="9" r="5.5"/><path d="M17 17l-3.8-3.8"/></svg>
+              <b data-i18n="appMock.meetingTitle">Kick-off Q3</b>
+              <span class="ap-dock-mini">
+                <svg class="ap-i" viewBox="0 0 20 20" aria-hidden="true"><path d="M10 2.3 16.2 6v8L10 17.7 3.8 14V6z"/><circle cx="10" cy="10" r="2.7"/></svg>
+                <svg class="ap-i" viewBox="0 0 20 20" aria-hidden="true"><rect x="7" y="7" width="9" height="9" rx="1.6"/><path d="M13 7V5.5A1.5 1.5 0 0 0 11.5 4H5.5A1.5 1.5 0 0 0 4 5.5v6A1.5 1.5 0 0 0 5.5 13H7"/></svg>
+                <svg class="ap-i" viewBox="0 0 20 20" aria-hidden="true"><path d="M4.5 10h11"/></svg>
+              </span>
             </div>
-            <div class="app-tabs" role="tablist">
-              <div class="app-tab on" role="tab" aria-selected="true" data-i18n="appMock.tabTranscript">Transcripcion</div>
-              <div class="app-tab" role="tab" aria-selected="false" data-i18n="appMock.tabNotes">Notas</div>
-              <div class="app-tab" role="tab" aria-selected="false" data-i18n="appMock.tabFiles">Archivos</div>
-              <div class="app-tab" role="tab" aria-selected="false" data-i18n="appMock.tabContext">Contexto</div>
-            </div>
-            <div class="app-utterances">
-              <div class="utt show">
-                <div class="utt-av" style="background:rgba(52,199,138,.2);color:#34C78A;" aria-hidden="true">TM</div>
-                <div class="utt-body">
-                  <div class="who"><span data-i18n="appMock.speaker1">Tomas</span> <span>00:12</span></div>
-                  <span class="utt-text" data-i18n="appMock.utterance1">El objetivo para Q3 es llegar a 500 usuarios activos antes de septiembre.</span>
-                </div>
-              </div>
-              <div class="utt show">
-                <div class="utt-av" style="background:rgba(134,181,224,.2);color:#86b5e0;" aria-hidden="true">SR</div>
-                <div class="utt-body">
-                  <div class="who"><span data-i18n="appMock.speaker2">Sara</span> <span>01:34</span></div>
-                  <span class="utt-text" data-i18n="appMock.utterance2">Necesitamos revisar el onboarding. El 60% abandona en el primer dia.</span>
-                </div>
-              </div>
-              <div class="utt show">
-                <div class="utt-av" style="background:rgba(232,193,123,.2);color:#e8c17b;" aria-hidden="true">YO</div>
-                <div class="utt-body">
-                  <div class="who"><span data-i18n="appMock.speaker3">Tu</span> <span>02:18</span></div>
-                  <span class="utt-text" data-i18n="appMock.utterance3">Propongo un rediseno del tutorial interactivo para el sprint 4.</span>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <div class="app-right">
-            <div class="mini-card">
-              <div class="mini-card-title">
-                <span data-i18n="appMock.audioTitle">Audio de la reunion</span>
-                <span class="mini-card-meta">
-                  <svg width="9" height="9" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><polygon points="6 3 20 12 6 21 6 3"/></svg>
-                  <span data-i18n="appMock.play">Reproducir</span>
-                </span>
-              </div>
-              <div class="wave wave-play" aria-hidden="true">
-                <span style="height:22%"></span><span style="height:48%"></span><span style="height:30%"></span>
-                <span style="height:66%"></span><span style="height:40%"></span><span style="height:78%"></span>
-                <span style="height:34%"></span><span style="height:56%"></span><span style="height:28%"></span>
-                <span style="height:70%"></span><span style="height:44%"></span><span style="height:60%"></span>
-                <span style="height:26%"></span><span style="height:52%"></span><span style="height:36%"></span>
-                <span style="height:74%"></span><span style="height:38%"></span><span style="height:58%"></span>
-                <span style="height:30%"></span><span style="height:46%"></span>
-                <div class="wave-playhead"></div>
-              </div>
-            </div>
-            <div class="mini-card">
-              <div class="mini-card-title" data-i18n="appMock.durationLabel">Duracion total</div>
-              <div class="stat-mini">
-                <div class="n" data-i18n="appMock.duration">34:12</div>
-                <div class="l" data-i18n="appMock.speakers">3 hablantes</div>
-              </div>
-            </div>
-            <div class="mini-card">
-              <div class="mini-card-title" data-i18n="appMock.glossaryLabel">Glosario automatico</div>
-              <div class="chip-list">
-                <div class="chip" data-i18n="appMock.keyword1">onboarding</div>
-                <div class="chip" data-i18n="appMock.keyword2">retencion</div>
-                <div class="chip" data-i18n="appMock.keyword3">Q3</div>
-                <div class="chip" data-i18n="appMock.keyword4">sprint 4</div>
-                <div class="chip" data-i18n="appMock.keyword5">tutorial</div>
-              </div>
+            <div class="ap-clock">34:12</div>
+            <div class="ap-live" data-i18n="appMock.livePhrase">El objetivo para Q3 es llegar a 500 usuarios activos antes de septiembre</div>
+            <div class="ap-live ap-live-typing"><i></i><i></i><i></i></div>
+            <div class="ap-dock-foot">
+              <span class="ap-ctl is-live"><svg class="ap-i" viewBox="0 0 20 20" aria-hidden="true"><path d="M3.4 9v2M6.8 6.6v6.8M10 4.2v11.6M13.2 6.6v6.8M16.6 9v2"/></svg></span>
+              <span class="ap-ctl is-dark"><svg class="ap-i" viewBox="0 0 20 20" aria-hidden="true"><rect x="7.5" y="3" width="5" height="9" rx="2.5"/><path d="M5 10a5 5 0 0 0 10 0M10 15v2.5"/><path d="M3.5 3.5l13 13"/></svg></span>
+              <span class="ap-ctl ap-ctl-lbl"><svg class="ap-i" viewBox="0 0 20 20" aria-hidden="true"><path d="M6 3h5l3 3v11H6z"/><path d="M11 3v3h3"/></svg><b data-i18n="appMock.ctlNotes">Notas</b></span>
+              <span class="ap-ctl ap-ctl-lbl"><svg class="ap-i" viewBox="0 0 20 20" aria-hidden="true"><path d="M3 7V4.5A1.5 1.5 0 0 1 4.5 3H7M13 3h2.5A1.5 1.5 0 0 1 17 4.5V7M17 13v2.5a1.5 1.5 0 0 1-1.5 1.5H13M7 17H4.5A1.5 1.5 0 0 1 3 15.5V13"/></svg><b data-i18n="appMock.ctlCapture">Capturar pantalla</b></span>
+              <span class="ap-ctl ap-stop"><svg class="ap-i ap-i-solid" viewBox="0 0 20 20" aria-hidden="true"><rect x="5" y="5" width="10" height="10" rx="2"/></svg></span>
+              <span class="ap-pick">Sprint planning ⌃</span>
+              <span class="ap-pick">Monitor 1 ⌃</span>
+              <span class="ap-pick">Auto ⌃</span>
             </div>
           </div>
         </div>
+
       </div>
     </div>
   </div>
@@ -313,7 +277,7 @@
 <!-- TICKER -->
 <div class="ticker-wrap band">
   <div class="ticker-inner">
-    <div class="ticker-item" data-i18n="ticker.item1">Transcripcion local con Whisper</div>
+    <div class="ticker-item" data-i18n="ticker.item1">Transcripcion local con Vosk</div>
     <div class="ticker-item" data-i18n="ticker.item2">Sin suscripcion mensual</div>
     <div class="ticker-item" data-i18n="ticker.item3">Grabacion de audio y pantalla</div>
     <div class="ticker-item" data-i18n="ticker.item4">Exporta contexto para Claude o ChatGPT</div>
@@ -321,7 +285,7 @@
     <div class="ticker-item" data-i18n="ticker.item6">Funciona sin internet</div>
     <div class="ticker-item" data-i18n="ticker.item7">Multiples hablantes</div>
     <div class="ticker-item" data-i18n="ticker.item8">Pago unico, licencia perpetua</div>
-    <div class="ticker-item" data-i18n="ticker.item1">Transcripcion local con Whisper</div>
+    <div class="ticker-item" data-i18n="ticker.item1">Transcripcion local con Vosk</div>
     <div class="ticker-item" data-i18n="ticker.item2">Sin suscripcion mensual</div>
     <div class="ticker-item" data-i18n="ticker.item3">Grabacion de audio y pantalla</div>
     <div class="ticker-item" data-i18n="ticker.item4">Exporta contexto para Claude o ChatGPT</div>
@@ -395,7 +359,7 @@
             <div class="how-step-n">02</div>
             <h3 data-i18n="how.step2Title">Transcripcion automatica local</h3>
           </div>
-          <p data-i18n="how.step2Desc">Whisper AI procesa el audio en tu PC. Identifica hablantes, marca tiempos y genera transcripcion editable al instante.</p>
+          <p data-i18n="how.step2Desc">Vosk procesa el audio en tu PC. Identifica hablantes, marca tiempos y genera transcripcion editable al instante.</p>
         </div>
         <div class="how-step" data-idx="2">
           <div class="how-step-head">
@@ -444,12 +408,12 @@
             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
           </div>
           <h3 data-i18n="features.f1Title">100% privado y local</h3>
-          <p data-i18n="features.f1Desc">Ni una sola palabra sale de tu computadora. Sin servidores, sin API keys externas, sin que nadie lea tus reuniones. Whisper corre en tu GPU o CPU.</p>
+          <p data-i18n="features.f1Desc">Ni una sola palabra sale de tu computadora. Sin servidores, sin API keys externas, sin que nadie lea tus reuniones. Vosk corre en el procesador de tu equipo.</p>
           <span class="tag" data-i18n="features.f1Tag">Diferenciador clave</span>
           <div class="b-visual">
             <div class="b-code">
               <div><span class="c" data-i18n="features.f1CodeLabel"># estado del pipeline</span></div>
-              <div><span class="k" data-i18n="features.f1CodeAudio">audio</span> → <span data-i18n="features.f1CodeLocal">local</span> · <span class="s" data-i18n="features.f1CodeWhisper">"whisper.cpp"</span></div>
+              <div><span class="k" data-i18n="features.f1CodeAudio">audio</span> → <span data-i18n="features.f1CodeLocal">local</span> · <span class="s" data-i18n="features.f1CodeMotor">"vosk"</span></div>
               <div><span class="k" data-i18n="features.f1CodeNetwork">network</span> → <span class="s" data-i18n="features.f1CodeDisabled">disabled</span></div>
               <div><span class="k" data-i18n="features.f1CodeTelemetry">telemetry</span> → <span class="s" data-i18n="features.f1CodeOff">off</span></div>
             </div>
@@ -692,7 +656,7 @@
         <div class="plan-once" data-i18n="pricing.personalDevice">Pago unico · 1 dispositivo</div>
         <ul class="plan-features">
           <li><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg><span data-i18n="pricing.personalF1">Grabacion de audio y video</span></li>
-          <li><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg><span data-i18n="pricing.personalF2">Transcripcion local (Whisper)</span></li>
+          <li><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg><span data-i18n="pricing.personalF2">Transcripcion local (Vosk)</span></li>
           <li><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg><span data-i18n="pricing.personalF3">10h de video por mes</span></li>
           <li><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg><span data-i18n="pricing.personalF4">Proyectos ilimitados</span></li>
           <li><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg><span data-i18n="pricing.personalF5">Exportar a .md y .txt</span></li>
@@ -769,7 +733,7 @@
           <span data-i18n="faq.q1">Realmente todo se procesa en mi PC?</span>
           <span class="faq-plus"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg></span>
         </button>
-        <div class="faq-a" data-i18n="faq.a1">Si. Helpmeet usa Whisper.cpp corriendo en local. La aplicacion no envia audio, transcripciones ni metadatos a ningun servidor externo. Puedes desconectar tu red al usarlo y funciona perfectamente.</div>
+        <div class="faq-a" data-i18n="faq.a1">Si. Helpmeet usa Vosk corriendo en local. La aplicacion no envia audio, transcripciones ni metadatos a ningun servidor externo. Puedes desconectar tu red al usarlo y funciona perfectamente.</div>
       </div>
       <div class="faq">
         <button class="faq-q">
@@ -783,7 +747,7 @@
           <span data-i18n="faq.q3">Puedo transcribir en varios idiomas?</span>
           <span class="faq-plus"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg></span>
         </button>
-        <div class="faq-a" data-i18n="faq.a3">Si. Whisper detecta el idioma automaticamente y soporta mas de 90 idiomas, incluyendo espanol, ingles, portugues, frances y aleman con muy alta precision.</div>
+        <div class="faq-a" data-i18n="faq.a3">Si. Se descarga un modelo por idioma —espanol, ingles, portugues, frances, aleman, italiano y varios mas— y eliges cual usar. Al ser modelos dedicados, cada uno rinde mejor en su idioma que un modelo general.</div>
       </div>
       <div class="faq">
         <button class="faq-q">
@@ -845,9 +809,7 @@
 <footer>
   <div class="footer-brand">
     <svg width="22" height="22" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
-      <rect x="12" y="13" width="40" height="11" rx="5.5" fill="#34C78A"/>
-      <rect x="12" y="27" width="40" height="11" rx="5.5" fill="#34C78A"/>
-      <circle cx="21" cy="47" r="7" fill="#34C78A"/>
+      <rect x="16.0064" y="14.32" width="31.9872" height="9.52" rx="4.76" fill="#34C78A"/><rect x="16.0064" y="26.56" width="22.848" height="9.52" rx="4.76" fill="#34C78A"/><circle cx="21.4464" cy="44.24" r="5.44" fill="#34C78A"/>
     </svg>
     Helpmeet
   </div>
@@ -859,8 +821,8 @@
 </footer>
 
 <!-- i18n — must load before landing.js to have translations ready for dynamic text -->
-<script src="/landing/i18n/i18n.js?v=20260725c"></script>
-<script src="/landing/landing.js?v=20260724b"></script>
+<script src="/landing/i18n/i18n.js?v=20260802h"></script>
+<script src="/landing/landing.js?v=20260802h"></script>
 
 </body>
 </html>

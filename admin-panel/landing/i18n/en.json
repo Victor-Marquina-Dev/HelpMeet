@@ -3,7 +3,7 @@
     "lang": "en",
     "title": "Helpmeet — Record, Transcribe and Understand Your Meetings. 100% Local.",
     "description": "Helpmeet turns your meetings into actionable context with local AI. Everything on your PC, no subscriptions, no cloud. Transcription, screen recording and export to Claude. One-time payment.",
-    "keywords": "meeting transcription, record meetings, local transcription, whisper, AI meetings, screen recording, helpmeet, offline transcription",
+    "keywords": "meeting transcription, record meetings, local transcription, vosk, AI meetings, screen recording, helpmeet, offline transcription",
     "ogTitle": "Helpmeet — Record, Transcribe and Understand Your Meetings. 100% Local.",
     "ogDescription": "AI meeting transcription on your PC. No cloud. No subscriptions. One-time payment. Export to Claude Code.",
     "ogImageAlt": "Helpmeet — 100% local meeting transcription",
@@ -11,9 +11,7 @@
     "twitterDescription": "AI meeting transcription on your PC. No cloud. No subscriptions. One-time payment.",
     "twitterImageAlt": "Helpmeet — 100% local meeting transcription"
   },
-
   "skipLink": "Skip to main content",
-
   "nav": {
     "how": "How it works",
     "features": "Features",
@@ -24,13 +22,11 @@
     "themeTitle": "Toggle theme",
     "buy": "Buy"
   },
-
   "langSwitcher": {
     "label": "Switch language",
     "es": "ES",
     "en": "EN"
   },
-
   "hero": {
     "titleLine1": "Your meetings,<br><em>understood.</em>",
     "leadLine1": "Everything on your PC.<br><span class=\"lead-em\">No subscriptions.</span>",
@@ -40,7 +36,6 @@
     "ctaMini": "Buy · from $49",
     "how": "See how it works"
   },
-
   "appMock": {
     "title": "Helpmeet v3.2.0 · Transcription completed",
     "projects": "Projects",
@@ -72,11 +67,28 @@
     "keyword2": "retention",
     "keyword3": "Q3",
     "keyword4": "sprint 4",
-    "keyword5": "tutorial"
+    "keyword5": "tutorial",
+    "navHome": "Home",
+    "navFav": "Favorites",
+    "navCal": "Calendar",
+    "navDocs": "Documents",
+    "navNotes": "My notes",
+    "navAll": "All my notes",
+    "navInterviews": "Interviews",
+    "navTrash": "Trash",
+    "navSettings": "Settings",
+    "tabTx": "Transcript",
+    "tabGeneral": "General",
+    "factDate": "Date",
+    "factDur": "Length",
+    "livePhrase": "The goal for Q3 is to reach 500 active users before September",
+    "ctlNotes": "Notes",
+    "ctlCapture": "Capture screen",
+    "folder1": "Acme Client",
+    "folder2": "Sprint planning"
   },
-
   "ticker": {
-    "item1": "Local transcription with Whisper",
+    "item1": "Local transcription with Vosk",
     "item2": "No monthly subscription",
     "item3": "Audio and screen recording",
     "item4": "Export context for Claude or ChatGPT",
@@ -85,14 +97,12 @@
     "item7": "Multiple speakers",
     "item8": "One-time payment, perpetual license"
   },
-
   "stats": {
     "local": "local, nothing leaves your PC",
     "noSubscriptions": "Monthly subscriptions",
     "unlimited": "Meetings and projects",
     "lifetimePlans": "Lifetime plans"
   },
-
   "how": {
     "label": "How it works",
     "titleLine1": "From meeting to<br>context <em>in 4 steps</em>",
@@ -100,54 +110,44 @@
     "step1Title": "Record audio or screen",
     "step1Desc": "Record your microphone, system audio, and screen simultaneously. Compatible with Meet, Zoom, Teams, and any app.",
     "step2Title": "Automatic local transcription",
-    "step2Desc": "Whisper AI processes audio on your PC. Identifies speakers, timestamps, and generates editable transcription instantly.",
+    "step2Desc": "Vosk processes audio on your PC. Identifies speakers, timestamps, and generates editable transcription instantly.",
     "step3Title": "Export and use with AI",
     "step3Desc": "Copy the full context of any project to paste into Claude or ChatGPT. Or export as .md, .txt, or .zip.",
     "step4Title": "Organize by project",
     "step4Desc": "Group meetings by client or project. Search across all transcriptions. The glossary extracts key terms."
   },
-
   "features": {
     "label": "Features",
     "titleLine1": "Everything you need.<br><em>Nothing you don't.</em>",
     "subtitle": "No hidden telemetry, no weird dependencies, no bloatware. Just the features a professional needs to master their meetings.",
-
     "f1Title": "100% private and local",
-    "f1Desc": "Not a single word leaves your computer. No servers, no external API keys, no one reading your meetings. Whisper runs on your GPU or CPU.",
+    "f1Desc": "Not a single word leaves your computer. No servers, no external API keys, no one reading your meetings. Vosk runs on your CPU.",
     "f1Tag": "Key differentiator",
     "f1CodeLabel": "pipeline status",
     "f1CodeAudio": "audio",
     "f1CodeLocal": "local",
-    "f1CodeWhisper": "whisper.cpp",
+    "f1CodeMotor": "vosk",
     "f1CodeNetwork": "network",
     "f1CodeDisabled": "disabled",
     "f1CodeTelemetry": "telemetry",
     "f1CodeOff": "off",
-
     "f2Title": "Screen recording + audio",
     "f2Desc": "Screen video with system audio and microphone on separate tracks. Per-channel transcription for better accuracy.",
-
     "f3Title": "Speaker identification",
     "f3Desc": "Assign names to each voice. Helpmeet learns who is who in each project.",
-
     "f4Title": "Full-text search",
     "f4Desc": "Search across all transcriptions instantly. Find any decision in seconds.",
-
     "f5Title": "AI-ready context",
     "f5Desc": "Export a project's complete history -- meetings, decisions, participants -- in a block ready to paste into Claude or ChatGPT.",
-
     "f6Title": "Documents to Markdown",
     "f6Desc": "PDFs, DOCX, and presentations to <code style=\"font-family:var(--font-mono);color:var(--green);\">.md</code> with OCR.",
-
     "f7Title": "Works without internet",
     "f7Desc": "Get on a plane, go to the countryside, lose your wifi. Helpmeet won't notice."
   },
-
   "compare": {
     "label": "Philosophy",
     "titleLine1": "Designed with a<br><em>different philosophy.</em>",
     "subtitle": "Most transcription tools live in the cloud and charge every month. Helpmeet is local by design and a one-time purchase. We compare models, not brands.",
-
     "cloudTag": "Traditional model",
     "cloudTitle": "Cloud + subscription",
     "cloudSub": "Most common approach in the market.",
@@ -158,7 +158,6 @@
     "cloud5": "Data handling depends on the provider's policies.",
     "cloudCostLabel": "3-year cost",
     "cloudCost": "~ $612",
-
     "usTag": "The Helpmeet model",
     "usTitle": "Local + one-time payment",
     "usSub": "Full control of your data and your costs.",
@@ -170,7 +169,6 @@
     "usCostLabel": "3-year cost",
     "usCost": "$99 <em>one time</em>"
   },
-
   "cost": {
     "label": "Real cost",
     "titleLine1": "Pay once today.<br><em>Not a lifetime rent.</em>",
@@ -185,22 +183,19 @@
     "savingsAmount": "$513",
     "savingsSub": "And every year that passes, the gap grows. No fine print. No auto-renewals."
   },
-
   "quote": {
     "text": "I spent over a year paying a cloud subscription to transcribe my meetings. With Helpmeet I pay once and my data stays on my PC. I'm never going back.",
     "author": "User · independent consultant"
   },
-
   "pricing": {
     "label": "Pricing",
     "titleLine1": "One payment,<br><em>forever.</em>",
     "subtitle": "No subscriptions. No surprises. First-year updates included. After that, yours forever in the version you bought.",
-
     "personalName": "Personal",
     "personalDesc": "For independent professionals and freelancers.",
     "personalDevice": "One-time payment · 1 device",
     "personalF1": "Audio and video recording",
-    "personalF2": "Local transcription (Whisper)",
+    "personalF2": "Local transcription (Vosk)",
     "personalF3": "10h video per month",
     "personalF4": "Unlimited projects",
     "personalF5": "Export to .md and .txt",
@@ -208,7 +203,6 @@
     "personalF7": "Participants and glossary",
     "personalF8": "ZIP export",
     "personalBtn": "Buy Personal",
-
     "proBadge": "Most popular",
     "proName": "Pro",
     "proDesc": "For professionals using AI who need all features.",
@@ -222,7 +216,6 @@
     "proF7": "Documents → Markdown (OCR)",
     "proF8": "Recording recovery",
     "proBtn": "Buy Pro",
-
     "teamName": "Team",
     "teamDesc": "For small teams and startups with daily meetings.",
     "teamDevice": "One-time payment · 5 devices",
@@ -232,42 +225,31 @@
     "teamF4": "Early access to features",
     "teamF5": "Company invoice",
     "teamBtn": "Buy Team",
-
     "guarantee": "14-day guarantee.",
     "guaranteeText": "If it doesn't work on your PC, we'll refund your money."
   },
-
   "faq": {
     "label": "Frequently asked questions",
     "titleLine1": "Questions <em>answered.</em>",
     "subtitlePrefix": "If you have any other questions, write to us at ",
     "subtitleSuffix": " and we'll reply within 24h.",
-
     "q1": "Is everything really processed on my PC?",
-    "a1": "Yes. Helpmeet uses Whisper.cpp running locally. The app does not send audio, transcriptions, or metadata to any external server. You can disconnect your network while using it and it works perfectly.",
-
+    "a1": "Yes. Helpmeet uses Vosk running locally. The app does not send audio, transcriptions, or metadata to any external server. You can disconnect your network while using it and it works perfectly.",
     "q2": "What are the PC requirements?",
     "a2": "Windows 10 or 11, 8 GB RAM minimum (16 GB recommended), 2 GB free disk space. Any modern CPU works; a GPU speeds up transcription but is not required.",
-
     "q3": "Can I transcribe in multiple languages?",
-    "a3": "Yes. Whisper detects the language automatically and supports over 90 languages, including Spanish, English, Portuguese, French, and German with very high accuracy.",
-
+    "a3": "Yes. You download one model per language —Spanish, English, Portuguese, French, German, Italian and more— and choose which to use. Being dedicated models, each performs better in its own language than a general one.",
     "q4": "What if I change computers?",
     "a4": "Your license includes free reactivation when you switch PCs. Just write to us and we'll free your slot within 24h. Pro and Team plans let you activate on more than one device from the start.",
-
     "q5": "Do I get updates forever?",
     "a5": "The first year includes all updates. After that, you can keep using the version you bought forever, or renew at a low cost for major new features.",
-
     "q6": "Does it work with Google Meet, Zoom and Teams?",
     "a6": "With all of them and any other app. Helpmeet captures system audio and your microphone at the OS level — it doesn't depend on official integrations that could block you.",
-
     "q7": "Is there a money-back guarantee?",
     "a7": "14 full days, no questions asked. If for any reason Helpmeet doesn't work as expected on your PC, we'll refund 100% of your money.",
-
     "q8": "Is there a portable version?",
     "a8": "Yes. Write to us at team+helpmeet@mimotech.vip and we'll send you the portable version. No installation required, just unzip and run. Ideal for corporate teams with installation restrictions."
   },
-
   "finalCta": {
     "titleLine1": "Stop paying<br><em>every month.</em>",
     "desc": "One-time payment. Data on your PC. Meeting context ready for AI.",
@@ -275,12 +257,10 @@
     "btnMini": "Get Pro · $99",
     "sub": "Only $99 · One-time payment · Windows · Lifetime license"
   },
-
   "footer": {
     "copy": "2026 MimoTech · All rights reserved",
     "store": "Gumroad Store"
   },
-
   "structuredData": {
     "description": "Desktop application to record, transcribe and understand meetings with local AI. No cloud, no subscriptions, one-time payment.",
     "offerDescription": "Perpetual license — one-time payment"
