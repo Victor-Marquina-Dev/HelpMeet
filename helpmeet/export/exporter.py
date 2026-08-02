@@ -355,42 +355,20 @@ def _organize_meeting(meeting: Meeting, base_dir: Path) -> Path:
     (folder / "transcripcion.md").write_text(
         "\n".join(document) + "\n", encoding="utf-8"
     )
-    # Formatos adicionales: TXT plano y TSV (para Excel / Google Sheets)
-    _write_transcript_txt(meeting, folder / "transcripcion.txt")
-    _write_transcript_tsv(meeting, folder / "transcripcion.tsv")
+    # Solo el .md (2026-07-31). Antes se escribían además transcripcion.txt y
+    # transcripcion.tsv con el mismo contenido en otros formatos, y la carpeta
+    # de cada reunión quedaba con tres archivos casi iguales: al abrirla no se
+    # sabía cuál era el bueno.
+    #
+    # El .md es el único que trae el contexto completo —proyecto, capturas
+    # enlazadas, notas— y es el que se copia para pegárselo a una IA, que es
+    # para lo que existe el producto. Los otros dos solo tenían las frases.
+    #
+    # Ninguno de los dos formatos se pierde de verdad: el TXT se sigue generando
+    # al exportar (build_transcript_txt, que usa el ZIP de export_transcript_
+    # package y la exportación manual). El TSV era el único sitio donde se
+    # producía; si vuelve a hacer falta, está en el historial de git.
     return folder
-
-
-def _write_transcript_txt(meeting: Meeting, dest: Path) -> None:
-    """Transcripción en texto plano con timestamps, sin Markdown."""
-    utterances = sorted(meeting.utterances, key=lambda u: u.start_time)
-    participants = list(meeting.initiative.participants)
-    lines = []
-    for u in utterances:
-        speaker = resolved_speaker_name(u, participants)
-        ts = fmt_time(u.start_time)
-        text = " ".join((u.text or "").split())
-        lines.append(f"[{ts}] {speaker}: {text}")
-    dest.write_text("\n".join(lines) + "\n", encoding="utf-8")
-
-
-def _write_transcript_tsv(meeting: Meeting, dest: Path) -> None:
-    """Transcripción en TSV: start\\tend\\tspeaker\\ttext."""
-    import csv
-    utterances = sorted(meeting.utterances, key=lambda u: u.start_time)
-    participants = list(meeting.initiative.participants)
-    with dest.open("w", encoding="utf-8", newline="") as f:
-        writer = csv.writer(f, delimiter="\t")
-        writer.writerow(["inicio", "fin", "hablante", "texto"])
-        for u in utterances:
-            speaker = resolved_speaker_name(u, participants)
-            text = " ".join((u.text or "").split())
-            writer.writerow([
-                f"{u.start_time:.2f}",
-                f"{u.end_time:.2f}" if u.end_time else "",
-                speaker,
-                text,
-            ])
 
 
 def organize_meeting_folder(session: Session, meeting_id: int, base_dir: Path) -> Path:
