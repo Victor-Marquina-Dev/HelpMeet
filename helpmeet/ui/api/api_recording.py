@@ -1146,3 +1146,66 @@ class RecordingApiMixin:
         self._enqueue_video_job(m.id, m.title, m.initiative_id, bool(force), clip_segments)
         return {"ok": True, "queued": True, "meeting_id": m.id}
 
+    def export_meeting_clips(self, meeting_id: int, segments: list[dict] | None = None,
+                             delete_original: bool = False) -> dict:
+        """Corta el vídeo de la reunión en un archivo .mp4 por tramo.
+
+        Copia los flujos sin recomprimir, así que tarda segundos y no pierde
+        calidad; a cambio cada clip empieza en el fotograma clave anterior al
+        punto marcado (ver `cut_video_segments`).
+
+        Con `delete_original`, el vídeo entero se manda a la **papelera del
+        sistema** —recuperable, no borrado a secas— y la reunión pasa a apuntar
+        al primer clip, para no quedarse sin nada que reproducir.
+        """
+        from helpmeet.media import cut_video_segments, cut_audio_segments, media_duration
+        from helpmeet.media_segments import normalize_segments
+
+        m = repo.get_meeting(self._session, int(meeting_id))
+        if m is None or not m.audio_path or not os.path.exists(m.audio_path):
+            return {"ok": False, "error": "No se encontró la grabación de esta reunión."}
+        src = str(m.audio_path)
+        # Con vídeo se copian los flujos sin recomprimir; con solo audio se corta
+        # exacto, porque no hay fotogramas clave que respetar.
+        es_video = src.lower().endswith(".mp4")
+        cortar = cut_video_segments if es_video else cut_audio_segments
+
+        try:
+            duracion = media_duration(src)
+        except Exception:
+            duracion = 0.0
+        if duracion <= 0:
+            return {"ok": False, "error": "No se pudo leer la duración del vídeo."}
+
+        pedidos = [(float(s.get("start", 0)), float(s.get("end", 0)))
+                   for s in (segments or [])]
+        tramos = normalize_segments(pedidos, duracion)
+        if not tramos:
+            return {"ok": False, "error": "No se marcó ningún tramo válido."}
+
+        destino = Path(src).parent / "clips"
+        try:
+            clips = cortar(src, tramos, str(destino), stem=Path(src).stem)
+        except Exception as exc:
+            logging.exception("No se pudieron cortar los clips")
+            return {"ok": False, "error": f"No se pudo cortar el vídeo: {exc}"}
+
+        borrado = False
+        if delete_original:
+            try:
+                from send2trash import send2trash
+                send2trash(src)
+                # Sin esto la reunión apuntaría a un archivo que ya no está y el
+                # reproductor quedaría en negro.
+                m.audio_path = clips[0]["path"]
+                self._session.commit()
+                borrado = True
+            except Exception as exc:
+                logging.exception("No se pudo enviar el original a la papelera")
+                return {"ok": True, "clips": clips, "folder": str(destino),
+                        "deleted_original": False,
+                        "warning": f"Los clips se crearon, pero el original sigue ahí: {exc}"}
+
+        return {"ok": True, "clips": clips, "folder": str(destino),
+                "deleted_original": borrado}
+
