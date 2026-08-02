@@ -7,10 +7,14 @@
 :root{
   --bg:#f6f8fc;--card:#fff;--card2:#f0f2f5;
   --border:#e4e7ec;--border2:#d3d7de;
-  --green:#0a9268;--green-dim:rgba(10,146,104,.1);
+  /* Verde de marca: el mismo matiz del logo (155°), oscurecido hasta 33 % de
+     luz. El verde del logo tal cual (#52C494) sobre blanco da 2,17:1 y dejaba
+     el texto de los botones casi ilegible; este llega a 4,99:1 sin salirse de
+     la familia. El tinte suave sí usa el color del logo, porque ahí es fondo. */
+  --green:#2b7d5b;--green-dim:rgba(82,196,148,.14);
   --red:#d93025;--red-dim:rgba(217,48,37,.08);
   --yellow:#b06000;--yellow-dim:rgba(176,96,0,.1);
-  --accent:#0a9268;--accent-dim:rgba(10,146,104,.1);
+  --accent:#2b7d5b;--accent-dim:rgba(82,196,148,.14);
   --text:#15181b;--muted:#5f6368;--faint:#80868b;
   --on-accent:#fff;--radius:12px;
   --input-bg:#eaeef4;--log-bg:#f0f2f5;
@@ -21,10 +25,11 @@
 body[data-theme="dark"] {
   --bg:#211d19;--card:#2a2521;--card2:#342e28;
   --border:#3b342c;--border2:#4c443a;
-  --green:#35c489;--green-dim:rgba(53,196,137,.12);
+  /* Sobre el marrón oscuro el verde del logo entra tal cual: 7,72:1. */
+  --green:#52c494;--green-dim:rgba(82,196,148,.14);
   --red:#f87171;--red-dim:rgba(248,113,113,.1);
   --yellow:#fbbf24;--yellow-dim:rgba(251,191,36,.1);
-  --accent:#35c489;--accent-dim:rgba(53,196,137,.12);
+  --accent:#52c494;--accent-dim:rgba(82,196,148,.14);
   --text:#f3eee6;--muted:#a89f91;--faint:#82796c;
   --on-accent:#06281c;
   --input-bg:#1b1815;--log-bg:#181512;
@@ -49,7 +54,10 @@ body{
   font-size:28px;font-weight:800;color:var(--accent);letter-spacing:-.5px;margin-bottom:6px;
 }
 .lcard p{color:var(--muted);font-size:13px;margin-bottom:28px}
-.brand-logo{width:34px;height:34px;display:block}
+/* Mas grande de lo que parece necesario: el simbolo trae margenes propios
+   (ocupa el 55 % de su caja, para que como icono de app respire), asi que
+   junto al texto hay que compensarlos o se ve chico. */
+.brand-logo{width:44px;height:44px;display:block;margin:-5px}
 
 /* ── INPUTS ── */
 .inp{
@@ -86,7 +94,7 @@ body{
   font-size:16px;color:var(--accent);letter-spacing:-.3px;text-decoration:none;
 }
 .topbar .brand:hover{opacity:.85}
-.topbar .brand .brand-logo{width:24px;height:24px}
+.topbar .brand .brand-logo{width:32px;height:32px;margin:-4px}
 .topbar .brand-sep{color:var(--faint);font-size:14px;margin:0 2px}
 .topbar .brand-sub{font-weight:600;font-size:14px;color:var(--muted)}
 .topbar .right{display:flex;align-items:center;gap:10px}
@@ -348,3 +356,11 @@ dialog.modal--sm{width:380px}
 .filter-select{cursor:pointer}
 
 @media (max-width:640px){.stats{grid-template-columns:repeat(2,1fr)}}
+
+/* ── Simbolo segun el tema ──
+   Mismo par de archivos que la app: la geometria y el verde no cambian, solo
+   la caja. Se usa `content:` porque el src de un <img> no se puede cambiar
+   desde CSS. */
+body[data-theme="dark"] .brand-logo {
+  content: url("../assets/helpmeet-symbol-dark.svg?v=20260802");
+}
