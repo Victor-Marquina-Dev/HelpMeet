@@ -5,27 +5,34 @@
 @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,300..800;1,300..800&display=swap');
 
 :root {
-  /* Superficies — neutras estilo Granola (redesign feat/rediseno-granola, ver mockup.html) */
+  /* Superficies.
+     Los neutros eran beige (sesgo cálido, del rediseño Granola). Ahora llevan el
+     mismo sesgo VERDE del sitio: se conserva la luz exacta de cada gris y solo
+     se le gira el matiz a los 155° de la marca. Por eso la jerarquía de claros
+     no cambia —el lienzo sigue siendo el más claro y el hover el más oscuro—
+     pero el conjunto deja de tirar a marrón y acompaña al logo. */
   --bg-app: #ffffff;             /* shell base */
-  --bg-sidebar: #f4f1ec;         /* equivalente claro: mas calido y un paso mas oscuro que el lienzo */
-  --bg-surface: #f7f6f3;         /* tarjetas, main-card, superficies elevadas */
-  --bg-elevated: #f7f6f3;        /* menús/modales (con sombra) */
-  --bg-input: #f1efea;           /* campos e inputs */
-  --bg-hover: #eeece7;           /* hover plano (nuevo; reemplaza a los rgba de --hover-soft/--hover-med en el redesign) */
-  --scrollbar: #ddd9d0;          /* pulgar de la barra de scroll */
+  --bg-sidebar: #eef2f0;         /* un paso mas oscuro que el lienzo */
+  --bg-surface: #f3f7f5;         /* tarjetas, main-card, superficies elevadas */
+  --bg-elevated: #f3f7f5;        /* menús/modales (con sombra) */
+  --bg-input: #ebf0ee;           /* campos e inputs */
+  --bg-hover: #e7eeeb;           /* hover plano */
+  --scrollbar: #d0ddd8;          /* pulgar de la barra de scroll */
   /* Bordes */
-  --border-subtle: #edeae3;      /* separadores suaves */
-  --border-strong: #e6e3dc;      /* bordes de tarjetas/botones */
-  /* Texto — negro elegante para que resalte sobre el blanco */
-  --text-primary: #201f1c;       /* texto principal (casi negro) */
-  --text-secondary: #6f6e69;     /* texto secundario */
-  --text-muted: #9b988f;         /* atenuado */
-  --text-faint: #b7b4ab;         /* muy atenuado */
-  /* Acentos — monocromos (redesign: el mockup no usa color de marca; "activo/primario" se
-     comunica invirtiendo texto/fondo — ver .pill-btn.solid y .navitem.active en mockup.html) */
-  --accent: var(--text-primary);
+  --border-subtle: #e4ece9;      /* separadores suaves */
+  --border-strong: #dce6e2;      /* bordes de tarjetas/botones */
+  /* Texto — casi negro, con una pizca del mismo verde para que no choque */
+  --text-primary: #1a221f;       /* texto principal · 16,3:1 sobre blanco */
+  --text-secondary: #5e7a6e;     /* texto secundario · 4,7:1 */
+  --text-muted: #87a397;         /* atenuado */
+  --text-faint: #a7bbb3;         /* muy atenuado */
+  /* Acento — el verde de la marca.
+     `#52C494` (el del logo) da 2,2:1 sobre blanco y no sirve para texto ni para
+     un botón con letra encima; este es el mismo matiz oscurecido hasta 5,0:1, y
+     es el que usa también el panel de administración. */
+  --accent: #2b7d5b;
   --accent-hover: color-mix(in srgb, var(--accent) 88%, var(--bg-app));
-  --on-accent: var(--bg-app);
+  --on-accent: #ffffff;
   --accent-soft: color-mix(in srgb, var(--accent) 13%, transparent);
   /* Único acento cromático del rediseño: "algo está pasando ahora" (entra
      audio, se está transcribiendo). Ver la nota extendida en style.css. */
@@ -36,17 +43,28 @@
   --recording: #d93025;
   --pro-badge: #c8a32b;          /* dorado para badge PRO */
   --team-badge: #7c3aed;         /* purpura para badge TEAM */
+  /* Tintes suaves derivados: siguen al token en claro/oscuro */
+  --danger-soft: color-mix(in srgb, var(--danger) 10%, transparent);
+  --warning-soft: color-mix(in srgb, var(--warning) 10%, transparent);
+  --success-soft: color-mix(in srgb, var(--success) 10%, transparent);
+  --recording-soft: color-mix(in srgb, var(--recording) 12%, transparent);
+  /* Capas (z-index) nombradas */
+  --z-overlay: 80;
+  --z-toast: 90;
+  --z-tour: 12000;
+  --z-window-controls: 20000;
   --pending: #b06000;            /* tertiary · V2 pendiente de backend */
-  --focus: rgba(32, 31, 28, .45);
-  /* Hovers/selección — neutros (redesign) */
-  --hover-soft: rgba(60, 64, 67, 0.06);   /* hover muy sutil (legacy, aún en uso; ver --bg-hover para el plano nuevo) */
-  --hover-med:  rgba(60, 64, 67, 0.09);   /* hover normal */
-  --sel-bg:     var(--bg-elevated);         /* fila/pestaña activa: superficie elevada, sin color */
-  --sel-text:   var(--text-primary);        /* texto sobre selección: máximo contraste, sin color */
+  --focus: rgba(43, 125, 91, .5);
+  /* Hovers/selección — el gris azulado de antes desentonaba contra los neutros
+     verdes; ahora el velo es del mismo verde a muy baja opacidad. */
+  --hover-soft: rgba(43, 125, 91, 0.06);  /* hover muy sutil (legacy; ver --bg-hover para el plano nuevo) */
+  --hover-med:  rgba(43, 125, 91, 0.10);  /* hover normal */
+  --sel-bg:     var(--bg-elevated);         /* fila/pestaña activa: superficie elevada */
+  --sel-text:   var(--text-primary);        /* texto sobre selección: máximo contraste */
   --newbtn-bg:  var(--text-primary);        /* botón "Nuevo proyecto": relleno invertido, igual que .pill-btn.solid */
   --newbtn-text:var(--bg-app);
-  --brand-green:#10b981;                    /* logo Helpmeet */
-  --brand-green-2:#34d399;
+  --brand-green:#52c494;                    /* el verde del logo, tal cual */
+  --brand-green-2:#74d3ab;
   /* Forma / sombra — Soft-Technical (radios más rectos) */
   --r-sm: 4px;
   --r-md: 6px;

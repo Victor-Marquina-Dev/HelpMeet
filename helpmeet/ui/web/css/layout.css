@@ -281,22 +281,13 @@ body[data-app-state="screen-recording"] .audio-chip:not(.muted) .eq.mini i:nth-c
 body.sidebar-dragging .sidebar { transition: none; }
 
 /* Handle de arrastre del sidebar */
-.sidebar-resize-handle {
-  position: relative; z-index: 30;
-  width: 4px; cursor: col-resize; flex: none;
-  background: transparent; transition: background .15s;
-}
-.sidebar-resize-handle:hover,
-body.sidebar-dragging .sidebar-resize-handle { background: var(--accent); }
-body[data-sidebar="collapsed"] .sidebar-resize-handle { display: none; }
+/* El tirador lo define css/shell.css, que se carga despues. Aqui quedaba una
+   copia con el fondo en :hover, que pintaba el bloque de 4px ADEMAS de la
+   linea nueva. */
 
-/* Handle de expansión en el rail */
-.rail-resize-handle {
-  position: absolute; right: -4px; top: 0; bottom: 0; width: 4px;
-  cursor: col-resize; z-index: 31; background: transparent; transition: background .15s;
-}
-.rail-resize-handle:hover,
-body.rail-expanding .rail-resize-handle { background: var(--accent); }
+/* El tirador del riel se quitó: `.rail-resize-handle` no existía en index.html,
+   así que estas reglas no pintaban nada. Redimensionar el panel colapsado lo
+   hace ahora el mismo tirador de siempre (css/shell.css). */
 
 .sidebar-rail {
   position: relative; flex: none; width: 52px; flex-direction: column; align-items: center; gap: 4px;
@@ -379,7 +370,7 @@ body.rail-expanding .rail-resize-handle { background: var(--accent); }
 .tree-initiative .count { font-size: 9px; color: var(--text-faint); font-family: var(--font-mono); }
 .tree-initiative .pin-ind { display: inline-flex; align-items: center; color: var(--accent); flex: none; }
 /* Separador entre proyectos anclados y el resto */
-.tree-pin-sep { height: 1px; background: var(--line); margin: 6px 8px 6px 28px; opacity: .6; }
+.tree-pin-sep { height: 1px; background: var(--border-subtle); margin: 6px 8px 6px 28px; opacity: .6; }
 /* Encabezados de seccion en el sidebar */
 .tree-section-hd { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 8px 12px 5px 14px; font-size: 10px; font-weight: 700; color: var(--text-faint); text-transform: uppercase; letter-spacing: .05em; }
 .tree-section-hd span:first-child { opacity: .8; }

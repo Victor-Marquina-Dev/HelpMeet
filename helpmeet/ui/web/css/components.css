@@ -293,7 +293,7 @@ body:has(#actionbar.actionbar--dock) .content { padding-bottom: 120px; }
   padding: 9px 12px; background: var(--bg-sidebar);
 }
 .event-capture .thumb { width: 54px; height: 34px; border-radius: var(--r-sm); border: 1px solid var(--border-strong); flex: none; background: repeating-linear-gradient(45deg, #1a1f2b 0 7px, #222838 7px 14px); }
-.cap-clock { font-family: var(--mono, "Cascadia Code", "Consolas", monospace); font-size: 9.4px; color: var(--text-muted); }
+.cap-clock { font-family: var(--font-mono); font-size: 9.4px; color: var(--text-muted); }
 .event-note { display: flex; align-items: baseline; gap: 9px; min-width: 0; padding: 8px 11px; border: 1px solid rgba(241,184,75,.28); border-radius: var(--r-md); background: rgba(241,184,75,.07); color: var(--text-secondary); font-size: 10.6px; }
 .event-note strong { color: var(--warning); font-size: 8.5px; letter-spacing: .5px; text-transform: uppercase; }
 
@@ -547,10 +547,10 @@ mark { background: rgba(241,184,75,.3); color: #ffe9b0; border-radius: 3px; padd
 .tx-count { font-size: 10.2px; color: var(--text-muted); white-space: nowrap; font-family: var(--font-mono, monospace); flex: none; }
 
 /* ── Language bar (multi-idioma) ── */
-.lang-bar { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 16px; padding-bottom: 14px; border-bottom: 1px solid var(--line); }
-.lang-chip { padding: 5px 12px; background: var(--panel); border: 1px solid var(--line); border-radius: 20px; font-size: 12px; font-weight: 600; color: var(--muted); cursor: pointer; transition: all .15s; display: inline-flex; align-items: center; gap: 6px; }
-.lang-chip:hover { border-color: var(--accent); color: var(--text); }
-.lang-chip.active { background: var(--accent-dim); border-color: var(--accent); color: var(--accent); }
+.lang-bar { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 16px; padding-bottom: 14px; border-bottom: 1px solid var(--border-subtle); }
+.lang-chip { padding: 5px 12px; background: var(--bg-surface); border: 1px solid var(--border-subtle); border-radius: 20px; font-size: 12px; font-weight: 600; color: var(--text-muted); cursor: pointer; transition: all .15s; display: inline-flex; align-items: center; gap: 6px; }
+.lang-chip:hover { border-color: var(--accent); color: var(--text-primary); }
+.lang-chip.active { background: var(--accent-soft); border-color: var(--accent); color: var(--accent); }
 .lang-chip-count { font-size: 10px; opacity: .7; }
 
 .meeting-tools { display: flex; align-items: flex-start; gap: 10px; width: 100%; }
@@ -1190,65 +1190,149 @@ mark { background: rgba(241,184,75,.3); color: #ffe9b0; border-radius: 3px; padd
    En el video, con el object-fit:contain que ya trae por defecto, se ajusta
    entero y conserva su proporcion. */
 .video-panel--compact .video-player { max-height: 300px; }
-.video-panel--compact .rec-actions { margin-top: 10px; }
+/* (el margen de .rec-actions lo fija .video-panel > .rec-actions: la barra va arriba) */
 
-/* ── Pestana General ── */
-.meeting-general { display: flex; flex-direction: column; gap: 20px; }
-.general-row { display: flex; gap: 24px; align-items: flex-start; flex-wrap: wrap; }
-.general-info { display: flex; flex-direction: column; gap: 8px; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 16px 20px; flex: 0 0 auto; min-width: 260px; }
+/* ── Pestana General ──
+   Los tokens --panel/--line/--muted venian del mockup y NO existen en la app:
+   la ficha se quedaba sin fondo ni borde y la etiqueta sin su gris. Aqui van
+   los equivalentes reales. */
+.meeting-general { display: flex; flex-direction: column; gap: 14px; }
+.general-row { display: flex; gap: 16px; align-items: flex-start; flex-wrap: wrap; }
+/* Dos columnas: con solo dos datos, apilarlos hacia abajo alargaba la ficha sin
+   necesidad y la separaba del video. `auto` y no `1fr` para que las columnas se
+   ajusten al contenido en vez de repartirse el ancho a partes iguales. */
+.general-info {
+  display: grid; grid-template-columns: repeat(2, auto);
+  gap: 6px 32px; justify-content: start;
+  background: var(--bg-surface); border: 1px solid var(--border-subtle);
+  border-radius: var(--r-lg); padding: 12px 16px; flex: 0 0 auto;
+}
 .general-info-row { display: flex; gap: 12px; font-size: 13px; }
-.general-info-label { color: var(--muted); min-width: 75px; font-weight: 600; }
+.general-info-label { color: var(--text-muted); min-width: 62px; font-weight: 600; }
+@media (max-width: 520px) { .general-info { grid-template-columns: 1fr; } }
 .video-panel--compact { max-width: 440px; flex: 1; min-width: 300px; }
 /* El tope va en el VIDEO, no en el contenedor. El wrap tiene overflow:hidden,
    asi que un max-height ahi no encoge el video: le corta la parte de abajo.
    En el video, con el object-fit:contain que ya trae por defecto, se ajusta
    entero y conserva su proporcion. */
 .video-panel--compact .video-player { max-height: 260px; }
-.video-panel--compact .rec-actions { margin-top: 8px; }
+/* idem: sin margin-top, la barra ya no cuelga debajo del reproductor */
 @media (max-width: 700px) { .general-row { flex-direction: column; } .video-panel--compact { max-width: 100%; } }
-.video-file {
-  display: flex; align-items: center; gap: 12px;
-  padding: 6px 4px 6px 0;
+
+/* El hueco del video mientras todavia no hay nada que reproducir.
+   Toma la FORMA del reproductor (16:9, mismo radio, mismo ancho) en vez de ser
+   una cajita de texto: asi, cuando el .mp4 llega, la pieza se completa en su
+   sitio y la pestana no pega el salto de reacomodarse. */
+.video-proc {
+  align-self: stretch; display: flex; flex-direction: column; gap: 12px;
+  animation: video-proc-in .22s var(--ease-out) both;
 }
-.video-file-icon {
-  width: 34px; height: 34px; flex: none; display: grid; place-items: center;
-  color: var(--accent); background: var(--accent-soft); border-radius: 50%;
-  border: none; cursor: pointer;
-  transition: transform .18s ease, background .18s ease, box-shadow .18s ease;
+@keyframes video-proc-in { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+
+.video-proc-frame {
+  position: relative; aspect-ratio: 16 / 9; overflow: hidden;
+  border-radius: var(--r-lg); background: var(--bg-input);
+  display: grid; place-items: center;
 }
-.video-file-icon:hover {
-  transform: scale(1.12);
-  background: rgba(10, 146, 104, 0.22);
-  box-shadow: 0 0 0 5px rgba(10, 146, 104, 0.1);
+/* Sin video no hay reproductor que reservar, asi que el marco no necesita 16:9
+   ni ocupar media pantalla: basta una banda que diga que algo esta pasando. */
+.video-proc-frame.is-audio { aspect-ratio: auto; height: 76px; }
+/* Un barrido de luz en lugar de un spinner al margen: ocupa la forma de lo que
+   viene, que es mas informativo que un punto girando. Solo transform => lo
+   compone la GPU y no repinta nada. */
+.video-proc-frame::after {
+  content: ''; position: absolute; inset: 0;
+  background: linear-gradient(105deg,
+    transparent 35%,
+    color-mix(in srgb, var(--text-primary) 8%, transparent) 50%,
+    transparent 65%);
+  transform: translateX(-100%);
+  animation: video-proc-sheen 2.1s var(--ease-out) infinite;
 }
-.video-file-icon:active { transform: scale(0.96); }
-.video-file-copy { display: flex; flex-direction: column; gap: 2px; }
-.video-file-copy b {
-  font-size: 10.5px; font-weight: 500; color: var(--text-secondary);
-  transition: color .15s;
+@keyframes video-proc-sheen { to { transform: translateX(100%); } }
+/* Mismos 2.1s que el barrido, a proposito: dos ritmos distintos sonando a la vez
+   es lo que hacia ver nervioso al spinner contra la barra. */
+.video-proc-glyph {
+  width: 28px; height: 28px; color: var(--text-faint);
+  animation: video-proc-breathe 2.1s ease-in-out infinite;
 }
-.video-file:hover .video-file-copy b { color: var(--text-primary); }
-.video-file-copy small { color: var(--text-muted); font-size: 8.8px; }
-.rec-actions { display: flex; align-items: center; gap: 6px; margin-left: 8px; }
+@keyframes video-proc-breathe { 0%, 100% { opacity: .4; } 50% { opacity: .75; } }
+
+.video-proc-copy b { display: block; font-size: 13px; }
+.video-proc-copy small { display: block; margin-top: 3px; font-size: 11.5px; color: var(--text-muted); line-height: 1.45; }
+
+/* Barra propia y no .proc-track: aquella vive dentro de un flex (.proc-dock) y
+   depende de su `flex:1` para ser bloque. Reusada aqui salia inline, ignoraba su
+   altura y pintaba un ladrillo claro sobre el fondo oscuro. */
+.video-proc-bar {
+  display: block; height: 4px; border-radius: 99px; overflow: hidden;
+  background: color-mix(in srgb, var(--text-primary) 12%, transparent);
+}
+.video-proc-bar[hidden] { display: none; }
+.video-proc-bar > i {
+  display: block; height: 100%; border-radius: inherit; background: var(--signal);
+  transition: width .35s var(--ease-out);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .video-proc { animation: none; }
+  .video-proc-frame::after, .video-proc-glyph { animation: none; }
+  .video-proc-glyph { opacity: .55; }
+}
+
+/* Acciones del reproductor: una barra ENCIMA del video. Copiar, favorito y
+   carpeta viven aqui (ya no arriba, donde estaban repetidos), separados por un
+   filete de los dos botones que producen texto. */
+.video-panel > .rec-actions {
+  display: flex; align-items: center;
+  gap: 8px; flex-wrap: wrap; margin: 0 0 8px;
+}
+.rec-actions-tail {
+  display: inline-flex; align-items: center; gap: 2px;
+  margin-left: 6px; padding-left: 10px;
+  border-left: 1px solid var(--border-subtle);
+}
+
+/* Boton "?" con la explicacion al pasar por encima. Puro CSS a proposito: asi
+   responde igual al teclado (:focus-visible) sin depender de JS. */
+.hint-btn {
+  position: relative; flex: none;
+  width: 22px; height: 22px; border-radius: 50%;
+  border: 1px solid var(--border-subtle); background: none;
+  color: var(--text-muted); font-family: inherit; font-size: 11px; line-height: 1;
+  cursor: help; display: inline-flex; align-items: center; justify-content: center;
+  transition: color .15s var(--ease-out), border-color .15s var(--ease-out);
+}
+.hint-btn:hover, .hint-btn:focus-visible { color: var(--text-primary); border-color: var(--border-strong); }
+.hint-btn::after {
+  content: attr(data-hint);
+  position: absolute; top: calc(100% + 8px); right: 0; z-index: 60;
+  width: max-content; max-width: 300px;
+  white-space: pre-line; text-align: left;
+  padding: 10px 12px; border-radius: var(--r-lg);
+  background: var(--bg-elevated); border: 1px solid var(--border-subtle);
+  box-shadow: var(--shadow-pop);
+  color: var(--text-secondary); font-size: 11.5px; line-height: 1.5;
+  opacity: 0; visibility: hidden; transform: translateY(-3px);
+  transition: opacity .16s var(--ease-out), transform .16s var(--ease-out), visibility .16s;
+  pointer-events: none;
+}
+.hint-btn:hover::after, .hint-btn:focus-visible::after { opacity: 1; visibility: visible; transform: none; }
+@media (prefers-reduced-motion: reduce) { .hint-btn::after { transition: none; transform: none; } }
+
+/* La fila `.video-file` (icono de play + nombre del archivo) se retiró: repetía
+   lo que ya dice la pestaña y su play duplicaba el del reproductor. Con ella se
+   fueron sus estilos y los que colgaban de ella. */
 /* Mientras se transcribe: los botones se bloquean y muestran el estado */
 .video-panel .btn[data-tx-btn]:disabled,
 .video-panel .btn.is-disabled { opacity: .55; pointer-events: none; cursor: not-allowed; }
-/* Botón carpeta: circular, sin borde, sutil */
-.video-file .icon-btn {
-  width: 30px; height: 30px; border-radius: 50%; border: none;
+/* Boton carpeta: circular, sin borde, sutil */
+.video-panel .rec-actions .icon-btn {
+  width: 28px; height: 28px; border-radius: 50%; border: none;
   color: var(--text-muted); background: transparent;
-  transition: background .15s, color .15s, transform .15s;
+  transition: background .15s var(--ease-out), color .15s var(--ease-out);
 }
-.video-file .icon-btn:hover { background: var(--hover-med); color: var(--text-primary); transform: scale(1.1); }
-/* Botón transcribir: píldora fina */
-.video-file .btn, .video-file .btn-primary {
-  border-radius: 6px; padding: 0 14px;
-  height: 30px; font-size: 10.5px; font-weight: 500;
-}
-@media (max-width: 680px) {
-  .video-file { flex-wrap: wrap; }
-  .video-file .rec-actions { width: 100%; justify-content: flex-start; padding-left: 40px; }
-}
+.video-panel .rec-actions .icon-btn:hover { background: var(--hover-med); color: var(--text-primary); }
 
 /* Reproductor de video embebido */
 .video-player-wrap {
@@ -1452,10 +1536,8 @@ mark { background: rgba(241,184,75,.3); color: #ffe9b0; border-radius: 3px; padd
 .note-item-actions { display: flex; gap: 1px; opacity: 0; transition: opacity .15s; }
 .note-item:hover .note-item-actions { opacity: 1; }
 .note-item-actions .u-act { width: 22px; height: 22px; border-radius: 4px; border: none; background: transparent; color: var(--text-faint); cursor: pointer; display: inline-flex; align-items: center; justify-content: center; }
-.note-item-actions .u-act:hover { background: var(--panel-2); color: var(--text); }
-.note-item-actions .u-act.danger:hover { color: var(--red); }
-  padding-top: 2px;
-}
+.note-item-actions .u-act:hover { background: var(--bg-elevated); color: var(--text-primary); }
+.note-item-actions .u-act.danger:hover { color: var(--danger); }
 
 .notes-compose {
   flex: none;
@@ -2407,12 +2489,10 @@ mark { background: rgba(241,184,75,.3); color: #ffe9b0; border-radius: 3px; padd
   color: #f28b82; text-align: center; line-height: 1.4;
 }
 
-/* ---- Recortador de vídeo (estilo CapCut) ---- */
-.clip-editor { margin-top: 10px; padding: 12px; background: var(--bg-surface);
-  border: 1px solid var(--border-subtle); border-radius: var(--r-lg);
-  display: flex; flex-direction: column; gap: 10px; animation: setupFadeIn .2s ease; }
-.clip-video { width: 100%; max-height: 420px; background: #000; border-radius: var(--r-md); cursor: pointer; }
-/* Controles minimalistas con iconos, sin cajas: ±10 s, play/pausa, marcas y ampliar */
+/* ---- Recortador de vídeo (estilo CapCut) ----
+   La caja y el tamaño del vídeo los define .clip-modal en style.css, que se
+   carga después: el recortador ya no es un bloque dentro de la pestaña. */
+/* Controles minimalistas con iconos, sin cajas: ±10 s, play/pausa y marcas */
 .clip-ctrl { display: flex; align-items: center; justify-content: center; gap: 4px; flex-wrap: wrap; }
 .clip-cbtn { display: inline-flex; align-items: center; justify-content: center; gap: 3px;
   min-width: 34px; height: 30px; padding: 0 7px;
@@ -2429,48 +2509,9 @@ mark { background: rgba(241,184,75,.3); color: #ffe9b0; border-radius: 3px; padd
 .clip-time { margin-left: auto; font-family: var(--font-mono); font-size: 10.5px; color: var(--text-muted); }
 .clip-range { color: var(--text-faint); font-family: var(--font-mono); font-size: 10.5px; }
 
-/* Modo ventana grande: modal amplio dentro de la app (no pantalla completa). */
-.clip-backdrop { position: fixed; inset: 0; background: rgba(0, 0, 0, .62); z-index: 8000; }
-.clip-editor--max { position: fixed; inset: 58px 56px 28px; z-index: 8001; margin: 0;
-  padding: 18px; overflow: auto; box-shadow: var(--shadow-modal); }
-.clip-editor--max .clip-video { max-height: calc(100vh - 360px); }
-.clip-editor--max .clip-ctrl { padding-top: 2px; }
-/* Sin overflow:hidden en .clip-tl: las manijas sobresalen y deben verse enteras.
-   El recorte redondeado se aplica solo a la tira de miniaturas. */
-.clip-tl { position: relative; height: 46px; margin: 0 6px; cursor: pointer;
-  user-select: none; touch-action: none; }
-.clip-thumbs { display: flex; height: 100%; overflow: hidden;
-  border-radius: var(--r-md); border: 1px solid var(--border-subtle); }
-.clip-thumbs i { flex: 1; background-size: cover; background-position: center;
-  border-right: 1px solid rgba(0,0,0,.3); }
-.clip-section-marks { position: absolute; inset: 0; pointer-events: none; }
-.clip-section-mark {
-  position: absolute; top: 0; bottom: 0; border: 1px solid rgba(10, 146, 104,.7);
-  background: rgba(10, 146, 104,.1); box-sizing: border-box; pointer-events: auto;
-  cursor: pointer;
-}
-.clip-section-mark:hover { background: rgba(10, 146, 104,.18); border-color: var(--accent); }
-.clip-sel { position: absolute; top: 0; bottom: 0; border: 2px solid var(--accent);
-  background: rgba(10, 146, 104,.16); box-sizing: border-box; }
-.clip-h { position: absolute; top: 50%; transform: translateY(-50%); width: 12px; height: 82%;
-  background: var(--accent); border-radius: 4px; cursor: ew-resize; touch-action: none;
-  z-index: 2; box-shadow: 0 1px 4px rgba(0,0,0,.45); }
-/* Zona de agarre ampliada (invisible): facilita atrapar la manija con el ratón. */
-.clip-h::after { content: ''; position: absolute; inset: -10px; }
-.clip-h.l { left: -6px; } .clip-h.r { right: -6px; }
-.clip-cursor { position: absolute; top: -2px; bottom: -2px; width: 2px; background: #fff; pointer-events: none; }
-.clip-scale { display: flex; justify-content: space-between; font-family: var(--font-mono);
-  font-size: 9px; color: var(--text-faint); }
-.clip-segs { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
-.clip-pill { background: var(--bg-elevated); border: 1px solid var(--border-strong); color: var(--text-secondary);
-  border-radius: var(--r-pill); padding: 4px 10px; font-size: 11px; font-family: var(--font-mono);
-  display: inline-flex; align-items: center; gap: 6px; cursor: pointer; }
-.clip-pill:hover { color: var(--text-primary); border-color: var(--accent); }
-.clip-pill.is-active { background: var(--accent-soft); border-color: var(--accent); color: var(--accent); }
-.clip-pill .x { color: var(--text-muted); cursor: pointer; }
-.clip-add { background: transparent; border: 1px dashed var(--border-strong); color: var(--text-muted);
-  border-radius: var(--r-pill); padding: 4px 10px; font-size: 11px; cursor: pointer; }
-.clip-add:disabled { opacity: .55; cursor: default; border-style: solid; }
+/* La linea de tiempo, los clips (.clip-tab) y el pie los define style.css, que
+   se carga despues. Aqui habia una copia entera con los colores viejos: su
+   `transform` en .clip-h se colaba en las manijas nuevas y las descentraba. */
 .clip-foot { display: flex; align-items: center; justify-content: space-between;
   border-top: 1px dashed var(--border-subtle); padding-top: 10px; }
 .clip-total { font-size: 11.5px; color: var(--accent); }
@@ -2520,32 +2561,11 @@ mark { background: rgba(241,184,75,.3); color: #ffe9b0; border-radius: 3px; padd
    (Ajustes → Apariencia). Redefine los tokens: todo lo que usa
    variables cambia solo; debajo, los pocos literales que no.
    ============================================================ */
-body[data-theme="dark"] {
-  --bg-app: #211d19;             /* marrón-gris cálido */
-  --bg-sidebar: #211d19;
-  --bg-surface: #2a2521;         /* tarjetas */
-  --bg-elevated: #342e28;        /* menús/modales */
-  --bg-input: #1b1815;
-  --border-subtle: #3b342c;
-  --border-strong: #4c443a;
-  --text-primary: #f3eee6;       /* marfil cálido */
-  --text-secondary: #d4ccc0;
-  --text-muted: #a89f91;
-  --text-faint: #82796c;
-  --accent: #35c489;             /* menta suave sobre oscuro (menos neón) */
-  --accent-hover: #4fd39c;
-  --on-accent: #06281c;
-  --accent-soft: rgba(53, 196, 137, 0.11);
-  --hover-soft: rgba(255, 250, 240, 0.05);
-  --hover-med: rgba(255, 250, 240, 0.09);
-  --sel-bg: rgba(53, 196, 137, 0.13);
-  --sel-text: #9adfc2;
-  --newbtn-bg: #2b3d34;
-  --newbtn-text: #a9dcc4;
-  --shadow-pop: 0 8px 28px rgba(0, 0, 0, .5);
-  --shadow-modal: 0 16px 48px rgba(0, 0, 0, .6);
-  --shadow-soft: 0 4px 16px rgba(0, 0, 0, .4);
-}
+/* Los tokens del tema oscuro viven SOLO en style.css, que se carga después.
+   Aquí había una copia con los valores de la paleta anterior que NUNCA se
+   aplicó: la pisaba la otra hoja. Mantenerla solo servía para que quien
+   viniera a cambiar un color lo cambiara en el sitio equivocado. */
+
 body[data-theme="dark"] ::-webkit-scrollbar-thumb { background: #4c443a; }
 body[data-theme="dark"] ::selection { background: rgba(53, 196, 137, .28); }
 body[data-theme="dark"] .brand-version { background: #342e28; }
@@ -2627,3 +2647,11 @@ body[data-theme="dark"] .tour-next { color: var(--on-accent); }
   transition: opacity .12s;
 }
 .hm-tooltip[hidden] { display: none; }
+
+/* Reproductor de las reuniones de solo audio. Comparte .video-panel con el de
+   video (misma caja, mismas acciones); solo cambia el medio. */
+.audio-player {
+  width: 100%; display: block; height: 38px;
+  border-radius: var(--r-pill);
+}
+.audio-panel { align-self: flex-start; }

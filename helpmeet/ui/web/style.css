@@ -9,86 +9,11 @@
    ============================================================ */
 @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,300..800;1,300..800&display=swap');
 
-:root {
-  /* Superficies — neutras estilo Granola (redesign feat/rediseno-granola, ver mockup.html) */
-  --bg-app: #ffffff;             /* shell base */
-  --bg-sidebar: #f4f1ec;         /* equivalente claro: mas calido y un paso mas oscuro que el lienzo */
-  --bg-surface: #f7f6f3;         /* tarjetas, main-card, superficies elevadas */
-  --bg-elevated: #f7f6f3;        /* menús/modales (con sombra) */
-  --bg-input: #f1efea;           /* campos e inputs */
-  --bg-hover: #eeece7;           /* hover plano (nuevo; reemplaza a los rgba de --hover-soft/--hover-med en el redesign) */
-  --scrollbar: #ddd9d0;          /* pulgar de la barra de scroll */
-  /* Bordes */
-  --border-subtle: #edeae3;      /* separadores suaves */
-  --border-strong: #e6e3dc;      /* bordes de tarjetas/botones */
-  /* Texto — negro elegante para que resalte sobre el blanco */
-  --text-primary: #201f1c;       /* texto principal (casi negro) */
-  --text-secondary: #6f6e69;     /* texto secundario */
-  --text-muted: #9b988f;         /* atenuado */
-  --text-faint: #b7b4ab;         /* muy atenuado */
-  /* Acentos — monocromos (redesign: el mockup no usa color de marca; "activo/primario" se
-     comunica invirtiendo texto/fondo — ver .pill-btn.solid y .navitem.active en mockup.html) */
-  --accent: var(--text-primary);
-  --accent-hover: color-mix(in srgb, var(--accent) 88%, var(--bg-app));
-  --on-accent: var(--bg-app);
-  --accent-soft: color-mix(in srgb, var(--accent) 13%, transparent);
-  /* Único acento cromático del rediseño. NO es color de marca: significa
-     "algo está pasando ahora" — entra audio, se está transcribiendo. El gris
-     no puede comunicar eso, y por eso sobrevive al paso a monocromo. Mismo
-     valor que usa el mockup en .waveform.live y en "Reanudar". */
-  --signal: #5fbf6a;
-  --success: #188038;            /* verde ok */
-  --warning: #e37400;            /* ámbar */
-  --danger: #d93025;             /* rojo */
-  --recording: #d93025;
-  /* Tintes suaves derivados (guía de diseño): siguen al token en claro/oscuro */
-  --danger-soft: color-mix(in srgb, var(--danger) 10%, transparent);
-  --warning-soft: color-mix(in srgb, var(--warning) 10%, transparent);
-  --success-soft: color-mix(in srgb, var(--success) 10%, transparent);
-  --recording-soft: color-mix(in srgb, var(--recording) 12%, transparent);
-  /* Capas (z-index) nombradas (guía de diseño) */
-  --z-overlay: 80;
-  --z-toast: 90;
-  --z-tour: 12000;
-  --z-window-controls: 20000;
-  --pending: #b06000;            /* tertiary · V2 pendiente de backend */
-  --focus: rgba(32, 31, 28, .45);
-  /* Hovers/selección — neutros (redesign) */
-  --hover-soft: rgba(60, 64, 67, 0.06);   /* hover muy sutil (legacy, aún en uso; ver --bg-hover para el plano nuevo) */
-  --hover-med:  rgba(60, 64, 67, 0.09);   /* hover normal */
-  --sel-bg:     var(--bg-elevated);         /* fila/pestaña activa: superficie elevada, sin color */
-  --sel-text:   var(--text-primary);        /* texto sobre selección: máximo contraste, sin color */
-  --newbtn-bg:  var(--text-primary);        /* botón "Nuevo proyecto": relleno invertido, igual que .pill-btn.solid */
-  --newbtn-text:var(--bg-app);
-  --brand-green:#10b981;                    /* logo Helpmeet */
-  --brand-green-2:#34d399;
-  /* Forma / sombra — Soft-Technical (radios más rectos) */
-  --r-sm: 4px;
-  --r-md: 6px;
-  --r-lg: 8px;
-  --r-xl: 12px;
-  --shadow-pop: 0 8px 28px rgba(60, 64, 67, 0.22);
-  --shadow-modal: 0 16px 48px rgba(60, 64, 67, 0.28);
-  /* Tipografía */
-  --font-ui: 'Plus Jakarta Sans', 'Segoe UI', system-ui, -apple-system, sans-serif;
-  --font-mono: 'JetBrains Mono', 'Cascadia Code', 'Consolas', ui-monospace, monospace;
-  --sidebar-w: 190px;
-  /* Animación */
-  --ease-out:      cubic-bezier(.2, .8, .2, 1);
-  --ease-in:       cubic-bezier(.4, 0, 1, 1);
-  --ease-standard: cubic-bezier(.4, 0, .2, 1);
-  --dur-hover:   120ms;
-  --dur-click:    80ms;
-  --dur-panel:   200ms;
-  --dur-toast:   220ms;
-  /* Espaciado */
-  --sp-1: 4px;  --sp-2: 8px;  --sp-3: 12px;
-  --sp-4: 16px; --sp-5: 20px; --sp-6: 24px;
-  /* Radios adicionales */
-  --r-pill: 999px;
-  /* Sombras */
-  --shadow-soft: 0 4px 16px rgba(60, 64, 67, 0.14);
-}
+/* Los tokens del tema claro viven SOLO en css/tokens.css.
+   Aquí había una copia entera y, como esta hoja se carga después, era la
+   que mandaba: tocar tokens.css no surtía efecto y había que cambiar el
+   color en los dos sitios o no se veía. */
+
 
 * { box-sizing: border-box; }
 
@@ -415,22 +340,13 @@ body[data-app-state="screen-recording"] .audio-chip:not(.muted) .eq.mini i:nth-c
 body.sidebar-dragging .sidebar { transition: none; }
 
 /* Handle de arrastre del sidebar */
-.sidebar-resize-handle {
-  position: relative; z-index: 30;
-  width: 4px; cursor: col-resize; flex: none;
-  background: transparent; transition: background .15s;
-}
-.sidebar-resize-handle:hover,
-body.sidebar-dragging .sidebar-resize-handle { background: var(--border-strong); }
-body[data-sidebar="collapsed"] .sidebar-resize-handle { display: none; }
+/* El tirador lo define css/shell.css, que se carga despues. Aqui quedaba una
+   copia con el fondo en :hover, que pintaba el bloque de 4px ADEMAS de la
+   linea nueva. */
 
-/* Handle de expansión en el rail */
-.rail-resize-handle {
-  position: absolute; right: -4px; top: 0; bottom: 0; width: 4px;
-  cursor: col-resize; z-index: 31; background: transparent; transition: background .15s;
-}
-.rail-resize-handle:hover,
-body.rail-expanding .rail-resize-handle { background: var(--border-strong); }
+/* El tirador del riel se quitó: `.rail-resize-handle` no existía en index.html,
+   así que estas reglas no pintaban nada. Redimensionar el panel colapsado lo
+   hace ahora el mismo tirador de siempre (css/shell.css). */
 
 /* 60px, no 52: el mockup dimensionó el riel para que el sangrado de 16px de las
    carpetas anidadas pueda mantenerse igual en los dos estados sin que los iconos
@@ -886,7 +802,7 @@ body:has(#actionbar.actionbar--dock) .content { padding-bottom: 120px; }
    los puntos mientras se habla. Cursiva para distinguirlo de una frase ya
    cerrada (ver window.setLivePartial). */
 .preview-partial { font-size: 13px; font-style: italic; color: var(--text-secondary); }
-.preview-partial b { font-style: normal; font-weight: 600; color: var(--text-tertiary); margin-right: 4px; }
+.preview-partial b { font-style: normal; font-weight: 600; color: var(--text-muted); margin-right: 4px; }
 
 /* Acciones flotantes (aparecen al pasar el cursor o enfocar) — sin caja */
 .u-actions {
@@ -1058,7 +974,7 @@ body:has(#actionbar.actionbar--dock) .content { padding-bottom: 120px; }
   padding: 9px 12px; background: var(--bg-sidebar);
 }
 .event-capture .thumb { width: 54px; height: 34px; border-radius: var(--r-sm); border: 1px solid var(--border-strong); flex: none; background: repeating-linear-gradient(45deg, #1a1f2b 0 7px, #222838 7px 14px); }
-.cap-clock { font-family: var(--mono, "Cascadia Code", "Consolas", monospace); font-size: 9.4px; color: var(--text-muted); }
+.cap-clock { font-family: var(--font-mono); font-size: 9.4px; color: var(--text-muted); }
 .event-note { display: flex; align-items: baseline; gap: 9px; min-width: 0; padding: 8px 11px; border: 1px solid rgba(241,184,75,.28); border-radius: var(--r-md); background: rgba(241,184,75,.07); color: var(--text-secondary); font-size: 10.6px; }
 .event-note strong { color: var(--warning); font-size: 8.5px; letter-spacing: .5px; text-transform: uppercase; }
 
@@ -2030,46 +1946,8 @@ body.folder-dragging .ftab[data-droppable] { border-bottom-style: dashed; border
 
 .video-section { display: flex; flex-direction: column; gap: 20px; }
 .video-panel { margin: 0; max-width: 860px; }
-.video-file {
-  display: flex; align-items: center; gap: 12px;
-  padding: 6px 4px 6px 0;
-}
-.video-file-icon {
-  width: 34px; height: 34px; flex: none; display: grid; place-items: center;
-  color: var(--accent); background: var(--accent-soft); border-radius: 50%;
-  border: none; cursor: pointer;
-  transition: transform .18s ease, background .18s ease, box-shadow .18s ease;
-}
-.video-file-icon:hover {
-  transform: scale(1.12);
-  background: color-mix(in srgb, var(--accent) 22%, transparent);
-  box-shadow: 0 0 0 5px color-mix(in srgb, var(--accent) 10%, transparent);
-}
-.video-file-icon:active { transform: scale(0.96); }
-.video-file-copy { display: flex; flex-direction: column; gap: 2px; }
-.video-file-copy b {
-  font-size: 10.5px; font-weight: 500; color: var(--text-secondary);
-  transition: color .15s;
-}
-.video-file:hover .video-file-copy b { color: var(--text-primary); }
-.video-file-copy small { color: var(--text-muted); font-size: 8.8px; }
-.rec-actions { display: flex; align-items: center; gap: 6px; margin-left: 8px; }
-/* Botón carpeta: circular, sin borde, sutil */
-.video-file .icon-btn {
-  width: 30px; height: 30px; border-radius: 50%; border: none;
-  color: var(--text-muted); background: transparent;
-  transition: background .15s, color .15s, transform .15s;
-}
-.video-file .icon-btn:hover { background: var(--hover-med); color: var(--text-primary); transform: scale(1.1); }
-/* Botón transcribir: píldora fina */
-.video-file .btn, .video-file .btn-primary {
-  border-radius: 6px; padding: 0 14px;
-  height: 30px; font-size: 10.5px; font-weight: 500;
-}
-@media (max-width: 680px) {
-  .video-file { flex-wrap: wrap; }
-  .video-file .rec-actions { width: 100%; justify-content: flex-start; padding-left: 40px; }
-}
+/* Los estilos de `.video-file` vivían aquí duplicados. La fila se retiró del
+   panel de vídeo; la barra de acciones la define ahora components.css. */
 
 /* ============================================================
    Objetivo de la iniciativa e instrucciones para la IA
@@ -3253,11 +3131,57 @@ body.licensing .topbar-status { visibility: hidden; }
   color: #f28b82; text-align: center; line-height: 1.4;
 }
 
-/* ---- Recortador de vídeo (estilo CapCut) ---- */
-.clip-editor { margin-top: 10px; padding: 12px; background: var(--bg-surface);
-  border: 1px solid var(--border-subtle); border-radius: var(--r-lg);
-  display: flex; flex-direction: column; gap: 10px; animation: setupFadeIn .2s ease; }
-.clip-video { width: 100%; max-height: 420px; background: #000; border-radius: var(--r-md); cursor: pointer; }
+/* ---- Recortador de vídeo (estilo CapCut) ----
+   Vive en un <dialog>: recortar es una tarea con foco propio, y embutido en la
+   pestaña competía con el reproductor que tenía justo encima. */
+.clip-modal {
+  width: min(920px, calc(100vw - 64px)); max-height: calc(100vh - 72px);
+  padding: 0; border: 1px solid var(--border-subtle); border-radius: var(--r-lg);
+  background: var(--bg-surface); color: var(--text-primary);
+  box-shadow: var(--shadow-modal); overflow: hidden;
+  display: flex; flex-direction: column;
+  animation: clip-modal-in .18s var(--ease-out) both;
+}
+@keyframes clip-modal-in { from { opacity: 0; transform: translateY(8px) scale(.99); } to { opacity: 1; transform: none; } }
+.clip-modal::backdrop { background: rgba(0, 0, 0, .62); }
+.clip-modal-head {
+  display: flex; align-items: flex-start; gap: 16px;
+  padding: 16px 18px 12px; border-bottom: 1px solid var(--border-subtle);
+}
+.clip-modal-title { min-width: 0; }
+.clip-modal-title b { display: block; font-size: 14px; }
+.clip-modal-title small { display: block; margin-top: 2px; font-size: 11.5px; color: var(--text-muted); }
+.clip-modal-head .clip-close { margin-left: auto; flex: none; }
+
+.clip-editor { padding: 14px 18px 18px; background: none;
+  display: flex; flex-direction: column; gap: 10px;
+  overflow: auto; min-height: 0; }
+.clip-video { width: 100%; max-height: min(420px, calc(100vh - 400px)); background: #000; border-radius: var(--r-md); cursor: pointer; }
+
+@media (prefers-reduced-motion: reduce) { .clip-modal { animation: none; } }
+
+/* Qué hacer con los tramos marcados. Van como casillas y no como botones
+   porque transcribir y cortar NO se excluyen: se pueden querer las dos. */
+.clip-out {
+  display: flex; flex-direction: column; gap: 2px;
+  padding: 10px 12px; margin-top: 4px;
+  border: 1px solid var(--border-subtle); border-radius: var(--r-md);
+  background: var(--bg-input);
+}
+.clip-opt {
+  display: flex; align-items: flex-start; gap: 10px;
+  padding: 7px 6px; border-radius: var(--r-md); cursor: pointer;
+  transition: background var(--dur-hover) var(--ease-out);
+}
+.clip-opt:hover { background: var(--hover-soft); }
+.clip-opt input { margin-top: 2px; flex: none; cursor: pointer; accent-color: var(--accent); }
+.clip-opt b { display: block; font-size: 12px; font-weight: 500; }
+.clip-opt small { display: block; margin-top: 2px; font-size: 10.8px; color: var(--text-muted); line-height: 1.45; }
+/* Una casilla deshabilitada tiene que verse deshabilitada, o el usuario hace
+   clic y cree que la app no responde. */
+.clip-opt:has(input:disabled) { cursor: not-allowed; opacity: .5; }
+.clip-opt:has(input:disabled):hover { background: none; }
+.clip-opt-danger:has(input:checked) b { color: #f28b82; }
 /* Controles minimalistas con iconos, sin cajas: ±10 s, play/pausa, marcas y ampliar */
 .clip-ctrl { display: flex; align-items: center; justify-content: center; gap: 4px; flex-wrap: wrap; }
 .clip-cbtn { display: inline-flex; align-items: center; justify-content: center; gap: 3px;
@@ -3275,50 +3199,122 @@ body.licensing .topbar-status { visibility: hidden; }
 .clip-time { margin-left: auto; font-family: var(--font-mono); font-size: 10.5px; color: var(--text-muted); }
 .clip-range { color: var(--text-faint); font-family: var(--font-mono); font-size: 10.5px; }
 
-/* Modo ventana grande: modal amplio dentro de la app (no pantalla completa). */
-.clip-backdrop { position: fixed; inset: 0; background: rgba(0, 0, 0, .62); z-index: 8000; }
-.clip-editor--max { position: fixed; inset: 58px 56px 28px; z-index: 8001; margin: 0;
-  padding: 18px; overflow: auto; box-shadow: var(--shadow-modal); }
-.clip-editor--max .clip-video { max-height: calc(100vh - 360px); }
-.clip-editor--max .clip-ctrl { padding-top: 2px; }
-/* Sin overflow:hidden en .clip-tl: las manijas sobresalen y deben verse enteras.
-   El recorte redondeado se aplica solo a la tira de miniaturas. */
-.clip-tl { position: relative; height: 46px; margin: 0 6px; cursor: pointer;
-  user-select: none; touch-action: none; }
-.clip-thumbs { display: flex; height: 100%; overflow: hidden;
-  border-radius: var(--r-md); border: 1px solid var(--border-subtle); }
-.clip-thumbs i { flex: 1; background-size: cover; background-position: center;
-  border-right: 1px solid rgba(0,0,0,.3); }
-.clip-section-marks { position: absolute; inset: 0; pointer-events: none; }
-.clip-section-mark {
-  position: absolute; top: 0; bottom: 0; border: 1px solid color-mix(in srgb, var(--accent) 70%, transparent);
-  background: color-mix(in srgb, var(--accent) 10%, transparent); box-sizing: border-box; pointer-events: auto;
-  cursor: pointer;
+/* El modo "ampliar" (.clip-backdrop / .clip-editor--max) se retiró: reproducía a
+   mano el fondo, el Esc y la retención del foco que el <dialog> trae de fábrica. */
+/* Línea de tiempo al modo de un editor de vídeo: la tira de fotogramas manda, y
+   lo que queda fuera del clip se aparta oscureciéndose. Sin overflow:hidden en
+   .clip-tl porque las manijas sobresalen y deben verse enteras. */
+.clip-tl {
+  position: relative; height: 64px; margin: 6px 8px 0; cursor: pointer;
+  user-select: none; touch-action: none;
 }
-.clip-section-mark:hover { background: color-mix(in srgb, var(--accent) 18%, transparent); border-color: var(--accent); }
-.clip-sel { position: absolute; top: 0; bottom: 0; border: 2px solid var(--accent);
-  background: color-mix(in srgb, var(--accent) 16%, transparent); box-sizing: border-box; }
-.clip-h { position: absolute; top: 50%; transform: translateY(-50%); width: 12px; height: 82%;
-  background: var(--accent); border-radius: 4px; cursor: ew-resize; touch-action: none;
-  z-index: 2; box-shadow: 0 1px 4px rgba(0,0,0,.45); }
+.clip-thumbs {
+  display: flex; height: 100%; overflow: hidden;
+  border-radius: var(--r-md); background: #101010;
+  box-shadow: inset 0 0 0 1px var(--border-subtle);
+}
+.clip-thumbs i { flex: 1; background-size: cover; background-position: center; }
+/* Mientras llegan los fotogramas la tira late, en vez de quedarse en un negro
+   que no distingue "cargando" de "el vídeo no tiene imagen". */
+.clip-thumbs.is-loading { animation: clip-thumbs-wait 1.4s ease-in-out infinite; }
+@keyframes clip-thumbs-wait { 0%, 100% { opacity: .5; } 50% { opacity: .85; } }
+.clip-thumbs.is-empty { background: repeating-linear-gradient(45deg,
+  color-mix(in srgb, var(--text-primary) 4%, var(--bg-input)) 0 8px,
+  var(--bg-input) 8px 16px); }
+
+/* Lo de fuera del clip, atenuado. */
+.clip-shade {
+  position: absolute; top: 0; bottom: 0; background: rgba(0, 0, 0, .6);
+  pointer-events: none; z-index: 1;
+}
+.clip-shade.sl { left: 0; width: 0; border-radius: var(--r-md) 0 0 var(--r-md); }
+.clip-shade.sr { right: 0; left: 100%; border-radius: 0 var(--r-md) var(--r-md) 0; }
+
+.clip-section-marks { position: absolute; inset: 0; pointer-events: none; z-index: 2; }
+.clip-section-mark {
+  position: absolute; top: 0; bottom: 0; box-sizing: border-box; cursor: pointer;
+  pointer-events: auto; border-radius: 3px;
+  border: 1px solid rgba(255, 255, 255, .55);
+  background: rgba(255, 255, 255, .10);
+}
+.clip-section-mark:hover { background: rgba(255, 255, 255, .2); border-color: #fff; }
+
+/* El clip activo: marco claro y SIN relleno, para no lavar los fotogramas. */
+.clip-sel {
+  position: absolute; top: 0; bottom: 0; z-index: 3; box-sizing: border-box;
+  border: 2px solid #fff; border-radius: 5px;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, .5);
+}
+.clip-h {
+  position: absolute; top: -1px; bottom: -1px; width: 13px;
+  background: #fff; cursor: ew-resize; touch-action: none; z-index: 4;
+  display: flex; align-items: center; justify-content: center; gap: 2px;
+}
+.clip-h.l { left: -13px; border-radius: 5px 0 0 5px; }
+.clip-h.r { right: -13px; border-radius: 0 5px 5px 0; }
+/* Las dos rayitas del agarre, como en cualquier editor. */
+.clip-h::before {
+  content: ''; width: 5px; height: 16px; border-radius: 1px;
+  border-left: 1.5px solid rgba(0, 0, 0, .45);
+  border-right: 1.5px solid rgba(0, 0, 0, .45);
+}
 /* Zona de agarre ampliada (invisible): facilita atrapar la manija con el ratón. */
 .clip-h::after { content: ''; position: absolute; inset: -10px; }
-.clip-h.l { left: -6px; } .clip-h.r { right: -6px; }
-.clip-cursor { position: absolute; top: -2px; bottom: -2px; width: 2px; background: #fff; pointer-events: none; }
+
+/* Cabezal de reproducción con su cabecita, para leer la posición de un vistazo. */
+.clip-cursor {
+  position: absolute; top: -5px; bottom: -3px; width: 2px; z-index: 5;
+  background: #ff5f56; pointer-events: none; border-radius: 1px;
+}
+.clip-cursor::before {
+  content: ''; position: absolute; top: -3px; left: 50%; transform: translateX(-50%);
+  border-left: 5px solid transparent; border-right: 5px solid transparent;
+  border-top: 6px solid #ff5f56;
+}
 .clip-scale { display: flex; justify-content: space-between; font-family: var(--font-mono);
-  font-size: 9px; color: var(--text-faint); }
-.clip-segs { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
-.clip-pill { background: var(--bg-elevated); border: 1px solid var(--border-strong); color: var(--text-secondary);
-  border-radius: var(--r-pill); padding: 4px 10px; font-size: 11px; font-family: var(--font-mono);
-  display: inline-flex; align-items: center; gap: 6px; cursor: pointer; }
-.clip-pill:hover { color: var(--text-primary); border-color: var(--accent); }
-.clip-pill.is-active { background: var(--accent-soft); border-color: var(--accent); color: var(--accent); }
-.clip-pill .x { color: var(--text-muted); cursor: pointer; }
-.clip-add { background: transparent; border: 1px dashed var(--border-strong); color: var(--text-muted);
-  border-radius: var(--r-pill); padding: 4px 10px; font-size: 11px; cursor: pointer; }
-.clip-add:disabled { opacity: .55; cursor: default; border-style: solid; }
-.clip-foot { display: flex; align-items: center; justify-content: space-between;
-  border-top: 1px dashed var(--border-subtle); padding-top: 10px; }
+  font-size: 9px; color: var(--text-faint); margin-top: 3px; }
+
+@media (prefers-reduced-motion: reduce) { .clip-thumbs.is-loading { animation: none; } }
+/* Los clips son pestañas, con el mismo lenguaje que las de la reunión: una
+   bandeja hundida y la activa levantada sobre ella. */
+.clip-segs {
+  display: flex; align-items: center; gap: 4px; flex-wrap: wrap;
+  padding: 4px; border-radius: var(--r-md); background: var(--bg-input);
+  border: 1px solid var(--border-subtle);
+}
+.clip-tab {
+  background: transparent; border: 1px solid transparent; color: var(--text-secondary);
+  border-radius: var(--r-sm, 6px); padding: 5px 12px; font-size: 11.5px; font-family: inherit;
+  display: inline-flex; align-items: center; gap: 8px; cursor: pointer;
+  transition: background var(--dur-hover) var(--ease-out), color var(--dur-hover) var(--ease-out);
+}
+.clip-tab:hover { color: var(--text-primary); background: var(--hover-soft); }
+.clip-tab.is-active {
+  background: var(--bg-surface); border-color: var(--border-subtle);
+  color: var(--text-primary); font-weight: 500;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, .18);
+}
+.clip-tab .x {
+  color: var(--text-muted); cursor: pointer; font-size: 14px; line-height: 1;
+  margin-right: -3px; padding: 0 2px; border-radius: 4px;
+}
+.clip-tab .x:hover { color: #f28b82; background: var(--hover-med); }
+.clip-add {
+  background: transparent; border: 1px dashed var(--border-strong); color: var(--text-muted);
+  border-radius: var(--r-sm, 6px); padding: 5px 11px; font-size: 11.5px;
+  font-family: inherit; cursor: pointer; margin-left: 2px;
+  transition: color var(--dur-hover) var(--ease-out), border-color var(--dur-hover) var(--ease-out);
+}
+.clip-add:hover:not(:disabled) { color: var(--text-primary); border-color: var(--text-muted); }
+.clip-add:disabled { opacity: .5; cursor: default; border-style: solid; }
+/* El pie se queda pegado abajo: con el vídeo, la línea de tiempo y las opciones
+   arriba, el botón de accion se iba fuera de la vista al hacer scroll. */
+.clip-foot {
+  display: flex; align-items: center; justify-content: space-between; gap: 16px;
+  position: sticky; bottom: 0; z-index: 2;
+  margin: 4px -18px -18px; padding: 12px 18px;
+  border-top: 1px solid var(--border-subtle); background: var(--bg-surface);
+}
 .clip-total { font-size: 11.5px; color: var(--accent); }
 .clip-total b { color: var(--text-primary); }
 .clip-actions { display: flex; gap: 8px; }
@@ -3367,27 +3363,35 @@ body.licensing .topbar-status { visibility: hidden; }
    variables cambia solo; debajo, los pocos literales que no.
    ============================================================ */
 body[data-theme="dark"] {
-  /* Redesign feat/rediseno-granola: de marrón cálido a neutro casi-negro (mockup.html :root[data-theme="dark"]) */
-  --bg-app: #1c1c1c;
-  --bg-sidebar: #2b2a28;         /* gris calido medio: el panel se distingue del lienzo por tono, no solo por la linea */
-  --bg-surface: #232323;         /* tarjetas */
-  --bg-elevated: #232323;        /* menús/modales */
-  --bg-input: #202020;
-  --bg-hover: #292929;
-  --scrollbar: #3a3a3a;
-  --border-subtle: #262626;
-  --border-strong: #2e2e2e;
-  --text-primary: #f2f1ee;
-  --text-secondary: #9d9c98;
-  --text-muted: #6c6b68;
-  --text-faint: #55534f;
-  --accent: var(--text-primary); /* monocromo, ver nota en :root */
-  --accent-hover: color-mix(in srgb, var(--accent) 88%, var(--bg-app));
-  --on-accent: var(--bg-app);
+  /* Marrón cálido, el mismo de la landing en oscuro (`--bg: #26201B`). Antes era
+     un gris casi-negro neutro: al lado del sitio y del icono se leía como otro
+     producto. Los escalones salen de los paneles de la landing —#2F2822,
+     #332B24, #3A322A— así que la app y la web comparten familia y no solo el
+     acento. */
+  --bg-app: #26201b;             /* lienzo */
+  --bg-sidebar: #221d18;         /* un paso mas hundido que el lienzo */
+  --bg-surface: #2f2822;         /* tarjetas */
+  --bg-elevated: #332b24;        /* menús/modales: un escalón por encima */
+  --bg-input: #1f1a16;           /* campos: lo más hundido */
+  --bg-hover: #3a322a;
+  --scrollbar: #4c4238;
+  --border-subtle: #362e27;
+  --border-strong: #453b32;
+  --text-primary: #f3eee6;       /* marfil cálido, el mismo de la landing */
+  --text-secondary: #d4ccc0;
+  --text-muted: #a89f91;
+  --text-faint: #82796c;
+  /* El verde del logo: sobre este marrón da 7,4:1. En claro se usa su versión
+     oscurecida, porque allí este no se leería. */
+  --accent: #52c494;
+  --accent-hover: color-mix(in srgb, var(--accent) 88%, #ffffff);
+  --on-accent: #10281f;
   --accent-soft: color-mix(in srgb, var(--accent) 15%, transparent);
-  --focus: rgba(242, 241, 238, .55);
-  --hover-soft: rgba(255, 250, 240, 0.05);
-  --hover-med: rgba(255, 250, 240, 0.09);
+  --focus: rgba(82, 196, 148, .55);
+  /* El velo de hover lleva el mismo marfil del texto, no un blanco puro: sobre
+     un fondo cálido un blanco frío se nota. */
+  --hover-soft: rgba(243, 238, 230, 0.05);
+  --hover-med: rgba(243, 238, 230, 0.09);
   --sel-bg: var(--bg-elevated);
   --sel-text: var(--text-primary);
   --newbtn-bg: var(--text-primary);
@@ -3690,3 +3694,64 @@ dialog.search-overlay.show .search-overlay-panel { opacity: 1; transform: transl
 .so-row .so-row-sub mark { background: var(--accent-soft); color: var(--text-primary); border-radius: 2px; padding: 0 1px; }
 .so-row .so-row-time { font-family: var(--font-mono); font-size: 10.5px; color: var(--text-faint); flex: none; }
 .so-row .so-dot { width: 8px; height: 8px; border-radius: 3px; flex: none; }
+
+/* ── Símbolo según el tema ──
+   Dos archivos con la misma geometría y el mismo verde; solo cambia la caja.
+   En claro es blanca, en oscuro el marrón `#26201B` del tema oscuro de la
+   landing. Se resuelve con `content:` porque el src de un <img> no se puede
+   cambiar desde CSS, y el WebView2 (Chromium) lo admite en imágenes. */
+body[data-theme="dark"] .empty-logo img,
+body[data-theme="dark"] .setup-logo-img,
+body[data-theme="dark"] .license-symbol {
+  content: url("assets/helpmeet-symbol-dark.svg?v=20260802v2");
+}
+
+/* Recortador de una grabación de solo audio: no hay reproductor que mostrar ni
+   fotogramas que dibujar, pero la línea de tiempo sirve igual para marcar. */
+.clip-modal.is-audio .clip-video { display: none; }
+.clip-modal.is-audio .clip-thumbs {
+  background: linear-gradient(var(--bg-input), var(--bg-input)) padding-box;
+  box-shadow: inset 0 0 0 1px var(--border-subtle);
+}
+.clip-modal.is-audio .clip-tl { height: 48px; }
+
+/* Con vídeo, el reproductor arranca plegado: la tira de fotogramas de la línea
+   de tiempo ya muestra qué se recorta, y así el modal entra entero sin scroll,
+   igual que el de una grabación de audio. El ojo lo despliega. */
+.clip-modal.video-oculto .clip-video { display: none; }
+.clip-ver.is-on { background: var(--bg-elevated); color: var(--text-primary); }
+
+/* ── Cambio de tema: enfoque ──
+   El navegador toma una instantánea del antes y del después. El tema viejo se
+   va desenfocándose y encogiendo un punto; el nuevo entra desenfocado y termina
+   de enfocarse. Se lee como si la interfaz se reajustara, no como un parpadeo.
+
+   El nuevo tarda algo más que el viejo y arranca antes de que aquel termine:
+   así hay un instante en que los dos conviven borrosos y no se ve el corte. */
+::view-transition-old(root) {
+  animation: tema-sale .32s var(--ease-in) both;
+  mix-blend-mode: normal;
+}
+::view-transition-new(root) {
+  animation: tema-entra .46s var(--ease-out) both;
+  mix-blend-mode: normal;
+}
+@keyframes tema-sale {
+  to { opacity: 0; filter: blur(7px); transform: scale(1.015); }
+}
+@keyframes tema-entra {
+  from { opacity: 0; filter: blur(11px); transform: scale(.988); }
+  to   { opacity: 1; filter: blur(0);    transform: none; }
+}
+
+/* NO se pone `transition: background-color` en el cuerpo ni en la barra lateral.
+   Parece buena idea y es justo lo que hacía que el encabezado y el panel
+   izquierdo cambiaran a destiempo: bajo la instantánea el DOM real ya tiene el
+   tema nuevo, así que esos elementos arrancaban ADEMÁS su propio fundido de
+   0,35 s; al desvanecerse la instantánea quedaban a mitad de camino y el corte
+   se veía. La instantánea ya anima la interfaz entera — no hay que ayudarla. */
+
+@media (prefers-reduced-motion: reduce) {
+  ::view-transition-old(root),
+  ::view-transition-new(root) { animation: none; }
+}

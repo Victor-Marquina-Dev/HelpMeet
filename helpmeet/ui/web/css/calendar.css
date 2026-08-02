@@ -131,5 +131,5 @@ body[data-theme="dark"] .cal-mode.is-on { background: var(--bg-elevated); box-sh
    coincidian y no se notaba cual estaba activo. */
 .cal-modes { background: var(--bg-input); }
 .cal-mode.is-on { background: var(--bg-app); color: var(--text-primary); font-weight: 600; }
-body[data-theme="dark"] .cal-modes { background: #141414; }
-body[data-theme="dark"] .cal-mode.is-on { background: #2e2e2e; }
+body[data-theme="dark"] .cal-modes { background: var(--bg-input); }
+body[data-theme="dark"] .cal-mode.is-on { background: var(--bg-hover); }

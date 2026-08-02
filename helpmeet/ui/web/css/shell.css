@@ -246,12 +246,44 @@ body { display: flex; flex-direction: column; }
 .sidebar-footer { padding: 0 8px 8px; display: flex; flex-direction: column; gap: 1px; }
 .shell.collapsed .sidebar-footer { align-items: center; }
 
+/* La franja mide 4 px pero la zona de agarre se amplía con un ::before que
+   sobresale a los dos lados: atinarle a 4 px con el ratón obliga a apuntar, y
+   era lo que hacía sentir que "solo agarra en algunos sitios". El ancho visible
+   no cambia; lo que crece es la superficie que escucha el ratón. */
+/* POSITION: FIXED, fuera del flujo de .shell.
+   Estaba dentro de .shell, que empieza debajo de la barra de título, y por más
+   que se estirara hacia arriba con un desplazamiento negativo, en ese tramo
+   competía con el apilado de la barra. Anclado a la ventana el problema
+   desaparece: arranca en el techo y llega al piso, y su posición horizontal la
+   marca la misma variable que fija el ancho del panel.
+   Los 6px de arriba quedan para .wr-n (z-index 11000), la franja que estira la
+   VENTANA: sin ellos no se podría redimensionar desde el borde superior. */
 .sidebar-resize-handle {
-  width: 4px; cursor: col-resize; flex: none; background: transparent;
-  position: relative; z-index: 30; transition: background .15s;
+  position: fixed; top: 6px; bottom: 0;
+  left: var(--sidebar-w); width: 4px; margin-left: -2px;
+  z-index: 10500; cursor: col-resize; background: transparent;
 }
-.sidebar-resize-handle:hover,
-body.sidebar-dragging .sidebar-resize-handle { background: var(--border-strong); }
+body[data-sidebar="collapsed"] .sidebar-resize-handle {
+  left: var(--sidebar-w-collapsed);
+}
+/* Zona de agarre ampliada a los lados (14px efectivos): atinarle a 4px obliga a
+   apuntar, y era lo que hacía sentir que "solo agarra en algunos sitios". */
+.sidebar-resize-handle::before {
+  content: ''; position: absolute; inset: 0 -5px; cursor: col-resize;
+}
+/* La marca visible es una línea de 2px de arriba abajo, no el fondo del bloque:
+   así siempre mide lo mismo y no aparece una banda ancha al pasar el ratón. */
+.sidebar-resize-handle::after {
+  content: ''; position: absolute; inset: 0 auto 0 1px; width: 2px;
+  background: var(--accent); border-radius: 2px;
+  opacity: 0; transition: opacity var(--dur-hover) var(--ease-out);
+  pointer-events: none;
+}
+.sidebar-resize-handle:hover::after,
+body.sidebar-dragging .sidebar-resize-handle::after { opacity: 1; }
+/* Mientras se arrastra no hay atenuación de entrada: la línea debe estar ahí
+   desde el primer píxel de movimiento. */
+body.sidebar-dragging .sidebar-resize-handle::after { transition: none; }
 .shell.collapsed .sidebar-resize-handle { cursor: e-resize; }
 
 /* ---------- Menú "···" de proyecto (popover nativo) ----------
@@ -354,4 +386,24 @@ body.sidebar-dragging .sidebar-resize-handle { background: var(--border-strong);
 }
 .shell.collapsed ~ * .titlebar, body:has(.shell.collapsed) .titlebar {
   --tb-corte: var(--sidebar-w-collapsed);
+}
+
+/* Mientras se arrastra el borde, NADA dentro del panel anima.
+   El ancho cambia en cada movimiento del ratón, y cualquier transición activa
+   —el padding de los items, el color de fondo, el ancho del propio panel— queda
+   persiguiendo un valor que ya cambió: se ve como un retardo elástico. El
+   `!important` se justifica aquí porque esas transiciones están repartidas por
+   varias hojas y esto es un estado momentáneo, solo mientras el botón está
+   apretado. */
+body.sidebar-dragging .sidebar,
+body.sidebar-dragging .sidebar * {
+  transition: none !important;
+}
+/* La barra de título entra en la misma regla, y es la que se notaba: su fondo
+   es un degradado cuyo corte sigue a --sidebar-w, pero con una transición de
+   240 ms. Al arrastrar, el panel ya se había ensanchado y el corte venía
+   detrás: quedaba una franja del color del lienzo sobre el panel, justo en el
+   tramo de arriba. Sin transición, el corte va pegado al borde. */
+body.sidebar-dragging .titlebar {
+  transition: none !important;
 }

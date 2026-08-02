@@ -36,7 +36,9 @@ const ICONS = {
   archive: '<rect x="2" y="4" width="20" height="5" rx="1"/><path d="M4 9v9a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9M10 13h4"/>',
   trash: '<path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>',
   download: '<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/>',
-  folder: '<path d="M4 20h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.93a2 2 0 0 1-1.66-.9l-.82-1.2A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13c0 1.1.9 2 2 2Z"/>',
+  // Misma carpeta maciza que #i-folder del sprite (ver la nota ahí): las dos
+  // versiones aparecen en la misma pantalla y tienen que verse iguales.
+  folder: '<path d="M2.5 7a2.4 2.4 0 0 1 2.4-2.4h4a1.8 1.8 0 0 1 1.3.6l1.4 1.5a1.8 1.8 0 0 0 1.3.6h5.2a2.4 2.4 0 0 1 2.4 2.4v7a2.4 2.4 0 0 1-2.4 2.4H4.9a2.4 2.4 0 0 1-2.4-2.4z" fill="currentColor" stroke="none"/>',
   dots: '<circle cx="5" cy="12" r="1.8" fill="currentColor"/><circle cx="12" cy="12" r="1.8" fill="currentColor"/><circle cx="19" cy="12" r="1.8" fill="currentColor"/>',
   palette: '<circle cx="12" cy="12" r="9"/><circle cx="8.5" cy="13.5" r="1.5" fill="currentColor"/><circle cx="10.5" cy="9" r="1.5" fill="currentColor"/><circle cx="14.5" cy="9" r="1.5" fill="currentColor"/><circle cx="16" cy="13.5" r="1.5" fill="currentColor"/>',
   monitor: '<rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/>',
@@ -88,10 +90,19 @@ const ICONS = {
   sun: '<circle cx="12" cy="12" r="5"/><path d="M12 1v2M12 21v2M4.2 4.2l1.4 1.4M18.4 18.4l1.4 1.4M1 12h2M21 12h2M4.2 19.8l1.4-1.4M18.4 5.6l1.4-1.4"/>',
   moon: '<path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/>',
 };
+/* Iconos de transporte de vídeo: son siluetas macizas (triángulos, barras), no
+   trazos. Con el `fill:none` general salían dibujados por su contorno, que a
+   14px casi desaparece — el play del recortador se veía como una punta de flecha
+   hueca en vez de un botón. */
+const SOLID_ICONS = new Set(['play', 'pause', 'rewind', 'fastForward']);
+
 function svg(name, size) {
   size = size || 15;
-  const stroke = (name === 'dots') ? '' : ' fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"';
-  return `<svg width="${size}" height="${size}" viewBox="0 0 24 24"${stroke}>${ICONS[name] || ''}</svg>`;
+  let attrs;
+  if (name === 'dots') attrs = '';
+  else if (SOLID_ICONS.has(name)) attrs = ' fill="currentColor" stroke="none"';
+  else attrs = ' fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"';
+  return `<svg width="${size}" height="${size}" viewBox="0 0 24 24"${attrs}>${ICONS[name] || ''}</svg>`;
 }
 function ico(name, size) { return `<span class="ico">${svg(name, size)}</span>`; }
 
@@ -229,6 +240,7 @@ const api = {
   startScreenRecording: (iid, idx) => call('start_screen_recording', iid, idx),
   stopScreenRecording: () => call('stop_screen_recording'),
   transcribeMeetingVideo: (mid, force, clipSegments) => call('transcribe_meeting_video', mid, !!force, clipSegments || null),
+  exportMeetingClips: (mid, segments, deleteOriginal) => call('export_meeting_clips', mid, segments || [], !!deleteOriginal),
   getVideoThumbnails: (mid, count) => call('get_video_thumbnails', mid, count || 12),
   getMediaVideoUrl: (mid) => call('get_media_video_url', mid),
   checkForUpdate: () => call('check_for_update'),
@@ -571,6 +583,17 @@ const STATE = {
   micMuted: _leerMicMuted(),
   meetingMicMuted: false,
   screenPanelCollapsed: false,
+  /* Reuniones cuyo .mp4 se está muxeando ahora mismo (id → timestamp de inicio).
+     El backend no expone este estado: stop_screen_recording vuelve enseguida y
+     el muxeo corre en un hilo que solo avisa al terminar (onScreenVideoSaved).
+     Entre esos dos momentos la reunión no tiene video_path, y sin esta marca la
+     pestaña General no tendría forma de distinguir "todavía no está" de "no hay
+     vídeo". Se pierde si se cierra la app a mitad del muxeo: es correcto, al
+     reabrir ya no sabemos si aquel trabajo terminó y no debemos inventarlo. */
+  videoPending: {},
+  /* Análogo a videoPending, para el otro hueco que el backend no expone: entre
+     detener una grabación de audio y que su trabajo aparezca en bgJobs. */
+  txPending: {},
   settings: { export_dir: '', token_set: false },
   archiveCount: 0,
   trashCount: 0,
@@ -583,6 +606,30 @@ function save(k, v) { try { localStorage.setItem(k, v); } catch (e) {} }
 if (!load('hm.sidebar-default-v74', '')) { save('hm.sidebar', '1'); save('hm.sidebar-default-v74', '1'); }
 // Tema: claro por defecto; 'dark' activa el modo oscuro calido (Ajustes -> Apariencia)
 if (load('hm.theme', 'light') === 'dark') document.body.dataset.theme = 'dark';
+
+/* Cambio de tema en un solo sitio. El tema nuevo se revela en un círculo que
+   crece desde el control que lo pidió, en vez de que toda la pantalla cambie de
+   golpe: el ojo sigue el origen y el salto de luminosidad deja de sorprender.
+
+   Se apoya en View Transitions, que toma una instantánea del antes y del después
+   y anima entre las dos. Donde no exista —o si el usuario pidió menos
+   movimiento— se aplica el tema directo, sin animación y sin errores. */
+function aplicarTema(valor) {
+  const poner = () => {
+    if (valor === 'dark') document.body.dataset.theme = 'dark';
+    else delete document.body.dataset.theme;
+  };
+  const menosMovimiento = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  if (menosMovimiento || typeof document.startViewTransition !== 'function') {
+    poner();
+    return;
+  }
+  try {
+    document.startViewTransition(poner);
+  } catch (e) {
+    poner();   // si el navegador la anuncia pero falla, el tema igual cambia
+  }
+}
 // Favicon: version oscura en modo oscuro
 (function updateFavicon() {
   const isDark = load('hm.theme', 'light') === 'dark';
@@ -934,7 +981,7 @@ function viewWelcome() {
       <span class="wm-diamond"></span>
     </div>
     <div class="empty-inner">
-      <div class="empty-logo"><img src="assets/helpmeet-symbol.svg" alt=""></div>
+      <div class="empty-logo"><img src="assets/helpmeet-symbol.svg?v=20260802v2" alt=""></div>
       <h2 class="empty-title">Helpmeet</h2>
       <p>${t('welcome.subtitle')}. ${t('welcome.newProjectHint')}</p>
       <button class="btn btn-welcome" id="wNew">${svg('plus', 18)} ${t('welcome.newProject')}</button>
@@ -2104,8 +2151,6 @@ function _carpetaReunion(m) {
   hojas.innerHTML =
     `<div class="folder-leaf-inner">` +
       `<div class="folder-leaf"><svg class="icon icon-sm"><use href="#i-doc"/></svg>transcripcion.md</div>` +
-      `<div class="folder-leaf"><svg class="icon icon-sm"><use href="#i-doc"/></svg>transcripcion.txt</div>` +
-      `<div class="folder-leaf"><svg class="icon icon-sm"><use href="#i-doc"/></svg>transcripcion.tsv</div>` +
       `<div class="folder-leaf"><svg class="icon icon-sm"><use href="#i-folder"/></svg>capturas/</div>` +
       `<div class="folder-leaf"><svg class="icon icon-sm"><use href="#i-mic"/></svg>${m.has_video ? 'grabacion.mp4' : 'grabacion.wav'}</div>` +
     `</div>`;
@@ -2435,19 +2480,41 @@ function fallbackCopy(text) {
   } catch (e) { return false; }
 }
 
-function currentMeetingJob() {
-  const mid = STATE.selMeeting == null ? null : String(STATE.selMeeting);
-  if (!mid) return null;
+// Trabajo en curso (encolado o corriendo) de una reunión, o null.
+function meetingJob(mid) {
+  if (mid == null) return null;
+  const key = String(mid);
   return (STATE.bgJobs || []).find(j =>
-    String(j.meeting_id) === mid && (j.state === 'queued' || j.state === 'running')
+    String(j.meeting_id) === key && (j.state === 'queued' || j.state === 'running')
   ) || null;
+}
+
+function currentMeetingJob() {
+  return meetingJob(STATE.selMeeting);
 }
 
 // ¿Esta reunión se está transcribiendo ahora mismo? (progreso en vivo de bgJobs)
 function meetingIsTranscribing(mid) {
-  return (STATE.bgJobs || []).some(j =>
-    String(j.meeting_id) === String(mid) && (j.state === 'queued' || j.state === 'running')
-  );
+  return !!meetingJob(mid);
+}
+
+// ¿El .mp4 de esta reunión se está muxeando todavía? (ver STATE.videoPending)
+function meetingVideoPending(mid) {
+  return mid != null && !!STATE.videoPending[String(mid)];
+}
+
+/* Qué mostrar en la columna del vídeo de la pestaña General. Un solo lugar
+   decide, para que el card de progreso y el panel de vídeo no puedan
+   contradecirse: son estados excluyentes del mismo hueco. */
+function generalVideoState(t, mid) {
+  if (meetingIsTranscribing(mid)) return 'transcribing';
+  /* La marca de "recién detenida" solo vale mientras la reunión no tenga texto:
+     si ya hay frases, el trabajo terminó y la marca quedó sin bajar. */
+  const sinTexto = !(t && t.utterances && t.utterances.some(u => !u.kind || u.kind === 'utterance'));
+  if (mid != null && STATE.txPending[String(mid)] && sinTexto) return 'transcribing';
+  if (t && t.video_path) return 'video';
+  if (meetingVideoPending(mid)) return 'muxing';
+  return 'none';
 }
 
 // Id de la reunión que se está grabando ahora mismo (reunión o pantalla), o null.
@@ -2481,7 +2548,11 @@ function refreshMeetingTitleJob() {
   group.classList.toggle('is-processing', !!job);
   // Los botones de transcribir del panel de vídeo no deben quedar activos
   // mientras ya hay una transcripción en curso para esta misma reunión.
-  document.querySelectorAll('.video-file .rec-actions .btn').forEach(b => {
+  /* Solo los de transcribir: `[data-tx-btn]` en vez de `.btn` a secas, para no
+     apagar también Ver y Copiar, que siguen siendo válidos mientras se
+     transcribe. (El selector anterior colgaba de `.video-file`, una fila que ya
+     no existe.) */
+  document.querySelectorAll('.video-panel .rec-actions .btn[data-tx-btn]').forEach(b => {
     b.disabled = !!job; b.classList.toggle('is-disabled', !!job);
     b.title = job ? 'Ya se está transcribiendo esta reunión…' : '';
   });
@@ -2522,8 +2593,12 @@ function viewMeeting() {
   const it = STATE.initiatives.find(x => x.id === STATE.selInit);
   const fraseCount = t && t.utterances ? t.utterances.filter(u => !u.kind || u.kind === 'utterance').length : 0;
   const transcribed = fraseCount > 0;
-  const esFav = _isMeetingFav(t ? t.id : 0);
   const meetingJob = currentMeetingJob();
+  /* Copiar/favorito/carpeta viven en la fila del reproductor —de vídeo o de
+     audio— y solo suben aquí cuando no hay ningún medio que reproducir. Se
+     decide en un único sitio para que las dos ramas no puedan mostrarlos a la
+     vez, que es lo que antes los ponía duplicados en pantalla. */
+  const hasVideoAsset = !!(t && (t.video_path || (t.assets && t.assets.audio)));
 
   const wrap = el('div', 'content-scroll scroll');
   const inner = el('div', 'content-inner');
@@ -2584,8 +2659,36 @@ function viewMeeting() {
     pills.appendChild(b);
   });
 
-  const bar = el('div', 'action-bar action-reveal');
-  bar.id = 'meetingActions';
+  tabsRow.appendChild(pills);
+  /* Copiar, favorito y carpeta bajan junto al vídeo. Aquí arriba solo se quedan
+     cuando NO hay vídeo: sin panel de reproducción esa fila no existe, y sin
+     esta salvedad una reunión de solo audio se quedaría sin esas tres acciones. */
+  if (!hasVideoAsset) {
+    const bar = el('div', 'action-bar action-reveal');
+    bar.id = 'meetingActions';
+    meetingBarButtons(STATE.selMeeting, t).forEach(b => bar.appendChild(b));
+    tabsRow.appendChild(bar);
+  }
+  tabsWrap.appendChild(tabsRow);
+
+  const panel = el('div', 'tab-panel active');
+  panel.dataset.tabPanel = STATE.activeTab;
+  if (STATE.activeTab === 'notas') panel.classList.add('notes-mode');
+  panel.appendChild(renderTab(STATE.activeTab, t));
+  tabsWrap.appendChild(panel);
+  inner.appendChild(tabsWrap);
+
+  wrap.appendChild(inner);
+  return wrap;
+}
+
+/* Copiar / favorito / abrir carpeta. Se construyen aquí una sola vez porque
+   viven en dos sitios según el caso: junto al vídeo cuando lo hay, y en la fila
+   de pestañas cuando la reunión es solo audio. Duplicar el código era lo que
+   antes los dejaba en pantalla dos veces a la vez. */
+function meetingBarButtons(mid, t) {
+  const transcribed = !!(t && t.utterances && t.utterances.some(u => !u.kind || u.kind === 'utterance'));
+  const esFav = t ? _isMeetingFav(t.id) : false;
 
   const btnCopy = el('button', 'icon-btn action-reveal-copy');
   btnCopy.type = 'button'; btnCopy.id = 'mCopy';
@@ -2593,7 +2696,7 @@ function viewMeeting() {
   btnCopy.title = transcribed ? 'Copiar la transcripción en Markdown' : 'Disponible cuando transcribas el vídeo';
   btnCopy.innerHTML = `<svg class="icon icon-sm"><use href="#i-copy"/></svg>` +
     `<span class="action-reveal-label-grid"><span class="action-reveal-label">Copiar transcripción .md</span></span>`;
-  btnCopy.onclick = (e) => copyMeetingContext(STATE.selMeeting, e.currentTarget);
+  btnCopy.onclick = (e) => copyMeetingContext(mid, e.currentTarget);
 
   const btnFav = el('button', 'icon-btn meeting-fav-btn' + (esFav ? ' active' : ''));
   btnFav.type = 'button'; btnFav.id = 'mFav';
@@ -2616,19 +2719,7 @@ function viewMeeting() {
   btnOpen.innerHTML = '<svg class="icon"><use href="#i-folder"/></svg>';
   btnOpen.onclick = (e) => doOpenFolder(e.currentTarget);
 
-  bar.append(btnCopy, btnFav, btnOpen);
-  tabsRow.append(pills, bar);
-  tabsWrap.appendChild(tabsRow);
-
-  const panel = el('div', 'tab-panel active');
-  panel.dataset.tabPanel = STATE.activeTab;
-  if (STATE.activeTab === 'notas') panel.classList.add('notes-mode');
-  panel.appendChild(renderTab(STATE.activeTab, t));
-  tabsWrap.appendChild(panel);
-  inner.appendChild(tabsWrap);
-
-  wrap.appendChild(inner);
-  return wrap;
+  return [btnCopy, btnFav, btnOpen];
 }
 
 function renderTab(tab, t) {
@@ -2640,8 +2731,11 @@ function renderTab(tab, t) {
 
 function renderGeneral(t) {
   const r = el('div', 'meeting-general');
-  const hasVideo = !!(t && t.video_path);
-  const transcribed = !!(t && t.utterances && t.utterances.filter(u => !u.kind || u.kind === 'utterance').length > 0);
+  const mid = (t && (t.meeting_id || t.id)) || STATE.selMeeting;
+  /* Se guarda lo dibujado para que syncGeneralVideoState detecte la transición
+     y rehaga la pestaña una sola vez. */
+  const vState = generalVideoState(t, mid);
+  _generalVideoState = vState;
 
   // ── Info + Video lado a lado ──
   const row = el('div', 'general-row');
@@ -2652,15 +2746,21 @@ function renderGeneral(t) {
   const fechaHora = t && t.date ? t.date : (t && t.started_at ? new Date(t.started_at).toLocaleString('es', { day:'numeric', month:'long', year:'numeric', hour:'2-digit', minute:'2-digit' }) : '—');
   info.innerHTML = `
     <div class="general-info-row"><span class="general-info-label">Fecha</span><span>${esc(fechaHora)}</span></div>
-    <div class="general-info-row"><span class="general-info-label">Duracion</span><span>${esc(dur)}</span></div>
-    <div class="general-info-row"><span class="general-info-label">Frases</span><span>${t && t.utterances ? t.utterances.filter(u => !u.kind || u.kind === 'utterance').length : 0}</span></div>`;
+    <div class="general-info-row"><span class="general-info-label">Duracion</span><span>${esc(dur)}</span></div>`;
   row.appendChild(info);
 
-  // Video compacto al costado
-  if (hasVideo) {
+  // Video compacto al costado — o el card que explica por qué todavía no está
+  if (vState === 'video') {
     const vp = videoPanel(t);
     vp.classList.add('video-panel--compact');
     row.appendChild(vp);
+  } else if (vState !== 'none') {
+    row.appendChild(videoProcCard(vState, mid, !!(t && t.video_path)));
+  } else if (t && t.assets && t.assets.audio) {
+    // Reunión de solo audio: su propio reproductor y sus acciones.
+    const ap = audioPanel(t);
+    ap.classList.add('video-panel--compact');
+    row.appendChild(ap);
   }
 
   r.appendChild(row);
@@ -2931,12 +3031,9 @@ function videoPanel(t) {
   const busy = meetingIsTranscribing(mid);
   const wrap = el('div', 'video-panel');
   wrap.dataset.videoMid = String(mid);
-  const name = String(t.video_path || '').split(/[\\/]/).pop() || 'grabacion.mp4';
-  wrap.innerHTML = `<div class="video-file">
-    <button class="video-file-icon" title="Reproducir video">${svg('play', 15)}</button>
-    <div class="video-file-copy"><b>Grabacion de pantalla</b><small>${esc(name)}</small></div>
-    <div class="rec-actions"></div>
-  </div>
+  /* La fila con el nombre del archivo se quitó: repetía lo que ya dice la
+     pestaña y su botón de play duplicaba el del propio reproductor. */
+  wrap.innerHTML = `<div class="rec-actions"></div>
   <div class="video-player-wrap">
     <video class="video-player" controls preload="metadata" muted playsinline></video>
     <div class="video-player-overlay">
@@ -2946,36 +3043,167 @@ function videoPanel(t) {
   const playerWrap = wrap.querySelector('.video-player-wrap');
   const player = wrap.querySelector('.video-player');
   const bigPlay = wrap.querySelector('.video-player-big-play');
-  const playIcon = wrap.querySelector('.video-file-icon');
   // Cargar URL del video inmediatamente (sin autoplay)
   api.getMediaVideoUrl(mid).then(url => { if (url) { player.src = url; player.load(); } }).catch(() => {});
   const startPlayback = () => { player.muted = false; player.play().catch(() => {}); playerWrap.classList.add('is-playing'); };
-  const pausePlayback = () => { player.pause(); playerWrap.classList.remove('is-playing'); };
   bigPlay.onclick = (e) => { e.stopPropagation(); startPlayback(); };
   player.onplay = () => { playerWrap.classList.add('is-playing'); };
   player.onpause = () => { playerWrap.classList.remove('is-playing'); };
-  playIcon.onclick = () => { if (player.paused) startPlayback(); else pausePlayback(); };
+
+  /* Solo las acciones que NO están ya en la barra de la reunión. Copiar, la
+     estrella y la carpeta viven arriba, junto a las pestañas, y "ver la
+     transcripción" es la pestaña de al lado: repetirlos aquí no daba un atajo,
+     daba dos sitios distintos para lo mismo. */
   const actions = el('div', 'rec-actions');
-  const folderPath = String(t.video_path).replace(/[/\\][^/\\]*$/, '');
-  const open = el('button', 'icon-btn');
-  open.innerHTML = svg('folder', 14);
-  open.title = 'Abrir carpeta';
-  open.onclick = () => api.openPath(folderPath);
-  actions.appendChild(open);
-  const bt = el('button', hasTx ? 'btn' : 'btn btn-primary', hasTx ? 'Retranscribir' : 'Recortar y transcribir');
+
+  /* Los rótulos describen la ACCIÓN, no el estado. "Retranscribir" obligaba a
+     saber de antemano que abría un recortador, y "Retranscribir todo" solo se
+     entendía por contraste con el otro botón. */
+  const bt = el('button', 'btn sm', 'Generar clips');
   bt.dataset.txBtn = 'clip';
   bt.dataset.txLabel = bt.textContent;
   bt.onclick = () => openClipEditor(wrap, t, hasTx);
   actions.appendChild(bt);
   // Transcribir directo, sin pasar por el recortador (vídeo completo)
-  const btNow = el('button', 'btn', hasTx ? 'Retranscribir todo' : 'Transcribir ahora');
+  const btNow = el('button', 'btn sm', 'Transcribir todo');
   btNow.dataset.txBtn = 'now';
   btNow.dataset.txLabel = btNow.textContent;
   btNow.onclick = () => transcribeScreenVideo(mid, hasTx, null);
   actions.appendChild(btNow);
+  actions.appendChild(hintButton(
+    '· Generar clips: marcás tramos del vídeo y sale un .mp4 por cada uno. Desde ahí también podés transcribir solo esos tramos.\n' +
+    '· Transcribir todo: recorre la grabación entera y la convierte en texto.' +
+    (hasTx ? '\n\nEsta grabación ya tiene transcripción: volver a transcribir la reemplaza.' : '')
+  ));
+
+  /* Copiar, favorito y carpeta viven aquí, junto al vídeo, y no arriba con las
+     pestañas: estaban en los dos sitios a la vez. `meetingBarButtons` los crea
+     una sola vez para que la barra de arriba pueda reusarlos cuando la reunión
+     no tiene vídeo y esta fila no existe. */
+  // `action-reveal` es lo que hace que "Copiar" despliegue su etiqueta al pasar
+  // el mouse por el grupo; sin esa clase en el padre el botón queda mudo.
+  const extra = el('span', 'rec-actions-tail action-reveal');
+  meetingBarButtons(mid, t).forEach(b => extra.appendChild(b));
+  actions.appendChild(extra);
+
   wrap.querySelector('.rec-actions').replaceWith(actions);
   applyVideoPanelTranscribing(wrap, mid);
   return wrap;
+}
+
+/* Panel para las reuniones de solo audio. General quedaba con la ficha de datos
+   y nada más: ni forma de escuchar lo grabado, ni de transcribirlo, ni las
+   acciones que sí tiene una grabación de pantalla.
+
+   Reusa el mismo servidor de medios que el vídeo —`url_for` devuelve el archivo
+   de la reunión, sea .mp4 o .wav— y las mismas clases, para que las dos
+   pestañas se vean como la misma pantalla con distinto contenido. */
+function audioPanel(t) {
+  const hasTx = !!(t.utterances && t.utterances.some(u => !u.kind || u.kind === 'utterance'));
+  const mid = t.meeting_id || t.id || STATE.selMeeting;
+  const wrap = el('div', 'video-panel audio-panel');
+  wrap.dataset.videoMid = String(mid);
+  wrap.innerHTML = `<div class="rec-actions"></div>
+    <audio class="audio-player" controls preload="metadata"></audio>`;
+
+  const player = wrap.querySelector('.audio-player');
+  api.getMediaVideoUrl(mid).then(url => { if (url) { player.src = url; player.load(); } }).catch(() => {});
+
+  const actions = el('div', 'rec-actions');
+  /* Generar clips también aquí: para audio el corte es exacto —no hay fotogramas
+     clave que respetar— y desde el mismo recortador se puede transcribir solo
+     los tramos marcados, que es lo que hacía el botón "Transcribir todo". */
+  const btClip = el('button', 'btn sm', 'Generar clips');
+  btClip.dataset.txBtn = 'clip';
+  btClip.dataset.txLabel = btClip.textContent;
+  btClip.onclick = () => openClipEditor(wrap, t, hasTx);
+  actions.appendChild(btClip);
+
+  /* Copiar con su nombre escrito, no como icono: era la acción que de verdad se
+     usa aquí, y estaba escondida detrás de un símbolo que además se repetía. */
+  const btCopy = el('button', 'btn sm btn-quiet');
+  btCopy.innerHTML = `<svg class="icon icon-sm"><use href="#i-copy"/></svg>Copiar transcripción`;
+  btCopy.disabled = !hasTx;
+  btCopy.title = hasTx ? 'Copiar la transcripción en Markdown' : 'Disponible cuando la reunión esté transcrita';
+  btCopy.onclick = (e) => copyMeetingContext(mid, e.currentTarget);
+  actions.appendChild(btCopy);
+
+  // Favorito y carpeta sí siguen como iconos: no son la acción principal.
+  const extra = el('span', 'rec-actions-tail');
+  meetingBarButtons(mid, t).slice(1).forEach(b => extra.appendChild(b));
+  actions.appendChild(extra);
+
+  wrap.querySelector('.rec-actions').replaceWith(actions);
+  applyVideoPanelTranscribing(wrap, mid);
+  return wrap;
+}
+
+/* Botón "?" con la explicación al pasar por encima. Nace del par «Transcribir
+   por partes / Transcribir todo»: los rótulos ya dicen QUÉ hace cada uno, pero
+   no cuál conviene. El tooltip del riel no sirve acá —está atado a `.sidebar`—
+   así que este se resuelve en CSS y responde igual al teclado. */
+function hintButton(texto) {
+  const b = el('button', 'hint-btn', '?');
+  b.type = 'button';
+  b.dataset.hint = texto;
+  b.setAttribute('aria-label', 'Qué hace cada opción');
+  return b;
+}
+
+/* Card que ocupa el hueco del vídeo mientras todavía no hay nada que reproducir.
+   Cubre los dos silencios que tenía la pestaña General: el muxeo (el .mp4 aún no
+   existe) y la transcripción (el panel de vídeo se esconde a propósito, ver
+   applyVideoPanelTranscribing). Sin esto el usuario ve la ficha de datos y un
+   costado vacío, sin ninguna pista de que falta algo en camino. */
+function videoProcCard(kind, mid, hasVideo) {
+  const card = el('div', 'video-proc video-panel--compact');
+  card.dataset.procMid = String(mid);
+  card.dataset.procKind = kind;
+  card.dataset.procVideo = hasVideo ? '1' : '';
+  /* Micrófono cuando la reunión es solo audio: un icono de vídeo prometería un
+     reproductor que no va a aparecer. */
+  const glifo = (hasVideo || kind === 'muxing') ? 'i-video' : 'i-mic';
+  card.innerHTML =
+    `<div class="video-proc-frame${glifo === 'i-mic' ? ' is-audio' : ''}">` +
+      `<svg class="video-proc-glyph"><use href="#${glifo}"/></svg>` +
+    `</div>` +
+    `<div class="video-proc-copy"><b data-proc-title></b><small data-proc-note></small></div>` +
+    `<span class="video-proc-bar" data-proc-bar hidden><i data-proc-fill></i></span>`;
+  updateVideoProcCard(card);
+  return card;
+}
+
+/* Refresca el texto y la barra sin reconstruir el card: renderBgJobs lo llama en
+   cada tic del progreso y un re-render completo ahí reiniciaría el vídeo y la
+   posición de lectura. */
+function updateVideoProcCard(card) {
+  const kind = card.dataset.procKind;
+  const title = card.querySelector('[data-proc-title]');
+  const note = card.querySelector('[data-proc-note]');
+  const fill = card.querySelector('[data-proc-fill]');
+  const bar = card.querySelector('[data-proc-bar]');
+  if (kind === 'muxing') {
+    title.textContent = 'Preparando el vídeo…';
+    note.textContent = 'Uniendo imagen y sonido. Podés seguir usando la app; aparece solo cuando esté listo.';
+    /* Sin barra: el muxeo no informa progreso. Una barra moviéndose sola finge
+       saber cuánto falta, y el barrido del marco ya dice que algo está pasando. */
+    bar.hidden = true;
+    return;
+  }
+  const job = meetingJob(card.dataset.procMid);
+  const pct = Math.max(0, Math.min(100, Math.round(((job && job.progress) || 0) * 100)));
+  title.textContent = (job && job.stage) || 'Transcribiendo…';
+  /* La nota promete solo lo que hay: si esta reunión no tiene vídeo, decir que
+     "vuelve a estar disponible" mandaría a buscar algo que no existe. */
+  if (job && job.state === 'queued') {
+    note.textContent = 'En cola. Empieza en cuanto termine el trabajo anterior.';
+  } else if (card.dataset.procVideo) {
+    note.textContent = `El vídeo vuelve a estar disponible al terminar · ${pct}%`;
+  } else {
+    note.textContent = `Convirtiendo el audio en texto · ${pct}%`;
+  }
+  bar.hidden = false;
+  fill.style.width = pct + '%';
 }
 
 function applyVideoPanelTranscribing(wrap, mid) {
@@ -3007,47 +3235,90 @@ function refreshVideoPanelButtons() {
   document.querySelectorAll('.video-panel[data-video-mid]').forEach(wrap => {
     applyVideoPanelTranscribing(wrap, wrap.dataset.videoMid);
   });
+  document.querySelectorAll('.video-proc[data-proc-mid]').forEach(updateVideoProcCard);
+  syncGeneralVideoState();
+}
+
+/* Último estado que dibujó renderGeneral. El card de progreso y el panel de
+   vídeo son piezas distintas del DOM, así que pasar de uno a otro (empieza una
+   transcripción, termina el muxeo) pide rehacer la pestaña, no repintar la
+   barra. Comparar contra lo dibujado hace que eso ocurra UNA vez por transición
+   y no en cada tic del progreso, que reiniciaría el reproductor. */
+let _generalVideoState = null;
+
+function syncGeneralVideoState() {
+  if (STATE.screen !== 'meeting' || STATE.activeTab !== 'general') return;
+  if (_generalVideoState === null) return;
+  if (generalVideoState(STATE.transcript, STATE.selMeeting) !== _generalVideoState) renderMain();
 }
 
 // Recortador estilo CapCut: reproductor + línea de tiempo con miniaturas + manijas.
 async function openClipEditor(wrap, t, isRetx) {
-  const existing = wrap.querySelector('.clip-editor');
-  if (existing) {
-    existing.remove();
-    document.querySelectorAll('.clip-backdrop').forEach(b => b.remove());
-    return;
-  }
+  // Un solo recortador a la vez: reabrirlo desde el mismo botón cierra el que hay.
+  const abierto = document.querySelector('.clip-modal');
+  if (abierto) { abierto.close(); abierto.remove(); return; }
+
   const mid = t.meeting_id || STATE.selMeeting;
   const url = await api.getMediaVideoUrl(mid);
-  const ed = el('div', 'clip-editor');
-  ed.innerHTML = `
-    <video class="clip-video" src="${esc(url || '')}" preload="metadata"></video>
-    <div class="clip-ctrl">
-      <button class="clip-cbtn clip-skip" data-d="-10" title="Retroceder 10 segundos">${svg('rewind', 14)}<span class="clip-cnum">10</span></button>
-      <button class="clip-cbtn clip-play" title="Reproducir la sección seleccionada">${svg('play', 16)}</button>
-      <button class="clip-cbtn clip-skip" data-d="10" title="Avanzar 10 segundos"><span class="clip-cnum">10</span>${svg('fastForward', 14)}</button>
-      <span class="clip-ctrl-sep"></span>
-      <button class="clip-cbtn clip-mark-a" title="La sección empieza aquí (posición actual del vídeo)">${svg('markIn', 14)}</button>
-      <button class="clip-cbtn clip-mark-b" title="La sección termina aquí (posición actual del vídeo)">${svg('markOut', 14)}</button>
-      <span class="clip-time">0:00 / 0:00</span>
-      <button class="clip-cbtn clip-max" title="Ampliar en ventana grande">${svg('expand', 14)}</button>
+
+  /* <dialog> nativo y no un div flotante: trae Esc, la retención del foco y el
+     ::backdrop de fábrica, que es justo lo que el modo "ampliar" imitaba a mano
+     con un .clip-backdrop y un listener de teclado propio. */
+  /* Sin vídeo el recortador sigue sirviendo —marcar tramos de audio es lo
+     mismo— pero sobran el reproductor y la tira de fotogramas. */
+  const esAudio = !(t && t.video_path);
+  const dlg = el('dialog', 'clip-modal' + (esAudio ? ' is-audio' : ''));
+  dlg.innerHTML = `
+    <div class="clip-modal-head">
+      <div class="clip-modal-title">
+        <b>Trabajar por partes</b>
+        <small>Marcá los tramos que te interesan y elegí abajo qué hacer con ellos</small>
+      </div>
+      <button class="icon-btn clip-close" type="button" title="Cerrar (Esc)">${svg('x', 16)}</button>
     </div>
-    <div class="clip-tl">
-      <div class="clip-thumbs"></div>
-      <div class="clip-section-marks"></div>
-      <div class="clip-sel"><span class="clip-h l"></span><span class="clip-h r"></span></div>
-      <div class="clip-cursor"></div>
-    </div>
-    <div class="clip-scale"><span>0:00</span><span class="clip-dur">--:--</span></div>
-    <div class="clip-segs"></div>
-    <div class="clip-foot">
-      <div class="clip-total">Carga el video para crear la primera sección</div>
-      <div class="clip-actions">
-        <button class="btn clip-cancel">Cancelar</button>
-        <button class="btn btn-primary clip-go" disabled>Transcribir selección →</button>
+    <div class="clip-editor">
+      <video class="clip-video" src="${esc(url || '')}" preload="metadata"></video>
+      <div class="clip-ctrl">
+        <button class="clip-cbtn clip-skip" data-d="-10" title="Retroceder 10 segundos">${svg('rewind', 14)}<span class="clip-cnum">10</span></button>
+        <button class="clip-cbtn clip-play" title="Reproducir el clip seleccionado">${svg('play', 16)}</button>
+        <button class="clip-cbtn clip-skip" data-d="10" title="Avanzar 10 segundos"><span class="clip-cnum">10</span>${svg('fastForward', 14)}</button>
+        <span class="clip-ctrl-sep"></span>
+        <button class="clip-cbtn clip-mark-a" title="El clip empieza aquí (posición actual del vídeo)">${svg('markIn', 14)}</button>
+        <button class="clip-cbtn clip-mark-b" title="El clip termina aquí (posición actual del vídeo)">${svg('markOut', 14)}</button>
+        <span class="clip-time">0:00 / 0:00</span>
+        ${esAudio ? '' : `<button class="clip-cbtn clip-ver" type="button" title="Mostrar u ocultar el vídeo">${svg('eye', 14)}</button>`}
+      </div>
+      <div class="clip-tl">
+        <div class="clip-thumbs is-loading"></div>
+        <div class="clip-section-marks"></div>
+        <div class="clip-shade sl"></div>
+        <div class="clip-shade sr"></div>
+        <div class="clip-sel"><span class="clip-h l"></span><span class="clip-h r"></span></div>
+        <div class="clip-cursor"></div>
+      </div>
+      <div class="clip-scale"><span>0:00</span><span class="clip-dur">--:--</span></div>
+      <div class="clip-segs"></div>
+      <div class="clip-out">
+        <label class="clip-opt"><input type="checkbox" class="clip-opt-clips" checked>
+          <span><b>Guardar como clips</b><small>${esAudio
+            ? 'Un .wav por clip, en una carpeta «clips». El corte es exacto: el audio no tiene fotogramas clave.'
+            : 'Un .mp4 por clip, en una carpeta «clips». No recomprime: es rápido y no pierde calidad.'}</small></span></label>
+        <label class="clip-opt"><input type="checkbox" class="clip-opt-tx">
+          <span><b>Transcribir los tramos</b><small>Convierte en texto solo lo marcado, sin recorrer el vídeo entero.</small></span></label>
+        <label class="clip-opt clip-opt-danger"><input type="checkbox" class="clip-opt-del" disabled>
+          <span><b>Enviar el vídeo original a la papelera</b><small class="clip-del-note">Solo con los clips activados.</small></span></label>
+      </div>
+      <div class="clip-foot">
+        <div class="clip-total">Cargando el vídeo…</div>
+        <div class="clip-actions">
+          <button class="btn clip-cancel" type="button">Cancelar</button>
+          <button class="btn btn-primary clip-go" type="button" disabled>Transcribir selección →</button>
+        </div>
       </div>
     </div>`;
-  wrap.appendChild(ed);
+  document.body.appendChild(dlg);
+  dlg.showModal();
+  const ed = dlg.querySelector('.clip-editor');
   if (!url) {
     ed.querySelector('.clip-total').textContent = 'No se pudo cargar el vídeo';
     return;
@@ -3056,6 +3327,8 @@ async function openClipEditor(wrap, t, isRetx) {
   const video = ed.querySelector('.clip-video');
   const tl = ed.querySelector('.clip-tl');
   const sel = ed.querySelector('.clip-sel');
+  const shadeL = ed.querySelector('.clip-shade.sl');
+  const shadeR = ed.querySelector('.clip-shade.sr');
   const cursor = ed.querySelector('.clip-cursor');
   const segsBox = ed.querySelector('.clip-segs');
   const marksBox = ed.querySelector('.clip-section-marks');
@@ -3064,10 +3337,25 @@ async function openClipEditor(wrap, t, isRetx) {
   const state = { dur: 0, a: 0, b: 0, segs: [], active: 0 };
   const fmt = s => `${Math.floor(s/60)}:${String(Math.floor(s%60)).padStart(2,'0')}`;
 
-  api.getVideoThumbnails(mid, 12).then(thumbs => {
-    ed.querySelector('.clip-thumbs').innerHTML = (thumbs || []).map(th =>
-      `<i style="background-image:url(data:image/jpeg;base64,${th.thumb})"></i>`).join('');
-  });
+  /* Las miniaturas tardan: hasta que llegan, la tira lleva `is-loading` y late
+     en vez de quedarse negra sin explicar por qué. Se piden 16 porque a lo ancho
+     del modal 12 salían estiradas. */
+  const tiraThumbs = ed.querySelector('.clip-thumbs');
+  if (esAudio) {
+    // No hay fotogramas que pedir: la tira queda como una pista lisa.
+    tiraThumbs.classList.remove('is-loading');
+  } else {
+    api.getVideoThumbnails(mid, 16).then(thumbs => {
+      const utiles = (thumbs || []).filter(th => th && th.thumb);
+      tiraThumbs.classList.remove('is-loading');
+      if (!utiles.length) { tiraThumbs.classList.add('is-empty'); return; }
+      tiraThumbs.innerHTML = utiles.map(th =>
+        `<i style="background-image:url(data:image/jpeg;base64,${th.thumb})"></i>`).join('');
+    }).catch(() => {
+      tiraThumbs.classList.remove('is-loading');
+      tiraThumbs.classList.add('is-empty');
+    });
+  }
 
   function sortedSegs() {
     return state.segs.map((s, i) => ({ ...s, i })).sort((a, b) => a.start - b.start || a.end - b.end);
@@ -3131,11 +3419,20 @@ async function openClipEditor(wrap, t, isRetx) {
   }
   function paintSel() {
     if (!state.dur) return;
-    sel.style.left = (state.a / state.dur * 100) + '%';
-    sel.style.width = ((state.b - state.a) / state.dur * 100) + '%';
+    const izq = state.a / state.dur * 100;
+    const der = state.b / state.dur * 100;
+    sel.style.left = izq + '%';
+    sel.style.width = (der - izq) + '%';
+    /* Se oscurece lo que queda FUERA del clip en vez de teñir lo de dentro: así
+       las miniaturas del tramo elegido se ven a su color y el resto se aparta
+       solo. Es lo que hace cualquier editor de vídeo. */
+    shadeL.style.width = izq + '%';
+    shadeR.style.left = der + '%';
     syncActiveSection();
     const secs = totalSelected();
-    totalEl.innerHTML = `Se transcribirá <b>${fmt(secs)}</b> de ${fmt(state.dur)} <span class="clip-range">· Sección ${state.active + 1}: ${fmt(state.a)} – ${fmt(state.b)}</span>`;
+    /* Neutro: desde aquí se puede cortar, transcribir o las dos cosas, así que
+       decir "se transcribirá" prometía solo una de las tres. */
+    totalEl.innerHTML = `Seleccionado <b>${fmt(secs)}</b> de ${fmt(state.dur)} <span class="clip-range">· Clip ${state.active + 1}: ${fmt(state.a)} – ${fmt(state.b)}</span>`;
     updateGo();
   }
   function paintSegs() {
@@ -3144,23 +3441,31 @@ async function openClipEditor(wrap, t, isRetx) {
       if (!state.dur || i === state.active) return '';
       const left = s.start / state.dur * 100;
       const width = (s.end - s.start) / state.dur * 100;
-      return `<button type="button" class="clip-section-mark" data-i="${i}" style="left:${left}%;width:${width}%" title="Sección ${i + 1}"></button>`;
+      return `<button type="button" class="clip-section-mark" data-i="${i}" style="left:${left}%;width:${width}%" title="Clip ${i + 1}"></button>`;
     }).join('');
     marksBox.querySelectorAll('.clip-section-mark').forEach(mark => mark.onclick = e => {
       e.stopPropagation();
       activateSection(+mark.dataset.i);
     });
-    const addLabel = canAdd ? '+ añadir sección'
-      : (isFullyCovered() ? 'Todo el video está cubierto' : 'Sin espacio junto a la sección activa');
-    segsBox.innerHTML = state.segs.map((s, i) =>
-      `<button type="button" class="clip-pill${i === state.active ? ' is-active' : ''}" data-i="${i}">Sección ${i+1} · ${fmt(s.start)}–${fmt(s.end)} <span class="x" title="Eliminar sección">×</span></button>`
-    ).join('') + `<button type="button" class="clip-add" ${canAdd ? '' : 'disabled'}>${addLabel}</button>`;
-    segsBox.querySelectorAll('.clip-pill').forEach(p => p.onclick = e => {
+    let addLabel = '+ Añadir clip';
+    if (!canAdd) addLabel = isFullyCovered() ? 'Todo el vídeo está cubierto' : 'Sin hueco junto al clip activo';
+    /* Pestañas «Clip N» en vez de píldoras con el rango dentro: con tres o más
+       tramos la fila se volvía ilegible, y el rango del activo ya se lee entero
+       en el pie. Solo el activo puede borrarse, para que la × no obligue a
+       apuntar fino entre pestañas. */
+    segsBox.innerHTML = state.segs.map((s, i) => {
+      const activo = i === state.active;
+      return `<button type="button" class="clip-tab${activo ? ' is-active' : ''}" data-i="${i}"` +
+        ` title="${fmt(s.start)}–${fmt(s.end)}">Clip ${i + 1}` +
+        (activo && state.segs.length > 1 ? `<span class="x" title="Eliminar este clip">×</span>` : '') +
+        `</button>`;
+    }).join('') + `<button type="button" class="clip-add" ${canAdd ? '' : 'disabled'}>${addLabel}</button>`;
+    segsBox.querySelectorAll('.clip-tab').forEach(p => p.onclick = e => {
       if (e.target.closest('.x')) return;
       activateSection(+p.dataset.i);
     });
     segsBox.querySelectorAll('.x').forEach(x => x.onclick = e => {
-      const idx = +e.target.closest('.clip-pill').dataset.i;
+      const idx = +e.target.closest('.clip-tab').dataset.i;
       state.segs.splice(idx, 1);
       if (!state.segs.length) {
         state.segs.push({ start: 0, end: state.dur });
@@ -3180,14 +3485,48 @@ async function openClipEditor(wrap, t, isRetx) {
       activateSection(insertAt);
     };
   }
+  // ── Qué hacer con los tramos ──
+  const optTx = ed.querySelector('.clip-opt-tx');
+  const optClips = ed.querySelector('.clip-opt-clips');
+  const optDel = ed.querySelector('.clip-opt-del');
+  const delNote = ed.querySelector('.clip-del-note');
+
+  /* Borrar el original y transcribir por tramos no pueden ir juntos: la
+     transcripción se encola y se ejecuta después, cuando el archivo del que
+     salen esos tramos ya no estaría. En vez de dejar que falle a destiempo, la
+     casilla se apaga sola y dice por qué. */
+  function syncOpciones() {
+    optDel.disabled = !optClips.checked;
+    if (optDel.disabled) optDel.checked = false;
+    if (optDel.checked && optTx.checked) optTx.checked = false;
+    optTx.disabled = optDel.checked;
+    if (optDel.checked) {
+      delNote.textContent = 'Se puede recuperar desde la papelera de Windows. La reunión pasa a mostrar el primer clip.';
+    } else if (optDel.disabled) {
+      delNote.textContent = 'Solo con los clips activados.';
+    } else {
+      delNote.textContent = 'No se borra del todo: va a la papelera de Windows. Desactiva transcribir, porque los tramos dejarían de tener de dónde salir.';
+    }
+    updateGo();
+  }
+  [optTx, optClips, optDel].forEach(c => c.addEventListener('change', syncOpciones));
+  setTimeout(syncOpciones, 0);   // estado inicial, ya con updateGo() definido
+
   function updateGo() {
-    goBtn.disabled = !state.segs.some(s => (s.end - s.start) >= 0.5);
+    const hayTramos = state.segs.some(s => (s.end - s.start) >= 0.5);
+    const nTramos = state.segs.filter(s => (s.end - s.start) >= 0.5).length;
+    const tx = optTx.checked, clips = optClips.checked;
+    goBtn.disabled = !hayTramos || (!tx && !clips);
+    if (!tx && !clips) goBtn.textContent = 'Elegí qué hacer';
+    else if (tx && clips) goBtn.textContent = 'Cortar y transcribir →';
+    else if (clips) goBtn.textContent = nTramos === 1 ? 'Crear el clip →' : `Crear ${nTramos} clips →`;
+    else goBtn.textContent = 'Transcribir selección →';
   }
 
   // Controles de reproducción: play/pausa y saltos de ±10 s.
   const playBtn = ed.querySelector('.clip-play');
   const timeEl = ed.querySelector('.clip-time');
-  let playingClip = false;   // reproduciendo la sección → pausa al llegar a su fin
+  let playingClip = false;   // reproduciendo el clip → pausa al llegar a su fin
   playBtn.onclick = () => {
     if (video.paused) {
       // Play arranca en el INICIO de la sección si el cursor está fuera de ella;
@@ -3203,14 +3542,14 @@ async function openClipEditor(wrap, t, isRetx) {
   };
   video.addEventListener('click', () => playBtn.onclick());
   video.addEventListener('play', () => { playBtn.innerHTML = svg('pause', 16); playBtn.title = 'Pausa'; });
-  video.addEventListener('pause', () => { playBtn.innerHTML = svg('play', 16); playBtn.title = 'Reproducir la sección seleccionada'; });
+  video.addEventListener('pause', () => { playBtn.innerHTML = svg('play', 16); playBtn.title = 'Reproducir el clip seleccionado'; });
   ed.querySelectorAll('.clip-skip').forEach(b => b.onclick = () => {
     if (!state.dur) return;
-    playingClip = false;   // navegación libre: no auto-pausar en el fin de la sección
+    playingClip = false;   // navegación libre: no auto-pausar en el fin del clip
     video.currentTime = Math.min(state.dur, Math.max(0, video.currentTime + Number(b.dataset.d)));
   });
 
-  // Marcar la sección viendo el vídeo: fija inicio/fin en la posición actual.
+  // Marcar el clip viendo el vídeo: fija inicio/fin en la posición actual.
   ed.querySelector('.clip-mark-a').onclick = () => {
     if (!state.dur) return;
     state.a = Math.max(0, Math.min(video.currentTime, state.b - 0.2));
@@ -3222,32 +3561,30 @@ async function openClipEditor(wrap, t, isRetx) {
     paintSel(); paintSegs();
   };
 
-  // Modo ventana grande: el editor pasa a un modal amplio dentro de la app
-  // (no pantalla completa del sistema). Conserva el estado: vídeo y selección.
-  const maxBtn = ed.querySelector('.clip-max');
-  const backdrop = el('div', 'clip-backdrop');
-  let maximized = false;
-  const onKey = e => { if (e.key === 'Escape' && maximized) maxBtn.onclick(); };
-  maxBtn.onclick = () => {
-    maximized = !maximized;
-    ed.classList.toggle('clip-editor--max', maximized);
-    if (maximized) {
-      document.body.appendChild(backdrop);
-      backdrop.onclick = () => maxBtn.onclick();
-      document.addEventListener('keydown', onKey);
-    } else {
-      backdrop.remove();
-      document.removeEventListener('keydown', onKey);
-    }
-    maxBtn.innerHTML = svg(maximized ? 'shrink' : 'expand', 14);
-    maxBtn.title = maximized ? 'Volver al panel (Esc)' : 'Ampliar en ventana grande';
-  };
-
-  function closeEditor() {
-    backdrop.remove();
-    document.removeEventListener('keydown', onKey);
-    ed.remove();
+  /* El reproductor arranca plegado también con vídeo: la tira de fotogramas de
+     la línea de tiempo ya dice qué se está recortando, y el modal entra entero
+     en pantalla sin scroll. Se despliega con el ojo cuando hace falta mirar un
+     momento concreto. */
+  const verBtn = ed.querySelector('.clip-ver');
+  if (verBtn) {
+    let visible = false;
+    const pintarVer = () => {
+      dlg.classList.toggle('video-oculto', !visible);
+      verBtn.classList.toggle('is-on', visible);
+      verBtn.title = visible ? 'Ocultar el vídeo' : 'Mostrar el vídeo';
+    };
+    verBtn.onclick = () => { visible = !visible; pintarVer(); };
+    pintarVer();
   }
+
+  /* Cerrar siempre pasa por aquí: `close()` dispara el evento y ahí se pausa el
+     vídeo. Sin eso, salir con Esc dejaba el audio sonando bajo la pantalla. */
+  function closeEditor() { dlg.close(); }
+  dlg.addEventListener('close', () => { video.pause(); dlg.remove(); });
+  dlg.querySelector('.clip-close').onclick = closeEditor;
+  // Clic fuera del contenido: el <dialog> ocupa toda la pantalla, así que el
+  // propio elemento ES el fondo.
+  dlg.addEventListener('mousedown', e => { if (e.target === dlg) closeEditor(); });
 
   video.addEventListener('loadedmetadata', () => {
     state.dur = video.duration || 0;
@@ -3347,9 +3684,43 @@ async function openClipEditor(wrap, t, isRetx) {
     syncActiveSection();
     const all = state.segs.filter(s => (s.end - s.start) >= 0.5);
     if (!all.length) return;
-    goBtn.disabled = true; goBtn.textContent = 'Transcribiendo…';
+    const quiereTx = optTx.checked && !optTx.disabled;
+    const quiereClips = optClips.checked;
+    const borrar = quiereClips && optDel.checked;
+    goBtn.disabled = true;
+
+    if (quiereClips) {
+      // El corte es síncrono y puede tardar unos segundos: el modal se queda
+      // abierto para poder dar el error sin haber perdido la selección.
+      goBtn.textContent = 'Cortando…';
+      let r;
+      try { r = await api.exportMeetingClips(mid, all, borrar); }
+      catch (e) { r = { ok: false, error: String(e) }; }
+      if (!r || !r.ok) {
+        toast('err', (r && r.error) || 'No se pudieron crear los clips');
+        goBtn.disabled = false; updateGo();
+        return;
+      }
+      const n = (r.clips || []).length;
+      /* El corte arranca en el fotograma clave anterior, así que un clip puede
+         empezar un poco antes de la marca. Se avisa solo cuando el desvío se
+         nota, en vez de prometer una exactitud que el método no da. */
+      const desvio = Math.max(0, ...(r.clips || []).map(c => c.start - c.real_start));
+      let msg = n === 1 ? '1 clip creado' : `${n} clips creados`;
+      if (desvio >= 0.5) msg += ` · empiezan hasta ${desvio.toFixed(1)} s antes de la marca`;
+      if (r.deleted_original) msg += ' · el original está en la papelera';
+      if (r.warning) msg += ` · ${r.warning}`;
+      toast(r.warning ? 'err' : 'ok', msg, 'Abrir carpeta', () => api.openPath(r.folder));
+      if (!quiereTx) {
+        closeEditor();
+        // La reunión ahora apunta al primer clip si se borró el original.
+        if (r.deleted_original) await openMeeting(mid);
+        return;
+      }
+    }
+
     closeEditor();
-    await transcribeScreenVideo(mid, isRetx, all);
+    if (quiereTx) await transcribeScreenVideo(mid, isRetx, all);
   };
 }
 
@@ -4470,8 +4841,11 @@ function viewAllInitiatives() {
   const tabla = el('table', 'esp-table');
   tabla.innerHTML =
     `<thead><tr>` +
-      `<th>Espacio</th><th>Última actividad</th>` +
-      `<th class="esp-num">Reuniones</th><th class="esp-num">Duración</th><th>Pendientes</th>` +
+      // scope="col" no es decorativo: sin él, un lector de pantalla no sabe que
+      // "98" pertenece a la columna "Reuniones" y lee las celdas como números
+      // sueltos, sin la cabecera que les da sentido.
+      `<th scope="col">Espacio</th><th scope="col">Última actividad</th>` +
+      `<th scope="col" class="esp-num">Reuniones</th><th scope="col" class="esp-num">Duración</th><th scope="col">Pendientes</th>` +
     `</tr></thead>`;
   const tbody = el('tbody');
 
@@ -4811,23 +5185,59 @@ function applySidebar() {
   }
 
   let startX, startW, dragging = false;
+  let pendiente = null, rafId = 0;
 
   function stopDrag() {
     dragging = false;
+    // Si quedó un fotograma en cola, aplicarlo ya: soltar el ratón un instante
+    // antes del repintado dejaba el panel un par de píxeles corrido.
+    if (rafId) { cancelAnimationFrame(rafId); rafId = 0; }
+    if (pendiente != null) {
+      document.documentElement.style.setProperty('--sidebar-w', pendiente + 'px');
+      pendiente = null;
+    }
     document.body.classList.remove('sidebar-dragging');
     document.body.style.userSelect = '';
   }
 
   document.addEventListener('mousedown', e => {
     const handle = e.target.closest('#sidebarResizeHandle');
-    if (!handle || !STATE.sidebarOpen) return;
+    if (!handle) return;
     e.preventDefault();
+    /* stopPropagation porque el tirador se superpone a la barra de título: sin
+       esto, el mismo mousedown podía llegar a quien mueve la ventana y el
+       arrastre tardaba en responder justo en esa franja de arriba. */
+    e.stopPropagation();
+
+    if (STATE.sidebarOpen) {
+      startW = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--sidebar-w'), 10) || 320;
+    } else {
+      /* Plegado: el arrastre lo despliega en vez de no hacer nada. Antes esta
+         función se salía si el panel estaba plegado, y el bloque que debía
+         cubrir ese caso escuchaba un `#railResizeHandle` que NO EXISTE en el
+         HTML — código muerto, así que no había forma de desplegarlo tirando. */
+      STATE.sidebarOpen = true;
+      applySidebar();
+      document.documentElement.style.setProperty('--sidebar-w', SIDEBAR_MIN + 'px');
+      startW = SIDEBAR_MIN;
+    }
     startX = e.clientX;
-    startW = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--sidebar-w'), 10) || 320;
     dragging = true;
     document.body.classList.add('sidebar-dragging');
     document.body.style.userSelect = 'none';
   });
+
+  /* El ancho se aplica UNA vez por fotograma, no en cada mousemove.
+     Cambiar `--sidebar-w` obliga a recalcular el layout del panel entero, y el
+     ratón dispara eventos más rápido de lo que el navegador puede repintar: los
+     sobrantes se encolaban y el borde llegaba tarde al puntero. Es el retardo
+     que se sentía al arrastrar. */
+  const aplicarAncho = () => {
+    rafId = 0;
+    if (pendiente == null || !dragging) return;
+    document.documentElement.style.setProperty('--sidebar-w', pendiente + 'px');
+    pendiente = null;
+  };
 
   document.addEventListener('mousemove', e => {
     if (!dragging) return;
@@ -4837,9 +5247,10 @@ function applySidebar() {
       stopDrag();
       STATE.sidebarOpen = false; applySidebar();
       document.documentElement.style.setProperty('--sidebar-w', SIDEBAR_MIN + 'px');
-    } else {
-      document.documentElement.style.setProperty('--sidebar-w', Math.max(SIDEBAR_MIN, newW) + 'px');
+      return;
     }
+    pendiente = Math.max(SIDEBAR_MIN, newW);
+    if (!rafId) rafId = requestAnimationFrame(aplicarAncho);
   });
 
   document.addEventListener('mouseup', e => {
@@ -4850,38 +5261,9 @@ function applySidebar() {
   });
 })();
 
-// ---- Expansión desde el rail ----
-(function initRailExpand() {
-  const SIDEBAR_MIN = 160, SIDEBAR_MAX = 480;
-  let dragging = false, startX = 0;
-
-  document.addEventListener('mousedown', e => {
-    if (!e.target.closest('#railResizeHandle')) return;
-    e.preventDefault();
-    dragging = true;
-    startX = e.clientX;
-    document.body.classList.add('rail-expanding');
-    document.body.style.userSelect = 'none';
-    // Expandir el sidebar inmediatamente con ancho mínimo para que aparezca
-    STATE.sidebarOpen = true; applySidebar();
-    document.documentElement.style.setProperty('--sidebar-w', SIDEBAR_MIN + 'px');
-  });
-
-  document.addEventListener('mousemove', e => {
-    if (!dragging) return;
-    const newW = Math.max(SIDEBAR_MIN, Math.min(SIDEBAR_MAX, SIDEBAR_MIN + (e.clientX - startX)));
-    document.documentElement.style.setProperty('--sidebar-w', newW + 'px');
-  });
-
-  document.addEventListener('mouseup', e => {
-    if (!dragging) return;
-    dragging = false;
-    document.body.classList.remove('rail-expanding');
-    document.body.style.userSelect = '';
-    const finalW = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--sidebar-w'), 10);
-    save('hm.sidebar-w2', String(finalW));
-  });
-})();
+/* El bloque "Expansión desde el rail" se retiró: escuchaba sobre un
+   `#railResizeHandle` que nunca existió en index.html, así que jamás corrió.
+   Desplegar arrastrando lo hace ahora el propio tirador del panel. */
 
 // ---- Resize de ventana frameless ----
 document.querySelectorAll('.wr[data-dir]').forEach(h => {
@@ -5806,17 +6188,28 @@ async function stopMeetingRecording() {
   try {
     const r = await api.stopRecording();
     const stoppedId = r && r.meeting_id;
-    STATE.screen = STATE.selInit ? 'initiative' : 'welcome';
     setAppState('idle');
     await refreshMeetings(STATE.selInit);
     if (r && r.ok) {
-      /* Se guarda y punto. Antes al detener aparecía un formulario "Nombrar la
-         reunión": justo cuando la reunión termina y uno se va, había que
-         atender un diálogo para algo opcional. El nombre se pone DURANTE la
-         grabación, en el título del panel, o después desde el menú "···" de la
-         fila — y mientras tanto la reunión lleva su fecha, que ya identifica. */
-      toast('ok', 'Grabación guardada · se transcribe en segundo plano');
+      /* Mismo cierre que la grabación de pantalla: detener lleva a la reunión.
+         Antes esto volvía al proyecto y dejaba dos avisos sueltos —"se
+         transcribe en segundo plano" y, un rato después, "transcripción
+         lista"— que obligaban a ir a buscar a mano lo que se acababa de grabar.
+
+         Se guarda sin preguntar el nombre: el nombre se pone DURANTE la
+         grabación o después desde el menú "···" de la fila, y mientras tanto la
+         reunión lleva su fecha, que ya identifica. */
+      if (stoppedId != null) {
+        /* El trabajo de transcripción tarda un momento en aparecer en bgJobs.
+           Sin esta marca, la pestaña General se dibujaría vacía en ese hueco y
+           el card de "transcribiendo" entraría un segundo después, de golpe. */
+        STATE.txPending[String(stoppedId)] = Date.now();
+        await openMeeting(stoppedId);
+      } else {
+        STATE.screen = STATE.selInit ? 'initiative' : 'welcome';
+      }
     } else {
+      STATE.screen = STATE.selInit ? 'initiative' : 'welcome';
       toast('err', errMsg(r && r.error, 'No se pudo finalizar la reunión'));
     }
   } catch (e) {
@@ -6205,13 +6598,24 @@ async function stopScreenRecording() {
   stopTimer();
   closeModal();
   setAppState('idle');
+  const mid = STATE.screenMeetingId;
   let res = null;
   try { res = await api.stopScreenRecording(); } catch (e) {}
   STATE.screenMeetingId = null;
   if (res && res.ok) {
-    // El muxeo va en segundo plano; no bloqueamos. Avisará onScreenVideoSaved.
-    toast('info', 'Guardando video…');
+    /* El muxeo va en segundo plano; no bloqueamos. Se anota como pendiente para
+       que la pestaña General pueda decir "preparando el vídeo" en vez de dejar
+       el hueco vacío. Lo borra onScreenVideoSaved. */
+    const savedId = res.meeting_id != null ? res.meeting_id : mid;
+    if (savedId != null) STATE.videoPending[String(savedId)] = Date.now();
     await refreshMeetings(STATE.selInit);
+    /* Detener lleva a la reunión recién grabada. La transcripción de pantalla se
+       hace EN VIVO durante la grabación (ver _save_screen_video_bg: solo encola
+       trabajo si falló del todo), así que al parar el texto ya está escrito y
+       nadie lo estaba llevando a verlo: quedaba un aviso suelto y una pantalla
+       que no cambiaba. Abrir la reunión es la consecuencia esperable de parar. */
+    if (savedId != null) await openMeeting(savedId);
+    else toast('info', 'Guardando video…');
   } else {
     toast('err', errMsg(res && res.error, 'No se pudo detener la grabación'));
   }
@@ -6223,18 +6627,31 @@ window.onScreenVideoSaved = async function (meetingId, initiativeId, ok, audio) 
   } else if (STATE.selInit) {
     await refreshMeetings(STATE.selInit);
   }
-  if (ok) {
-    const msg = audio === false ? 'Vídeo guardado (sin sonido)' : 'Vídeo añadido a Archivos';
-    toast(audio === false ? 'info' : 'ok', msg, 'Ver archivo', () => {
-      if (meetingId) {
-        openMeeting(meetingId);
-        STATE.activeTab = 'archivos';
-        renderMain();
-      }
-    });
-  } else {
-    toast('err', 'No se pudo guardar el vídeo');
+  /* Si la reunión está abierta se recarga ANTES de bajar la marca de pendiente:
+     así el transcript ya trae video_path cuando General vuelve a dibujarse y el
+     card de "preparando" da paso al reproductor sin pasar por un hueco vacío. */
+  const abierta = STATE.screen === 'meeting' && String(STATE.selMeeting) === String(meetingId);
+  if (ok && abierta) {
+    try { await openMeeting(meetingId, true); } catch (e) { /* refresco best-effort */ }
   }
+  // Se baja pase lo que pase: si el guardado falló, dejar el card girando para
+  // siempre sería peor que decir que no hay vídeo.
+  delete STATE.videoPending[String(meetingId)];
+  if (!ok) { toast('err', 'No se pudo guardar el vídeo'); return; }
+  if (abierta) renderMain();
+
+  /* Un solo aviso, y que diga lo que de verdad pasó. Antes salía "Vídeo añadido
+     a Archivos" con un enlace a esa pestaña: describía el archivo, no el estado
+     de la grabación, y no mencionaba la transcripción. El enlace solo aparece si
+     el usuario está en otra pantalla — estando ya en la reunión no llevaría a
+     ninguna parte. */
+  let msg;
+  if (audio === false) msg = 'Vídeo guardado, pero sin sonido';  // sin audio no hay transcripción que prometer
+  else if (meetingIsTranscribing(meetingId)) msg = 'Vídeo listo · transcribiendo…';
+  else msg = 'Grabación lista';
+  const kind = audio === false ? 'info' : 'ok';
+  if (abierta || !meetingId) toast(kind, msg);
+  else toast(kind, msg, 'Abrir reunión', () => openMeeting(meetingId));
 };
 /* ============================================================
    7d. PROCESAMIENTO (con barra; Cancelar es V2)
@@ -6605,11 +7022,23 @@ function renderBgJobs(jobs) {
 }
 window.onBackgroundJobs = renderBgJobs;
 window.onJobFinished = async function (meetingId, initiativeId, ok) {
+  /* La comparación va por String: meetingId llega desde Python como número, pero
+     STATE.selMeeting suele venir de un data-* del árbol, que es texto. Con ===
+     el refresco no se disparaba y la transcripción recién terminada no entraba
+     hasta cambiar de pantalla y volver. */
+  const abierta = STATE.screen === 'meeting' && String(STATE.selMeeting) === String(meetingId);
+  delete STATE.txPending[String(meetingId)];
   try {
     if (initiativeId != null) await refreshMeetings(initiativeId);
-    if (STATE.screen === 'meeting' && STATE.selMeeting === meetingId) await openMeeting(meetingId, true);
+    if (abierta) await openMeeting(meetingId, true);
   } catch (e) { /* refresco best-effort */ }
-  toast(ok ? 'ok' : 'err', ok ? 'Transcripción lista' : 'No se pudo transcribir una reunión');
+  if (!ok) { toast('err', 'No se pudo transcribir una reunión'); return; }
+  /* Sin aviso cuando la reunión está delante: el texto aparece solo, y un toast
+     que anuncia lo que ya se ve es ruido. Solo se avisa si estás en otra
+     pantalla, porque ahí no hay forma de enterarse. */
+  if (!abierta) {
+    toast('ok', 'Transcripción lista', 'Abrir', () => openMeeting(meetingId, true));
+  }
 };
 
 /* ---- Adaptadores V2 opcionales (Python puede llamarlos; si no, no pasa nada) ---- */
@@ -7079,8 +7508,7 @@ function viewSettings() {
       themeBox.querySelectorAll('[data-theme-opt]').forEach(b => b.onclick = () => {
         const v = b.dataset.themeOpt;
         save('hm.theme', v);
-        if (v === 'dark') document.body.dataset.theme = 'dark';
-        else delete document.body.dataset.theme;
+        aplicarTema(v);
         // Actualizar favicon
         const icoEl = document.getElementById('faviconIco');
         if (icoEl) icoEl.href = v === 'dark' ? 'assets/helpmeet-dark.ico' : 'assets/helpmeet.ico';
@@ -7406,8 +7834,7 @@ function wireTopbar() {
     const isDark = load('hm.theme', 'light') === 'dark';
     const next = isDark ? 'light' : 'dark';
     save('hm.theme', next);
-    if (next === 'dark') document.body.dataset.theme = 'dark';
-    else delete document.body.dataset.theme;
+    aplicarTema(next);
     // Actualizar favicon
     const icoEl = document.getElementById('faviconIco');
     if (icoEl) icoEl.href = next === 'dark' ? 'assets/helpmeet-dark.ico' : 'assets/helpmeet.ico';
@@ -7478,7 +7905,7 @@ function showSetupOverlay(cfg) {
     </div>
     <div class="setup-box">
       <div class="setup-hero">
-        <img class="setup-logo-img" src="assets/helpmeet-symbol.svg" alt="">
+        <img class="setup-logo-img" src="assets/helpmeet-symbol.svg?v=20260802v2" alt="">
         <h1 class="setup-h1">Bienvenido a Helpmeet</h1>
         <p class="setup-sub">Vamos a preparar el motor de transcripción antes de tu primera grabación. Solo se hace una vez y tardará unos minutos.</p>
       </div>
@@ -7528,8 +7955,7 @@ function showSetupOverlay(cfg) {
     themeBox.querySelectorAll('[data-theme-opt]').forEach(b => b.onclick = () => {
       const v = b.dataset.themeOpt;
       save('hm.theme', v);
-      if (v === 'dark') document.body.dataset.theme = 'dark';
-      else delete document.body.dataset.theme;
+      aplicarTema(v);
       renderTheme();
     });
     renderTheme();
