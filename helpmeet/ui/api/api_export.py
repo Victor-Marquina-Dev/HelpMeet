@@ -214,9 +214,15 @@ class ExportApiMixin:
         Si todavía no se había exportado, la exporta primero para que siempre
         haya algo que abrir.
         """
+        # El id se valida ANTES de convertirlo: con meeting_id None el int()
+        # lanzaba TypeError y el error llegaba a la interfaz como un fallo
+        # genérico ("No se pudo abrir la carpeta"), sin decir que en realidad no
+        # había ninguna reunión seleccionada.
+        if meeting_id is None:
+            return {"ok": False, "error": "sin_reunion"}
         m = repo.get_meeting(self._session, int(meeting_id))
         if m is None:
-            return {"ok": False}
+            return {"ok": False, "error": "no_encontrada"}
         exports = settings.get_export_dir()
         # Regenera la iniciativa para migrar también las reuniones antiguas del
         # mismo mes y retirar archivos sueltos de la estructura anterior.
