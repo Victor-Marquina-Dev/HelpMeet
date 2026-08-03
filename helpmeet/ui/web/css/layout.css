@@ -268,7 +268,7 @@ body[data-app-state="screen-recording"] .audio-chip:not(.muted) .eq.mini i:nth-c
 }
 .status-rec .rdot { width: 9px; height: 9px; border-radius: 50%; background: var(--recording); animation: pulse 1.3s infinite; }
 .status-proc { display: flex; align-items: center; gap: 9px; font-size: 10.6px; color: var(--accent); font-weight: 600; }
-.spinner { width: 14px; height: 14px; border-radius: 50%; border: 2px solid rgba(10, 146, 104,.3); border-top-color: var(--accent); animation: spin .8s linear infinite; flex: none; }
+.spinner { width: 14px; height: 14px; border-radius: 50%; border: 2px solid color-mix(in srgb, var(--accent) 30%, transparent); border-top-color: var(--accent); animation: spin .8s linear infinite; flex: none; }
 
 /* ============ BODY / SIDEBAR ============ */
 .body { flex: 1; display: flex; min-height: 0; }
@@ -384,7 +384,7 @@ body.sidebar-dragging .sidebar { transition: none; }
   animation: spin .7s linear infinite;
 }
 .tree-initiative.has-transcribing .proj-av::after {
-  border-color: rgba(10, 146, 104, .25); border-top-color: var(--accent);
+  border-color: color-mix(in srgb, var(--accent) 25%, transparent); border-top-color: var(--accent);
 }
 
 /* Árbol de reuniones dentro de una iniciativa */
@@ -431,7 +431,7 @@ body.sidebar-dragging .sidebar { transition: none; }
 .tree-meeting .stat.recovered { background: var(--accent); }
 .tree-meeting.transcribing .stat {
   width: 9px !important; height: 9px !important; margin: -1.5px !important;
-  border: 1.5px solid rgba(10, 146, 104,.3) !important;
+  border: 1.5px solid color-mix(in srgb, var(--accent) 30%, transparent) !important;
   border-top-color: var(--accent) !important;
   background: transparent !important; border-radius: 50%;
   animation: spin .7s linear infinite;

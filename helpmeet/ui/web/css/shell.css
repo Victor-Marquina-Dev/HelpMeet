@@ -47,9 +47,46 @@ body { display: flex; flex-direction: column; }
 .titlebar {
   height: var(--titlebar-h); flex-shrink: 0;
   display: flex; align-items: center; justify-content: space-between;
-  padding: 0 10px 0 16px; background: var(--bg-app);
+  /* El botón de plegar cae sobre el panel —la barra lleva su mismo color hasta
+     --tb-corte—, así que su icono tiene que caer en la MISMA columna que los de
+     abajo o la primera fila se lee torcida.
+     La cuenta: .icon-btn mide 28 y centra un icono de 16, o sea 6px de sobra a
+     cada lado; los iconos del panel arrancan en 16 (8 de .nav + 8 de .navitem).
+     16 − 6 = 10 de padding. Antes eran 16 y el icono caía en 22: 6px corrido. */
+  padding: 0 10px; background: var(--bg-app);
   position: relative; z-index: 10000;
+  transition: padding-left var(--dur-panel-fold) var(--ease-reveal);
 }
+/* Plegado el criterio se invierte: ya no hay columna con la que alinearse, hay
+   que centrar en el riel. 16 + 6 = 22, y el icono ocupa 22–38: su centro cae en
+   30, la mitad exacta de los 60px del riel, igual que el resto. */
+body:has(.shell.collapsed) .titlebar { padding-left: 16px; }
+
+/* ============================================================
+   Pantalla de licencia — ocultar la app de detrás
+   Las reglas que hacían esto (en style.css) apuntan a `.body`, `.topbar` y
+   `.topbar-menu`: tres selectores que el rediseño renombró y que YA NO EXISTEN
+   en index.html. Al no ocultar nada quedaba el panel lateral vacío detrás del
+   diálogo, con el botón de plegar flotando arriba a la izquierda.
+   Y encima la barra de título ahora pinta un degradado —el color del panel
+   hasta --tb-corte— en vez del fondo plano que tenía cuando se escribió aquello:
+   por eso asomaba una banda gris sobre el blanco. Aquí se ocultan los nombres
+   reales y se aplana la barra mientras dura la activación.
+   ============================================================ */
+/* La condición es que el diálogo esté REALMENTE visible, no que body lleve la
+   clase `licensing`. La clase solo se quita al activar una licencia con éxito
+   (app.js), así que en cualquier otro camino —saltarse la validación en
+   desarrollo, un fallo de red, cerrar el diálogo por otra vía— se queda pegada.
+   Mientras estas reglas apuntaban a `.body`/`.topbar` (clases que el rediseño
+   renombró) eso no se notaba porque no ocultaban nada. Al arreglarlas, una clase
+   pegada dejaba de ocultar «la app de detrás del diálogo» y pasaba a ocultarlo
+   TODO sin nada delante: la ventana entera en blanco. Pasó en la primera prueba.
+   Atado al [hidden] del propio diálogo el estado no puede desincronizarse, y si
+   el navegador no soportara :has() la regla simplemente no aplica — se ve la app
+   detrás del diálogo, que es feo pero nunca una ventana vacía. */
+body:has(.license-gate:not([hidden])) .shell { visibility: hidden; }
+body:has(.license-gate:not([hidden])) .sidebar-collapse-btn { visibility: hidden; }
+body:has(.license-gate:not([hidden])) .titlebar { background: var(--bg-app); }
 /* Sin app-region:drag. La ventana la mueve el JS llamando a win_start_move()
    sobre el mousedown de esta barra; declarar la region de arrastre del sistema
    interceptaba ese mousedown y la ventana dejaba de poder moverse. Los handles
@@ -62,8 +99,42 @@ body { display: flex; flex-direction: column; }
   transition: background .12s, color .12s;
 }
 .titlebar-action:hover { background: var(--bg-hover); color: var(--text-primary); }
+
+/* Luna/sol del conmutador de tema, animación de itshover.com
+   (r/moon-icon.json): gira -15° y crece un 10% al pasar el ratón. Allí son
+   0,5s easeInOut. Se anima el <svg> entero y no una parte, así que funciona
+   igual con <use> — el icono cambia entre #i-sun y #i-moon desde app.js. */
+#themeIcon { transition: transform 500ms var(--ease-standard); }
+.titlebar-action:hover #themeIcon { transform: rotate(-15deg) scale(1.1); }
+@media (prefers-reduced-motion: reduce) {
+  #themeIcon { transition: none; }
+  .titlebar-action:hover #themeIcon { transform: none; }
+}
 .sidebar-collapse-btn { color: var(--text-muted); flex-shrink: 0; background: none; border: none; cursor: pointer; }
 .sidebar-collapse-btn:hover { color: var(--text-primary); }
+
+/* Animación del icono del panel, portada de itshover.com
+   (r/layout-sidebar-right-icon.json): al pasar el ratón el divisor se corre
+   —como si el panel se ensanchara— y el marco crece un pelín. Allí son 0,3s
+   easeInOut sobre `x: 2` en un viewBox de 24; aquí el viewBox es 20, así que
+   los 2 se convierten en 1,67.
+   `transform-box: fill-box` es obligatorio: sin él, transform-origin en un nodo
+   SVG se mide contra el viewBox entero y la escala manda la figura de paseo. */
+.i-panel-anim .pn-marco,
+.i-panel-anim .pn-divisor {
+  transform-box: fill-box; transform-origin: center;
+  transition: transform 300ms var(--ease-standard);
+}
+.sidebar-collapse-btn:hover .pn-divisor { transform: translateX(1.67px); }
+.sidebar-collapse-btn:hover .pn-marco { transform: scale(1.04); }
+/* Plegado el divisor se va del todo hacia el borde: el icono dice en qué estado
+   está la ventana, no solo qué botón es. */
+body:has(.shell.collapsed) .i-panel-anim .pn-divisor { transform: translateX(-2.2px); opacity: .55; }
+@media (prefers-reduced-motion: reduce) {
+  .i-panel-anim .pn-marco, .i-panel-anim .pn-divisor { transition: none; }
+  .sidebar-collapse-btn:hover .pn-divisor,
+  .sidebar-collapse-btn:hover .pn-marco { transform: none; }
+}
 
 .icon-btn {
   width: 28px; height: 28px; flex-shrink: 0;
@@ -111,8 +182,17 @@ body { display: flex; flex-direction: column; }
   width: 100%; text-align: left; border: none; background: none; cursor: pointer;
   transition: background .12s, color .12s, padding var(--dur-panel-fold) var(--ease-reveal);
 }
-.navitem:hover { background: var(--bg-hover); color: var(--text-primary); }
-.navitem.active { background: var(--bg-elevated); color: var(--text-primary); }
+/* Velo translúcido, no color plano. --bg-hover está calculado contra el lienzo
+   BLANCO: sobre él salta 8 puntos de luz y se ve, pero sobre el panel —que ya
+   es gris verdoso— solo 2, y el hover era invisible justo donde más se usa.
+   El velo, en cambio, es un escalón sobre el fondo que tenga debajo, así que
+   funciona igual en los dos temas: 1,283 en claro y 1,280 en oscuro. */
+.navitem:hover { background: var(--hover-med); color: var(--text-primary); }
+/* El activo lleva ADEMÁS más peso de letra. Con solo el fondo, hover y activo
+   se distinguían por 1,15 de contraste entre sí —perceptible pero justo—, y al
+   pasar el ratón por encima de otra fila costaba recordar cuál estaba abierta.
+   El peso separa por forma, que se lee sin comparar dos tonos. */
+.navitem.active { background: var(--nav-active); color: var(--text-primary); font-weight: 600; }
 .navitem .label-text { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .navitem .nav-count { margin-left: auto; font-size: 10px; color: var(--text-muted); font-family: var(--font-mono); }
 /* Iconos centrados en el riel, pero SIN justify-content:center.
@@ -143,12 +223,20 @@ body { display: flex; flex-direction: column; }
 /* .projitem es un contenedor de fila (div), no un botón: envuelve dos objetivos
    de clic independientes para que la fila tenga "el nombre navega, el control
    hace otra cosa", igual que el triángulo de un árbol de archivos. */
+/* padding-right 6: los botones «+» y «→» de la fila quedaban pegados al borde
+   del resaltado, sin aire entre el icono y la esquina redondeada. */
 .projitem {
   display: flex; align-items: center; border-radius: 6px; position: relative;
   color: var(--text-secondary); font-size: 12px; width: 100%; text-align: left;
+  padding-right: 6px;
 }
-.projitem:hover { background: var(--bg-hover); color: var(--text-primary); }
-.projitem.active { background: var(--bg-elevated); color: var(--text-primary); }
+/* Los mismos tokens que .navitem, por el mismo motivo: --bg-hover y
+   --bg-elevated son colores planos calculados contra el lienzo BLANCO, y sobre
+   el panel —que ya es gris verdoso— no llegan a verse. Con el color plano el
+   hover se notaba en Inicio/Favoritos/Calendario/Documentos y desaparecía justo
+   en «Mis notas» y en las carpetas, que son estas filas. */
+.projitem:hover { background: var(--hover-med); color: var(--text-primary); }
+.projitem.active { background: var(--nav-active); color: var(--text-primary); font-weight: 600; }
 .projitem .label-text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 
@@ -157,13 +245,24 @@ body { display: flex; flex-direction: column; }
   color: inherit; font: inherit; font-family: inherit; text-align: left;
   border: none; background: none; cursor: pointer;
 }
-.space-toggle-btn { padding: 7px 8px; }
+/* padding-left 2 y no 8: el rótulo "Mis notas" caía 6px a la derecha del resto.
+   Un .navitem lleva icono y texto en el MISMO botón separados por `gap: 10px`;
+   aquí son dos botones distintos —el icono pliega, el texto navega— y entre
+   ambos se sumaban el padding-right del primero (8) y el padding-left del
+   segundo (8) = 16px. Con 2 la suma vuelve a dar los mismos 10px y los rótulos
+   arrancan todos en la misma columna. Medido: 49,0px antes, 43,0px ahora. */
+.space-toggle-btn { padding: 7px 8px 7px 2px; }
 .space-fold-btn {
   display: flex; align-items: center; padding: 7px 8px; flex-shrink: 0; border-radius: 6px;
   color: var(--text-secondary); border: none; background: none; cursor: pointer;
   transition: background .12s, color .12s;
 }
-.space-fold-btn:hover { background: var(--border-strong); color: var(--text-primary); }
+/* Solo cambia de color, sin fondo propio. Con un fondo aparecía un cuadrado
+   verde AL REDEDOR DEL ICONO —el botón mide lo que el icono, no lo que la
+   fila—, así que «Espacios» se resaltaba de una forma distinta a todos los
+   demás ítems del panel, que se pintan enteros. El resalte de la fila ya lo da
+   `.projitem:hover`; este botón solo tiene que decir «yo soy el objetivo». */
+.space-fold-btn:hover { background: none; color: var(--text-primary); }
 
 /* "+" y "→": aparecen al pasar el mouse por la fila. Llevan caja propia porque
    sobre el fondo resaltado un icono suelto se lee como parte del texto. */
@@ -240,7 +339,8 @@ body { display: flex; flex-direction: column; }
 .projitem.nested:hover .proj-row-menu-btn,
 .proj-row-menu-btn.open,
 .proj-row-menu-btn:focus-visible { opacity: 1; }
-.proj-row-menu-btn:hover { background: var(--border-strong); color: var(--text-primary); }
+/* Igual que .space-fold-btn: se separa de la fila YA pintada, no del reposo. */
+.proj-row-menu-btn:hover { background: var(--nav-active); color: var(--text-primary); }
 
 .sidebar-spacer { flex: 1; min-height: 8px; }
 .sidebar-footer { padding: 0 8px 8px; display: flex; flex-direction: column; gap: 1px; }
@@ -407,3 +507,58 @@ body.sidebar-dragging .sidebar * {
 body.sidebar-dragging .titlebar {
   transition: none !important;
 }
+
+/* Cuenta de reuniones + menú «···» de cada carpeta, en el MISMO hueco.
+   Grid de una celda con los dos hijos encima: el ancho lo fija el más ancho y
+   ya no cambia, así que al recorrer la lista ninguna fila se ensancha. */
+.proj-row-end {
+  display: grid; flex-shrink: 0; min-width: 24px;
+  place-items: center end;
+}
+.proj-row-end > * { grid-area: 1/1; }
+.proj-row-count {
+  font-size: 10px; color: var(--text-faint); font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums; padding-right: 4px;
+  transition: opacity 150ms var(--ease-reveal);
+}
+/* Al señalar la fila el número se va y entra el menú: los dos a la vez en 24px
+   se pisarían, y el número ya cumplió su papel —orientar de un vistazo— cuando
+   el usuario aún no había decidido dónde entrar. */
+.projitem:hover .proj-row-count,
+.projitem:has(:focus-visible) .proj-row-count,
+.projitem.active .proj-row-count { opacity: 0; }
+
+@media (prefers-reduced-motion: reduce) {
+  .proj-row-count { transition: none; }
+}
+
+/* ---------- El botón de plegar anuncia su acción ----------
+   En reposo se ve el cuaderno; al pasar el ratón se cambia por un chevron que
+   apunta a lo que va a ocurrir: arriba cuando la lista está abierta (se va a
+   plegar) y abajo cuando está plegada (se va a desplegar). Antes el icono era
+   siempre el mismo y no había forma de saber que ese botón plegaba nada.
+   Los dos SVG se superponen en un grid de una celda: cruzarlos por opacidad no
+   mueve nada de sitio, y el ancho del botón no cambia al pasar el ratón. */
+.space-fold-btn { display: grid; place-items: center; }
+.space-fold-btn > .icon { grid-area: 1/1; transition: opacity 160ms var(--ease-out), transform 220ms var(--ease-out); }
+.space-fold-btn .sf-chev { opacity: 0; transform: translateY(3px); }
+.space-fold-btn:hover .sf-ico,
+.space-fold-btn:focus-visible .sf-ico { opacity: 0; transform: translateY(-3px); }
+.space-fold-btn:hover .sf-chev,
+.space-fold-btn:focus-visible .sf-chev { opacity: 1; transform: translateY(0); }
+/* Plegada la lista, el chevron se da la vuelta: ahora la acción es abrir. */
+.space-fold-btn[aria-expanded="false"] .sf-chev { transform: translateY(-3px) rotate(180deg); }
+.space-fold-btn[aria-expanded="false"]:hover .sf-chev,
+.space-fold-btn[aria-expanded="false"]:focus-visible .sf-chev { transform: translateY(0) rotate(180deg); }
+
+@media (prefers-reduced-motion: reduce) {
+  .space-fold-btn > .icon { transition: opacity 100ms linear; transform: none !important; }
+}
+
+/* Plegado el panel, el icono NO cambia. En el riel este botón no pliega nada:
+   su handler abre la gestión de espacios (ver #btnFoldProjects en app.js), así
+   que enseñar un chevron de plegar anunciaba una acción que no iba a ocurrir.
+   Un icono que promete lo que no hace es peor que uno que no promete nada. */
+.shell.collapsed .space-fold-btn .sf-chev { display: none; }
+.shell.collapsed .space-fold-btn:hover .sf-ico,
+.shell.collapsed .space-fold-btn:focus-visible .sf-ico { opacity: 1; transform: none; }

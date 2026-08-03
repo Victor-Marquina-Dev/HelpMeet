@@ -57,8 +57,22 @@
   --focus: rgba(43, 125, 91, .5);
   /* Hovers/selección — el gris azulado de antes desentonaba contra los neutros
      verdes; ahora el velo es del mismo verde a muy baja opacidad. */
-  --hover-soft: rgba(43, 125, 91, 0.06);  /* hover muy sutil (legacy; ver --bg-hover para el plano nuevo) */
-  --hover-med:  rgba(43, 125, 91, 0.10);  /* hover normal */
+  /* El velo del hover NO puede llevar la misma opacidad en los dos temas.
+     En oscuro es un velo claro sobre fondo casi negro y aclara mucho: al 5% ya
+     da un escalón de 1,10 contra el panel. En claro es un verde oscuro sobre un
+     panel casi blanco, y al 6% daba 1,077 — sobre el lienzo blanco se notaba,
+     pero sobre el panel (que ya es gris) no se veía nada. Era el mismo número
+     produciendo dos efectos distintos.
+     Medido contra --bg-sidebar #eef2f0: 0,13 → 1,17 · 0,20 → 1,29. Con eso el
+     hover del panel en claro se ve igual de definido que en oscuro, y el texto
+     principal conserva 12,3:1 encima. */
+  --hover-soft: rgba(43, 125, 91, 0.13);  /* hover sutil (filas del árbol, cabeceras) */
+  --hover-med:  rgba(43, 125, 91, 0.20);  /* hover normal (navegación del panel) */
+  /* Ítem activo de la navegación lateral. Un escalón POR ENCIMA del hover
+     (1,47 contra el panel frente a 1,28), para que se distinga tanto de la fila
+     en reposo como de la que solo está señalada. Antes usaba --bg-elevated, que
+     es MÁS claro que el panel y daba 1,048: prácticamente el mismo tono. */
+  --nav-active: rgba(43, 125, 91, 0.36);
   --sel-bg:     var(--bg-elevated);         /* fila/pestaña activa: superficie elevada */
   --sel-text:   var(--text-primary);        /* texto sobre selección: máximo contraste */
   --newbtn-bg:  var(--text-primary);        /* botón "Nuevo proyecto": relleno invertido, igual que .pill-btn.solid */
@@ -75,7 +89,11 @@
   /* Tipografía */
   --font-ui: 'Plus Jakarta Sans', 'Segoe UI', system-ui, -apple-system, sans-serif;
   --font-mono: 'JetBrains Mono', 'Cascadia Code', 'Consolas', ui-monospace, monospace;
-  --sidebar-w: 190px;
+  /* 210 y no 190: a 190 los nombres largos de carpeta se cortan con puntos
+     suspensivos ("ENTELGY - BBVA", "Todas mis notas 168"), y una carpeta cuyo
+     nombre no se lee entero no sirve para elegir. El valor sale de medir el
+     panel con esos nombres reales, no de tantear. */
+  --sidebar-w: 210px;
   /* Animación */
   --ease-out:      cubic-bezier(.2, .8, .2, 1);
   --ease-in:       cubic-bezier(.4, 0, 1, 1);

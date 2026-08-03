@@ -31,10 +31,23 @@
 
 /* Fila de ajuste: etiqueta a la izquierda, control a la derecha, separadas por
    una línea que NO aparece en la primera — el borde del grupo ya la da. */
+/* `flex-wrap` es obligatorio aquí: los chips llevan `flex-shrink: 0` —no pueden
+   encoger, y bien, porque partir "Optimizado · 1080p · 20 fps" en dos líneas no
+   se lee— pero sin wrap tampoco bajaban, así que invadían el sitio del rótulo y
+   «CALIDAD» quedaba impreso encima de las opciones. Con wrap, cuando no caben al
+   lado bajan enteros a su propia línea. */
 .sv-row, .toggle-row, .sv-row-end {
-  display: flex; align-items: center; justify-content: space-between; gap: 16px;
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 16px; row-gap: 10px; flex-wrap: wrap;
   padding: 12px 18px; border-top: 1px solid var(--border-subtle); margin: 0;
 }
+/* Un ancho mínimo para el rótulo: por debajo de eso los chips bajan solos. Sin
+   él, el rótulo se estrujaba letra a letra antes de que el wrap actuara. */
+.sv-row > .sv-lbl { flex: 1 1 130px; }
+/* Ya en su propia línea, las opciones se alinean a la izquierda con el rótulo:
+   pegadas a la derecha quedaban colgando lejos de lo que nombran. */
+.sv-row > .cfg-chips { justify-content: flex-end; }
+.sv-row:has(.cfg-chips) { align-items: baseline; }
 .sv-card > .sv-row:first-of-type,
 .sv-card > .toggle-row:first-of-type { border-top: none; }
 .sv-row-end { justify-content: flex-end; gap: 8px; }
@@ -96,3 +109,56 @@
   border: 1px solid var(--border-subtle); color: var(--text-muted);
 }
 .privacy-badge i { width: 6px; height: 6px; border-radius: 50%; background: var(--signal); }
+
+/* ============================================================
+   Jerarquía de la pantalla de ajustes
+   ============================================================ */
+
+/* Las etiquetas de fila salían en MAYÚSCULAS y negrita («IDIOMA», «MODELO»,
+   «ESTADO», «PLAN»), el mismo tratamiento que los títulos de sección
+   («TRANSCRIPCIÓN», «LICENCIA»): dos niveles distintos pintados igual, así que
+   la pantalla no tenía jerarquía y todo gritaba a la vez.
+   Viene de que `.sv-lbl` está declarada DOS veces —en style.css y aquí— y esta
+   hoja solo pisaba `font-size` y `color`; el `text-transform` y el `font-weight`
+   de la otra sobrevivían. Hay que anularlos explícitamente. Es el antipatrón de
+   la declaración duplicada: lo que no repites, lo heredas sin querer. */
+.sv-row > .sv-lbl,
+.toggle-row > .sv-lbl {
+  text-transform: none; font-weight: 400; letter-spacing: normal;
+  width: auto; font-size: 13px; color: var(--text-primary);
+}
+
+/* Lista de funciones del plan. Los emojis ✅/🔒 los pintaba la fuente de emoji
+   del sistema en color, y eran lo único de colores de la pantalla. */
+.feat-row {
+  display: flex; align-items: center; gap: 9px;
+  padding: 7px 18px; font-size: 12.5px; color: var(--text-secondary);
+}
+.feat-ico { width: 14px; height: 14px; flex-shrink: 0; color: var(--accent); }
+.feat-lbl { flex: 1; min-width: 0; }
+.feature-locked { color: var(--text-muted); }
+.feature-locked .feat-ico { color: var(--text-faint); }
+
+/* El distintivo PRO era ámbar sobre una paleta verde y marrón: el único
+   elemento cálido de la interfaz, y encima repetido en cinco filas seguidas.
+   Contorno neutro: sigue marcando qué falta sin convertirse en el foco. */
+.pro-badge {
+  background: none !important; border: 1px solid var(--border-strong) !important;
+  color: var(--text-muted) !important;
+  font-size: 9px !important; font-weight: 600; letter-spacing: .06em;
+  padding: 1px 6px !important; border-radius: var(--r-sm) !important;
+}
+
+/* El conmutador suelto («Micrófono silenciado al iniciar») quedaba FUERA de la
+   tarjeta y con el control pegado al borde de la ventana en vez de al de su
+   grupo: se leía como si se hubiera caído de la caja. */
+.sv-card > .toggle-row,
+.sv-section > .toggle-row { padding: 12px 18px; }
+.toggle-row > .sv-lbl { flex: 1 1 auto; }
+
+/* Acción destructiva de la licencia: contorno, no relleno. Es irreversible y
+   no debe ser lo que más pesa del bloque. */
+.sv-row-end .btn-danger, .sv-row-end .btn.btn-danger {
+  background: none; color: var(--danger); border: 1px solid var(--danger);
+}
+.sv-row-end .btn-danger:hover { background: var(--danger-soft); }

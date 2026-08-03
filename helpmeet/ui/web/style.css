@@ -1750,11 +1750,22 @@ body.folder-dragging .ftab[data-droppable] { border-bottom-style: dashed; border
   border-radius: var(--r-lg); box-shadow: var(--shadow-pop);
   animation: toast-in .25s ease; pointer-events: auto; max-width: 460px;
 }
-.toast .ti { width: 20px; height: 20px; border-radius: 50%; display: flex; align-items: center; justify-content: center; flex: none; color: #0b0d12; }
-.toast.ok .ti { background: var(--success); }
-.toast.err .ti { background: var(--danger); }
-.toast.info .ti { background: var(--accent); }
-.toast .tmsg { font-size: 11px; color: var(--text-primary); }
+/* El disco de color macizo era lo más saturado de toda la interfaz: un aviso de
+   "listo" no necesita gritar más que el contenido que el usuario está mirando.
+   Ahora es un halo tenue del color del estado con el icono en trazo encima; el
+   color sigue distinguiendo ok / error / info, pero a un volumen razonable.
+   El "ok" pasa a neutro a propósito: en el rediseño el color se reserva para lo
+   que exige atención, y confirmar algo que acaba de hacer el usuario no lo es.
+   El rojo del error sí se queda: ahí el color SÍ está informando. */
+.toast .ti {
+  width: 22px; height: 22px; border-radius: 50%; flex: none;
+  display: flex; align-items: center; justify-content: center;
+}
+.toast .ti svg { width: 13px; height: 13px; stroke-width: 2.2; }
+.toast.ok .ti   { background: color-mix(in srgb, var(--text-primary) 10%, transparent); color: var(--text-primary); }
+.toast.err .ti  { background: var(--danger-soft);  color: var(--danger); }
+.toast.info .ti { background: var(--accent-soft);  color: var(--accent); }
+.toast .tmsg { font-size: 12px; color: var(--text-primary); }
 .toast .taction { font-size: 10.2px; color: var(--accent); font-weight: 600; cursor: pointer; margin-left: 6px; }
 
 /* Tour inicial */
@@ -3392,6 +3403,12 @@ body[data-theme="dark"] {
      un fondo cálido un blanco frío se nota. */
   --hover-soft: rgba(243, 238, 230, 0.05);
   --hover-med: rgba(243, 238, 230, 0.09);
+  /* Mismo papel que en claro y un escalón por encima del hover: 1,49 contra el
+     panel frente a los 1,28 del hover. Antes el activo era --bg-elevated y daba
+     1,20 — MENOS que el hover, así que señalar una fila la hacía resaltar más
+     que tenerla abierta. Sin definirlo aquí heredaría el verde oscuro de claro,
+     que sobre este fondo no se vería. */
+  --nav-active: rgba(243, 238, 230, 0.18);
   --sel-bg: var(--bg-elevated);
   --sel-text: var(--text-primary);
   --newbtn-bg: var(--text-primary);
