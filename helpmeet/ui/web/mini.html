@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Helpmeet</title>
+<style>
+/* ============================================================
+   Indicador flotante — pastilla mínima sobre el escritorio mientras se graba
+   con la ventana principal minimizada.
+
+   SOLO ICONOS, sin una sola letra: a este tamaño (58x28) cualquier texto obliga
+   a ensanchar la pastilla hasta que deja de ser un indicador y pasa a ser una
+   ventana. Lo que hay que comunicar —"esto sigue grabando" y "de qué tipo"— se
+   dice con la forma.
+
+   Autocontenido: es otra ventana de pywebview, no comparte hojas ni sprite con
+   la app, así que aquí no hay tokens. Colores literales, en la variante oscura
+   de la marca; la pastilla flota sobre el escritorio, no sobre la interfaz.
+
+   RECTANGULAR, sin esquinas redondeadas. Se intentó tres veces recortar la
+   ventana con una región del sistema y las tres reapareció un borde claro: la
+   región recorta la VENTANA, pero el control del navegador que va dentro se
+   pinta con su propio fondo y en el arco de la curva asoma. Un rectángulo del
+   marrón de la marca se ve limpio y no tiene forma de fallar.
+   ============================================================ */
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+html, body {
+  width: 100%; height: 100%;
+  background: #26201B;          /* a sangre: sin hueco no hay halo */
+  overflow: hidden; user-select: none; cursor: pointer;
+}
+
+/* Sin degradado ni brillo: en un rectángulo, cualquier aclarado tocando el
+   canto superior se lee exactamente como el halo claro que se está evitando.
+   Marrón uniforme de borde a borde. */
+
+.pill {
+  position: absolute; inset: 0;
+  display: grid; place-items: center;   /* una sola celda: las dos capas encima */
+  color: #f3eee6;
+  animation: entrar 380ms cubic-bezier(.2,.9,.25,1) both;
+  transition: background 200ms ease, transform 260ms cubic-bezier(.2,.9,.25,1);
+}
+@keyframes entrar {
+  0%   { transform: scale(.55); opacity: 0; }
+  65%  { transform: scale(1.06); opacity: 1; }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+/* ---- Logo: misma geometría que scripts/generar_iconos.py (dos barras y un
+   punto), con divs para no arrastrar el sprite de la app. ---- */
+.mark {
+  display: flex; flex-direction: column; gap: 2.5px; flex: none;
+  animation: marca 440ms cubic-bezier(.2,.9,.25,1) both;
+}
+.mark i { display: block; background: #52C494; border-radius: 99px; }
+.mark .b1  { width: 15px; height: 4.5px; }
+.mark .b2  { width: 10.5px; height: 4.5px; }
+.mark .dot { width: 4.5px; height: 4.5px; }
+@keyframes marca {
+  0%   { transform: scale(.3) rotate(-30deg); opacity: 0; }
+  60%  { transform: scale(1.15) rotate(5deg); opacity: 1; }
+  100% { transform: scale(1) rotate(0); opacity: 1; }
+}
+
+/* ---- Barras: dicen que sigue vivo ---- */
+.eq { display: flex; align-items: center; gap: 3px; height: 18px; flex: none; }
+.eq i { width: 3px; border-radius: 99px; background: #52C494; animation: eq .95s ease-in-out infinite; }
+.eq i:nth-child(1) { height: 9px;  animation-delay: 0s;   }
+.eq i:nth-child(2) { height: 17px; animation-delay: .16s; }
+.eq i:nth-child(3) { height: 12px; animation-delay: .32s; }
+@keyframes eq {
+  0%, 100% { transform: scaleY(.3); opacity: .5; }
+  50%      { transform: scaleY(1);  opacity: 1;  }
+}
+
+/* ---- Los dos estados ocupan EL MISMO hueco ----
+   En reposo: logo + barras. Al pasar el ratón: micrófono (o monitor) + cerrar.
+   No se añaden, se SUSTITUYEN, superpuestos en la misma celda de un grid: así
+   la ventana nunca cambia de tamaño. Ensancharla obligaba a recolocarla y a
+   rehacer el recorte en cada entrada del puntero, y eso deformaba la pastilla y
+   le devolvía las esquinas blancas. */
+.capa {
+  grid-area: 1/1;
+  display: flex; align-items: center; justify-content: center; gap: 8px;
+  transition: opacity 150ms ease, transform 300ms cubic-bezier(.34,1.4,.5,1);
+}
+/* Las capas no solo se funden: la que sale se va HACIA ARRIBA y la que entra
+   llega DESDE ABAJO. Un cruce de opacidades a secas se lee como un parpadeo;
+   con dirección se lee como que una releva a la otra. La curva lleva un poco de
+   rebote (1.4) para que el relevo tenga carácter en un espacio tan pequeño. */
+.capa-reposo { opacity: 1; transform: translateY(0) scale(1); }
+.capa-hover  { opacity: 0; transform: translateY(9px) scale(.8); pointer-events: none; }
+body:hover .capa-reposo { opacity: 0; transform: translateY(-9px) scale(.8); }
+body:hover .mark { transform: rotate(-8deg); transition: transform 260ms cubic-bezier(.2,.9,.25,1); }
+body:hover .capa-hover  { opacity: 1; transform: translateY(0) scale(1); pointer-events: auto; }
+
+/* La pastilla entera responde: se aclara y crece una pizca al señalarla, para
+   que el puntero note que hay algo debajo antes incluso de leer los iconos.
+   (La transición vive en el bloque .pill de arriba.) */
+body:hover .pill { background: #2f2822; transform: scale(1.04); }
+body:active .pill { transform: scale(.97); }
+
+/* Las barras se aceleran al señalar: refuerza que aquello está VIVO. */
+body:hover .eq i { animation-duration: .62s; }
+
+.capa-hover svg { width: 17px; height: 17px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+.tipo { color: #d4ccc0; display: none; }
+.tipo.on { display: block; }
+.cerrar {
+  border: none; background: none; padding: 0; color: #a89f91; cursor: pointer;
+  width: 23px; height: 23px; border-radius: 50%; display: grid; place-items: center;
+  transition: background 120ms, color 120ms;
+}
+.cerrar:hover { background: rgba(217,48,37,.25); color: #ff8a84; }
+.cerrar svg { width: 11px; height: 11px; stroke-width: 2.3; }
+
+/* ---- Micrófono silenciado: las barras se paran y se apagan ---- */
+body.pausado .eq i { animation: none; transform: scaleY(.4); opacity: .3; background: #a89f91; }
+body.pausado .mark i { background: #a89f91; }
+
+@media (prefers-reduced-motion: reduce) {
+  .pill, .mark { animation: none; transition: none; }
+  .capa { transition: opacity 120ms linear; transform: none !important; }
+  body:hover .pill, body:active .pill, body:hover .mark { transform: none; }
+  .eq i { animation: none; transform: scaleY(.7); }
+  .extra { transition: none; }
+}
+</style>
+</head>
+<body>
+  <div class="pill" id="pill">
+    <span class="capa capa-reposo" aria-hidden="true">
+      <span class="mark"><i class="b1"></i><i class="b2"></i><i class="dot"></i></span>
+      <span class="eq"><i></i><i></i><i></i></span>
+    </span>
+    <span class="capa capa-hover">
+      <!-- Micrófono o monitor, según lo que se esté grabando -->
+      <svg class="tipo on" id="icoAudio" aria-hidden="true" viewBox="0 0 20 20">
+        <rect x="7.5" y="3" width="5" height="9" rx="2.5"/><path d="M5 10a5 5 0 0 0 10 0M10 15v2.5"/>
+      </svg>
+      <svg class="tipo" id="icoPantalla" aria-hidden="true" viewBox="0 0 20 20">
+        <rect x="2.6" y="4" width="14.8" height="9.6" rx="1.6"/><path d="M7.4 16.6h5.2M10 13.6v3"/>
+      </svg>
+      <button class="cerrar" id="btnX" aria-label="Ocultar indicador">
+        <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M5 5l10 10M15 5 5 15"/></svg>
+      </button>
+    </span>
+  </div>
+
+<script>
+const api = () => (window.pywebview && window.pywebview.api) || null;
+
+/* Clic y arrastre comparten el botón izquierdo: la ventana es arrastrable, así
+   que moverla dispara también un `click` y Helpmeet se abriría cada vez que se
+   recolocase la pastilla. Más de 4px de desplazamiento del puntero entre pulsar
+   y soltar cuenta como arrastre, no como clic. */
+let x0 = 0, y0 = 0;
+document.body.addEventListener('mousedown', (e) => { x0 = e.screenX; y0 = e.screenY; });
+document.getElementById('pill').addEventListener('click', (e) => {
+  if (Math.abs(e.screenX - x0) > 4 || Math.abs(e.screenY - y0) > 4) return;
+  const a = api(); if (a && a.mini_restore) a.mini_restore();
+});
+document.getElementById('btnX').addEventListener('click', (e) => {
+  e.stopPropagation();
+  const a = api(); if (a && a.mini_close) a.mini_close();
+});
+
+
+/* La llama Python al mostrar la pastilla. */
+window.miniEstado = function (estado) {
+  const e = estado || {};
+  document.body.classList.toggle('pausado', !!e.pausado);
+  const pantalla = e.tipo === 'pantalla';
+  document.getElementById('icoPantalla').classList.toggle('on', pantalla);
+  document.getElementById('icoAudio').classList.toggle('on', !pantalla);
+  document.getElementById('pill').title =
+    (pantalla ? 'Grabando pantalla' : 'Grabando audio') + ' · clic para volver a Helpmeet';
+};
+</script>
+</body>
+</html>

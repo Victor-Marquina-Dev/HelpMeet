@@ -240,6 +240,258 @@ def _apply_dark_titlebar(hwnd: int) -> None:
         pass
 
 
+# Tamaño del indicador flotante. En reposo mide lo justo para el logo y las
+# barras; al pasar el ratón se ensancha para dejar sitio al rótulo y a la X.
+_MINI_ANCHO, _MINI_ALTO = 93, 39
+_MINI_MARGEN = 18          # separación del borde de la pantalla
+
+
+def _posicion_mini(ancho: int, alto: int) -> tuple[int, int]:
+    """Esquina superior izquierda para que la pastilla quede pegada a la derecha.
+
+    Se ancla arriba y no al centro: en el centro se cruza con lo que el usuario
+    tiene abierto, y abajo choca con la barra de tareas.
+    """
+    try:
+        import ctypes
+        u = ctypes.windll.user32
+        # SIN SetProcessDPIAware: cambia el modo DPI de TODO el proceso, y
+        # llamarlo cuando la ventana principal ya existe descoloca sus tamaños.
+        # GetSystemMetrics ya devuelve lo que pywebview espera (píxeles lógicos).
+        pantalla_w = u.GetSystemMetrics(0)
+        return (pantalla_w - ancho - _MINI_MARGEN, _MINI_MARGEN + 46)
+    except Exception:
+        return (900, 64)
+
+
+class _MiniApi:
+    """Puente de la ventana flotante. Diminuto y aparte a propósito.
+
+    Compartir la instancia grande de `Api` entre las dos ventanas hacía que
+    pywebview no inyectara `pywebview.api` en la principal, y la app arrancaba
+    en blanco. Cada ventana con el suyo.
+    """
+
+    def __init__(self, al_restaurar, al_cerrar, ventana=None):
+        self._al_restaurar = al_restaurar
+        self._al_cerrar = al_cerrar
+        # La ventana se asigna DESPUÉS de crearla: create_window necesita el
+        # js_api ya construido, así que no puede pasarse por el constructor.
+        self._ventana = ventana or (lambda: None)
+        # Dónde está la pastilla y cuánto mide ahora mismo. Hace falta porque
+        # pywebview no permite consultar la posición de una ventana, y sin ella
+        # ensancharla la devolvería al borde derecho cada vez, tirando por tierra
+        # el sitio al que el usuario la hubiera arrastrado.
+        self._x = None
+        self._ancho = _MINI_ANCHO
+
+    def recordar_posicion(self, x, y) -> None:
+        self._x, self._y = int(x), int(y)
+
+    def mini_restore(self) -> dict:
+        try:
+            self._al_restaurar()
+            return {"ok": True}
+        except Exception:
+            _log.exception("mini_restore")
+            return {"ok": False}
+
+    def mini_close(self) -> dict:
+        """Descarta el indicador hasta la próxima grabación (no toca el ajuste)."""
+        try:
+            self._al_cerrar()
+            return {"ok": True}
+        except Exception:
+            _log.exception("mini_close")
+            return {"ok": False}
+
+    # `mini_hover` se retiró. La pastilla ya NO cambia de tamaño al pasar el
+    # ratón: lo que cambia es su contenido —logo + barras se sustituyen por
+    # micrófono + cerrar, en el mismo hueco— y eso se resuelve entero en CSS.
+    # Redimensionar la ventana obligaba a recolocarla y a rehacer el recorte en
+    # cada entrada y salida del puntero, y de ahí venían los saltos de posición
+    # y las esquinas blancas reapareciendo.
+
+
+def _ajustar_ventana_mini(window, ancho: int, alto: int, colocar: bool = True) -> None:
+    """Fija tamaño y posición del indicador, en una sola pasada.
+
+    Se hace con Win32 sobre el HWND y no con la API de pywebview porque cada
+    pieza fallaba por su lado: `min_size` inflaba la ventana a 200x100 sin
+    avisar, `x`/`y` no siempre se respetan en el backend WinForms, y el
+    `border-radius` del CSS deja ver el fondo blanco en las esquinas porque
+    `transparent=True` no funciona ahí. SetWindowPos + SetWindowRgn mandan por
+    encima de todo eso.
+
+    Los errores se registran: la versión anterior los tragaba en un `except`
+    mudo, así que el recorte llevaba sesiones sin aplicarse y no había forma de
+    saberlo mirando la pantalla.
+    """
+    if not sys.platform.startswith("win"):
+        return
+    try:
+        if not window.events.shown.wait(10):
+            _log.warning("Indicador: la ventana no llegó a mostrarse")
+            return
+        import ctypes
+        import ctypes.wintypes            # `import ctypes` NO trae el submódulo
+        from webview.platforms.winforms import BrowserView
+        from System import Action
+
+        form = BrowserView.instances.get(window.uid)
+        if form is None:
+            _log.warning("Indicador: sin form nativo para %s", window.uid)
+            return
+
+        u, gdi = ctypes.windll.user32, ctypes.windll.gdi32
+
+        def aplicar():
+            # Por .NET y no con SetWindowPos: el formulario de WinForms impone su
+            # propio tamaño y lo restablece, así que la llamada de Win32 quedaba
+            # sin efecto — medido: se pedían 62x26 y quedaba en 185x47.
+            from System.Drawing import Size as _Size, Point as _Point, Color as _Color
+
+            # El fondo del formulario, del color de la pastilla. Es la última
+            # defensa contra el blanco: si en algún fotograma el navegador
+            # incrustado no cubre del todo la ventana —al crearse, al recortarse,
+            # al cambiar de DPI—, lo que asoma es este color y no se nota.
+            form.BackColor = _Color.FromArgb(0x26, 0x20, 0x1B)
+            form.MinimumSize = _Size(0, 0)
+            form.MaximumSize = _Size(0, 0)
+            form.ClientSize = _Size(ancho, alto)   # el ÁREA ÚTIL, sin marco
+
+            # El navegador incrustado tiene su propio tamaño: si no se ajusta,
+            # deja a la vista franjas del fondo del formulario — el "blanco" de
+            # las esquinas que no se iba con el recorte.
+            for hijo in form.Controls:
+                hijo.Location = _Point(0, 0)
+                hijo.Size = form.ClientSize
+
+            hwnd = form.Handle.ToInt64()
+            area = ctypes.wintypes.RECT()
+            u.SystemParametersInfoW(0x0030, 0, ctypes.byref(area), 0)  # área de trabajo
+            form.Location = _Point(area.right - form.Width - _MINI_MARGEN,
+                                   area.top + _MINI_MARGEN + 40)
+
+            # SIN recorte: la ventana se queda RECTANGULAR.
+            # Se intentó tres veces darle forma de cápsula con SetWindowRgn y las
+            # tres reapareció un borde claro en las esquinas. La región recorta
+            # la ventana, pero el control del navegador que va dentro se sigue
+            # pintando con sus propias esquinas y con su propio fondo, y en el
+            # arco de la curva asoma ese fondo. Perseguirlo más no compensa: un
+            # rectángulo del marrón de la marca se ve limpio y no tiene forma de
+            # fallar. Con `SetWindowRgn(None)` se retira cualquier región previa.
+            u.SetWindowRgn(hwnd, None, True)
+
+            # Siempre delante, y delante también de otras ventanas «al frente».
+            # `on_top` de pywebview lo pide al crear, pero cualquier ventana que
+            # se active después puede acabar tapándola; TopMost + SetWindowPos con
+            # HWND_TOPMOST lo re-afirma sobre la ventana ya construida.
+            form.TopMost = True
+            SWP_NOMOVE, SWP_NOSIZE, SWP_NOACTIVATE, HWND_TOPMOST = 0x0002, 0x0001, 0x0010, -1
+            u.SetWindowPos(hwnd, HWND_TOPMOST, 0, 0, 0, 0,
+                           SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE)
+
+        form.Invoke(Action(aplicar))
+        # Se registra el tamaño REAL, no el pedido: es la única forma de saber
+        # si el sistema lo respetó. Antes se logueaba el valor solicitado y por
+        # eso el log decía 62x26 mientras en pantalla se veía el doble.
+        try:
+            r = ctypes.wintypes.RECT()
+            u.GetWindowRect(form.Handle.ToInt64(), ctypes.byref(r))
+            _log.info("Indicador flotante: pedido %sx%s → real %sx%s en (%s,%s)",
+                      ancho, alto, r.right - r.left, r.bottom - r.top, r.left, r.top)
+        except Exception:
+            _log.info("Indicador flotante colocado (%sx%s)", ancho, alto)
+    except Exception:
+        _log.exception("No se pudo ajustar el indicador flotante")
+
+
+def _quitar_de_barra_de_tareas(window) -> None:
+    """Marca la ventana como herramienta para que no salga en la barra de tareas.
+
+    Sin esto el indicador aparece como una segunda aplicación abierta, que es
+    justo lo contrario de lo que se busca: la pastilla debe leerse como parte de
+    Helpmeet, no como otro programa.
+    """
+    if not sys.platform.startswith("win"):
+        return
+    try:
+        if not window.events.shown.wait(8):
+            return
+        import ctypes
+        from webview.platforms.winforms import BrowserView
+
+        form = BrowserView.instances.get(window.uid)
+        if form is None:
+            return
+        GWL_EXSTYLE = -20
+        WS_EX_TOOLWINDOW = 0x00000080
+        WS_EX_APPWINDOW = 0x00040000
+        u = ctypes.windll.user32
+
+        def aplicar():
+            # WinForms impone su propio MinimumSize (200x100 por defecto en
+            # pywebview) y lo respeta AUNQUE se llame a SetWindowPos: la ventana
+            # se quedaba grande y el log decía otra cosa. Hay que ponerlo a cero
+            # antes de tocar nada.
+            from System.Drawing import Size as _Size
+            form.MinimumSize = _Size(0, 0)
+            form.MaximumSize = _Size(0, 0)
+            hwnd = form.Handle.ToInt64()
+            estilo = u.GetWindowLongW(hwnd, GWL_EXSTYLE)
+            estilo = (estilo | WS_EX_TOOLWINDOW) & ~WS_EX_APPWINDOW
+            u.SetWindowLongW(hwnd, GWL_EXSTYLE, estilo)
+
+        from System import Action
+        form.Invoke(Action(aplicar))
+    except Exception:
+        _log.debug("No se pudo ocultar el indicador de la barra de tareas", exc_info=True)
+
+
+def _crear_ventana_mini(web_dir: Path, api, principal):
+    """Crea la ventana del indicador. Se llama la PRIMERA vez que hace falta."""
+    def restaurar():
+        api.ocultar_mini()
+        principal.restore()
+
+    puente = _MiniApi(restaurar, api.ocultar_mini)
+
+    # Título distinto del de la ventana principal: con los dos iguales, cualquier
+    # cosa que busque la ventana "Helpmeet" (incluido el propio Windows al
+    # activar la app) puede quedarse con la pastilla en vez de con la app.
+    # Pegada al borde derecho de la pantalla, como hace Granola. La posición se
+    # calcula aquí porque pywebview centra por defecto y una pastilla en mitad
+    # del escritorio tapa justo lo que el usuario está mirando.
+    x0, y0 = _posicion_mini(_MINI_ANCHO, _MINI_ALTO)
+    mini = webview.create_window(
+        "Helpmeet · grabando", str(web_dir / "mini.html"),
+        js_api=puente,
+        # Del tamaño EXACTO del contenido en reposo (logo + barras). La pastilla
+        # llena la ventana entera: `transparent=True` no funciona en el backend
+        # WinForms de Windows, así que cualquier margen que se dejara alrededor
+        # se veía como un halo blanco. Sin margen no hay halo que ver.
+        width=_MINI_ANCHO, height=_MINI_ALTO, x=x0, y=y0,
+        # min_size es LO QUE HACÍA que la pastilla saliera enorme: pywebview lo
+        # deja en (200, 100) por defecto, así que una ventana de 58x28 se
+        # inflaba hasta 200x100 sin avisar. Con el escalado del sistema al 125%
+        # eso son los ~250x125 que se veían en pantalla.
+        min_size=(1, 1),
+        # easy_drag: se puede arrastrar a donde el usuario quiera. Nace pegada a
+        # la esquina superior derecha; lo que pasaba antes —que «se movía sola»—
+        # no era el arrastre sino este código reposicionándola mal por culpa del
+        # tamaño inflado por min_size.
+        frameless=True, easy_drag=True, on_top=True,
+        resizable=False,
+    )
+    puente._ventana = lambda: mini
+    puente.recordar_posicion(x0, y0)
+    threading.Thread(target=_quitar_de_barra_de_tareas, args=(mini,), daemon=True).start()
+    threading.Thread(target=_ajustar_ventana_mini,
+                     args=(mini, _MINI_ANCHO, _MINI_ALTO), daemon=True).start()
+    return mini
+
+
 def _apply_native_window_icon(window, icon_path: Path) -> None:
     """Aplica el .ico y el tema oscuro a WinForms después de que pywebview cree la ventana."""
     if not sys.platform.startswith("win") or not window.events.shown.wait(15):
@@ -507,6 +759,82 @@ class Api(InitiativeApiMixin, MeetingApiMixin, RecordingApiMixin, ExportApiMixin
 
     def set_window(self, window):
         self._window = window
+
+    # ── Indicador flotante al minimizar ──────────────────────────────────
+    def set_mini_factory(self, factory):
+        """Guarda cómo crear la ventana del indicador, sin crearla todavía."""
+        self._mini_factory = factory
+        self._mini_window = None
+
+    def tipo_de_grabacion(self) -> str:
+        """'pantalla', 'audio' o '' — para que el indicador diga qué está
+        grabando cuando el usuario pasa el ratón por encima."""
+        try:
+            if getattr(self, "_screen_rec", None) is not None:
+                return "pantalla"
+            if getattr(self, "_recorder", None) is not None:
+                return "audio"
+        except Exception:
+            pass
+        return ""
+
+    def hay_transcripcion_en_curso(self) -> bool:
+        """Si hay una grabación viva, de audio o de pantalla.
+
+        Es lo que decide si el indicador flotante tiene algo que anunciar: sin
+        grabación, minimizar la ventana no debe dejar nada sobre el escritorio.
+        """
+        return bool(self.tipo_de_grabacion())
+
+    def mostrar_mini(self) -> None:
+        mini = getattr(self, "_mini_window", None)
+        if mini is None:
+            factory = getattr(self, "_mini_factory", None)
+            if factory is None:
+                return
+            mini = self._mini_window = factory()
+        else:
+            mini.show()
+        # El tipo se envía cuando la ventana ya cargó su HTML; si se manda antes,
+        # la global todavía no existe y la llamada se pierde en silencio.
+        self._enviar_estado_mini(mini)
+
+    def _enviar_estado_mini(self, mini) -> None:
+        import json as _json
+        datos = _json.dumps({
+            "tipo": self.tipo_de_grabacion(),
+            "pausado": bool(getattr(self, "_mic_muted", False)),
+        })
+        def enviar():
+            try:
+                mini.events.loaded.wait(6)
+                mini.evaluate_js(f"window.miniEstado && window.miniEstado({datos})")
+            except Exception:
+                _log.debug("No se pudo enviar el estado al indicador", exc_info=True)
+        threading.Thread(target=enviar, daemon=True).start()
+
+    def ocultar_mini(self) -> None:
+        mini = getattr(self, "_mini_window", None)
+        if mini is not None:
+            try:
+                mini.hide()
+            except Exception:
+                pass
+
+    def get_mini_indicator(self) -> dict:
+        return {"ok": True, "enabled": settings.get_mini_indicator()}
+
+    def set_mini_indicator(self, enabled: bool) -> dict:
+        settings.set_mini_indicator(bool(enabled))
+        # Si se apaga con la pastilla en pantalla, se retira en el acto.
+        if not enabled:
+            try:
+                mini = getattr(self, "_mini_window", None)
+                if mini is not None:
+                    mini.hide()
+            except Exception:
+                pass
+        return {"ok": True, "enabled": bool(enabled)}
 
     def set_media_server(self, server):
         self._media_server = server
@@ -1829,6 +2157,34 @@ def run():
         frameless=True, easy_drag=False,
     )
     api.set_window(window)
+
+    # ── Indicador flotante ───────────────────────────────────────────────
+    # La ventana NO se crea aquí. El primer intento la creaba junto a la
+    # principal y compartiendo la misma instancia de `js_api`; el resultado fue
+    # que pywebview dejaba de inyectar `pywebview.api` en la ventana principal y
+    # la app salía EN BLANCO. Se crea bajo demanda, la primera vez que se
+    # minimiza con una grabación viva, y con un puente propio (_MiniApi).
+    api.set_mini_factory(lambda: _crear_ventana_mini(web_dir, api, window))
+
+    def _al_minimizar():
+        try:
+            if not settings.get_mini_indicator():
+                return
+            if not api.hay_transcripcion_en_curso():
+                return
+            api.mostrar_mini()
+        except Exception:
+            _log.exception("No se pudo mostrar el indicador flotante")
+
+    def _al_restaurar():
+        try:
+            api.ocultar_mini()
+        except Exception:
+            pass
+
+    window.events.minimized += _al_minimizar
+    window.events.restored += _al_restaurar
+    window.events.closing += _al_restaurar
     # Perfil persistente de WebView2. Sin esto (modo privado por defecto de
     # pywebview) el tema oscuro, el "tour visto" y las preferencias de la
     # interfaz se pierden cada vez que se cierra la app.

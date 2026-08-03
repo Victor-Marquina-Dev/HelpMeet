@@ -387,6 +387,21 @@ def set_consent_seen(seen: bool = True) -> None:
     _save(current)
 
 
+def get_mini_indicator() -> bool:
+    """Si al minimizar la ventana se muestra el indicador flotante.
+
+    Por defecto SÍ: la transcripción sigue corriendo con la ventana minimizada y
+    sin ninguna señal no hay forma de saberlo. Quien no lo quiera lo apaga.
+    """
+    return bool(_load().get("mini_indicator", True))
+
+
+def set_mini_indicator(enabled: bool) -> None:
+    data = _load()
+    data["mini_indicator"] = bool(enabled)
+    _save(data)
+
+
 def get_setup_done() -> bool:
     """Si el usuario completó el asistente de primera ejecución."""
     return bool(_load().get("setup_done", False))
