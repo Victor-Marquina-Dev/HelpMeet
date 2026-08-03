@@ -114,7 +114,7 @@
   border-radius: 8px; transition: background 120ms ease; pointer-events: none;
 }
 .row-wrap > * { position: relative; z-index: 1; }
-.row-wrap:hover::before, .row-wrap:focus-within::before { background: var(--bg-hover); }
+.row-wrap:hover::before, .row-wrap:has(:focus-visible)::before { background: var(--bg-hover); }
 /* Seleccionada sigue viéndose seleccionada sin el mouse encima. */
 .row-wrap:has(.row-checkbox:checked)::before { background: var(--bg-elevated); }
 .row-wrap .row {
@@ -132,23 +132,51 @@
   display: grid; place-items: center; width: 32px; height: 32px; flex-shrink: 0;
   border-radius: 8px; background: var(--bg-elevated); color: var(--text-secondary);
 }
+/* La casilla dejó de ser un cuadrado relleno y pasó a ser el círculo con tick
+   de itshover.com (r/checked-icon.json), redibujado para este sistema.
+   El <input> sigue existiendo —es lo que da el :checked, el foco de teclado y
+   el aria— pero no pinta nada: se estira invisible por encima del dibujo para
+   seguir siendo el objetivo del clic. Lo visible es el SVG hermano. */
 .row-checkbox {
-  appearance: none; -webkit-appearance: none; width: 16px; height: 16px; margin: 0;
-  border-radius: 5px; border: 1.5px solid var(--border-strong); background: var(--bg-elevated);
-  cursor: pointer; opacity: 0;
-  transition: opacity 150ms var(--ease-reveal), background-color 120ms ease, border-color 120ms ease;
+  appearance: none; -webkit-appearance: none; margin: 0;
+  width: 17px; height: 17px; border: none; background: none;
+  cursor: pointer; z-index: 1;
 }
-.row-checkbox:checked { background: var(--text-primary); border-color: var(--text-primary); }
-.row-wrap:hover .row-checkbox, .row-wrap:focus-within .row-checkbox, .row-checkbox:checked { opacity: 1; }
-/* El tick va atado a :checked y nunca a :hover — sobre una fila solo señalada
-   mentiría sobre el estado. Arranca en scale(.8) y no en 0: nada en el mundo
-   real aparece desde la nada. */
 .row-check-mark {
-  width: 10px; height: 10px; stroke-width: 2.4; color: var(--bg-app);
-  opacity: 0; transform: scale(.8);
-  transition: opacity 140ms var(--ease-reveal), transform 140ms var(--ease-reveal);
+  width: 17px; height: 17px; pointer-events: none;
+  fill: none; stroke-linecap: round; stroke-linejoin: round;
+  opacity: 0; transition: opacity 150ms var(--ease-reveal);
 }
-.row-checkbox:checked ~ .row-check-mark { opacity: 1; transform: scale(1); }
+.row-wrap:hover .row-check-mark,
+.row-wrap:has(:focus-visible) .row-check-mark,
+.row-checkbox:checked ~ .row-check-mark { opacity: 1; }
+
+.rcm-ring { stroke: var(--border-strong); stroke-width: 1.5; transition: stroke 120ms ease; }
+.row-wrap:hover .rcm-ring { stroke: var(--text-muted); }
+.row-checkbox:checked ~ .row-check-mark .rcm-ring { stroke: var(--accent); }
+
+/* El tick se DIBUJA, no aparece. Es el rasgo del icono original —allí anima
+   `pathLength`, que en CSS es stroke-dasharray/offset—: el trazo mide 9,34
+   (2,97 + 6,37 de sus dos tramos), y con 10 sobra para taparlo del todo.
+   Atado a :checked y nunca a :hover: sobre una fila solo señalada mentiría
+   sobre el estado. */
+.rcm-tick {
+  stroke: var(--accent); stroke-width: 2;
+  stroke-dasharray: 10; stroke-dashoffset: 10;
+}
+.row-checkbox:checked ~ .row-check-mark .rcm-tick {
+  animation: rcm-dibujar 380ms var(--ease-out) forwards;
+}
+@keyframes rcm-dibujar { to { stroke-dashoffset: 0; } }
+
+/* El conjunto da un pulso mientras el tick se dibuja, como el original
+   (escala 1 → 1,1 → 1). Va en el SVG y no en el <input>, que es invisible. */
+.row-checkbox:checked ~ .row-check-mark { animation: rcm-pulso 340ms var(--ease-out); }
+@keyframes rcm-pulso {
+  0%   { transform: scale(1); }
+  28%  { transform: scale(1.14); }
+  100% { transform: scale(1); }
+}
 
 /* Proyecto como icono teñido, con el nombre que crece al pasar el mouse
    (técnica grid 0fr→1fr: anima el ancho sin reflow ni parpadeo del texto). */
@@ -156,8 +184,8 @@
 .row-proj-icon svg { width: 14px; height: 14px; flex-shrink: 0; }
 .row-proj-name-grid { display: grid; grid-template-columns: 0fr; transition: grid-template-columns 200ms var(--ease-reveal); }
 .row-proj-name { overflow: hidden; white-space: nowrap; font-size: 10px; color: var(--text-muted); opacity: .75; letter-spacing: .01em; }
-.row-wrap:hover .row-proj-name-grid, .row-wrap:focus-within .row-proj-name-grid { grid-template-columns: 1fr; }
-.row-wrap:hover .row-proj-name, .row-wrap:focus-within .row-proj-name { padding-left: 4px; }
+.row-wrap:hover .row-proj-name-grid, .row-wrap:has(:focus-visible) .row-proj-name-grid { grid-template-columns: 1fr; }
+.row-wrap:hover .row-proj-name, .row-wrap:has(:focus-visible) .row-proj-name { padding-left: 4px; }
 
 /* Estrella: oculta en reposo, revelada al hover, pero SIEMPRE visible cuando
    está activa — si solo existiera al hover, una reunión marcada no se
@@ -169,10 +197,20 @@
   display: grid; place-items: center;
   transition: opacity 150ms var(--ease-reveal), background .12s, color .12s, transform 120ms var(--ease-reveal);
 }
-.row-fav-btn svg { width: 15px; height: 15px; }
-.row-wrap:hover .row-fav-btn, .row-wrap:focus-within .row-fav-btn, .row-fav-btn.active { opacity: 1; }
-.row-fav-btn.active { color: var(--text-primary); }
-.row-fav-btn.active svg { fill: currentColor; }
+/* Los mismos atributos que .icon, porque este <svg> no lleva esa clase y sin
+   ellos cae al `fill: black` por defecto del navegador: el marcador salía macizo
+   y negro, sin contorno, y era lo que más pesaba de la fila. */
+.row-fav-btn svg {
+  width: 15px; height: 15px;
+  fill: none; stroke: currentColor; stroke-width: 1.6;
+  stroke-linecap: round; stroke-linejoin: round;
+}
+.row-wrap:hover .row-fav-btn, .row-wrap:has(:focus-visible) .row-fav-btn, .row-fav-btn.active { opacity: 1; }
+/* Marcada = verde de marca, SIN relleno. El marcador macizo pesaba demasiado en
+   una lista densa: es lo primero que veía el ojo en cada fila, por encima del
+   título. Con el contorno teñido la marca se sigue leyendo de un vistazo —es el
+   único elemento con color de la fila— y no compite con el texto. */
+.row-fav-btn.active { color: var(--accent); }
 .row-wrap .row-fav-btn:hover { background: var(--border-strong); color: var(--text-primary); transform: scale(1.08); }
 .row-fav-btn:active { transform: scale(.94); }
 
@@ -184,7 +222,7 @@
   display: grid; flex-shrink: 0; grid-template-columns: 1fr 28px; align-items: center;
   transition: grid-template-columns 200ms var(--ease-reveal);
 }
-.row-wrap:hover .row-actions-slot, .row-wrap:focus-within .row-actions-slot { grid-template-columns: 0fr 28px; }
+.row-wrap:hover .row-actions-slot, .row-wrap:has(:focus-visible) .row-actions-slot { grid-template-columns: minmax(0, 0fr) 28px; }
 .row-actions-slot > .row-meta { grid-column: 1; justify-self: end; overflow: hidden; }
 .row-actions-slot > .row-more-btn { grid-column: 2; justify-self: end; }
 .row-more-btn {
@@ -192,7 +230,7 @@
   color: var(--text-muted); cursor: pointer; display: grid; place-items: center; opacity: 0;
   transition: opacity 150ms var(--ease-reveal), background .12s, color .12s, transform 120ms var(--ease-reveal);
 }
-.row-wrap:hover .row-more-btn, .row-wrap:focus-within .row-more-btn { opacity: 1; }
+.row-wrap:hover .row-more-btn, .row-wrap:has(:focus-visible) .row-more-btn { opacity: 1; }
 .row-more-btn:hover { background: var(--border-strong); color: var(--text-primary); transform: scale(1.08); }
 .row-more-btn:active { transform: scale(.94); }
 
@@ -211,6 +249,10 @@
   .row-check-mark, .row-fav-btn, .row-more-btn, .row-select-slot { transition: none; }
   .row-wrap .row-fav-btn:hover, .row-more-btn:hover,
   .row-select-slot:active, .row-fav-btn:active, .row-more-btn:active { transform: none; }
+  /* El tick sigue apareciendo, pero ya dibujado: sin animación no puede quedarse
+     invisible, que es lo que pasaría si solo se anulara el keyframe. */
+  .row-checkbox:checked ~ .row-check-mark { animation: none; }
+  .row-checkbox:checked ~ .row-check-mark .rcm-tick { animation: none; stroke-dashoffset: 0; }
 }
 
 /* ============================================================
@@ -481,8 +523,8 @@
    sueltos y una hora sin día no ubica nada. Y como estas filas no llevan menú,
    la hora no debe encogerse al pasar el mouse — si no, la fecha bailaría. */
 .fav-list .row-time { width: 52px; }
-.fav-list .row-wrap:hover .row-time, .fav-list .row-wrap:focus-within .row-time { width: 52px; }
-.fav-list .row-wrap:hover .row-actions-slot, .fav-list .row-wrap:focus-within .row-actions-slot { grid-template-columns: 1fr 0px; }
+.fav-list .row-wrap:hover .row-time, .fav-list .row-wrap:has(:focus-visible) .row-time { width: 52px; }
+.fav-list .row-wrap:hover .row-actions-slot, .fav-list .row-wrap:has(:focus-visible) .row-actions-slot { grid-template-columns: 1fr 0px; }
 
 /* ---- Tabla de espacios ---- */
 .esp-head { display: flex; align-items: baseline; gap: 12px; margin-bottom: 20px; }
@@ -690,13 +732,13 @@ th.esp-num, td.esp-num { text-align: right; font-variant-numeric: tabular-nums; 
 /* La hora se va al pasar el mouse; el boton aparece en su columna, siempre
    reservada, asi que nada se mueve de sitio. */
 .row-wrap:hover .row-actions-slot > .row-meta,
-.row-wrap:focus-within .row-actions-slot > .row-meta { opacity: 0; }
+.row-wrap:has(:focus-visible) .row-actions-slot > .row-meta { opacity: 0; }
 
 /* El indicador de proyecto debe verse en los DOS estados: en reposo el icono,
    y al pasar el mouse tambien su nombre. Antes desaparecia justo al señalar la
    fila, que es cuando mas se quiere saber de que proyecto es. */
 .row-proj-icon { opacity: .85; }
-.row-wrap:hover .row-proj-icon, .row-wrap:focus-within .row-proj-icon { opacity: 1; }
+.row-wrap:hover .row-proj-icon, .row-wrap:has(:focus-visible) .row-proj-icon { opacity: 1; }
 
 /* Cuando la reunion esta dentro de una carpeta el nombre es mas largo
    ("Proyecto / Carpeta"), asi que necesita mas sitio al revelarse. */
@@ -713,8 +755,251 @@ th.esp-num, td.esp-num { text-align: right; font-variant-numeric: tabular-nums; 
 .row-fav-btn { margin-right: 0; }
 .row-proj-icon { margin-right: 0; }
 .row-wrap { gap: 8px; }
-/* El bloque de la derecha se lee como un grupo: estrella, ubicacion, hora y
-   menu, separados de forma uniforme y sin pisarse. */
-.row-wrap > .row-fav-btn,
+/* El bloque de la derecha se lee como un grupo: ubicacion, hora y menu,
+   separados de forma uniforme y sin pisarse. */
 .row-wrap > .row-proj-icon,
 .row-wrap > .row-actions-slot { flex-shrink: 0; }
+
+/* ============================================================
+   Casilla + estrella: un solo grupo a la izquierda
+   Las dos son acciones SOBRE la reunion —seleccionarla y marcarla— y las dos se
+   revelan con el mismo hover, asi que se leen como un par. Al final de la fila
+   la estrella competia por el sitio con la hora, el proyecto y los "···", que
+   son otra cosa: navegacion y metadatos.
+   ============================================================ */
+.row-lead { display: flex; align-items: center; gap: 2px; flex-shrink: 0; }
+/* Casilla y estrella quedan las DOS fuera del recuadro: son controles de la
+   lista, no contenido de la fila, y el recuadro del hover marca donde empieza
+   el contenido.
+   La cuenta, en coordenadas de .row-wrap: padding 8 + lead 44 (18 casilla + 2 de
+   hueco + 24 estrella) = 52, mas 4 de aire antes del icono = 56 para el recuadro.
+   El -8 solo compensa el padding del .row-wrap, para que la casilla arranque a
+   ras del area de contenido. Un margen mayor la sacaria FUERA del area y quedaria
+   cortada contra el panel lateral: probado con -50 y se perdia media casilla. */
+.row-wrap::before { left: 56px; }
+.list:has(.row-wrap) { margin-left: -8px; }
+/* El encabezado de mes se alinea con el RECUADRO, no con los controles: los
+   48px son los mismos 56 del ::before menos los 8 que la lista se corrio. Sin
+   esto el titulo del mes quedaba flotando a la izquierda de todo. */
+.content:has(.row-wrap) .list-month-hdr { padding-left: 48px; }
+
+/* ---------- Marcar como favorita ----------
+   Antes solo cambiaba de color: el clic no se sentia, y sobre una lista densa
+   ni se notaba cual de las filas se habia marcado.
+   El movimiento sale del icono, no al reves. Un marcador no gira ni rebota como
+   una pelota: CUELGA de arriba, asi que el origen esta en 50% 15% y lo que se
+   anima es el alto. Primero se estira hacia arriba (anticipacion: un gesto que
+   arranca al reves lee como impulso), despues se clava hacia abajo comprimido, y
+   se asienta oscilando.
+   Es la misma idea que el componente original de itshover —scaleY 0.9 con y:+2—
+   con mas recorrido, porque alli responde al raton y aqui confirma una accion.
+   Se anima el <svg> y no el boton, asi el fondo del :hover se queda quieto. */
+@keyframes fav-marcar {
+  0%   { transform: scaleY(1)    translateY(0); }
+  22%  { transform: scaleY(1.12) translateY(-1.5px); }
+  55%  { transform: scaleY(.82)  translateY(2.5px); }
+  78%  { transform: scaleY(1.06) translateY(-.8px); }
+  100% { transform: scaleY(1)    translateY(0); }
+}
+/* Al desmarcar no hay celebracion: se descuelga y vuelve, nada mas.
+   Marcar y desmarcar no son el mismo gesto y no deben sonar igual. */
+@keyframes fav-desmarcar {
+  0%   { transform: scaleY(1) translateY(0); }
+  45%  { transform: scaleY(.9) translateY(1.5px); }
+  100% { transform: scaleY(1) translateY(0); }
+}
+/* El origen alto es lo que hace que parezca colgado y no estirado por el medio. */
+.row-fav-btn svg { transform-origin: 50% 15%; }
+/* Al señalar la fila, el marcador se comprime un poco: es el gesto de hover del
+   icono original, y hace que el boton responda antes incluso de pulsarlo. */
+.row-wrap:hover .row-fav-btn svg {
+  transform: scaleY(.92) translateY(1px);
+  transition: transform 180ms var(--ease-out);
+}
+/* Mientras corre la animacion de clic manda ella: sin esto el hover le pisa el
+   transform en cuanto termina y el icono pega un tiron al asentarse. */
+.row-fav-btn.fav-anim-on svg,
+.row-fav-btn.fav-anim-off svg { transition: none; }
+/* El halo sale de la estrella y se desvanece: confirma el clic en el sitio
+   exacto donde ocurrio. Es un ::after del boton para no tocar el markup. */
+@keyframes fav-halo {
+  0%   { opacity: .5; transform: scale(.4); }
+  100% { opacity: 0;  transform: scale(2.1); }
+}
+.row-fav-btn { position: relative; }
+.row-fav-btn::after {
+  content: ""; position: absolute; inset: 0; border-radius: 50%;
+  background: radial-gradient(circle, var(--accent) 0%, transparent 68%);
+  opacity: 0; pointer-events: none;
+}
+.row-fav-btn.fav-anim-on svg    { animation: fav-marcar    460ms var(--ease-out); }
+.row-fav-btn.fav-anim-on::after { animation: fav-halo      520ms var(--ease-out); }
+.row-fav-btn.fav-anim-off svg   { animation: fav-desmarcar 220ms var(--ease-out); }
+
+@media (prefers-reduced-motion: reduce) {
+  .row-fav-btn.fav-anim-on svg,
+  .row-fav-btn.fav-anim-off svg,
+  .row-fav-btn.fav-anim-on::after { animation: none; }
+  .row-wrap:hover .row-fav-btn svg { transform: none; transition: none; }
+}
+
+/* ============================================================
+   PAPELERA / ARCHIVADOS
+   Antes se dibujaba con estilos en línea desde app.js. Tres cambios de fondo:
+   el tipo pasó de rótulo repetido a icono, «Eliminar» dejó de ser un botón rojo
+   macizo en cada fila, y las cajas con borde se cambiaron por filas separadas
+   por una línea — siete cajas apiladas pesaban más que su contenido.
+   ============================================================ */
+.trash-row {
+  display: flex; align-items: center; gap: 12px;
+  padding: 11px 10px; border-bottom: 1px solid var(--border-subtle);
+  border-radius: 8px; transition: background 120ms ease;
+}
+.trash-row:last-child { border-bottom: none; }
+.trash-row:hover { background: var(--bg-hover); }
+.trash-ico {
+  display: grid; place-items: center; width: 30px; height: 30px; flex-shrink: 0;
+  border-radius: 8px; background: var(--bg-elevated); color: var(--text-muted);
+}
+.trash-body { flex: 1; min-width: 0; }
+.trash-title {
+  font-size: 13px; color: var(--text-primary);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.trash-meta { font-size: 11px; color: var(--text-muted); margin-top: 1px; }
+
+/* Las acciones aparecen al señalar la fila. «Restaurar» se reserva su sitio
+   siempre para que nada se mueva al recorrer la lista. */
+.trash-acts { display: flex; align-items: center; gap: 4px; flex-shrink: 0; }
+.trash-acts > * { opacity: 0; transition: opacity 150ms var(--ease-reveal); }
+.trash-row:hover .trash-acts > *,
+.trash-row:has(:focus-visible) .trash-acts > * { opacity: 1; }
+
+/* El destructivo solo se tiñe cuando se apunta: en reposo es un icono más. */
+.trash-del {
+  width: 28px; height: 28px; display: grid; place-items: center;
+  border: none; background: none; border-radius: 6px; cursor: pointer;
+  color: var(--text-muted);
+  transition: background .12s, color .12s, transform 120ms var(--ease-reveal);
+}
+.trash-del:hover { background: var(--danger-soft); color: var(--danger); transform: scale(1.06); }
+.trash-del:active { transform: scale(.94); }
+
+@media (prefers-reduced-motion: reduce) {
+  .trash-acts > *, .trash-del { transition: none; }
+  .trash-del:hover, .trash-del:active { transform: none; }
+}
+
+/* ---------- Favoritos: la columna derecha ----------
+   Dos correcciones sobre las reglas de más arriba, que se escribieron sobre una
+   premisa que dejó de ser cierta ("estas filas no llevan menú"): meetingRow
+   crea SIEMPRE el botón «···».
+
+   1. La celda de la hora medía 52px, pero aquí el texto es fecha + hora
+      ("31 jul · 9:34 AM") y no cabe: se desbordaba y se montaba encima del
+      icono de carpeta del proyecto.
+   2. Al pasar el ratón, la columna del menú se ponía a `0px`. El botón se
+      seguía dibujando —justify-self: end lo empuja fuera de su celda— así que
+      aparecía recortado contra el borde y no había forma de acertarle.
+
+   Ahora se comporta como el resto de listas: la fecha se cierra al señalar la
+   fila y el botón entra en su columna reservada, sin que nada se mueva. */
+.fav-list .row-time { width: 92px; }
+.fav-list .row-wrap:hover .row-actions-slot,
+.fav-list .row-wrap:has(:focus-visible) .row-actions-slot { grid-template-columns: minmax(0, 0fr) 28px; }
+.fav-list .row-wrap:hover .row-time,
+.fav-list .row-wrap:has(:focus-visible) .row-time { width: 92px; }
+
+/* ---------- El nombre del proyecto, siempre visible ----------
+   Estaba en `grid-template-columns: 0fr` y solo se abría al pasar el ratón. El
+   efecto era bonito, pero el resultado en reposo es una carpeta de color suelta
+   en mitad de la fila, con hueco en blanco a los dos lados: un icono sin
+   etiqueta no dice de qué proyecto es la reunión, que es justo el dato por el
+   que está ahí. Y en Inicio, donde conviven reuniones de proyectos distintos,
+   ese dato es el que distingue una fila de otra.
+   El revelado se conserva donde sí tiene sentido: el nombre completo se lee al
+   señalar la fila, porque en reposo se recorta a 120px. */
+.row-proj-name-grid { grid-template-columns: 1fr; }
+.row-proj-name {
+  padding-left: 5px; max-width: 120px;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  transition: max-width 200ms var(--ease-reveal), opacity .12s;
+}
+.row-wrap:hover .row-proj-name,
+.row-wrap:has(:focus-visible) .row-proj-name { max-width: 220px; opacity: 1; }
+/* El margen negativo lo pegaba a la hora; con el nombre siempre puesto necesita
+   su propia separación. */
+.row-wrap > .row-proj-icon { margin-right: 0; }
+
+@media (prefers-reduced-motion: reduce) {
+  .row-proj-name { transition: none; }
+}
+
+/* ---------- El proyecto, en columna ----------
+   El bloque no tenía ancho: se pegaba a la derecha y su contenido se alineaba
+   por el final, así que la posición del icono dependía de lo LARGO que fuera
+   cada nombre — «aaaa» y «bc-digital» dejaban los iconos en sitios distintos y
+   la lista se leía en zigzag.
+   Con un ancho fijo y el contenido alineado al principio, los iconos caen todos
+   en la misma columna y los nombres arrancan a la misma altura. El texto que no
+   entre se recorta; el nombre completo sigue en el `title` de la fila. */
+.row-wrap > .row-proj-icon {
+  width: 142px; flex: 0 0 142px; justify-content: flex-start; overflow: hidden;
+}
+/* Ya no crece al pasar el ratón: hacerlo movería la columna entera justo cuando
+   el usuario está apuntando, que es cuando más molesta. */
+.row-proj-name, .row-wrap:hover .row-proj-name,
+.row-wrap:has(:focus-visible) .row-proj-name { max-width: 118px; }
+
+/* ---------- El proyecto, en la columna de la derecha ----------
+   El contenido vuelve a estirarse para que el bloque del proyecto quede pegado
+   a la hora, alineado en columna con el de las demás filas. El hueco queda
+   entre el título y la carpeta; es el precio de tener la columna alineada, y
+   entre las dos cosas se eligió la columna.
+   El ancho fijo es lo que mantiene los iconos en línea: sin él, el bloque se
+   alinea por el final y su posición depende de lo largo que sea cada nombre —
+   «aaaa» y «bc-digital» dejaban los iconos en sitios distintos. */
+.row-wrap .row { flex: 1; width: 100%; }
+/* 104 y no 142: cuanto MÁS ESTRECHA es esta columna, más a la derecha empieza
+   —el contenido de su izquierda se estira para llenar el hueco—, así que la
+   carpeta queda junto a la hora en vez de a media fila. Se mantiene el ancho
+   fijo, que es lo que conserva los iconos en columna, y el nombre se recorta a
+   80px; el completo sigue llegando por el `title` de la fila. */
+/* Alineado por el FINAL, no por el principio: con `flex-start` el nombre corto
+   («aaaa») dejaba 70px muertos entre él y la hora dentro de su propia columna.
+   Alineando al final, el nombre termina siempre pegado a la hora y lo que sobra
+   se va al otro lado, junto al título. Los nombres quedan igual de alineados
+   entre sí —por su borde derecho en vez de por el izquierdo— y el bloque de la
+   derecha se lee como una sola pieza. */
+.row-wrap > .row-proj-icon {
+  flex: 0 0 auto; width: auto; max-width: 150px; justify-content: flex-end;
+  margin-right: 0; margin-left: 0; overflow: hidden;
+}
+.row-proj-name, .row-wrap:hover .row-proj-name,
+.row-wrap:has(:focus-visible) .row-proj-name { max-width: 80px; }
+
+/* Fila sin fecha (Inicio): la hora es «5:26 PM», no «02 ago · 2:04 PM», así que
+   su celda no necesita 118px. Con 62 el bloque entero —proyecto, hora y menú—
+   se corre a la derecha y desaparece el vacío del final de la fila. */
+.row-wrap--sin-fecha .row-time,
+.list .row-wrap--sin-fecha .row-time { width: 62px; }
+
+/* La lista se queda ESTRECHA a propósito.
+   El hueco tiene que caer en algún sitio: los títulos son cortos ("dom 2 Ago
+   5:26 PM") y, con la fila ancha, o el vacío queda en medio —separando el
+   título de su carpeta, que son datos que se leen juntos— o queda fuera del
+   bloque. Estirar la lista a todo el ancho probó lo primero y era peor: más
+   ancho, más vacío en medio.
+   Con 640px las tres columnas caen cerca unas de otras y el sobrante se va a la
+   derecha del bloque, donde no separa nada. */
+.content:has(.row-wrap) .list { max-width: 640px; }
+
+/* `minmax(0, 0fr)` y no `0fr` a secas: en CSS Grid una pista nunca baja de su
+   contenido mínimo, y `.row-time` lleva un ancho fijo. Con `0fr` la celda de la
+   hora seguía midiendo sus 62px aunque el texto estuviera invisible, así que al
+   pasar el ratón quedaba un hueco muerto entre el proyecto y los «···».
+   `minmax(0, …)` es lo que autoriza a la pista a llegar de verdad a cero. */
+.row-wrap:hover .row-actions-slot,
+.row-wrap:has(:focus-visible) .row-actions-slot { grid-template-columns: minmax(0, 0fr) 28px; }
+.fav-list .row-wrap:hover .row-actions-slot,
+.fav-list .row-wrap:has(:focus-visible) .row-actions-slot { grid-template-columns: minmax(0, 0fr) 28px; }

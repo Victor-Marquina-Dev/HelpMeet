@@ -200,6 +200,8 @@ const api = {
   exportTranscript: (mid) => call('export_transcript', mid),
   exportInitiativeById: (iid) => call('export_initiative_by_id', iid),
   openInitiativeFolder: (iid) => call('open_initiative_folder', iid),
+  getMiniIndicator: () => call('get_mini_indicator'),
+  setMiniIndicator: (v) => call('set_mini_indicator', v),
   exportMeetingTo: (mid) => call('export_meeting_to', mid),
   exportInitiativeTo: (iid) => call('export_initiative_to', iid),
   setInitiativeDescription: (iid, d) => call('set_initiative_description', iid, d),
@@ -1007,15 +1009,25 @@ function meetingRow(m, it, opts) {
   const esPantalla = m.source === 'screen' || m.source === 'import';
   const color = it ? (it.color || avatarColorFor(it.name)) : 'var(--text-faint)';
 
-  const wrap = el('div', 'row-wrap');
+  /* La celda de la derecha está dimensionada para "02 ago · 2:04 PM". En las
+     listas sin fecha —Inicio— el texto es la mitad y sobraban ~54px, así que el
+     proyecto y la hora quedaban lejos del borde con un vacío detrás. Solo el JS
+     sabe si la fila lleva fecha, de modo que lo marca aquí y el CSS ajusta. */
+  const wrap = el('div', 'row-wrap' + (opts.showDate ? '' : ' row-wrap--sin-fecha'));
   wrap.dataset.mid = m.id;
 
   // Casilla de selección
   const slot = el('label', 'row-select-slot');
   slot.title = 'Seleccionar';
   slot.innerHTML =
+    /* El SVG va en línea y no con <use>: la animación tiene que alcanzar al
+       trazo del tick por separado (se dibuja solo con stroke-dashoffset) y a
+       través del shadow DOM de <use> no se puede seleccionar una parte. */
     `<input type="checkbox" class="row-checkbox" aria-label="Seleccionar ${esc(m.title || 'reunión')}">` +
-    `<svg class="row-check-mark" aria-hidden="true"><use href="#i-check"/></svg>`;
+    `<svg class="row-check-mark" viewBox="0 0 20 20" aria-hidden="true">` +
+      `<circle class="rcm-ring" cx="10" cy="10" r="7.4"/>` +
+      `<path class="rcm-tick" d="M6.8 10.3l2.1 2.1 4.3-4.7"/>` +
+    `</svg>`;
 
   // Icono de tipo: la verdad la fija si hay vídeo, igual que en el mockup.
   const tipo = el('span', 'row-doc-icon');
@@ -1032,10 +1044,12 @@ function meetingRow(m, it, opts) {
       `<span class="row-title">${esc(_fmtMeetingLabel(m))}</span>` +
       `<span class="row-sub">` +
         `<svg class="icon row-sub-ico" aria-hidden="true"><use href="#i-clock"/></svg>${esc(sub)}` +
-        `<span class="row-folder-chip" title="${esc(ubic.titulo)}">` +
-          `<svg class="icon" aria-hidden="true"><use href="#i-folder"/></svg>` +
-          `<span class="row-folder-chip-name">${esc(ubic.nombre)}</span>` +
-        `</span>` +
+        (ubic
+          ? `<span class="row-folder-chip" title="${esc(ubic.titulo)}">` +
+              `<svg class="icon" aria-hidden="true"><use href="#i-folder"/></svg>` +
+              `<span class="row-folder-chip-name">${esc(ubic.nombre)}</span>` +
+            `</span>`
+          : '') +
       `</span>` +
     `</span>`;
   nav.onclick = () => { if (it) STATE.selInit = it.id; openMeeting(m.id); };
@@ -1045,18 +1059,31 @@ function meetingRow(m, it, opts) {
   fav.type = 'button';
   fav.setAttribute('aria-pressed', esFav ? 'true' : 'false');
   fav.title = esFav ? 'Quitar de favoritos' : 'Marcar como favorita';
-  fav.innerHTML = '<svg aria-hidden="true"><use href="#i-star"/></svg>';
+  fav.innerHTML = '<svg aria-hidden="true"><use href="#i-bookmark"/></svg>';
   fav.onclick = (e) => {
     e.stopPropagation();
     const ahora = _toggleMeetingFav(m.id);
     fav.classList.toggle('active', ahora);
     fav.setAttribute('aria-pressed', ahora ? 'true' : 'false');
     fav.title = ahora ? 'Quitar de favoritos' : 'Marcar como favorita';
+    /* Las dos clases se quitan SIEMPRE antes de poner la nueva, y en medio se
+       fuerza un reflujo: sin eso, marcar dos veces seguidas no reinicia la
+       animación —el navegador ve la misma clase puesta y no vuelve a lanzarla—
+       y el segundo clic se queda sin respuesta visual. */
+    fav.classList.remove('fav-anim-on', 'fav-anim-off');
+    void fav.offsetWidth;
+    fav.classList.add(ahora ? 'fav-anim-on' : 'fav-anim-off');
     const favEl = $('#favCount');
-    if (favEl) { const n = _getMeetingFavs().size; favEl.textContent = n || ''; }
+    if (favEl) { const n = _contarFavsVivos(); favEl.textContent = n || ''; }
   };
 
-  wrap.append(slot, tipo, nav, fav);
+  /* La estrella va pegada a la casilla, no al final de la fila: las dos son
+     acciones sobre la reunión —marcarla y seleccionarla— y se revelan con el
+     mismo hover, así que se leen como un par. Al final competía por el sitio
+     con la hora, el proyecto y los "···", que son otra cosa. */
+  const lead = el('span', 'row-lead');
+  lead.append(slot, fav);
+  wrap.append(lead, tipo, nav);
 
   // Proyecto: solo donde la lista mezcla varios. Dentro de un proyecto todas
   // las filas son del mismo y el indicador sería ruido.
@@ -1101,16 +1128,13 @@ function meetingRow(m, it, opts) {
 }
 
 /* Subtítulo de la fila: duración cuando la hay, y si no el estado real.
-   El recuento de frases se añade acá porque salió del título: como nombre no
-   servía —cambia solo mientras se transcribe—, pero como dato sí dice algo que
-   la fila no dice en ningún otro sitio: cuánto contenido tiene. */
+   Sin el recuento de frases: era un número que no se usa para decidir nada al
+   recorrer la lista y competía por el ancho con la duración, que sí. */
 function _subtituloReunion(m) {
   if (m.status === 'processing') return 'Transcribiendo…';
-  const n = m.frases || 0;
-  const frases = n ? ` · ${n} ${n === 1 ? 'frase' : 'frases'}` : '';
   const d = _duracionReunion(m);
-  if (d) return d + frases;
-  if (m.has_video) return 'Sin transcribir' + frases;
+  if (d) return d;
+  if (m.has_video) return 'Sin transcribir';
   return 'Pendiente';
 }
 
@@ -1218,7 +1242,20 @@ const CAL_MONTHS_SHORT = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago'
 const CAL_DOW = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
 
 function _dkey(d) { return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; }
-function _startOfWeek(d) { const x = new Date(d.getFullYear(), d.getMonth(), d.getDate()); x.setDate(x.getDate() - x.getDay()); return x; }
+/* La semana empieza en LUNES.
+   Restaba `getDay()` a secas, que en JavaScript cuenta el domingo como 0: la
+   semana arrancaba en domingo, a la americana. Pero las cabeceras de la vista
+   van LUN·MAR·MIÉ…·DOM y la vista de MES ya calculaba con lunes
+   (`(getDay() + 6) % 7`), así que las dos vistas del mismo calendario no
+   coincidían. El síntoma: el domingo 2 de agosto de 2026 aparecía rotulado
+   como LUNES, y cada reunión caía una columna corrida.
+   `(getDay() + 6) % 7` convierte domingo=0 en 6, que es su posición real
+   cuando la semana abre en lunes. */
+function _startOfWeek(d) {
+  const x = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+  x.setDate(x.getDate() - ((x.getDay() + 6) % 7));
+  return x;
+}
 
 // Paleta de colores para iniciativas (tonos suaves que encajan con el tema oscuro).
 const INIT_COLORS = ['#aacfbf', '#e8c17b', '#e0857b', '#86b5e0', '#a98fd6', '#8fc99b', '#e093c0', '#7fcdd0'];
@@ -1340,7 +1377,7 @@ function viewFavorites() {
   if (!total) {
     const v = el('div', 'empty-state');
     v.innerHTML =
-      `<svg class="icon icon-lg"><use href="#i-star"/></svg>` +
+      `<svg class="icon icon-lg"><use href="#i-bookmark"/></svg>` +
       `<div class="l1">Sin favoritos todavía</div>` +
       `<div class="l2">Marcá una reunión con la estrella y la vas a encontrar acá.</div>`;
     inner.appendChild(v);
@@ -1811,7 +1848,14 @@ function viewInitiative() {
   bFolder.type = 'button'; bFolder.id = 'initOpenFolder';
   bFolder.title = 'Abrir la carpeta completa del proyecto';
   bFolder.innerHTML = '<svg class="icon"><use href="#i-folder"/></svg>';
-  bFolder.onclick = (e) => doOpenFolder(e.currentTarget);
+  /* openInitiativeFolder y no doOpenFolder: este botón está en la cabecera del
+     PROYECTO y su rótulo promete «la carpeta completa del proyecto», pero
+     llamaba a la función de la REUNIÓN, que usa STATE.selMeeting. Al entrar a un
+     proyecto sin abrir ninguna reunión ese valor es null, llegaba a Python como
+     `int(None)` y reventaba: de ahí el «No se pudo abrir la carpeta» en un
+     proyecto recién creado. Copiar el handler del botón de al lado sin repasar
+     a qué se refiere cada uno. */
+  bFolder.onclick = (e) => openInitiativeFolder(STATE.selInit, e.currentTarget);
 
   const bMenu = el('button', 'icon-btn');
   bMenu.type = 'button'; bMenu.id = 'initMenu';
@@ -2238,17 +2282,16 @@ function _carpetaDe(m, it, fid) {
   return null;
 }
 
-/* Subcarpeta donde la reuni\u00f3n est\u00e1 guardada, para el box del subt\u00edtulo de la
-   fila. Prioridad: la carpeta del usuario si est\u00e1 archivada en una; si no, la
-   carpeta de mes del exportador. Las dos contestan "\u00bfd\u00f3nde est\u00e1?" \u2014 una dentro
-   de la app, la otra en disco. */
+/* Subcarpeta del usuario donde la reuni\u00f3n est\u00e1 guardada, o null si est\u00e1 suelta.
+   Antes, cuando no hab\u00eda carpeta, ca\u00eda a la del mes en disco ("2026-08 Agosto")
+   y el box sal\u00eda en TODAS las filas: al no faltar en ninguna no distingu\u00eda a
+   ninguna, y encima repet\u00eda el encabezado de mes que ya agrupa la lista. Un
+   indicador que siempre est\u00e1 no informa; este solo aparece si es la excepci\u00f3n. */
 function _ubicacionReunion(m, it) {
   const fid = _getMeetingFolder(m.id);
   const carpeta = fid == null ? null : _carpetaDe(m, it, fid);
-  if (carpeta) return { nombre: carpeta.name, titulo: `Carpeta: ${carpeta.name}` };
-  const mes = _slugMes(m.started_at);
-  const raiz = it ? _slugProyecto(it.name) + '/' : '';
-  return { nombre: mes, titulo: `Carpeta en disco: ${raiz}${mes}/` };
+  if (!carpeta) return null;
+  return { nombre: carpeta.name, titulo: `Carpeta: ${carpeta.name}` };
 }
 
 // Formatea un ISO timestamp a "dd/mm/aa" para mostrar en la UI.
@@ -2702,7 +2745,7 @@ function meetingBarButtons(mid, t) {
   btnFav.type = 'button'; btnFav.id = 'mFav';
   btnFav.setAttribute('aria-pressed', esFav ? 'true' : 'false');
   btnFav.title = esFav ? 'Quitar de favoritos' : 'Añadir a favoritos';
-  btnFav.innerHTML = '<svg class="icon"><use href="#i-star"/></svg>';
+  btnFav.innerHTML = '<svg class="icon"><use href="#i-bookmark"/></svg>';
   if (t) btnFav.onclick = () => {
     _toggleMeetingFav(t.id);
     const ahora = _isMeetingFav(t.id);
@@ -4289,12 +4332,31 @@ function viewArchiveTrash(which) {
       return;
     }
     items.forEach(x => {
-      const type = x.kind === 'initiative' ? 'PROYECTO' : 'REUNIÓN';
-      const sub = x.kind === 'initiative' ? ((x.meeting_count || 0) + ' reuniones') : ('en ' + (x.initiative || '—'));
-      const c = el('div', 'row-card'); c.style.cursor = 'default';
-      c.innerHTML = `<span style="flex:none;font-size:10px;font-weight:700;letter-spacing:.4px;color:var(--text-secondary);border:1px solid var(--border-strong);border-radius:5px;padding:3px 7px">${type}</span>
-        <div class="rc-body"><div class="rc-title">${esc(x.title)}</div><div class="rc-meta">${esc(sub)}${x.date ? ' · ' + esc(x.date) : ''}</div></div>
-        <div style="display:flex;gap:7px"><button class="btn" data-restore>Restaurar</button><button class="btn btn-danger" data-del>Eliminar</button></div>`;
+      /* El tipo pasa de rótulo a icono: «PROYECTO» escrito en cada fila ocupaba
+         el sitio del nombre y, al repetirse idéntico, no distinguía ninguna.
+         Un proyecto es una carpeta y una reunión una grabación; con el icono se
+         sabe igual y queda espacio para lo que sí cambia. */
+      const esProyecto = x.kind === 'initiative';
+      const n = x.meeting_count || 0;
+      const sub = esProyecto
+        ? (n === 1 ? '1 reunión' : n + ' reuniones')
+        : ('en ' + (x.initiative || '—'));
+      const c = el('div', 'trash-row');
+      c.innerHTML =
+        `<span class="trash-ico" title="${esProyecto ? 'Proyecto' : 'Reunión'}">` +
+          `<svg class="icon"><use href="#i-${esProyecto ? 'folder' : 'monitor'}"/></svg></span>` +
+        `<div class="trash-body"><div class="trash-title">${esc(x.title)}</div>` +
+          `<div class="trash-meta">${esc(sub)}${x.date ? ' · ' + esc(x.date) : ''}</div></div>` +
+        `<div class="trash-acts">` +
+          `<button class="btn-pill-secondary" data-restore>Restaurar</button>` +
+          /* Eliminar deja de ser un botón rojo macizo. Repetido en cada fila era
+             lo más llamativo de la pantalla, y es la única acción irreversible
+             que hay aquí: llamar la atención sobre ella es justo lo contrario de
+             lo que conviene. Ahora es un icono que solo se tiñe al apuntarlo. */
+          `<button class="trash-del" data-del title="Eliminar permanentemente" ` +
+            `aria-label="Eliminar permanentemente ${esc(x.title)}">` +
+            `<svg class="icon"><use href="#i-trash"/></svg></button>` +
+        `</div>`;
       c.querySelector('[data-restore]').onclick = async () => {
         const r = await api.restoreItem(x.kind, x.id);
         if (r && r.ok === false) { toast('err', errMsg(r.error, 'No se pudo restaurar')); return; }
@@ -5019,7 +5081,19 @@ function _renderInitRow(tree, it) {
   menuBtn.innerHTML = '<svg class="icon icon-sm"><use href="#i-more"/></svg>';
   menuBtn.onclick = (e) => { e.stopPropagation(); openInitiativeMenu(e, it.id); };
 
-  row.append(nav, menuBtn);
+  /* Cuántas reuniones tiene la carpeta, y los "···" en su MISMO hueco: en reposo
+     se ve el número, al señalar la fila se cambia por el menú. Los dos en la
+     misma celda de un grid para que la fila no se ensanche al pasar el ratón —
+     si no, recorrer la lista empujaría el nombre de cada carpeta una tras otra.
+     Mismo patrón que la hora y los "···" de una fila de reunión. */
+  const n = ((STATE.meetingsByInit || {})[it.id] || []).length;
+  const fin = el('span', 'proj-row-end');
+  const cuenta = el('span', 'proj-row-count');
+  cuenta.textContent = n || '';
+  cuenta.title = n === 1 ? '1 reunión' : n + ' reuniones';
+  fin.append(cuenta, menuBtn);
+
+  row.append(nav, fin);
   // Clic derecho en cualquier punto de la fila: mismo menú.
   row.oncontextmenu = (e) => { e.preventDefault(); openInitiativeMenu(e, it.id); };
   tree.appendChild(row);
@@ -5054,7 +5128,7 @@ function renderSidebar() {
 
   // Contadores de los accesos directos (vacíos cuando son cero).
   const favEl = $('#favCount');
-  if (favEl) { const n = _getMeetingFavs().size; favEl.textContent = n || ''; }
+  if (favEl) { const n = _contarFavsVivos(); favEl.textContent = n || ''; }
 
   const all = STATE.initiatives || [];
   // Anclados arriba, el resto después. Sin cabeceras de sección: el mockup
@@ -5179,7 +5253,11 @@ function applySidebar() {
      Clave de almacenamiento nueva (hm.sidebar-w2) para IGNORAR los anchos
      guardados con el diseno viejo, que seguian pisando los 190px. */
   const SIDEBAR_MIN = 168, SIDEBAR_MAX = 280, SNAP_THRESHOLD = 130;
-  const saved = parseInt(load('hm.sidebar-w2', ''), 10);
+  /* Clave -w3: el ancho por defecto subió de 190 a 210 para que quepan los
+     nombres largos de carpeta, y un valor guardado con el default viejo seguiría
+     pisándolo. Subir la clave es la forma de que el nuevo default llegue a quien
+     ya tenía uno guardado; el que quiera otro ancho vuelve a arrastrar una vez. */
+  const saved = parseInt(load('hm.sidebar-w3', ''), 10);
   if (saved && saved >= SIDEBAR_MIN && saved <= SIDEBAR_MAX) {
     document.documentElement.style.setProperty('--sidebar-w', saved + 'px');
   }
@@ -5257,7 +5335,7 @@ function applySidebar() {
     if (!dragging) return;
     const finalW = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--sidebar-w'), 10);
     stopDrag();
-    save('hm.sidebar-w2', String(finalW));
+    save('hm.sidebar-w3', String(finalW));
   });
 })();
 
@@ -5652,16 +5730,28 @@ function pickInitiativeColor(iid) {
   const it = STATE.initiatives.find(x => x.id === iid);
   const current = _initColor(it);
   const m = el('div', 'modal-card color-picker-modal');
+  /* El título dice de QUÉ proyecto es el color. Abriendo el menú de una fila y
+     el diálogo encima, «Color del proyecto» a secas no confirma cuál. */
   m.innerHTML = `
-    <div class="modal-head"><span class="modal-title">Color del proyecto</span><button class="icon-btn" data-x>✕</button></div>
+    <div class="modal-head">
+      <span class="modal-title">Color de «${esc(it ? it.name : 'el proyecto')}»</span>
+      <button class="icon-btn sm" data-x aria-label="Cerrar"><svg class="icon icon-sm"><use href="#i-close"/></svg></button>
+    </div>
     <div class="modal-body">
-      <div class="color-swatches" id="colorSwatches"></div>
+      <div class="color-swatches" id="colorSwatches" role="radiogroup" aria-label="Color del proyecto"></div>
     </div>`;
   const swatches = m.querySelector('#colorSwatches');
   INIT_COLORS.forEach(c => {
     const s = el('button', 'color-sw' + (c === current ? ' on' : ''));
+    s.type = 'button';
     s.style.setProperty('--sw', c);
-    s.title = c;
+    /* Un check DENTRO de la muestra, además del aro. El aro solo dice «esta
+       está señalada»; el check dice «esta es la que está puesta», y sobre los
+       colores claros de la paleta el aro se distinguía poco del borde. */
+    s.innerHTML = '<svg class="sw-check" viewBox="0 0 20 20" aria-hidden="true"><path d="M6.2 10.4l2.5 2.5 5.1-5.6"/></svg>';
+    s.setAttribute('role', 'radio');
+    s.setAttribute('aria-checked', c === current ? 'true' : 'false');
+    s.title = c === current ? 'Color actual' : 'Usar este color';
     s.onclick = async () => {
       await api.setInitiativeColor(iid, c);
       if (it) it.color = c;
@@ -5678,6 +5768,28 @@ function _getMeetingFavs() { try { return new Set(JSON.parse(localStorage.getIte
 function _setMeetingFavs(s) { localStorage.setItem('hm.favMeetings', JSON.stringify([...s])); }
 function _toggleMeetingFav(mid) { const s = _getMeetingFavs(); s.has(mid) ? s.delete(mid) : s.add(mid); _setMeetingFavs(s); return s.has(mid); }
 function _isMeetingFav(mid) { return _getMeetingFavs().has(mid); }
+
+/* Cuántos favoritos quedan VIVOS, para el contador del panel.
+   El badge contaba `_getMeetingFavs().size`, o sea los ids guardados en
+   localStorage — y ahí se queda el id de una reunión aunque se borre. Por eso
+   el panel decía 5 y la pantalla, que recorre las reuniones de verdad, 4.
+   Solo se puede afinar cuando TODAS las reuniones están cargadas; si falta
+   alguna iniciativa por cargar, se devuelve el total guardado, porque contar de
+   menos es peor que contar de más: el usuario buscaría una favorita que sí está.
+   Cuando la lista está completa se aprovecha para purgar los huérfanos — sin
+   eso el número nunca se corrige y el almacenamiento crece con cada borrado. */
+function _contarFavsVivos() {
+  const favs = _getMeetingFavs();
+  if (!favs.size) return 0;
+  const its = STATE.initiatives || [];
+  if (!its.length || !its.every(it => STATE.meetingsByInit[it.id])) return favs.size;
+  const vivos = new Set();
+  its.forEach(it => (STATE.meetingsByInit[it.id] || []).forEach(m => {
+    if (favs.has(m.id)) vivos.add(m.id);
+  }));
+  if (vivos.size !== favs.size) _setMeetingFavs(vivos);
+  return vivos.size;
+}
 
 async function _ensureAllMeetingsLoaded() {
   const pending = (STATE.initiatives || []).filter(it => !STATE.meetingsByInit[it.id]);
@@ -7373,6 +7485,12 @@ function viewSettings() {
           <input type="checkbox" id="svDefaultMute" ${s.default_mic_muted ? 'checked' : ''}>
           <span class="toggle-ui" aria-hidden="true"><i></i></span>
         </label>
+        <label class="toggle-row" for="svMiniInd">
+          <span class="sv-lbl">Indicador flotante al minimizar
+            <small class="sv-sub">Una pastilla sobre el escritorio mientras se transcribe con la ventana minimizada.</small></span>
+          <input type="checkbox" id="svMiniInd">
+          <span class="toggle-ui" aria-hidden="true"><i></i></span>
+        </label>
       </div>
 
       <div class="sv-col">
@@ -7488,6 +7606,19 @@ function viewSettings() {
     }
     if (hasTx) { renderChips(); renderVideoChips(); }
 
+    /* El valor vive en settings.py, no en el paquete de ajustes de
+       transcripción, así que se pide aparte al abrir la pantalla. */
+    const miniChk = inner.querySelector('#svMiniInd');
+    if (miniChk) {
+      api.getMiniIndicator().then(r => { miniChk.checked = !(r && r.enabled === false); }).catch(() => {});
+      miniChk.onchange = async (e) => {
+        await api.setMiniIndicator(e.target.checked);
+        toast('ok', e.target.checked
+          ? 'El indicador aparecerá al minimizar durante una grabación'
+          : 'Indicador flotante desactivado');
+      };
+    }
+
     inner.querySelector('#svDefaultMute').onchange = async (e) => {
       STATE.micMuted = e.target.checked; _guardarMicMuted(STATE.micMuted); updateMicChip();
       await api.v2.setTranscriptionSettings({ default_mic_muted: e.target.checked });
@@ -7587,19 +7718,23 @@ function viewSettings() {
           api.getPlanFeatures().then(pf => {
             window._planFeatures = pf;
             if (!featEl || !pf) return;
+            /* «Participantes» sale de esta lista por decisión del dueño. El
+               gate de la función sigue donde estaba (hasFeature) — esto es solo
+               el listado informativo del plan. */
             const features = [
               { key: 'video_unlimited', label: 'Video ilimitado', ok: pf.video_unlimited, locked: !pf.video_unlimited ? `Limitado a ${pf.video_hours}h (${pf.video_hours_used?.toFixed(1) || 0}h usadas)` : '' },
               { key: 'zip_export', label: 'Exportar ZIP', ok: pf.zip_export },
-              { key: 'participants', label: 'Participantes', ok: pf.participants },
               { key: 'glossary', label: 'Glosario', ok: pf.glossary },
               { key: 'recovery', label: 'Recuperar grabaciones', ok: pf.recovery },
             ];
+            /* Los emojis ✅/🔒 se cambian por iconos del sistema: en Windows los
+               pinta la fuente de emoji en color, y eran las dos únicas cosas de
+               colores de toda la pantalla de ajustes. */
             featEl.innerHTML = features.map(f => {
-              const icon = f.ok ? '✅' : '🔒';
-              const cls = f.ok ? '' : 'feature-locked';
-              const msg = f.locked || `Disponible en Helpmeet Pro`;
-              return `<div class="sv-row ${cls}" data-upgrade-msg="${msg}" style="font-size:12px;padding:2px 0;color:var(--text-secondary)">
-                <span>${icon} ${f.label}</span>
+              const msg = f.locked || 'Disponible en Helpmeet Pro';
+              return `<div class="feat-row${f.ok ? '' : ' feature-locked'}" data-upgrade-msg="${esc(msg)}">
+                <svg class="feat-ico"><use href="#i-${f.ok ? 'check' : 'lock'}"/></svg>
+                <span class="feat-lbl">${esc(f.label)}</span>
                 ${!f.ok && pf.plan === 'personal' ? '<span class="pro-badge">PRO</span>' : ''}
               </div>`;
             }).join('');
@@ -7799,14 +7934,17 @@ function wireTopbar() {
       foldBtn.setAttribute('aria-expanded', plegado ? 'false' : 'true');
     };
   }
-  // El texto "Mis notas" abre la misma vista agregada que la fila de abajo.
+  /* El rótulo lleva a la gestión de espacios, no a la vista agregada: la fila
+     de abajo, «Todas mis notas», ya abre esa vista, así que el texto de arriba
+     hacía exactamente lo mismo que su primer hijo. Ahora cada uno tiene su
+     destino — el grupo se gestiona desde el título, el contenido se ve desde la
+     fila. La flecha «→» sigue llevando al mismo sitio, que es su función. */
   $('#btnMyNotes')?.addEventListener('click', () => {
-    STATE.screen = 'allnotes'; STATE.selInit = null; STATE.selMeeting = null;
+    STATE.screen = 'initiatives-list'; STATE.selInit = null; STATE.selMeeting = null;
     renderSidebar(); renderMain(); renderTopStatus();
   });
-  $('#btnManageSpaces')?.addEventListener('click', () => {
-    STATE.screen = 'initiatives-list'; renderMain(); renderTopStatus();
-  });
+  /* El listener de #btnManageSpaces se retiró con su botón: la flecha «→» y el
+     rótulo «Espacios» llevaban al mismo sitio. */
 
   // Sincronizar con las carpetas del disco: era el botón ↻ de la cabecera
   // "Proyectos", que el mockup eliminó. La acción sigue disponible desde el
@@ -8655,7 +8793,7 @@ function refrescarSeleccion() {
   });
 
   // Marcar todas como favoritas: es local (localStorage), instantáneo.
-  accion('i-star', 'Favoritas', () => {
+  accion('i-bookmark', 'Favoritas', () => {
     const s = _getMeetingFavs();
     const todasYa = ids.every(id => s.has(id));
     ids.forEach(id => todasYa ? s.delete(id) : s.add(id));
