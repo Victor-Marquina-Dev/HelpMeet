@@ -6,29 +6,60 @@
   <title>Helpmeet</title>
   <link rel="icon" type="image/png" href="assets/helpmeet-favicon.png?v=20260731b" id="faviconPng">
   <link rel="alternate icon" type="image/x-icon" href="assets/helpmeet.ico?v=20260731b" id="faviconIco">
-  <link rel="stylesheet" href="css/tokens.css?v=20260802tokens">
-  <link rel="stylesheet" href="css/layout.css?v=20260802tokens">
-  <link rel="stylesheet" href="css/components.css?v=20260802tokens">
-  <link rel="stylesheet" href="style.css?v=20260802tokens">
-  <link rel="stylesheet" href="css/shell.css?v=20260802tokens">
-  <link rel="stylesheet" href="css/content.css?v=20260802tokens">
-  <link rel="stylesheet" href="css/meeting.css?v=20260802tokens">
-  <link rel="stylesheet" href="css/calendar.css?v=20260802tokens">
-  <link rel="stylesheet" href="css/recording.css?v=20260802tokens">
-  <link rel="stylesheet" href="css/settings.css?v=20260802tokens">
+  <link rel="stylesheet" href="css/tokens.css?v=20260802mini">
+  <link rel="stylesheet" href="css/layout.css?v=20260802mini">
+  <link rel="stylesheet" href="css/components.css?v=20260802mini">
+  <link rel="stylesheet" href="style.css?v=20260802mini">
+  <link rel="stylesheet" href="css/shell.css?v=20260802mini">
+  <link rel="stylesheet" href="css/content.css?v=20260802mini">
+  <link rel="stylesheet" href="css/meeting.css?v=20260802mini">
+  <link rel="stylesheet" href="css/calendar.css?v=20260802mini">
+  <link rel="stylesheet" href="css/recording.css?v=20260802mini">
+  <link rel="stylesheet" href="css/settings.css?v=20260802mini">
   <script src="js/i18n.js?v=20260725b"></script>
 </head>
 <body data-app-state="idle" data-screen="welcome">
 
 <svg width="0" height="0" style="position:absolute" aria-hidden="true">
   <defs>
-    <symbol id="i-home" viewBox="0 0 20 20"><path d="M3 9.5 10 3l7 6.5M5 8.5V17h10V8.5"/></symbol>
+    <!-- Casa cerrada y menos pesada arriba: el tejado ocupaba TODO el ancho (3 a 17)
+         y aplastaba al cuerpo, que solo medía 10.
+         Caja de 14 x 14,6 centrada en (10,10), la misma que el resto. -->
+    <symbol id="i-home" viewBox="0 0 20 20"><path d="M3.6 9.4 10 3.6l6.4 5.8M5.6 8.2v7.2a1 1 0 0 0 1 1h6.8a1 1 0 0 0 1-1V8.2"/></symbol>
     <symbol id="i-trash" viewBox="0 0 20 20"><path d="M4 6h12M8 6V4.5A1.5 1.5 0 0 1 9.5 3h1A1.5 1.5 0 0 1 12 4.5V6M6 6l.6 10a1.5 1.5 0 0 0 1.5 1.4h3.8a1.5 1.5 0 0 0 1.5-1.4L14 6"/></symbol>
-    <symbol id="i-settings" viewBox="0 0 20 20"><path d="M10 2.3 16.2 6v8L10 17.7 3.8 14V6z"/><circle cx="10" cy="10" r="2.7"/></symbol>
+    <!-- Deslizadores. El hexágono con un círculo dentro se leía como un TORNILLO,
+         no como ajustes, y a 16px era una mancha oscura.
+         Caja de 14 x 14,6 centrada en (10,10), la misma que el resto. -->
+    <symbol id="i-settings" viewBox="0 0 20 20"><path d="M3.4 7.2h13.2M3.4 12.8h13.2M7.6 4.9v4.6M12.4 10.5v4.6"/></symbol>
     <symbol id="i-search" viewBox="0 0 20 20"><circle cx="9" cy="9" r="5.5"/><path d="M17 17l-3.8-3.8"/></symbol>
-    <symbol id="i-panel" viewBox="0 0 20 20"><rect x="3" y="4" width="14" height="12" rx="2"/><path d="M8 4v12"/></symbol>
+    <!-- Forma tomada de itshover.com (r/layout-sidebar-right-icon.json): marco
+         CUADRADO con las esquinas bien redondeadas, en vez del 14x12 apaisado de
+         antes. El divisor va a la IZQUIERDA y no a la derecha como el original,
+         porque el panel de Helpmeet esta a la izquierda y el icono describe la
+         ventana real. Se conserva como <symbol> para los usos sin animacion; el
+         boton de la barra de titulo lo lleva en linea para poder mover el
+         divisor por separado. -->
+    <symbol id="i-panel" viewBox="0 0 20 20"><rect x="3" y="3" width="14" height="14" rx="2.6"/><path d="M7.4 3v14"/></symbol>
     <symbol id="i-chevleft" viewBox="0 0 20 20"><path d="M12 4.5 6.5 10l5.5 5.5"/></symbol>
-    <symbol id="i-star" viewBox="0 0 20 20"><path d="M10 3.3l2 4 4.4.6-3.2 3 .8 4.4L10 13.2l-4 2.1.8-4.4-3.2-3 4.4-.6 2-4z"/></symbol>
+    <!-- Estrella generada geometricamente (radio exterior 7,1 / interior 3,05,
+         vertices suavizados con cuadraticas). La anterior estaba dibujada a mano
+         y se le notaba: la punta de arriba salia mas larga que las otras cuatro
+         y el conjunto quedaba descentrado en su propio viewBox. Las puntas se
+         redondean menos que los valles o se pierde el pico. -->
+    <symbol id="i-star" viewBox="0 0 20 20"><path d="M10.21 3.45L11.36 6.43Q11.79 7.53 12.98 7.60L16.16 7.77Q16.75 7.81 16.30 8.18L13.82 10.19Q12.90 10.94 13.20 12.09L14.02 15.17Q14.17 15.74 13.68 15.42L11.00 13.69Q10.00 13.05 9.00 13.69L6.32 15.42Q5.83 15.74 5.98 15.17L6.80 12.09Q7.10 10.94 6.18 10.19L3.70 8.18Q3.25 7.81 3.84 7.77L7.02 7.60Q8.21 7.53 8.64 6.43L9.79 3.45Q10.00 2.90 10.21 3.45Z"/></symbol>
+    <!-- Marcador, inspirado en el de itshover.com (r/bookmark-icon.json).
+         Alli es un componente React con Motion; aqui no hay React, asi que se
+         trae la forma y la animacion se rehace en CSS (ver .row-fav-btn en
+         css/content.css).
+         Redibujado con parametros y no copiado: el original tiene las esquinas
+         de arriba apenas insinuadas (radio 6% del ancho) y aqui se pidieron
+         claramente redondeadas. Geometria: caja 12,1 x 14,6 centrada en 10,10 —
+         el alto util del resto de iconos—, radio superior 15% del ancho y muesca
+         del 32% del alto. En viewBox 20 y no en el 48 del original, para que
+         herede el `stroke-width: 1.6` del sistema; en 48 se habria visto 2,4
+         veces mas fino que sus vecinos. Las puntas de abajo las redondea el
+         `stroke-linejoin: round` global. -->
+    <symbol id="i-bookmark" viewBox="0 0 20 20"><path d="M10.00 12.63L16.05 17.30V4.52A1.81 1.81 0 0 0 14.24 2.70H5.77A1.81 1.81 0 0 0 3.95 4.52V17.30Z"/></symbol>
     <symbol id="i-monitor" viewBox="0 0 20 20"><rect x="2.6" y="4" width="14.8" height="9.6" rx="1.6"/><path d="M7.4 16.6h5.2M10 13.6v3"/></symbol>
     <symbol id="i-mic" viewBox="0 0 20 20"><rect x="7.5" y="3" width="5" height="9" rx="2.5"/><path d="M5 10a5 5 0 0 0 10 0M10 15v2.5M7.5 17.5h5"/></symbol>
     <symbol id="i-mic-off" viewBox="0 0 20 20"><rect x="7.5" y="3" width="5" height="9" rx="2.5"/><path d="M5 10a5 5 0 0 0 10 0M10 15v2.5M7.5 17.5h5"/><path d="M3.5 3.5l13 13"/></symbol>
@@ -40,15 +71,26 @@
     <symbol id="i-image" viewBox="0 0 20 20"><rect x="3" y="4.5" width="14" height="11" rx="2"/><circle cx="7.3" cy="8.5" r="1.2"/><path d="M4 14l4-3.5 3 2.5 2-2L17 14"/></symbol>
     <symbol id="i-pin" viewBox="0 0 20 20"><path d="M10 3l3 3-3.2 3.2L9 13l-2-2 3.8-3.8L8 4.2 10 3z"/><path d="M8.6 11.4 4 16"/></symbol>
     <symbol id="i-download" viewBox="0 0 20 20"><path d="M10 3v9M6.5 9 10 12.5 13.5 9M4 15h12"/></symbol>
-    <symbol id="i-copy" viewBox="0 0 20 20"><rect x="7" y="7" width="9" height="9" rx="1.6"/><path d="M13 7V5.5A1.5 1.5 0 0 0 11.5 4H5.5A1.5 1.5 0 0 0 4 5.5v6A1.5 1.5 0 0 0 5.5 13H7"/></symbol>
+    <!-- Copiar, de itshover.com (r/copy-icon.json). Reescrito de viewBox 24 a 20
+         (escala 0,811, la que deja el alto util en los 14,6 del resto) para que
+         herede el stroke del sistema. La hoja de atras deja de ser una "L" y
+         pasa a ser un rectangulo con las esquinas redondeadas, igual que la de
+         delante: las dos se leen ahora como el mismo objeto duplicado. -->
+    <symbol id="i-copy" viewBox="0 0 20 20"><path d="M3.52 13.84a1.63 1.63 0 0 1-.82-1.41v-8.11c0-.89.73-1.62 1.62-1.62h8.11c.61 0 .94.31 1.22.81"/><path d="M5.94 5.94m0 2.16a2.16 2.16 0 0 1 2.16-2.16h7.03a2.16 2.16 0 0 1 2.16 2.16v7.03a2.16 2.16 0 0 1-2.16 2.16h-7.03a2.16 2.16 0 0 1-2.16-2.16z"/></symbol>
     <symbol id="i-check-square" viewBox="0 0 20 20"><rect x="3.5" y="3.5" width="13" height="13" rx="2.5"/><path d="M6.8 10.3l2.1 2.1 4.3-4.7"/></symbol>
     <symbol id="i-check" viewBox="0 0 20 20"><path d="M6.8 10.3l2.1 2.1 4.3-4.7"/></symbol>
     <symbol id="i-activity" viewBox="0 0 20 20"><path d="M3 10h3l1.5-5L11 15l1.5-5H17"/></symbol>
     <symbol id="i-help" viewBox="0 0 20 20"><circle cx="10" cy="10" r="7"/><path d="M7.8 8a2.2 2.2 0 1 1 3.1 2c-.8.5-1 .9-1 1.7"/><circle cx="10" cy="14" r=".2"/></symbol>
     <symbol id="i-sun" viewBox="0 0 20 20"><circle cx="10" cy="10" r="3.2"/><path d="M10 2.5v2M10 15.5v2M2.5 10h2M15.5 10h2M4.6 4.6l1.4 1.4M14 14l1.4 1.4M15.4 4.6 14 6M6 14l-1.4 1.4"/></symbol>
-    <symbol id="i-moon" viewBox="0 0 20 20"><path d="M15.5 12.4A6.5 6.5 0 1 1 7.6 4.5a5.2 5.2 0 0 0 7.9 7.9z"/></symbol>
+    <!-- Luna, de itshover.com (r/moon-icon.json), reescrita de viewBox 24 a 20.
+         La anterior era un creciente fino; esta tiene mas cuerpo y se lee mejor
+         a 16px. La animacion (gira -15 grados y crece) esta en css/shell.css. -->
+    <symbol id="i-moon" viewBox="0 0 20 20"><path d="M10 2.7c.11 0 .21 0 .32 0a6.08 6.08 0 0 0 6.42 10.1a7.3 7.3 0 1 1-6.74-10.1z"/></symbol>
     <symbol id="i-plus" viewBox="0 0 20 20"><path d="M10 4v12M4 10h12"/></symbol>
-    <symbol id="i-doc" viewBox="0 0 20 20"><path d="M6 3h5l3 3v11H6z"/><path d="M11 3v3h3"/><path d="M8 11h4M8 13.5h4"/></symbol>
+    <!-- Medía 8 de ancho contra los 14 de sus vecinos y se veía enclenque en la fila.
+         Ahora 10,6 y con la esquina doblada de verdad, no una escuadra suelta.
+         Caja de 14 x 14,6 centrada en (10,10), la misma que el resto. -->
+    <symbol id="i-doc" viewBox="0 0 20 20"><path d="M5.3 3.4h6.1l3.3 3.3v9.9a1 1 0 0 1-1 1H5.3a1 1 0 0 1-1-1V4.4a1 1 0 0 1 1-1z"/><path d="M11.4 3.4v2.3a1 1 0 0 0 1 1h2.3M7 11h6M7 13.6h6"/></symbol>
     <!-- El .md se distingue del original por la "M" en la hoja: en la carpeta del
          documento conviven los dos archivos y el nombre solo cambia en 2 letras. -->
     <symbol id="i-md" viewBox="0 0 20 20"><path d="M6 3h5l3 3v11H6z"/><path d="M11 3v3h3"/><path d="M8 13.6v-3.2l1.2 1.6 1.2-1.6v3.2"/></symbol>
@@ -69,7 +111,10 @@
     <symbol id="i-clock" viewBox="0 0 20 20"><circle cx="10" cy="10" r="6.8"/><path d="M10 6.3V10l2.6 1.6"/></symbol>
     <symbol id="i-crop" viewBox="0 0 20 20"><path d="M5.6 2.6v11.8h11.8"/><path d="M2.6 5.6h11.8v11.8"/></symbol>
     <symbol id="i-notebook" viewBox="0 0 20 20"><path d="M6.2 3.2h8.2a1.4 1.4 0 0 1 1.4 1.4v10.8a1.4 1.4 0 0 1-1.4 1.4H6.2"/><path d="M6.2 3.2A1.6 1.6 0 0 0 4.6 4.8v10.4a1.6 1.6 0 0 0 1.6 1.6"/><path d="M8.4 7.4h4.6M8.4 10.4h4.6"/></symbol>
-    <symbol id="i-mynotes" viewBox="0 0 20 20"><path d="M15.6 8.4V5.1a1.5 1.5 0 0 0-1.5-1.5H5.9A1.5 1.5 0 0 0 4.4 5.1v9.8a1.5 1.5 0 0 0 1.5 1.5h3.2"/><circle cx="14.2" cy="12.4" r="1.9"/><path d="M11.3 17.1a3 3 0 0 1 5.8 0"/><path d="M7.2 7.1h5.6M7.2 10.1h3"/></symbol>
+    <!-- Cuaderno con lomo y renglones. El anterior metía una persona diminuta dentro
+         de 16px: a ese tamaño no era una persona, era ruido.
+         Caja de 14 x 14,6 centrada en (10,10), la misma que el resto. -->
+    <symbol id="i-mynotes" viewBox="0 0 20 20"><path d="M6.4 3.4h8.2a1.2 1.2 0 0 1 1.2 1.2v10.8a1.2 1.2 0 0 1-1.2 1.2H6.4M6.4 3.4A1.4 1.4 0 0 0 5 4.8v10.4a1.4 1.4 0 0 0 1.4 1.4M8.6 7.4h4.8M8.6 10h4.8M8.6 12.6h3"/></symbol>
     <symbol id="i-chevup" viewBox="0 0 20 20"><path d="m5.5 12.2 4.5-4.4 4.5 4.4"/></symbol>
     <symbol id="i-chevright" viewBox="0 0 20 20"><path d="M8 4.5 13.5 10 8 15.5"/></symbol>
     <symbol id="i-users" viewBox="0 0 20 20"><circle cx="7.6" cy="7.2" r="2.7"/><path d="M3 16.4c0-2.5 2.1-4.2 4.6-4.2s4.6 1.7 4.6 4.2"/><path d="M13.4 5.1a2.6 2.6 0 0 1 0 4.9"/><path d="M14.6 12.5c1.5.5 2.6 1.8 2.6 3.6"/></symbol>
@@ -109,7 +154,12 @@
     <button class="icon-btn sidebar-collapse-btn no-drag" id="btnMenu" type="button"
             data-i18n-attr="title:topbar.menu,aria-label:topbar.menu"
             title="Mostrar u ocultar el panel" aria-label="Colapsar barra lateral">
-      <svg class="icon"><use href="#i-panel"/></svg>
+      <!-- En linea y no con <use>: la animacion mueve el divisor por separado y
+           a traves del shadow DOM de <use> no se puede seleccionar una parte. -->
+      <svg class="icon i-panel-anim" viewBox="0 0 20 20">
+        <rect class="pn-marco" x="3" y="3" width="14" height="14" rx="2.6"/>
+        <path class="pn-divisor" d="M7.4 3v14"/>
+      </svg>
     </button>
 
     <div class="topbar-status" id="topbarStatus" aria-live="polite"></div>
@@ -141,7 +191,7 @@
           <svg class="icon"><use href="#i-home"/></svg><span class="label-text" data-i18n="sidebar.home">Inicio</span>
         </button>
         <button class="navitem" id="navFavorites" data-nav="favoritos" type="button" data-i18n-attr="title:sidebar.favorites" title="Favoritos">
-          <svg class="icon"><use href="#i-star"/></svg><span class="label-text" data-i18n="sidebar.favorites">Favoritos</span><span class="nav-count" id="favCount"></span>
+          <svg class="icon"><use href="#i-bookmark"/></svg><span class="label-text" data-i18n="sidebar.favorites">Favoritos</span><span class="nav-count" id="favCount"></span>
         </button>
         <button class="navitem" id="navMeetings" data-nav="calendario" type="button" data-i18n-attr="title:sidebar.calendar" title="Calendario">
           <svg class="icon"><use href="#i-calendar"/></svg><span class="label-text" data-i18n="sidebar.calendar">Calendario</span>
@@ -156,18 +206,26 @@
            flecha a la tabla de gestion. -->
       <div class="projlist" id="navInitiatives">
         <div class="projitem space-root">
+          <!-- Dos iconos superpuestos: el cuaderno en reposo y un chevron al pasar
+               el ratón. El chevron apunta a lo que va a PASAR al pulsar —arriba
+               si la lista está abierta, abajo si está plegada—, así que el botón
+               anuncia su acción en vez de limitarse a nombrar la sección.
+               El chevron es uno solo y se gira con CSS: dos iconos distintos
+               obligarían a mantener dos geometrías en el sprite. -->
           <button class="space-fold-btn" id="btnFoldProjects" type="button" aria-expanded="true" aria-label="Plegar o desplegar proyectos">
-            <svg class="icon"><use href="#i-mynotes"/></svg>
+            <svg class="icon sf-ico"><use href="#i-mynotes"/></svg>
+            <svg class="icon sf-chev"><use href="#i-chevup"/></svg>
           </button>
-          <button class="space-toggle-btn" id="btnMyNotes" data-nav="misnotas" type="button" title="Ver las reuniones de todos los proyectos">
-            <span class="label-text">Mis notas</span>
+          <button class="space-toggle-btn" id="btnMyNotes" data-nav="gestionar-espacios" type="button" title="Gestionar espacios">
+            <span class="label-text">Espacios</span>
           </button>
           <button class="icon-btn space-add-btn" id="btnNewInitiative" type="button" data-i18n-attr="title:sidebar.newProjectTitle" title="Nuevo proyecto (Ctrl+N)" aria-label="Nuevo proyecto">
             <svg class="icon"><use href="#i-plus"/></svg>
           </button>
-          <button class="icon-btn space-manage-btn" id="btnManageSpaces" data-nav="gestionar-espacios" type="button" title="Gestionar espacios" aria-label="Gestionar espacios">
-            <svg class="icon icon-sm"><use href="#i-arrow-right"/></svg>
-          </button>
+          <!-- La flecha «→» se retiró: llevaba a la gestión de espacios, que es
+               justo lo que hace ahora el rótulo «Espacios» de al lado. Dos
+               controles pegados para el mismo destino. -->
+
         </div>
         <!-- El plegado va en .projlist-fold y el contenido en .projlist-nested:
              son dos elementos porque la animación usa grid-template-rows 0fr→1fr,
@@ -220,7 +278,7 @@
   <div class="license-gate" id="licenseGate" hidden>
     <div class="license-card">
       <div class="license-brand">
-        <img src="assets/helpmeet-symbol.svg?v=20260802v2" alt="" class="license-symbol">
+        <img src="assets/helpmeet-symbol.svg?v=20260802mini" alt="" class="license-symbol">
         <span class="license-brand-name">Helpmeet</span>
       </div>
       <h2 class="license-title">Activa tu licencia</h2>
@@ -257,6 +315,6 @@
   </dialog>
 
   <!-- Plantillas SVG de iconos. Inyectadas por app.js -->
-  <script src="app.js?v=20260802tokens"></script>
+  <script src="app.js?v=20260802mini"></script>
 </body>
 </html>
